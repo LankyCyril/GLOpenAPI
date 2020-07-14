@@ -1,7 +1,7 @@
-from genefab3.exceptions import GeneLabJSONException
+from genefab3.exceptions import GeneLabJSONException, GeneLabException
 from genefab3.utils import INDEX_BY, DEFAULT_NAME_DELIMITER
 from collections import defaultdict
-from pandas import concat, Series
+from pandas import Series, DataFrame, concat, merge
 from re import search, fullmatch, sub, IGNORECASE
 
 
@@ -20,26 +20,26 @@ def parse_assay_json_fields(json):
     return dict(fields), field2title
 
 
-def parse_metadata_json(self, json):
+def parse_metadata_json(metadata_object, json):
     """Convert assay JSON to metadata DataFrame"""
     try:
         raw = json["raw"]
     except KeyError:
         raise GeneLabJSONException("Malformed assay JSON: raw")
     # convert raw JSON to raw DataFrame:
-    unindexed_metadata = concat(map(Series, raw), axis=1).T
+    unindexed_dataframe = concat(map(Series, raw), axis=1).T
     # find field title to index metadata by:
-    matching_indexer_titles = self.match_field_titles(INDEX_BY)
+    matching_indexer_titles = metadata_object.match_field_titles(INDEX_BY)
     if len(matching_indexer_titles) == 0:
         raise IndexError("Nonexistent '{}'".format(INDEX_BY))
     elif len(matching_indexer_titles) > 1:
         raise IndexError("Ambiguous '{}'".format(INDEX_BY))
     else:
         matching_title = matching_indexer_titles.pop()
-        if matching_title == self.indexed_by:
-            matching_fields = {self.field_indexed_by}
+        if matching_title == metadata_object.indexed_by:
+            matching_fields = {metadata_object.field_indexed_by}
         else:
-            matching_fields = self.fields[matching_title]
+            matching_fields = metadata_object.fields[matching_title]
     if len(matching_fields) == 0:
         raise IndexError("Nonexistent '{}'".format(INDEX_BY))
     elif len(matching_fields) > 1:
@@ -47,16 +47,44 @@ def parse_metadata_json(self, json):
     else:
         field_indexed_by = list(matching_fields)[0]
     # make sure found field is unambiguous:
-    indexed_by = self.match_field_titles(INDEX_BY, method=fullmatch)
+    indexed_by = metadata_object.match_field_titles(INDEX_BY, method=fullmatch)
     if len(indexed_by) != 1:
         msg = "Nonexistent or ambiguous index_by value: '{}'".format(INDEX_BY)
         raise IndexError(msg)
     # reindex raw DataFrame:
-    raw_metadata = unindexed_metadata.set_index(field_indexed_by)
-    raw_metadata.index = raw_metadata.index.map(
+    raw_dataframe = unindexed_dataframe.set_index(field_indexed_by)
+    raw_dataframe.index = raw_dataframe.index.map(
         lambda f: sub(r'[._-]', DEFAULT_NAME_DELIMITER, f)
     )
-    return raw_metadata, indexed_by.pop(), field_indexed_by
+    return raw_dataframe, indexed_by.pop(), field_indexed_by
+
+
+def make_multiindex_metadata_dataframe(metadata_object):
+    """Convert raw dataframe into human-accessible dataframe"""
+    multicols = ["field", "internal_field"]
+    columns_dataframe = DataFrame(
+        data=metadata_object.raw_dataframe.columns, columns=["internal_field"]
+    )
+    fields_dataframe = DataFrame(
+        data=[[k, v] for k, vv in metadata_object.fields.items() for v in vv],
+        columns=multicols
+    )
+    multiindex_dataframe = (
+        merge(columns_dataframe, fields_dataframe, sort=False, how="outer")
+        .fillna("Unknown")
+    )
+    mdv = multiindex_dataframe["internal_field"].values
+    rmv = metadata_object.raw_dataframe.columns.values
+    if (mdv != rmv).any():
+        raise GeneLabException(
+            "Inconsistent internal and human-readable fields in assay metadata"
+        )
+    else:
+        multiindex_dataframe = multiindex_dataframe.sort_values(by="field")
+        internal_field_order = multiindex_dataframe["internal_field"]
+        as_frame = metadata_object.raw_dataframe[internal_field_order].copy()
+        as_frame.columns = multiindex_dataframe.set_index(multicols).index
+        return as_frame
 
 
 class AssayMetadata():
@@ -66,10 +94,11 @@ class AssayMetadata():
     def __init__(self, json):
         """Convert assay JSON to metadata object"""
         self.fields, self.field2title = parse_assay_json_fields(json)
-        self.raw_metadata, self.indexed_by, self.field_indexed_by = (
+        self.raw_dataframe, self.indexed_by, self.field_indexed_by = (
             parse_metadata_json(self, json)
         )
         del self.fields[self.indexed_by]
+        self.dataframe = make_multiindex_metadata_dataframe(self)
  
     def match_field_titles(self, pattern, flags=IGNORECASE, method=search):
         """Find fields matching pattern"""

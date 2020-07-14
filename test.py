@@ -4,5 +4,4 @@ from genefab3 import ColdStorageDataset
 glds = ColdStorageDataset("GLDS-42")
 for assay in glds.assays.values():
     break
-print(assay.metadata.raw_metadata)
-print(assay.name)
+print(assay.metadata.dataframe["Protocol REF"])
