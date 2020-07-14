@@ -5,6 +5,7 @@ from genefab3.exceptions import GeneLabException, GeneLabJSONException
 from genefab3.utils import API_ROOT, GENELAB_ROOT
 from genefab3.utils import date2stamp
 from pandas import DataFrame, concat
+from collections import defaultdict
 
 
 def parse_glds_json(accession):
@@ -66,7 +67,7 @@ def parse_filedates_json(_id):
 
 
 class ColdStorageDataset():
-    """GLDS metadata associated with an accession number"""
+    """Contains GLDS metadata associated with an accession number"""
  
     def __init__(self, accession):
         """Request JSON representation of ISA metadata and store fields"""
@@ -80,16 +81,18 @@ class ColdStorageDataset():
             self.organisms = info["organisms"]
         except KeyError:
             raise GeneLabJSONException("Invalid JSON, missing isa2json fields")
-        try:
-            self.assays = AssayDispatcher(dataset=self, json=info["assays"])
-        except KeyError:
-            raise GeneLabJSONException("Invalid JSON, missing 'assays' field")
         self.fileurls = parse_fileurls_json(accession)
         self.filedates = parse_filedates_json(self._id)
+        try:
+            self.assays = ColdStorageAssayDispatcher(
+                dataset=self, assays_json=info["assays"],
+            )
+        except KeyError:
+            raise GeneLabJSONException("Invalid JSON, missing 'assays' field")
  
     @property
     def summary(self):
-        """Return summary dataframe"""
+        """List factors, assay names and types"""
         assays_summary = self.assays.summary.copy()
         assays_summary["type"] = "assay"
         factors_dataframe = DataFrame(
@@ -102,6 +105,42 @@ class ColdStorageDataset():
         return concat([factors_dataframe, assays_summary], axis=0, sort=False)
 
 
-class AssayDispatcher(dict):
-    def __init__(self, **kwargs):
-        pass
+class ColdStorageAssayDispatcher(dict):
+    """Contains a dataset's assay objects, indexable by name or by attributes"""
+ 
+    def __init__(self, dataset, assays_json):
+        """Populate dictionary of assay_name -> Assay()"""
+        try:
+            for name, json in assays_json.items():
+                super().__setitem__(name, ColdStorageAssay(dataset, name, json))
+        except KeyError:
+            raise GeneLabJSONException("Malformed assay JSON")
+
+
+def parse_assay_json_fields(json):
+    """Parse fields and titles from assay json 'header'"""
+    try:
+        header = json["header"]
+        field2title = {entry["field"]: entry["title"] for entry in header}
+    except KeyError:
+        raise GeneLabJSONException("Malformed assay JSON: header")
+    if len(field2title) != len(header):
+        raise GeneLabJSONException("Conflicting IDs of data fields")
+    fields = defaultdict(set)
+    for field, title in field2title.items():
+        fields[title].add(field)
+    return dict(fields), field2title
+
+
+class ColdStorageAssay():
+    """Stores individual assay information and metadata in raw form"""
+ 
+    def __init__(self, dataset, name, json):
+        """Parse assay JSON reported by cold storage"""
+        if isinstance(dataset, ColdStorageDataset):
+            self.dataset = dataset
+        else:
+            self.dataset = ColdStorageDataset(dataset)
+        self.fileurls = self.dataset.fileurls
+        self.filedates = self.dataset.filedates
+        self.fields, self.field2title = parse_assay_json_fields(json)
