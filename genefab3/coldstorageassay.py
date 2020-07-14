@@ -179,3 +179,25 @@ class ColdStorageAssay():
         else:
             return untransposed_annotation.T
         # TODO: consider multiindex here, to mirror AssayMetadata
+ 
+    def get_factors(self, cls=None, continuous="infer"):
+        """Get subset of annotation that represents factors"""
+        annotation = self.get_annotation()
+        factor_fields = [
+            field for field in annotation.columns
+            if search(r'^factor value', field, flags=IGNORECASE)
+        ]
+        factors = annotation[factor_fields]
+        factors.index.name, factors.columns.name = (
+            self.metadata.indexed_by, "Factor"
+        )
+        if (cls == "*") or (cls is True):
+            if factors.shape[1] != 1:
+                raise KeyError("One of multiple factors needs to be specified")
+            else:
+                cls = str(factors.columns[0])
+            return to_cls(factors, target=cls, continuous=continuous)
+        elif cls is not None:
+            return to_cls(factors, target=cls, continuous=continuous)
+        else:
+            return factors
