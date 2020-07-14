@@ -3,6 +3,7 @@ from datetime import datetime
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
+INDEX_BY = "Sample Name"
 DEFAULT_NAME_DELIMITER = "-"
 
 

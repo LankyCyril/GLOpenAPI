@@ -2,4 +2,7 @@
 from genefab3 import ColdStorageDataset
 
 glds = ColdStorageDataset("GLDS-42")
-print(glds.filedates)
+for assay in glds.assays.values():
+    break
+print(assay.metadata.raw_metadata)
+print(assay.name)
