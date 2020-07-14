@@ -5,3 +5,5 @@ glds = ColdStorageDataset("GLDS-42")
 for assay in glds.assays.values():
     break
 print(assay.metadata.dataframe["Protocol REF"])
+print(assay.name)
+print(assay.get_annotation(cls="Factor Value: Spaceflight"))

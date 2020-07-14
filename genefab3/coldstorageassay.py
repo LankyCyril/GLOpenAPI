@@ -1,5 +1,6 @@
 from genefab3.exceptions import GeneLabJSONException, GeneLabException
 from genefab3.utils import INDEX_BY, DEFAULT_NAME_DELIMITER
+from genefab3.formats import to_cls
 from collections import defaultdict
 from pandas import Series, DataFrame, concat, merge
 from re import search, fullmatch, sub, IGNORECASE
@@ -125,3 +126,56 @@ class ColdStorageAssay():
         self.fileurls = self.dataset.fileurls
         self.filedates = self.dataset.filedates
         self.metadata = AssayMetadata(json)
+ 
+    @property
+    def sample_key(self):
+        """Look up sample key in dataset metadata"""
+        sample_keys = set(self.dataset.samples.keys())
+        if len(sample_keys) == 1:
+            return sample_keys.pop()
+        else:
+            sample_key = sub(r'^a', "s", self.name)
+            if sample_key not in self.dataset.samples:
+                raise GeneLabJSONException(
+                    "Could not find an unambiguous samples key"
+                )
+            else:
+                return sample_key
+ 
+    def get_annotation(self, variable_only=True, named_only=True, cls=None, continuous="infer"):
+        """Get annotation of samples: entries that are named only and differ, by default"""
+        try:
+            samples_field2title = {
+                entry["field"]: entry["title"]
+                for entry in self.dataset.samples[self.sample_key]["header"]
+            }
+            untransposed_annotation = concat([
+                Series(raw_sample_annotation) for raw_sample_annotation
+                in self.dataset.samples[self.sample_key]["raw"]
+            ], axis=1)
+        except KeyError:
+            raise GeneLabJSONException("Malformed samples JSON")
+        if named_only:
+            untransposed_annotation = untransposed_annotation.loc[[
+                field for field in untransposed_annotation.index
+                if field in samples_field2title
+            ]]
+        untransposed_annotation.index = untransposed_annotation.index.map(
+            lambda field: samples_field2title.get(field, field)
+        )
+        if variable_only:
+            variable_rows = untransposed_annotation.apply(
+                lambda r: len(set(r.values))>1, axis=1,
+            )
+            untransposed_annotation = untransposed_annotation[variable_rows]
+        untransposed_annotation = untransposed_annotation.T.set_index(INDEX_BY).T
+        untransposed_annotation.columns = untransposed_annotation.columns.map(
+            lambda f: sub(r'[._-]', DEFAULT_NAME_DELIMITER, f)
+        )
+        untransposed_annotation.columns.name = INDEX_BY
+        annotation = untransposed_annotation.T
+        if cls:
+            return to_cls(annotation, target=cls, continuous=continuous)
+        else:
+            return untransposed_annotation.T
+        # TODO: consider multiindex here, to mirror AssayMetadata
