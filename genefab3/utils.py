@@ -3,7 +3,7 @@ from re import sub
 
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
-API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
+COLD_API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 INDEX_BY = "Sample Name"
 
 

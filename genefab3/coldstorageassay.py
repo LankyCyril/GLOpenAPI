@@ -86,9 +86,8 @@ def make_metadatalike_dataframe(metadata_object):
     mdv = multiindex_dataframe["internal_field"].values
     rmv = metadata_object.raw_dataframe.columns.values
     if (mdv != rmv).any():
-        raise GeneLabException(
-            "Inconsistent internal and human-readable fields in assay metadata"
-        )
+        em = "Inconsistent internal and human-readable fields in assay metadata"
+        raise GeneLabException(em)
     else:
         multiindex_dataframe = multiindex_dataframe.sort_values(by="field")
         internal_field_order = multiindex_dataframe["internal_field"]
@@ -105,7 +104,7 @@ def get_variable_subset_of_dataframe(df):
 def get_minimal_dataframe(df, index_name=None):
     """Keep only named (known) variable columns, drop internal field names"""
     fields = df.columns.get_level_values(0)
-    minimal_df = df.loc[:, [f != "Unknown" for f in fields]]
+    minimal_df = df.loc[:, [f != "Unknown" for f in fields]].copy()
     minimal_df.columns = minimal_df.columns.droplevel(1)
     if index_name:
         minimal_df.index.name = index_name

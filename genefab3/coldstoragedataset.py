@@ -2,7 +2,7 @@ from urllib.request import urlopen
 from json import loads
 from re import search, sub
 from genefab3.exceptions import GeneLabException, GeneLabJSONException
-from genefab3.utils import API_ROOT, GENELAB_ROOT, date2stamp
+from genefab3.utils import COLD_API_ROOT, GENELAB_ROOT, date2stamp
 from genefab3.coldstorageassay import ColdStorageAssay
 from pandas import DataFrame, concat
 from argparse import Namespace
@@ -10,7 +10,7 @@ from argparse import Namespace
 
 def parse_glds_json(accession):
     """Parse GLDS JSON reported by cold storage"""
-    url = "{}/data/study/data/{}/".format(API_ROOT, accession)
+    url = "{}/data/study/data/{}/".format(COLD_API_ROOT, accession)
     with urlopen(url) as response:
         data_json = loads(response.read().decode())
     if len(data_json) == 0:
@@ -43,7 +43,7 @@ def parse_fileurls_json(accession):
         accession_number = accession_number_match.group()
     else:
         raise GeneLabException("Malformed accession number")
-    url = "{}/data/glds/files/{}".format(API_ROOT, accession_number)
+    url = "{}/data/glds/files/{}".format(COLD_API_ROOT, accession_number)
     with urlopen(url) as response:
         fileurls_json = loads(response.read().decode())
     try:
@@ -57,7 +57,7 @@ def parse_fileurls_json(accession):
 
 def parse_filedates_json(_id):
     """Parse file dates JSON reported by cold storage"""
-    url = "{}/data/study/filelistings/{}".format(API_ROOT, _id)
+    url = "{}/data/study/filelistings/{}".format(COLD_API_ROOT, _id)
     with urlopen(url) as response:
         filedates_json = loads(response.read().decode())
     try:
@@ -112,24 +112,8 @@ class ColdStorageDataset():
                 filename=filename, url=url,
                 timestamp=self.filedates.get(filename, -1)
             )
-            for filename, url in self.fileurls.items()
-            if search(mask, filename)
+            for filename, url in self.fileurls.items() if search(mask, filename)
         }
-
-
-def infer_sample_key(dataset, assay_name):
-    """Look up sample key in dataset metadata"""
-    sample_keys = set(dataset.samples.keys())
-    if len(sample_keys) == 1:
-        return sample_keys.pop()
-    else:
-        sample_key = sub(r'^a', "s", assay_name)
-        if sample_key not in dataset.samples:
-            raise GeneLabJSONException(
-                "Could not find an unambiguous samples key"
-            )
-        else:
-            return sample_key
 
 
 class ColdStorageAssayDispatcher(dict):
@@ -139,7 +123,7 @@ class ColdStorageAssayDispatcher(dict):
         """Populate dictionary of assay_name -> Assay()"""
         try:
             for assay_name, assay_json in assays_json.items():
-                sample_key = infer_sample_key(dataset, assay_name)
+                sample_key = sub(r'^a', "s", assay_name)
                 super().__setitem__(
                     assay_name, ColdStorageAssay(
                         dataset, assay_name, assay_json,
