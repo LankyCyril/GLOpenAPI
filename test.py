@@ -5,4 +5,5 @@ glds = ColdStorageDataset("GLDS-42")
 for assay in glds.assays.values():
     break
 
-print(glds.resolve_filename(r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'))
+for filename, fileinfo in assay.resolve_filename(r'CEL', r'.*FLT.*').items():
+    print(filename, fileinfo.timestamp)

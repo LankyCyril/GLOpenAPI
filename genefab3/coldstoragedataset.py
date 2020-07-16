@@ -106,14 +106,14 @@ class ColdStorageDataset():
  
     def resolve_filename(self, mask):
         """Given mask, find filenames, urls, and datestamps"""
-        return [
-            Namespace(
+        return {
+            filename: Namespace(
                 filename=filename, url=url,
                 timestamp=self.filedates.get(filename, -1)
             )
             for filename, url in self.fileurls.items()
             if search(mask, filename)
-        ]
+        }
 
 
 class ColdStorageAssayDispatcher(dict):

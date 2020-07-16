@@ -2,7 +2,7 @@ from genefab3.exceptions import GeneLabJSONException, GeneLabException
 from genefab3.utils import INDEX_BY, force_default_name_delimiter
 from collections import defaultdict
 from pandas import Series, DataFrame, concat, merge
-from re import search, fullmatch, sub, IGNORECASE
+from re import search, fullmatch, sub, split, IGNORECASE
 
 
 def parse_assay_json_fields(json):
@@ -191,3 +191,29 @@ class ColdStorageAssay():
             self.metadata.indexed_by, "Factor"
         )
         return factors
+ 
+    def resolve_filename(self, mask, sample_mask=".*", field_mask=".*"):
+        """Given masks, find filenames, urls, and datestamps"""
+        dataset_level_files = self.dataset.resolve_filename(mask)
+        if len(dataset_level_files) == 0:
+            return {}
+        else:
+            metadata_df = self.metadata.dataframe
+            sample_names = [
+                sn for sn in metadata_df.index
+                if search(sample_mask, sn)
+            ]
+            fields = [
+                fn for fn in metadata_df.columns.get_level_values(0)
+                if search(field_mask, fn)
+            ]
+            metadata_subset_filenames = set.union(set(), *[
+                split(r'\s*,\s*', cell_value)
+                for cell_value
+                in metadata_df.loc[sample_names, fields].values.flatten()
+            ])
+            return {
+                filename: fileinfo
+                for filename, fileinfo in dataset_level_files.items()
+                if filename in metadata_subset_filenames
+            }
