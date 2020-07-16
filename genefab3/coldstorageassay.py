@@ -147,19 +147,13 @@ class ColdStorageAssay():
  
     def __init__(self, dataset, name, assay_json, sample_json):
         """Parse assay JSON reported by cold storage"""
-        from genefab3.coldstoragedataset import ColdStorageDataset
-        if isinstance(dataset, ColdStorageDataset):
-            self.dataset = dataset
-        else:
-            self.dataset = ColdStorageDataset(dataset)
-        self.name = name
         try:
-            _ = dataset.assays[self.name]
+            _ = dataset.assays[name]
         except (AttributeError, KeyError):
             msg = "Attempt to associate an assay with a wrong dataset"
             raise GeneLabException(msg)
-        self.fileurls = self.dataset.fileurls
-        self.filedates = self.dataset.filedates
+        self.name = name
+        self.dataset = dataset
         self.metadata = MetadataLike(assay_json)
         self.annotation = MetadataLike(sample_json)
         self.factors = MetadataLike(sample_json, field_mask=r'^Factor Value')
@@ -172,16 +166,14 @@ class ColdStorageAssay():
         else:
             metadata_df = self.metadata.full
             sample_names = [
-                sn for sn in metadata_df.index
-                if search(sample_mask, sn)
+                sn for sn in metadata_df.index if search(sample_mask, sn)
             ]
             fields = [
                 fn for fn in metadata_df.columns.get_level_values(0)
                 if search(field_mask, fn)
             ]
             metadata_subset_filenames = set.union(set(), *[
-                split(r'\s*,\s*', cell_value)
-                for cell_value
+                split(r'\s*,\s*', cell_value) for cell_value
                 in metadata_df.loc[sample_names, fields].values.flatten()
             ])
             return {
