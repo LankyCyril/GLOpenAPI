@@ -6,4 +6,5 @@ for assay in glds.assays.values():
     break
 print(assay.metadata.dataframe["Protocol REF"])
 print(assay.name)
-print(assay.get_factors(cls=True))
+print(assay.annotation)
+print(assay.factors)

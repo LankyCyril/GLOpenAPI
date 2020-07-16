@@ -1,10 +1,10 @@
 from datetime import datetime
+from re import sub
 
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 INDEX_BY = "Sample Name"
-DEFAULT_NAME_DELIMITER = "-"
 
 
 def date2stamp(fd, key="date_modified", fallback_key="date_created", fallback_value=-1):
@@ -21,3 +21,8 @@ def date2stamp(fd, key="date_modified", fallback_key="date_created", fallback_va
             return fallback_value
         else:
             return int(dt.timestamp())
+
+
+def force_default_name_delimiter(string):
+    """Replace variable delimiters (._-) with '-' (default)"""
+    return sub(r'[._-]', "-", string)

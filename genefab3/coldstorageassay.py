@@ -1,6 +1,5 @@
 from genefab3.exceptions import GeneLabJSONException, GeneLabException
-from genefab3.utils import INDEX_BY, DEFAULT_NAME_DELIMITER
-from genefab3.formats import to_cls
+from genefab3.utils import INDEX_BY, force_default_name_delimiter
 from collections import defaultdict
 from pandas import Series, DataFrame, concat, merge
 from re import search, fullmatch, sub, IGNORECASE
@@ -54,9 +53,7 @@ def parse_metadata_json(metadata_object, json):
         raise IndexError(msg)
     # reindex raw DataFrame:
     raw_dataframe = unindexed_dataframe.set_index(field_indexed_by)
-    raw_dataframe.index = raw_dataframe.index.map(
-        lambda f: sub(r'[._-]', DEFAULT_NAME_DELIMITER, f)
-    )
+    raw_dataframe.index = raw_dataframe.index.map(force_default_name_delimiter)
     return raw_dataframe, indexed_by.pop(), field_indexed_by
 
 
@@ -142,7 +139,12 @@ class ColdStorageAssay():
             else:
                 return sample_key
  
-    def get_annotation(self, variable_only=True, named_only=True, cls=None, continuous="infer"):
+    @property
+    def annotation(self):
+        """Property alias to get_annotation() with default settings"""
+        return self.get_annotation()
+ 
+    def get_annotation(self, variable_only=True, named_only=True):
         """Get annotation of samples: entries that are named only and differ, by default"""
         try:
             samples_field2title = {
@@ -170,17 +172,14 @@ class ColdStorageAssay():
             untransposed_annotation = untransposed_annotation[variable_rows]
         untransposed_annotation = untransposed_annotation.T.set_index(INDEX_BY).T
         untransposed_annotation.columns = untransposed_annotation.columns.map(
-            lambda f: sub(r'[._-]', DEFAULT_NAME_DELIMITER, f)
+            force_default_name_delimiter
         )
         untransposed_annotation.columns.name = INDEX_BY
-        annotation = untransposed_annotation.T
-        if cls:
-            return to_cls(annotation, target=cls, continuous=continuous)
-        else:
-            return untransposed_annotation.T
+        return untransposed_annotation.T
         # TODO: consider multiindex here, to mirror AssayMetadata
  
-    def get_factors(self, cls=None, continuous="infer"):
+    @property
+    def factors(self):
         """Get subset of annotation that represents factors"""
         annotation = self.get_annotation()
         factor_fields = [
@@ -191,13 +190,4 @@ class ColdStorageAssay():
         factors.index.name, factors.columns.name = (
             self.metadata.indexed_by, "Factor"
         )
-        if (cls == "*") or (cls is True):
-            if factors.shape[1] != 1:
-                raise KeyError("One of multiple factors needs to be specified")
-            else:
-                cls = str(factors.columns[0])
-            return to_cls(factors, target=cls, continuous=continuous)
-        elif cls is not None:
-            return to_cls(factors, target=cls, continuous=continuous)
-        else:
-            return factors
+        return factors
