@@ -3,6 +3,21 @@ from genefab3.utils import INDEX_BY, force_default_name_delimiter
 from collections import defaultdict
 from pandas import Series, DataFrame, concat, merge
 from re import search, fullmatch, split, IGNORECASE
+from copy import deepcopy
+
+
+def filter_json(json, field_mask):
+    """Reduce metadata-like JSON to 'header' fields matching `field_mask`"""
+    try:
+        return {
+            "raw": deepcopy(json["raw"]),
+            "header": [
+                deepcopy(e) for e in json["header"]
+                if search(field_mask, e["title"]) or (e["title"] == INDEX_BY)
+            ]
+        }
+    except KeyError:
+        raise GeneLabJSONException("Malformed assay JSON: header and/or raw")
 
 
 def parse_assay_json_fields(json):
@@ -87,30 +102,34 @@ def get_variable_subset_of_dataframe(df):
     return df.loc[:, df.apply(lambda r: len(set(r.values))>1)]
 
 
-def get_tidy_dataframe(df, index_name=None):
+def get_minimal_dataframe(df, index_name=None):
     """Keep only named (known) variable columns, drop internal field names"""
     fields = df.columns.get_level_values(0)
-    tidy_df = df.loc[:, [f != "Unknown" for f in fields]]
-    tidy_df.columns = tidy_df.columns.droplevel(1)
+    minimal_df = df.loc[:, [f != "Unknown" for f in fields]]
+    minimal_df.columns = minimal_df.columns.droplevel(1)
     if index_name:
-        tidy_df.index.name = index_name
-    return tidy_df
+        minimal_df.index.name = index_name
+    return minimal_df
 
 
 class MetadataLike():
     """Stores assay fields and metadata in raw and processed form"""
     indexed_by, internally_indexed_by = None, None
  
-    def __init__(self, json):
+    def __init__(self, json, field_mask=None):
         """Convert assay JSON to metadata object"""
-        self.fields, self.field2title = parse_assay_json_fields(json)
+        if field_mask is None:
+            filtered_json = json
+        else:
+            filtered_json = filter_json(json, field_mask)
+        self.fields, self.field2title = parse_assay_json_fields(filtered_json)
         self.raw_dataframe, self.indexed_by, self.internally_indexed_by = (
-            parse_metadatalike_json(self, json)
+            parse_metadatalike_json(self, filtered_json)
         )
         del self.fields[self.indexed_by]
         self.full = make_metadatalike_dataframe(self)
         self.differential = get_variable_subset_of_dataframe(self.full)
-        self.tidy = get_tidy_dataframe(self.differential, self.indexed_by)
+        self.minimal = get_minimal_dataframe(self.differential, self.indexed_by)
  
     def match_field_titles(self, pattern, flags=IGNORECASE, method=search):
         """Find fields matching pattern"""
@@ -143,19 +162,7 @@ class ColdStorageAssay():
         self.filedates = self.dataset.filedates
         self.metadata = MetadataLike(assay_json)
         self.annotation = MetadataLike(sample_json)
- 
-    @property
-    def factors(self):
-        """Get subset of annotation that represents factors"""
-        tidy_annotation = self.annotation.tidy
-        factors = self.annotation.tidy[[
-            field for field in tidy_annotation.columns
-            if search(r'^factor value', field, flags=IGNORECASE)
-        ]]
-        factors.index.name, factors.columns.name = (
-            self.metadata.indexed_by, "Factor"
-        )
-        return factors
+        self.factors = MetadataLike(sample_json, field_mask=r'^Factor Value')
  
     def resolve_filename(self, mask, sample_mask=".*", field_mask=".*"):
         """Given masks, find filenames, urls, and datestamps"""
