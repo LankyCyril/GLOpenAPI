@@ -120,6 +120,11 @@ class ColdStorageAssay():
         else:
             self.dataset = ColdStorageDataset(dataset)
         self.name = name
+        try:
+            _ = dataset.assays[self.name]
+        except (AttributeError, KeyError):
+            msg = "Attempt to associate an assay with a wrong dataset"
+            raise GeneLabException(msg)
         self.fileurls = self.dataset.fileurls
         self.filedates = self.dataset.filedates
         self.metadata = AssayMetadata(json)

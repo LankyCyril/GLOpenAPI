@@ -84,7 +84,8 @@ class ColdStorageDataset():
         self.fileurls = parse_fileurls_json(accession)
         self.filedates = parse_filedates_json(self._id)
         try:
-            self.assays = ColdStorageAssayDispatcher(
+            self.assays = {name: None for name in info["assays"]} # placeholders
+            self.assays = ColdStorageAssayDispatcher( # actual assays
                 dataset=self, assays_json=info["assays"],
             )
         except KeyError:
