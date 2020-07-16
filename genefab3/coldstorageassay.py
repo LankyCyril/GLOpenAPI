@@ -156,31 +156,29 @@ class ColdStorageAssay():
                 entry["field"]: entry["title"]
                 for entry in self.dataset.samples[self.sample_key]["header"]
             }
-            untransposed_annotation = concat([
+            annotation = concat([
                 Series(raw_sample_annotation) for raw_sample_annotation
                 in self.dataset.samples[self.sample_key]["raw"]
-            ], axis=1)
+            ], axis=1).T
         except KeyError:
             raise GeneLabJSONException("Malformed samples JSON")
         if named_only:
-            untransposed_annotation = untransposed_annotation.loc[[
-                field for field in untransposed_annotation.index
+            annotation = annotation[[
+                field for field in annotation.columns
                 if field in samples_field2title
             ]]
-        untransposed_annotation.index = untransposed_annotation.index.map(
+        annotation.columns = annotation.columns.map(
             lambda field: samples_field2title.get(field, field)
         )
+        annotation = annotation.set_index(INDEX_BY)
         if variable_only:
-            variable_rows = untransposed_annotation.apply(
-                lambda r: len(set(r.values))>1, axis=1,
-            )
-            untransposed_annotation = untransposed_annotation[variable_rows]
-        untransposed_annotation = untransposed_annotation.T.set_index(INDEX_BY).T
-        untransposed_annotation.columns = untransposed_annotation.columns.map(
+            annotation = annotation.loc[
+                :, annotation.apply(lambda r: len(set(r.values))>1)
+            ]
+        annotation.columns = annotation.columns.map(
             force_default_name_delimiter
         )
-        untransposed_annotation.columns.name = INDEX_BY
-        return untransposed_annotation.T
+        return annotation
         # TODO: consider multiindex here, to mirror AssayMetadata
  
     @property
