@@ -5,6 +5,7 @@ from genefab3.exceptions import GeneLabException, GeneLabJSONException
 from genefab3.utils import API_ROOT, GENELAB_ROOT, date2stamp
 from genefab3.coldstorageassay import ColdStorageAssay
 from pandas import DataFrame, concat
+from argparse import Namespace
 
 
 def parse_glds_json(accession):
@@ -102,6 +103,17 @@ class ColdStorageDataset():
             ]
         )
         return concat([factors_dataframe, assays_summary], axis=0, sort=False)
+ 
+    def resolve_filename(self, mask):
+        """Given mask, find filenames, urls, and datestamps"""
+        return [
+            Namespace(
+                filename=filename, url=url,
+                timestamp=self.filedates.get(filename, -1)
+            )
+            for filename, url in self.fileurls.items()
+            if search(mask, filename)
+        ]
 
 
 class ColdStorageAssayDispatcher(dict):
