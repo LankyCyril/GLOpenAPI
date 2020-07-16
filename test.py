@@ -8,4 +8,5 @@ for assay in glds.assays.values():
 for filename, fileinfo in assay.resolve_filename(r'CEL', r'.*FLT.*').items():
     print(filename, fileinfo.timestamp)
 
-print(assay.annotation)
+print(assay.annotation.tidy)
+print(assay.factors)

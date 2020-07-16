@@ -2,7 +2,7 @@ from genefab3.exceptions import GeneLabJSONException, GeneLabException
 from genefab3.utils import INDEX_BY, force_default_name_delimiter
 from collections import defaultdict
 from pandas import Series, DataFrame, concat, merge
-from re import search, fullmatch, sub, split, IGNORECASE
+from re import search, fullmatch, split, IGNORECASE
 
 
 def parse_assay_json_fields(json):
@@ -20,7 +20,7 @@ def parse_assay_json_fields(json):
     return dict(fields), field2title
 
 
-def parse_metadata_json(metadata_object, json):
+def parse_metadatalike_json(metadata_object, json):
     """Convert assay JSON to metadata DataFrame"""
     try:
         raw = json["raw"]
@@ -29,35 +29,32 @@ def parse_metadata_json(metadata_object, json):
     # convert raw JSON to raw DataFrame:
     unindexed_dataframe = concat(map(Series, raw), axis=1).T
     # find field title to index metadata by:
-    matching_indexer_titles = metadata_object.match_field_titles(INDEX_BY)
+    matching_indexer_titles = metadata_object.match_field_titles(
+        INDEX_BY, method=fullmatch,
+    )
     if len(matching_indexer_titles) == 0:
         raise IndexError("Nonexistent '{}'".format(INDEX_BY))
     elif len(matching_indexer_titles) > 1:
         raise IndexError("Ambiguous '{}'".format(INDEX_BY))
     else:
-        matching_title = matching_indexer_titles.pop()
-        if matching_title == metadata_object.indexed_by:
-            matching_fields = {metadata_object.field_indexed_by}
+        indexed_by = matching_indexer_titles.pop()
+        if indexed_by == metadata_object.indexed_by:
+            matching_fields = {metadata_object.internally_indexed_by}
         else:
-            matching_fields = metadata_object.fields[matching_title]
+            matching_fields = metadata_object.fields[indexed_by]
     if len(matching_fields) == 0:
         raise IndexError("Nonexistent '{}'".format(INDEX_BY))
     elif len(matching_fields) > 1:
         raise IndexError("Ambiguous '{}'".format(INDEX_BY))
     else:
-        field_indexed_by = list(matching_fields)[0]
-    # make sure found field is unambiguous:
-    indexed_by = metadata_object.match_field_titles(INDEX_BY, method=fullmatch)
-    if len(indexed_by) != 1:
-        msg = "Nonexistent or ambiguous index_by value: '{}'".format(INDEX_BY)
-        raise IndexError(msg)
+        internally_indexed_by = list(matching_fields)[0]
     # reindex raw DataFrame:
-    raw_dataframe = unindexed_dataframe.set_index(field_indexed_by)
+    raw_dataframe = unindexed_dataframe.set_index(internally_indexed_by)
     raw_dataframe.index = raw_dataframe.index.map(force_default_name_delimiter)
-    return raw_dataframe, indexed_by.pop(), field_indexed_by
+    return raw_dataframe, indexed_by, internally_indexed_by
 
 
-def make_multiindex_metadata_dataframe(metadata_object):
+def make_metadatalike_dataframe(metadata_object):
     """Convert raw dataframe into human-accessible dataframe"""
     multicols = ["field", "internal_field"]
     columns_dataframe = DataFrame(
@@ -85,18 +82,35 @@ def make_multiindex_metadata_dataframe(metadata_object):
         return as_frame
 
 
-class AssayMetadata():
+def get_variable_subset_of_dataframe(df):
+    """Subset `df` to columns that have variable values"""
+    return df.loc[:, df.apply(lambda r: len(set(r.values))>1)]
+
+
+def get_tidy_dataframe(df, index_name=None):
+    """Keep only named (known) variable columns, drop internal field names"""
+    fields = df.columns.get_level_values(0)
+    tidy_df = df.loc[:, [f != "Unknown" for f in fields]]
+    tidy_df.columns = tidy_df.columns.droplevel(1)
+    if index_name:
+        tidy_df.index.name = index_name
+    return tidy_df
+
+
+class MetadataLike():
     """Stores assay fields and metadata in raw and processed form"""
-    indexed_by, field_indexed_by = None, None
+    indexed_by, internally_indexed_by = None, None
  
     def __init__(self, json):
         """Convert assay JSON to metadata object"""
         self.fields, self.field2title = parse_assay_json_fields(json)
-        self.raw_dataframe, self.indexed_by, self.field_indexed_by = (
-            parse_metadata_json(self, json)
+        self.raw_dataframe, self.indexed_by, self.internally_indexed_by = (
+            parse_metadatalike_json(self, json)
         )
         del self.fields[self.indexed_by]
-        self.dataframe = make_multiindex_metadata_dataframe(self)
+        self.full = make_metadatalike_dataframe(self)
+        self.differential = get_variable_subset_of_dataframe(self.full)
+        self.tidy = get_tidy_dataframe(self.differential, self.indexed_by)
  
     def match_field_titles(self, pattern, flags=IGNORECASE, method=search):
         """Find fields matching pattern"""
@@ -112,7 +126,7 @@ class AssayMetadata():
 class ColdStorageAssay():
     """Stores individual assay information and metadata"""
  
-    def __init__(self, dataset, name, json):
+    def __init__(self, dataset, name, assay_json, sample_json):
         """Parse assay JSON reported by cold storage"""
         from genefab3.coldstoragedataset import ColdStorageDataset
         if isinstance(dataset, ColdStorageDataset):
@@ -127,69 +141,17 @@ class ColdStorageAssay():
             raise GeneLabException(msg)
         self.fileurls = self.dataset.fileurls
         self.filedates = self.dataset.filedates
-        self.metadata = AssayMetadata(json)
- 
-    @property
-    def sample_key(self):
-        """Look up sample key in dataset metadata"""
-        sample_keys = set(self.dataset.samples.keys())
-        if len(sample_keys) == 1:
-            return sample_keys.pop()
-        else:
-            sample_key = sub(r'^a', "s", self.name)
-            if sample_key not in self.dataset.samples:
-                raise GeneLabJSONException(
-                    "Could not find an unambiguous samples key"
-                )
-            else:
-                return sample_key
- 
-    @property
-    def annotation(self):
-        """Property alias to get_annotation() with default settings"""
-        return self.get_annotation()
- 
-    def get_annotation(self, variable_only=True, named_only=True):
-        """Get annotation of samples: entries that are named only and differ, by default"""
-        try:
-            samples_field2title = {
-                entry["field"]: entry["title"]
-                for entry in self.dataset.samples[self.sample_key]["header"]
-            }
-            annotation = concat([
-                Series(raw_sample_annotation) for raw_sample_annotation
-                in self.dataset.samples[self.sample_key]["raw"]
-            ], axis=1).T
-        except KeyError:
-            raise GeneLabJSONException("Malformed samples JSON")
-        if named_only:
-            annotation = annotation[[
-                field for field in annotation.columns
-                if field in samples_field2title
-            ]]
-        annotation.columns = annotation.columns.map(
-            lambda field: samples_field2title.get(field, field)
-        )
-        annotation = annotation.set_index(INDEX_BY)
-        if variable_only:
-            annotation = annotation.loc[
-                :, annotation.apply(lambda r: len(set(r.values))>1)
-            ]
-        annotation.columns = annotation.columns.map(
-            force_default_name_delimiter
-        )
-        return annotation
-        # TODO: consider multiindex here, to mirror AssayMetadata
+        self.metadata = MetadataLike(assay_json)
+        self.annotation = MetadataLike(sample_json)
  
     @property
     def factors(self):
         """Get subset of annotation that represents factors"""
-        annotation = self.get_annotation()
-        factor_fields = [
-            field for field in annotation.columns
+        tidy_annotation = self.annotation.tidy
+        factors = self.annotation.tidy[[
+            field for field in tidy_annotation.columns
             if search(r'^factor value', field, flags=IGNORECASE)
-        ]
-        factors = annotation[factor_fields]
+        ]]
         factors.index.name, factors.columns.name = (
             self.metadata.indexed_by, "Factor"
         )
@@ -201,7 +163,7 @@ class ColdStorageAssay():
         if len(dataset_level_files) == 0:
             return {}
         else:
-            metadata_df = self.metadata.dataframe
+            metadata_df = self.metadata.full
             sample_names = [
                 sn for sn in metadata_df.index
                 if search(sample_mask, sn)

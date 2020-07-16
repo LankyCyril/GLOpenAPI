@@ -1,6 +1,6 @@
 from urllib.request import urlopen
 from json import loads
-from re import search
+from re import search, sub
 from genefab3.exceptions import GeneLabException, GeneLabJSONException
 from genefab3.utils import API_ROOT, GENELAB_ROOT, date2stamp
 from genefab3.coldstorageassay import ColdStorageAssay
@@ -117,13 +117,34 @@ class ColdStorageDataset():
         }
 
 
+def infer_sample_key(dataset, assay_name):
+    """Look up sample key in dataset metadata"""
+    sample_keys = set(dataset.samples.keys())
+    if len(sample_keys) == 1:
+        return sample_keys.pop()
+    else:
+        sample_key = sub(r'^a', "s", assay_name)
+        if sample_key not in dataset.samples:
+            raise GeneLabJSONException(
+                "Could not find an unambiguous samples key"
+            )
+        else:
+            return sample_key
+
+
 class ColdStorageAssayDispatcher(dict):
     """Contains a dataset's assay objects, indexable by name or by attributes"""
  
     def __init__(self, dataset, assays_json):
         """Populate dictionary of assay_name -> Assay()"""
         try:
-            for name, json in assays_json.items():
-                super().__setitem__(name, ColdStorageAssay(dataset, name, json))
+            for assay_name, assay_json in assays_json.items():
+                sample_key = infer_sample_key(dataset, assay_name)
+                super().__setitem__(
+                    assay_name, ColdStorageAssay(
+                        dataset, assay_name, assay_json,
+                        sample_json=dataset.samples[sample_key],
+                    )
+                )
         except KeyError:
             raise GeneLabJSONException("Malformed assay JSON")
