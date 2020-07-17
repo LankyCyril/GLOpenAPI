@@ -143,23 +143,18 @@ class MetadataLike():
         }
 
 
-def INPLACE_force_default_name_delimiter_in_file_data(filedata, indexed_by, name_set):
+def INPLACE_force_default_name_delimiter_in_file_data(filedata, metadata_indexed_by, metadata_name_set):
     """In data read from file, find names and force default name delimiter"""
-    if indexed_by in filedata.columns:
-        filedata[indexed_by] = filedata[indexed_by].apply(
+    if metadata_indexed_by in filedata.columns:
+        filedata[metadata_indexed_by] = filedata[metadata_indexed_by].apply(
             force_default_name_delimiter,
         )
-    columns_to_convert = {
-        column for column in filedata.columns
-        if force_default_name_delimiter(column) in name_set
-    }
-    if columns_to_convert:
-        filedata.columns = [
-            force_default_name_delimiter(column)
-            if column in columns_to_convert
-            else column
-            for column in filedata.columns[:]
-        ]
+    filedata.columns = [
+        force_default_name_delimiter(column)
+        if force_default_name_delimiter(column) in metadata_name_set
+        else column
+        for column in filedata.columns[:]
+    ]
 
 
 class ColdStorageAssay():
@@ -205,7 +200,7 @@ class ColdStorageAssay():
                 if filename in metadata_subset_filenames
             }
  
-    def get_file(self, mask, sample_mask=".*", field_mask=".*", astype=DataFrame, sep=","):
+    def get_file(self, mask, sample_mask=".*", field_mask=".*", astype=None, sep=None):
         """Given masks, read file data directly from cold storage"""
         fileinfos = self.resolve_filename(mask, sample_mask, field_mask)
         if len(fileinfos) == 0:
@@ -214,7 +209,10 @@ class ColdStorageAssay():
             raise GeneLabException("Ambiguous file lookup")
         else:
             fileinfo = copy(next(iter(fileinfos.values())))
-        if astype is DataFrame:
+        if astype is None:
+            with urlopen(fileinfo.url) as response:
+                fileinfo.filedata = response.read()
+        elif astype is DataFrame:
             fileinfo.filedata = read_csv(fileinfo.url, sep=sep)
             if fileinfo.filedata.columns[0] == "Unnamed: 0":
                 fileinfo.filedata.columns = (
@@ -222,10 +220,10 @@ class ColdStorageAssay():
                     list(fileinfo.filedata.columns[1:])
                 )
             INPLACE_force_default_name_delimiter_in_file_data(
-                fileinfo.filedata, indexed_by=self.metadata.indexed_by,
-                name_set=set(self.metadata.full.index),
+                fileinfo.filedata,
+                metadata_indexed_by=self.metadata.indexed_by,
+                metadata_name_set=set(self.metadata.full.index),
             )
         else:
-            with urlopen(fileinfo.url) as response:
-                fileinfo.filedata = response.read()
+            raise NotImplementedError("Unsupported astype in get_file()")
         return fileinfo

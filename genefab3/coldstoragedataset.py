@@ -2,8 +2,8 @@ from urllib.request import urlopen
 from json import loads
 from re import search, sub
 from genefab3.exceptions import GeneLabException, GeneLabJSONException
-from genefab3.utils import COLD_API_ROOT, GENELAB_ROOT, date2stamp
-from genefab3.utils import levenshtein_distance
+from genefab3.utils import COLD_API_ROOT, GENELAB_ROOT
+from genefab3.utils import date2timestamp, levenshtein_distance
 from genefab3.coldstorageassay import ColdStorageAssay
 from pandas import DataFrame, concat
 from argparse import Namespace
@@ -62,7 +62,7 @@ def parse_filedates_json(_id):
     with urlopen(url) as response:
         filedates_json = loads(response.read().decode())
     try:
-        return {fd["file_name"]: date2stamp(fd) for fd in filedates_json}
+        return {fd["file_name"]: date2timestamp(fd) for fd in filedates_json}
     except KeyError:
         raise GeneLabJSONException("Malformed 'filelistings' JSON")
 
@@ -118,7 +118,6 @@ class ColdStorageDataset():
 
 def infer_sample_key(assay_name, keys):
     """Infer sample key for assay from dataset JSON"""
-    fallback_error = "No matching samples key for assay"
     expected_key = sub(r'^a', "s", assay_name)
     if expected_key in keys: # first, try key as-is, expected behavior
         return expected_key
@@ -130,19 +129,16 @@ def infer_sample_key(assay_name, keys):
             if len(keys) == 1: # otherwise, the only one must be correct
                 return next(iter(keys))
             else: # find longest match starting from head
-                max_comparison_length = min(
-                    len(expected_key), max(len(key) for key in keys)
-                )
+                max_key_length = max(len(key) for key in keys)
+                max_comparison_length = min(len(expected_key), max_key_length)
                 for cl in range(max_comparison_length, 0, -1):
-                    likely_keys = set()
-                    for key in keys:
-                        if key[:cl].lower() == expected_key[:cl].lower():
-                            likely_keys |= {key}
-                    if len(likely_keys) == 0:
-                        raise GeneLabException(fallback_error)
-                    elif len(likely_keys) == 1:
+                    likely_keys = {
+                        key for key in keys
+                        if key[:cl].lower() == expected_key[:cl].lower()
+                    }
+                    if len(likely_keys) == 1:
                         return likely_keys.pop()
-                    else: # multiple keys matched at same depth
+                    elif len(likely_keys) > 1: # resolve by edit distance
                         best_key, best_ld = None, -1
                         for key in likely_keys:
                             key_ld = levenshtein_distance(
@@ -150,10 +146,10 @@ def infer_sample_key(assay_name, keys):
                             )
                             if key_ld > best_ld:
                                 best_key, best_ld = key, key_ld
-                        if best_key is None:
-                            raise GeneLabException(fallback_error)
-                        else:
+                        if best_key:
                             return best_key
+                else:
+                    raise GeneLabException("No matching samples key for assay")
 
 
 class ColdStorageAssayDispatcher(dict):

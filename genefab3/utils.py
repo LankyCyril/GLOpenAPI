@@ -1,6 +1,7 @@
 from datetime import datetime
 from re import sub
 from numpy import zeros
+from functools import lru_cache
 
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
@@ -8,7 +9,7 @@ COLD_API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
 INDEX_BY = "Sample Name"
 
 
-def date2stamp(fd, key="date_modified", fallback_key="date_created", fallback_value=-1):
+def date2timestamp(fd, key="date_modified", fallback_key="date_created", fallback_value=-1):
     """Convert date like 'Fri Oct 11 22:02:48 EDT 2019' to timestamp"""
     strdate = fd.get(key)
     if strdate is None:
@@ -24,11 +25,13 @@ def date2stamp(fd, key="date_modified", fallback_key="date_created", fallback_va
             return int(dt.timestamp())
 
 
+@lru_cache(maxsize=None)
 def force_default_name_delimiter(string):
     """Replace variable delimiters (._-) with '-' (default)"""
     return sub(r'[._-]', "-", string)
 
 
+@lru_cache(maxsize=None)
 def levenshtein_distance(v, w):
     """Calculate levenshtein distance between two sequences"""
     m, n = len(v), len(w)
