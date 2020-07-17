@@ -1,9 +1,10 @@
 from genefab3.exceptions import GeneLabJSONException, GeneLabException
 from genefab3.utils import INDEX_BY, force_default_name_delimiter
 from collections import defaultdict
-from pandas import Series, DataFrame, concat, merge
+from pandas import Series, DataFrame, concat, merge, read_csv
 from re import search, fullmatch, split, IGNORECASE
-from copy import deepcopy
+from copy import copy, deepcopy
+from urllib.request import urlopen
 
 
 def filter_json(json, field_mask):
@@ -180,3 +181,19 @@ class ColdStorageAssay():
                 for filename, fileinfo in dataset_level_files.items()
                 if filename in metadata_subset_filenames
             }
+ 
+    def get_file(self, mask, sample_mask=".*", field_mask=".*", astype=DataFrame, sep=","):
+        """Given masks, read file data directly from cold storage"""
+        fileinfos = self.resolve_filename(mask, sample_mask, field_mask)
+        if len(fileinfos) == 0:
+            raise GeneLabException("File not found")
+        elif len(fileinfos) > 1:
+            raise GeneLabException("Ambiguous file lookup")
+        else:
+            fileinfo = copy(next(iter(fileinfos.values())))
+        if astype is DataFrame:
+            fileinfo.filedata = read_csv(fileinfo.url, sep=sep)
+        else:
+            with urlopen(fileinfo.url) as response:
+                fileinfo.filedata = response.read()
+        return fileinfo
