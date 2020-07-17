@@ -30,10 +30,10 @@ def parse_glds_json(accession):
             raise GeneLabJSONException("Invalid JSON, multiple foreignFields")
         else:
             try:
-                isa2json = foreign_fields[0]["isa2json"]
+                info = foreign_fields[0]["isa2json"]["additionalInformation"]
             except KeyError:
-                raise GeneLabJSONException("Invalid JSON, no isa2json")
-            return _id, metadata_id, isa2json
+                raise GeneLabJSONException("Invalid JSON: isa2json")
+            return _id, metadata_id, info
 
 
 def parse_fileurls_json(accession):
@@ -72,13 +72,12 @@ class ColdStorageDataset():
     def __init__(self, accession):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
-        self._id, self.metadata_id, isa2json = parse_glds_json(accession)
+        self._id, self.metadata_id, info = parse_glds_json(accession)
         try:
-            info = isa2json["additionalInformation"]
-            self.description = info["description"]
-            self.samples = info["samples"]
-            self.ontologies = info["ontologies"]
-            self.organisms = info["organisms"]
+            self.json = Namespace(**{
+                field: info[field] for field in
+                ("description", "samples", "ontologies", "organisms")
+            })
         except KeyError:
             raise GeneLabJSONException("Invalid JSON, missing isa2json fields")
         self.fileurls = parse_fileurls_json(accession)
@@ -100,7 +99,7 @@ class ColdStorageDataset():
             columns=["type", "name", "factors"],
             data=[
                 ["dataset", self.accession, fi["factor"]]
-                for fi in self.description["factors"]
+                for fi in self.json.description["factors"]
             ]
         )
         return concat([factors_dataframe, assays_summary], axis=0, sort=False)
@@ -127,7 +126,7 @@ class ColdStorageAssayDispatcher(dict):
                 super().__setitem__(
                     assay_name, ColdStorageAssay(
                         dataset, assay_name, assay_json,
-                        sample_json=dataset.samples[sample_key],
+                        sample_json=dataset.json.samples[sample_key],
                     )
                 )
         except KeyError:
