@@ -161,8 +161,11 @@ class ColdStorageAssay():
     def resolve_filename(self, mask, sample_mask=".*", field_mask=".*"):
         """Given masks, find filenames, urls, and datestamps"""
         dataset_level_files = self.dataset.resolve_filename(mask)
+        metadata_filters_present = (sample_mask != ".*") or (field_mask != ".*")
         if len(dataset_level_files) == 0:
             return {}
+        elif (len(dataset_level_files) == 1) and (not metadata_filters_present):
+            return dataset_level_files
         else:
             metadata_df = self.metadata.full
             sample_names = [
@@ -193,6 +196,11 @@ class ColdStorageAssay():
             fileinfo = copy(next(iter(fileinfos.values())))
         if astype is DataFrame:
             fileinfo.filedata = read_csv(fileinfo.url, sep=sep)
+            if fileinfo.filedata.columns[0] == "Unnamed: 0":
+                fileinfo.filedata.columns = (
+                    [self.metadata.indexed_by] +
+                    list(fileinfo.filedata.columns[1:])
+                )
         else:
             with urlopen(fileinfo.url) as response:
                 fileinfo.filedata = response.read()

@@ -9,8 +9,5 @@ glds = ColdStorageDataset("GLDS-42")
 for assay in glds.assays.values():
     break
 
-for filename, fileinfo in assay.resolve_filename(DEG_CSV_REGEX).items():
-    print(filename, fileinfo.timestamp)
-
-df = assay.get_file(DEG_CSV_REGEX).filedata
-print(df.columns)
+df = assay.get_file(PCA_CSV_REGEX).filedata
+print(df)
