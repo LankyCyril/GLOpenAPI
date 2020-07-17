@@ -9,5 +9,5 @@ glds = ColdStorageDataset("GLDS-239")
 for assay in glds.assays.values():
     break
 
-df = assay.get_file(DEG_CSV_REGEX).filedata
-print(df.columns)
+print(assay.annotation.minimal)
+print(assay.get_file(PCA_CSV_REGEX).filedata.iloc[:3, :4])

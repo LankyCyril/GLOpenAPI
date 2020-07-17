@@ -107,6 +107,7 @@ def get_minimal_dataframe(df, index_name=None):
     fields = df.columns.get_level_values(0)
     minimal_df = df.loc[:, [f != "Unknown" for f in fields]].copy()
     minimal_df.columns = minimal_df.columns.droplevel(1)
+    minimal_df.columns.name = None
     if index_name:
         minimal_df.index.name = index_name
     return minimal_df
