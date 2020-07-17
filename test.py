@@ -5,9 +5,9 @@ DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expre
 VIZ_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table.csv$'
 PCA_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$'
 
-glds = ColdStorageDataset("GLDS-42")
+glds = ColdStorageDataset("GLDS-239")
 for assay in glds.assays.values():
     break
 
-df = assay.get_file(PCA_CSV_REGEX).filedata
-print(df)
+df = assay.get_file(DEG_CSV_REGEX).filedata
+print(df.columns)

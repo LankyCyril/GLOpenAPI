@@ -1,5 +1,6 @@
 from datetime import datetime
 from re import sub
+from numpy import zeros
 
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
@@ -26,3 +27,20 @@ def date2stamp(fd, key="date_modified", fallback_key="date_created", fallback_va
 def force_default_name_delimiter(string):
     """Replace variable delimiters (._-) with '-' (default)"""
     return sub(r'[._-]', "-", string)
+
+
+def levenshtein_distance(v, w):
+    """Calculate levenshtein distance between two sequences"""
+    m, n = len(v), len(w)
+    dp = zeros((m+1, n+1), dtype=int)
+    for i in range(m+1):
+        for j in range(n+1):
+            if i == 0:
+                dp[i, j] = j
+            elif j == 0:
+                dp[i, j] = i
+            elif v[i-1] == w[j-1]:
+                dp[i, j] = dp[i-1, j-1]
+            else:
+                dp[i, j] = 1 + min(dp[i, j-1], dp[i-1, j], dp[i-1, j-1])
+    return dp[m, n]

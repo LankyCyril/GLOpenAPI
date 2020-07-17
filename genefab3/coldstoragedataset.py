@@ -3,6 +3,7 @@ from json import loads
 from re import search, sub
 from genefab3.exceptions import GeneLabException, GeneLabJSONException
 from genefab3.utils import COLD_API_ROOT, GENELAB_ROOT, date2stamp
+from genefab3.utils import levenshtein_distance
 from genefab3.coldstorageassay import ColdStorageAssay
 from pandas import DataFrame, concat
 from argparse import Namespace
@@ -115,6 +116,46 @@ class ColdStorageDataset():
         }
 
 
+def infer_sample_key(assay_name, keys):
+    """Infer sample key for assay from dataset JSON"""
+    fallback_error = "No matching samples key for assay"
+    expected_key = sub(r'^a', "s", assay_name)
+    if expected_key in keys: # first, try key as-is, expected behavior
+        return expected_key
+    else: # otherwise, match regardless of case
+        for key in keys:
+            if key.lower() == expected_key.lower():
+                return key
+        else:
+            if len(keys) == 1: # otherwise, the only one must be correct
+                return next(iter(keys))
+            else: # find longest match starting from head
+                max_comparison_length = min(
+                    len(expected_key), max(len(key) for key in keys)
+                )
+                for cl in range(max_comparison_length, 0, -1):
+                    likely_keys = set()
+                    for key in keys:
+                        if key[:cl].lower() == expected_key[:cl].lower():
+                            likely_keys |= {key}
+                    if len(likely_keys) == 0:
+                        raise GeneLabException(fallback_error)
+                    elif len(likely_keys) == 1:
+                        return likely_keys.pop()
+                    else: # multiple keys matched at same depth
+                        best_key, best_ld = None, -1
+                        for key in likely_keys:
+                            key_ld = levenshtein_distance(
+                                key.lower(), expected_key.lower(),
+                            )
+                            if key_ld > best_ld:
+                                best_key, best_ld = key, key_ld
+                        if best_key is None:
+                            raise GeneLabException(fallback_error)
+                        else:
+                            return best_key
+
+
 class ColdStorageAssayDispatcher(dict):
     """Contains a dataset's assay objects, indexable by name or by attributes"""
  
@@ -122,7 +163,9 @@ class ColdStorageAssayDispatcher(dict):
         """Populate dictionary of assay_name -> Assay()"""
         try:
             for assay_name, assay_json in assays_json.items():
-                sample_key = sub(r'^a', "s", assay_name)
+                sample_key = infer_sample_key(
+                    assay_name, dataset.json.samples.keys(),
+                )
                 super().__setitem__(
                     assay_name, ColdStorageAssay(
                         dataset, assay_name, assay_json,
