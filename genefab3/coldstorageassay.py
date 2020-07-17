@@ -143,6 +143,25 @@ class MetadataLike():
         }
 
 
+def INPLACE_force_default_name_delimiter_in_file_data(filedata, indexed_by, name_set):
+    """In data read from file, find names and force default name delimiter"""
+    if indexed_by in filedata.columns:
+        filedata[indexed_by] = filedata[indexed_by].apply(
+            force_default_name_delimiter,
+        )
+    columns_to_convert = {
+        column for column in filedata.columns
+        if force_default_name_delimiter(column) in name_set
+    }
+    if columns_to_convert:
+        filedata.columns = [
+            force_default_name_delimiter(column)
+            if column in columns_to_convert
+            else column
+            for column in filedata.columns[:]
+        ]
+
+
 class ColdStorageAssay():
     """Stores individual assay information and metadata"""
  
@@ -202,6 +221,10 @@ class ColdStorageAssay():
                     [self.metadata.indexed_by] +
                     list(fileinfo.filedata.columns[1:])
                 )
+            INPLACE_force_default_name_delimiter_in_file_data(
+                fileinfo.filedata, indexed_by=self.metadata.indexed_by,
+                name_set=set(self.metadata.full.index),
+            )
         else:
             with urlopen(fileinfo.url) as response:
                 fileinfo.filedata = response.read()
