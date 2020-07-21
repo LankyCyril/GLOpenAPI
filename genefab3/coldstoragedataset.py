@@ -3,7 +3,7 @@ from json import loads
 from re import search, sub
 from genefab3.exceptions import GeneLabException, GeneLabJSONException
 from genefab3.utils import COLD_API_ROOT, GENELAB_ROOT
-from genefab3.utils import date2timestamp, levenshtein_distance
+from genefab3.utils import extract_file_timestamp, levenshtein_distance
 from genefab3.coldstorageassay import ColdStorageAssay
 from pandas import DataFrame, concat
 from argparse import Namespace
@@ -62,7 +62,10 @@ def parse_filedates_json(_id):
     with urlopen(url) as response:
         filedates_json = loads(response.read().decode())
     try:
-        return {fd["file_name"]: date2timestamp(fd) for fd in filedates_json}
+        return {
+            fd["file_name"]: extract_file_timestamp(fd)
+            for fd in filedates_json
+        }
     except KeyError:
         raise GeneLabJSONException("Malformed 'filelistings' JSON")
 
