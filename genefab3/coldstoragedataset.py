@@ -9,20 +9,44 @@ from pandas import DataFrame, concat
 from argparse import Namespace
 
 
-def parse_glds_json(accession):
+def get_json(identifier, kind):
+    """Request and pre-parse cold storage JSONs for datasets, file listings, file dates"""
+    if kind == "glds":
+        url = "{}/data/study/data/{}/".format(COLD_API_ROOT, identifier)
+        with urlopen(url) as response:
+            return loads(response.read().decode())
+    elif kind == "fileurls":
+        accession_number_match = search(r'\d+$', identifier)
+        if accession_number_match:
+            accession_number = accession_number_match.group()
+        else:
+            raise GeneLabException("Malformed accession number")
+        url = "{}/data/glds/files/{}".format(COLD_API_ROOT, accession_number)
+        with urlopen(url) as response:
+            raw_json = loads(response.read().decode())
+            try:
+                return raw_json["studies"][identifier]["study_files"]
+            except KeyError:
+                raise GeneLabJSONException("Malformed 'files' JSON")
+    elif kind == "filedates":
+        url = "{}/data/study/filelistings/{}".format(COLD_API_ROOT, identifier)
+        with urlopen(url) as response:
+            return loads(response.read().decode())
+    else:
+        raise GeneLabException("Unknown JSON request: kind='{}'".format(kind))
+
+
+def parse_glds_json(glds_json):
     """Parse GLDS JSON reported by cold storage"""
-    url = "{}/data/study/data/{}/".format(COLD_API_ROOT, accession)
-    with urlopen(url) as response:
-        data_json = loads(response.read().decode())
-    if len(data_json) == 0:
+    if len(glds_json) == 0:
         raise GeneLabJSONException("Invalid JSON (GLDS does not exist?)")
-    elif len(data_json) > 1:
+    elif len(glds_json) > 1:
         raise GeneLabJSONException("Invalid JSON, too many sections")
     else:
         try:
-            json = data_json[0]
+            json = glds_json[0]
             _id, metadata_id = json["_id"], json["metadata_id"]
-        except KeyError:
+        except (TypeError, KeyError):
             raise GeneLabJSONException("Invalid JSON, missing ID fields")
         foreign_fields = json.get("foreignFields", [])
         if len(foreign_fields) == 0:
@@ -37,30 +61,19 @@ def parse_glds_json(accession):
             return _id, metadata_id, info
 
 
-def parse_fileurls_json(accession):
+def parse_fileurls_json(fileurls_json):
     """Parse file urls JSON reported by cold storage"""
-    accession_number_match = search(r'\d+$', accession)
-    if accession_number_match:
-        accession_number = accession_number_match.group()
-    else:
-        raise GeneLabException("Malformed accession number")
-    url = "{}/data/glds/files/{}".format(COLD_API_ROOT, accession_number)
-    with urlopen(url) as response:
-        fileurls_json = loads(response.read().decode())
     try:
         return {
             fd["file_name"]: GENELAB_ROOT+fd["remote_url"]
-            for fd in fileurls_json["studies"][accession]["study_files"]
+            for fd in fileurls_json
         }
     except KeyError:
         raise GeneLabJSONException("Malformed 'files' JSON")
 
 
-def parse_filedates_json(_id):
+def parse_filedates_json(filedates_json):
     """Parse file dates JSON reported by cold storage"""
-    url = "{}/data/study/filelistings/{}".format(COLD_API_ROOT, _id)
-    with urlopen(url) as response:
-        filedates_json = loads(response.read().decode())
     try:
         return {
             fd["file_name"]: extract_file_timestamp(fd)
@@ -72,11 +85,17 @@ def parse_filedates_json(_id):
 
 class ColdStorageDataset():
     """Contains GLDS metadata associated with an accession number"""
+    rawjson = Namespace()
  
-    def __init__(self, accession):
+    def __init__(self, accession, glds_json=None, fileurls_json=None, filedates_json=None):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
-        self._id, self.metadata_id, info = parse_glds_json(accession)
+        self.rawjson.glds = glds_json or get_json(accession, "glds")
+        _id, metadata_id, info = parse_glds_json(self.rawjson.glds)
+        self.rawjson.fileurls = fileurls_json or get_json(accession, "fileurls")
+        self.rawjson.filedates = filedates_json or get_json(_id, "filedates")
+        self.fileurls = parse_fileurls_json(self.rawjson.fileurls)
+        self.filedates = parse_filedates_json(self.rawjson.filedates)
         try:
             self.json = Namespace(**{
                 field: info[field] for field in
@@ -84,8 +103,6 @@ class ColdStorageDataset():
             })
         except KeyError:
             raise GeneLabJSONException("Invalid JSON, missing isa2json fields")
-        self.fileurls = parse_fileurls_json(accession)
-        self.filedates = parse_filedates_json(self._id)
         try:
             self.assays = {name: None for name in info["assays"]} # placeholders
             self.assays = ColdStorageAssayDispatcher( # actual assays
