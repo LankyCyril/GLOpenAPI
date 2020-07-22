@@ -2,6 +2,7 @@
 
 Data access API for GeneLab
 
+
 ### Requirements
 
 * Python 3 (developed against 3.6.10)
@@ -10,3 +11,4 @@ Data access API for GeneLab
 * pandas
 * flask
 * pymongo
+* flask-compress
