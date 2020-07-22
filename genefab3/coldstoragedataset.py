@@ -2,7 +2,7 @@ from urllib.request import urlopen
 from json import loads
 from re import search, sub
 from genefab3.exceptions import GeneLabException, GeneLabJSONException
-from genefab3.utils import COLD_API_ROOT, GENELAB_ROOT
+from genefab3.config import COLD_API_ROOT, GENELAB_ROOT
 from genefab3.utils import extract_file_timestamp, levenshtein_distance
 from genefab3.coldstorageassay import ColdStorageAssay
 from pandas import DataFrame, concat

@@ -1,5 +1,6 @@
 from genefab3.exceptions import GeneLabJSONException, GeneLabException
-from genefab3.utils import INDEX_BY, force_default_name_delimiter
+from genefab3.config import INDEX_BY
+from genefab3.utils import force_default_name_delimiter
 from collections import defaultdict
 from pandas import Series, DataFrame, concat, merge, read_csv
 from re import search, fullmatch, split, IGNORECASE
