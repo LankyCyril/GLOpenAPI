@@ -2,8 +2,9 @@
 from flask import Flask, request
 from flask_compress import Compress
 from genefab3.config import FLASK_DEBUG_MARKERS, COMPRESSIBLE_MIMETYPES
-from genefab3.exceptions import traceback_printer, exception_catcher
 from os import environ
+from genefab3.exceptions import traceback_printer, exception_catcher
+from genefab3.readme import readme
 
 
 app = Flask("genefab3")
@@ -26,4 +27,4 @@ def favicon(imgtype):
 @app.route("/", methods=["GET"])
 def landing_page():
     """Hello, Space!"""
-    return "Hello, Space!"
+    return readme(url_root=request.url_root.rstrip("/"))
