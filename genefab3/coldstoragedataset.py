@@ -1,42 +1,11 @@
-from urllib.request import urlopen
-from json import loads
 from re import search, sub
 from genefab3.exceptions import GeneLabException, GeneLabJSONException
-from genefab3.config import COLD_API_ROOT, GENELAB_ROOT
+from genefab3.config import GENELAB_ROOT
+from genefab3.json import download_cold_json as dl_json
 from genefab3.utils import extract_file_timestamp, levenshtein_distance
 from genefab3.coldstorageassay import ColdStorageAssay
 from pandas import DataFrame, concat
 from argparse import Namespace
-
-
-def get_json(identifier, kind="raw"):
-    """Request and pre-parse cold storage JSONs for datasets, file listings, file dates"""
-    if kind == "glds":
-        url = "{}/data/study/data/{}/".format(COLD_API_ROOT, identifier)
-        with urlopen(url) as response:
-            return loads(response.read().decode())
-    elif kind == "fileurls":
-        accession_number_match = search(r'\d+$', identifier)
-        if accession_number_match:
-            accession_number = accession_number_match.group()
-        else:
-            raise GeneLabException("Malformed accession number")
-        url = "{}/data/glds/files/{}".format(COLD_API_ROOT, accession_number)
-        with urlopen(url) as response:
-            raw_json = loads(response.read().decode())
-            try:
-                return raw_json["studies"][identifier]["study_files"]
-            except KeyError:
-                raise GeneLabJSONException("Malformed 'files' JSON")
-    elif kind == "filedates":
-        url = "{}/data/study/filelistings/{}".format(COLD_API_ROOT, identifier)
-        with urlopen(url) as response:
-            return loads(response.read().decode())
-    elif kind == "raw":
-        with urlopen(identifier) as response:
-            return loads(response.read().decode())
-    else:
-        raise GeneLabException("Unknown JSON request: kind='{}'".format(kind))
 
 
 def parse_glds_json(glds_json):
@@ -88,17 +57,17 @@ def parse_filedates_json(filedates_json):
 
 class ColdStorageDataset():
     """Contains GLDS metadata associated with an accession number"""
-    rawjson = Namespace()
+    raw_json = Namespace()
  
     def __init__(self, accession, glds_json=None, fileurls_json=None, filedates_json=None):
         """Request JSON representation of ISA metadata and store fields"""
         self.accession = accession
-        self.rawjson.glds = glds_json or get_json(accession, "glds")
-        _id, metadata_id, info = parse_glds_json(self.rawjson.glds)
-        self.rawjson.fileurls = fileurls_json or get_json(accession, "fileurls")
-        self.rawjson.filedates = filedates_json or get_json(_id, "filedates")
-        self.fileurls = parse_fileurls_json(self.rawjson.fileurls)
-        self.filedates = parse_filedates_json(self.rawjson.filedates)
+        self.raw_json.glds = glds_json or dl_json(accession, "glds")
+        _id, metadata_id, info = parse_glds_json(self.raw_json.glds)
+        self.raw_json.fileurls = fileurls_json or dl_json(accession, "fileurls")
+        self.raw_json.filedates = filedates_json or dl_json(_id, "filedates")
+        self.fileurls = parse_fileurls_json(self.raw_json.fileurls)
+        self.filedates = parse_filedates_json(self.raw_json.filedates)
         try:
             self.json = Namespace(**{
                 field: info[field] for field in
