@@ -8,7 +8,7 @@ from flask_compress import Compress
 from os import environ
 from genefab3.exceptions import traceback_printer, exception_catcher
 from genefab3.mongo import refresh_json_store
-from genefab3.readme import readme
+from genefab3.docs import interactive_doc
 
 
 app = Flask("genefab3")
@@ -41,4 +41,4 @@ def favicon(imgtype):
 @refresh_json_store(db)
 def landing_page():
     """Hello, Space!"""
-    return readme(url_root=request.url_root.rstrip("/"))
+    return interactive_doc(url_root=request.url_root.rstrip("/"))
