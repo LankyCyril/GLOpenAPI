@@ -42,3 +42,9 @@ def favicon(imgtype):
 def landing_page():
     """Hello, Space!"""
     return interactive_doc(url_root=request.url_root.rstrip("/"))
+
+
+@app.route("/debug", methods=["GET"])
+def debug_page():
+    from genefab3.mongo import refresh_json_store_inner
+    return refresh_json_store_inner(db)
