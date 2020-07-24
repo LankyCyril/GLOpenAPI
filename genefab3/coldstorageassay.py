@@ -170,9 +170,13 @@ class ColdStorageAssay():
             raise GeneLabException(msg)
         self.name = name
         self.dataset = dataset
-        self.metadata = MetadataLike(assay_json)
-        self.annotation = MetadataLike(sample_json)
-        self.factors = MetadataLike(sample_json, field_mask=r'^Factor Value')
+        try:
+            self.metadata = MetadataLike(assay_json)
+            self.annotation = MetadataLike(sample_json)
+            self.factors = MetadataLike(sample_json, r'^Factor Value')
+        except IndexError as e:
+            msg = "{}, {}: {}".format(dataset.accession, name, e)
+            raise GeneLabJSONException(msg)
  
     def resolve_filename(self, mask, sample_mask=".*", field_mask=".*"):
         """Given masks, find filenames, urls, and datestamps"""

@@ -68,6 +68,7 @@ class ColdStorageDataset():
         self.raw_json.filedates = filedates_json or dl_json(_id, "filedates")
         self.fileurls = parse_fileurls_json(self.raw_json.fileurls)
         self.filedates = parse_filedates_json(self.raw_json.filedates)
+        self._id = _id
         try:
             self.json = Namespace(**{
                 field: info[field] for field in
