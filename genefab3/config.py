@@ -9,7 +9,10 @@ COMPRESSIBLE_MIMETYPES = [
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 COLD_API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
-SEARCH_URL_MASK = "{}/data/search/?term=GLDS&type=cgene&size={}"
+COLD_SEARCH_MASK = COLD_API_ROOT + "/data/search/?term=GLDS&type=cgene&size={}"
+COLD_GLDS_MASK = COLD_API_ROOT + "/data/study/data/{}/"
+COLD_FILEURLS_MASK = COLD_API_ROOT + "/data/glds/files/{}"
+COLD_FILEDATES_MASK = COLD_API_ROOT + "/data/study/filelistings/{}"
 
 INDEX_BY = "Sample Name"
 TIMESTAMP_FMT = "%a %b %d %H:%M:%S %Z %Y"

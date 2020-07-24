@@ -1,10 +1,10 @@
 from functools import wraps, partial
-from genefab3.config import COLD_API_ROOT, MAX_JSON_AGE, SEARCH_URL_MASK
+from genefab3.config import MAX_JSON_AGE, COLD_SEARCH_MASK
 from datetime import datetime
 from genefab3.utils import download_cold_json
 from genefab3.exceptions import GeneLabJSONException
 from pymongo import DESCENDING
-from genefab3.coldstoragedataset import ColdStorageDataset
+from genefab3.coldstoragedataset import ColdStorageDataset as CSD
 from pandas import Series
 
 
@@ -62,11 +62,11 @@ def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE):
 def refresh_json_store_inner(db):
     """Iterate over datasets in cold storage, put updated JSONs into database"""
     fresh, stale = get_fresh_and_stale_accessions(db)
-    gfj, CSD = partial(get_fresh_json, db), ColdStorageDataset
+    gfj = partial(get_fresh_json, db)
     try: # get number of datasets in database, and then all dataset JSONs
-        url = SEARCH_URL_MASK.format(COLD_API_ROOT, 0)
+        url = COLD_SEARCH_MASK.format(0)
         n_datasets = gfj(url)["hits"]["total"]
-        url = SEARCH_URL_MASK.format(COLD_API_ROOT, n_datasets)
+        url = COLD_SEARCH_MASK.format(n_datasets)
         raw_datasets_json = gfj(url)["hits"]["hits"]
         all_accessions = {raw_json["_id"] for raw_json in raw_datasets_json}
     except KeyError:

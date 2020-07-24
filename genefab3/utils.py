@@ -1,5 +1,6 @@
 from urllib.request import urlopen
-from genefab3.config import COLD_API_ROOT, TIMESTAMP_FMT
+from genefab3.config import COLD_GLDS_MASK, COLD_FILEURLS_MASK
+from genefab3.config import COLD_FILEDATES_MASK, TIMESTAMP_FMT
 from json import loads
 from re import search, sub
 from genefab3.exceptions import GeneLabException, GeneLabJSONException
@@ -11,7 +12,7 @@ from functools import lru_cache
 def download_cold_json(identifier, kind="other"):
     """Request and pre-parse cold storage JSONs for datasets, file listings, file dates"""
     if kind == "glds":
-        url = "{}/data/study/data/{}/".format(COLD_API_ROOT, identifier)
+        url = COLD_GLDS_MASK.format(identifier)
         with urlopen(url) as response:
             return loads(response.read().decode())
     elif kind == "fileurls":
@@ -20,7 +21,7 @@ def download_cold_json(identifier, kind="other"):
             accession_number = accession_number_match.group()
         else:
             raise GeneLabException("Malformed accession number")
-        url = "{}/data/glds/files/{}".format(COLD_API_ROOT, accession_number)
+        url = COLD_FILEURLS_MASK.format(accession_number)
         with urlopen(url) as response:
             raw_json = loads(response.read().decode())
             try:
@@ -28,7 +29,7 @@ def download_cold_json(identifier, kind="other"):
             except KeyError:
                 raise GeneLabJSONException("Malformed 'files' JSON")
     elif kind == "filedates":
-        url = "{}/data/study/filelistings/{}".format(COLD_API_ROOT, identifier)
+        url = COLD_FILEDATES_MASK.format(identifier)
         with urlopen(url) as response:
             return loads(response.read().decode())
     elif kind == "other":
