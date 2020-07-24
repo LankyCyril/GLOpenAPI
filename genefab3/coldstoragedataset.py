@@ -9,7 +9,7 @@ from pandas import DataFrame, concat
 from argparse import Namespace
 
 
-def get_json(identifier, kind):
+def get_json(identifier, kind="raw"):
     """Request and pre-parse cold storage JSONs for datasets, file listings, file dates"""
     if kind == "glds":
         url = "{}/data/study/data/{}/".format(COLD_API_ROOT, identifier)
@@ -31,6 +31,9 @@ def get_json(identifier, kind):
     elif kind == "filedates":
         url = "{}/data/study/filelistings/{}".format(COLD_API_ROOT, identifier)
         with urlopen(url) as response:
+            return loads(response.read().decode())
+    elif kind == "raw":
+        with urlopen(identifier) as response:
             return loads(response.read().decode())
     else:
         raise GeneLabException("Unknown JSON request: kind='{}'".format(kind))

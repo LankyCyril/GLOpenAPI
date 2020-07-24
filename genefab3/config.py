@@ -1,4 +1,6 @@
-FLASK_DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
+MONGO_DB_NAME = "genefab3"
+
+DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
 
 COMPRESSIBLE_MIMETYPES = [
     "text/plain", "text/html", "text/css", "text/xml",

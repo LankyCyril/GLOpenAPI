@@ -13,6 +13,6 @@ def readme(html_path=None, document="index.html", url_root="/"):
         with open(html_path, mode="rt") as handle:
             template = handle.read()
     except (FileNotFoundError, OSError, IOError):
-        template = "Hello, Space! (%URL_ROOT%)"
+        template = "Hello, Space! (No readme at %URL_ROOT%)"
     html = sub(r'%URL_ROOT%', url_root, template)
     return html

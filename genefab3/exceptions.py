@@ -3,6 +3,7 @@ from traceback import format_tb
 
 
 class GeneLabException(Exception): pass
+class GeneLabDatabaseException(Exception): pass
 class GeneLabJSONException(GeneLabException): pass
 class GeneLabFileException(Exception): pass
 class GeneLabDataManagerException(GeneLabException): pass
