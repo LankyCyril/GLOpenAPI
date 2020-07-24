@@ -66,8 +66,10 @@ def refresh_json_store_inner(db):
             glds = CSD(accession, glds_json, fileurls_json, filedates_json=None)
             dbatiio({"accession": accession, "_id": glds._id})
             filedates_json = gfj(glds._id, "filedates")
+            print("ANEW:", accession)
         else:
             filedates_json = gfj(_id_search["_id"], "filedates")
+            print("CACHED:", accession)
         if glds is None: # make sure ColdStorageDataset is initialized
             glds = CSD(accession, glds_json, fileurls_json, filedates_json)
 

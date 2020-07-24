@@ -37,6 +37,16 @@ def parse_assay_json_fields(json):
     return dict(fields), field2title
 
 
+def INPLACE_merge_duplicate_fields(dataframe, fields):
+    first_field, *other_fields = fields
+    for other_field in other_fields:
+        if (dataframe[first_field] != dataframe[other_field]).any():
+            raise ValueError("Ambiguous and differing duplicate fields")
+    else:
+        dataframe.drop(columns=other_fields, inplace=True)
+        return first_field
+
+
 def parse_metadatalike_json(metadata_object, json):
     """Convert assay JSON to metadata DataFrame"""
     try:
@@ -62,7 +72,12 @@ def parse_metadatalike_json(metadata_object, json):
     if len(matching_fields) == 0:
         raise IndexError("Nonexistent '{}'".format(INDEX_BY))
     elif len(matching_fields) > 1:
-        raise IndexError("Ambiguous '{}'".format(INDEX_BY))
+        try:
+            internally_indexed_by = INPLACE_merge_duplicate_fields(
+                unindexed_dataframe, matching_fields,
+            )
+        except ValueError:
+            raise IndexError("Ambiguous '{}'".format(INDEX_BY))
     else:
         internally_indexed_by = list(matching_fields)[0]
     # reindex raw DataFrame:
