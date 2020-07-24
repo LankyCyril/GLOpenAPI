@@ -94,6 +94,7 @@ def refresh_json_store_inner(db):
     for accession in (fresh | stale) - all_accessions: # drop removed datasets
         db.dataset_timestamps.delete_many({"accession": accession})
         db.accession_to_id.delete_many({"accession": accession})
+    return all_accessions, fresh, stale
 
 
 def refresh_json_store(db):
@@ -101,7 +102,7 @@ def refresh_json_store(db):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            refresh_json_store_inner(db)
+            _ = refresh_json_store_inner(db)
             return func(*args, **kwargs)
         return wrapper
     return decorator

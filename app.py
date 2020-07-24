@@ -47,4 +47,9 @@ def landing_page():
 @app.route("/debug", methods=["GET"])
 def debug_page():
     from genefab3.mongo import refresh_json_store_inner
-    return refresh_json_store_inner(db)
+    all_accessions, fresh, stale = refresh_json_store_inner(db)
+    return "<hr>".join([
+        "All accessions:<br>" + ", ".join(sorted(all_accessions)),
+        "Fresh accessions:<br>" + ", ".join(sorted(fresh)),
+        "Stale accessions:<br>" + ", ".join(sorted(stale)),
+    ])
