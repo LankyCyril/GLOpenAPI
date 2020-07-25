@@ -1,10 +1,10 @@
-from functools import wraps, partial
+from functools import wraps
 from genefab3.config import MAX_DATASETS, MAX_JSON_AGE, COLD_SEARCH_MASK
-from datetime import datetime
 from genefab3.utils import download_cold_json
 from genefab3.exceptions import GeneLabJSONException
-from pymongo import DESCENDING
 from genefab3.coldstoragedataset import ColdStorageDataset as CSD
+from datetime import datetime
+from pymongo import DESCENDING
 from pandas import Series
 
 
@@ -35,36 +35,52 @@ def is_json_cache_fresh(json_cache_info, max_age=MAX_JSON_AGE):
         return (current_timestamp - cache_timestamp <= max_age)
 
 
-def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE):
+def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, compare=False):
     """Get JSON from local database if fresh, otherwise update local database and get"""
     json_cache_info = db.json_cache.find_one(
         {"identifier": identifier, "kind": kind},
         sort=[("last_refreshed", DESCENDING)],
     )
     if is_json_cache_fresh(json_cache_info, max_age):
-        return json_cache_info["raw"]
+        fresh_json, json_changed = json_cache_info["raw"], False
     else:
         try:
-            json = download_cold_json(identifier, kind=kind)
+            fresh_json = download_cold_json(identifier, kind=kind)
         except Exception:
             try:
-                return json_cache_info["raw"]
+                fresh_json, json_changed = json_cache_info["raw"], False
             except (TypeError, KeyError):
-                raise GeneLabJSONException("Cannot retrieve cold storage JSON")
+                msg_mask = "Cannot retrieve cold storage JSON for '{}'"
+                raise GeneLabJSONException(msg_mask.format(identifier))
         else:
             replace_doc(
                 db.json_cache, {"identifier": identifier, "kind": kind},
-                last_refreshed=int(datetime.now().timestamp()), raw=json,
+                last_refreshed=int(datetime.now().timestamp()), raw=fresh_json,
             )
-            return json
+            if compare:
+                json_changed = (fresh_json != json_cache_info.get("raw", {}))
+    if compare:
+        return fresh_json, json_changed
+    else:
+        return fresh_json
 
 
 def refresh_dataset_json_store(db, accession):
+    """Refresh top-level JSON of dataset in database"""
+    glds_json, glds_changed = get_fresh_json(
+        db, accession, "glds", compare=True,
+    )
+    replace_doc(
+        db.dataset_timestamps, {"accession": accession},
+        last_refreshed=int(datetime.now().timestamp()),
+    )
+    return glds_json, glds_changed
+
+
+def get_dataset_with_caching(db, accession):
     """Refresh dataset JSONs in database"""
-    gfj = partial(get_fresh_json, db)
-    glds = None
-    glds_json = gfj(accession, "glds")
-    fileurls_json = gfj(accession, "fileurls")
+    glds_json, _ = refresh_dataset_json_store(db, accession)
+    fileurls_json = get_fresh_json(db, accession, "fileurls")
     # internal _id is only found through dataset JSON, but may be cached:
     _id_search = db.accession_to_id.find_one({"accession": accession})
     if (_id_search is None) or ("cold_id" not in _id_search):
@@ -73,15 +89,10 @@ def refresh_dataset_json_store(db, accession):
         replace_doc(
             db.accession_to_id, {"accession": accession}, cold_id=glds._id,
         )
-        filedates_json = gfj(glds._id, "filedates")
+        filedates_json = get_fresh_json(db, glds._id, "filedates")
     else:
-        filedates_json = gfj(_id_search["cold_id"], "filedates")
-    if glds is None: # make sure ColdStorageDataset is initialized
+        filedates_json = get_fresh_json(db, _id_search["cold_id"], "filedates")
         glds = CSD(accession, glds_json, fileurls_json, filedates_json)
-    replace_doc(
-        db.dataset_timestamps, {"accession": accession},
-        last_refreshed=int(datetime.now().timestamp()),
-    )
     return glds
 
 
@@ -110,21 +121,22 @@ def refresh_assay_property_store(db, assay):
 def refresh_json_store_inner(db):
     """Iterate over datasets in cold storage, put updated JSONs into database"""
     fresh, stale = get_fresh_and_stale_accessions(db)
-    # TODO: only cascade JSON update if top-level JSON has changed!! XXX XXX XXX
-    gfj = partial(get_fresh_json, db)
     try: # get number of datasets in database, and then all dataset JSONs
         n_datasets = min(
-            gfj(COLD_SEARCH_MASK.format(0))["hits"]["total"], MAX_DATASETS,
+            get_fresh_json(db, COLD_SEARCH_MASK.format(0))["hits"]["total"],
+            MAX_DATASETS,
         )
         url = COLD_SEARCH_MASK.format(n_datasets)
-        raw_datasets_json = gfj(url)["hits"]["hits"]
+        raw_datasets_json = get_fresh_json(db, url)["hits"]["hits"]
         all_accessions = {raw_json["_id"] for raw_json in raw_datasets_json}
     except KeyError:
         raise GeneLabJSONException("Malformed search JSON")
     for accession in all_accessions - fresh: # update stale JSONs
-        glds = refresh_dataset_json_store(db, accession)
-        for assay in glds.assays.values():
-            refresh_assay_property_store(db, assay)
+        glds_json, glds_changed = refresh_dataset_json_store(db, accession)
+        if glds_changed:
+            glds = get_dataset_with_caching(db, accession)
+            for assay in glds.assays.values():
+                refresh_assay_property_store(db, assay)
     for accession in (fresh | stale) - all_accessions: # drop removed datasets
         db.dataset_timestamps.delete_many({"accession": accession})
         db.accession_to_id.delete_many({"accession": accession})
