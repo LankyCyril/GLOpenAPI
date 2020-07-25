@@ -1,5 +1,5 @@
 from functools import wraps
-from genefab3.config import MAX_DATASETS, COLD_SEARCH_MASK
+from genefab3.config import MAX_AUTOUPDATED_DATASETS, COLD_SEARCH_MASK
 from genefab3.config import MAX_JSON_AGE, MAX_JSON_THREADS
 from genefab3.utils import download_cold_json
 from genefab3.exceptions import GeneLabJSONException
@@ -7,7 +7,7 @@ from genefab3.coldstoragedataset import ColdStorageDataset
 from datetime import datetime
 from pymongo import DESCENDING
 from pandas import Series
-from concurrent.futures import ThreadPoolExecutor as TPE
+from concurrent.futures import as_completed, ThreadPoolExecutor
 
 
 def replace_doc(db, query, **kwargs):
@@ -130,22 +130,21 @@ def refresh_json_store_inner(db):
     try: # get number of datasets in database, and then all dataset JSONs
         n_datasets = min(
             get_fresh_json(db, COLD_SEARCH_MASK.format(0))["hits"]["total"],
-            MAX_DATASETS,
+            MAX_AUTOUPDATED_DATASETS,
         )
         url = COLD_SEARCH_MASK.format(n_datasets)
         raw_datasets_json = get_fresh_json(db, url)["hits"]["hits"]
         all_accessions = {raw_json["_id"] for raw_json in raw_datasets_json}
     except KeyError:
         raise GeneLabJSONException("Malformed search JSON")
-    with TPE(max_workers=MAX_JSON_THREADS) as pool: # update stale JSONs
-        futures = {
-            accession: pool.submit(
-                refresh_dataset_json_store, db=db, accession=accession,
-            )
+    with ThreadPoolExecutor(max_workers=MAX_JSON_THREADS) as pool:
+        future_to_accession = { # update stale JSONs
+            pool.submit(refresh_dataset_json_store, db, accession): accession
             for accession in all_accessions - fresh
         }
-        for accession, future in futures.items():
+        for future in as_completed(future_to_accession):
             _, glds_changed = future.result()
+            accession = future_to_accession[future]
             if glds_changed:
                 glds = get_dataset_with_caching(db, accession)
                 for assay in glds.assays.values():
