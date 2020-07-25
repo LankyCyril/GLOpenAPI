@@ -1,11 +1,13 @@
 from functools import wraps
-from genefab3.config import MAX_DATASETS, MAX_JSON_AGE, COLD_SEARCH_MASK
+from genefab3.config import MAX_DATASETS, COLD_SEARCH_MASK
+from genefab3.config import MAX_JSON_AGE, MAX_JSON_THREADS
 from genefab3.utils import download_cold_json
 from genefab3.exceptions import GeneLabJSONException
-from genefab3.coldstoragedataset import ColdStorageDataset as CSD
+from genefab3.coldstoragedataset import ColdStorageDataset
 from datetime import datetime
 from pymongo import DESCENDING
 from pandas import Series
+from concurrent.futures import ThreadPoolExecutor as TPE
 
 
 def replace_doc(db, query, **kwargs):
@@ -85,14 +87,18 @@ def get_dataset_with_caching(db, accession):
     _id_search = db.accession_to_id.find_one({"accession": accession})
     if (_id_search is None) or ("cold_id" not in _id_search):
         # internal _id not cached, initialize dataset to find it:
-        glds = CSD(accession, glds_json, fileurls_json, filedates_json=None)
+        glds = ColdStorageDataset(
+            accession, glds_json, fileurls_json, filedates_json=None,
+        )
         replace_doc(
             db.accession_to_id, {"accession": accession}, cold_id=glds._id,
         )
         filedates_json = get_fresh_json(db, glds._id, "filedates")
     else:
         filedates_json = get_fresh_json(db, _id_search["cold_id"], "filedates")
-        glds = CSD(accession, glds_json, fileurls_json, filedates_json)
+        glds = ColdStorageDataset(
+            accession, glds_json, fileurls_json, filedates_json,
+        )
     return glds
 
 
@@ -131,12 +137,19 @@ def refresh_json_store_inner(db):
         all_accessions = {raw_json["_id"] for raw_json in raw_datasets_json}
     except KeyError:
         raise GeneLabJSONException("Malformed search JSON")
-    for accession in all_accessions - fresh: # update stale JSONs
-        glds_json, glds_changed = refresh_dataset_json_store(db, accession)
-        if glds_changed:
-            glds = get_dataset_with_caching(db, accession)
-            for assay in glds.assays.values():
-                refresh_assay_property_store(db, assay)
+    with TPE(max_workers=MAX_JSON_THREADS) as pool: # update stale JSONs
+        futures = {
+            accession: pool.submit(
+                refresh_dataset_json_store, db=db, accession=accession,
+            )
+            for accession in all_accessions - fresh
+        }
+        for accession, future in futures.items():
+            _, glds_changed = future.result()
+            if glds_changed:
+                glds = get_dataset_with_caching(db, accession)
+                for assay in glds.assays.values():
+                    refresh_assay_property_store(db, assay)
     for accession in (fresh | stale) - all_accessions: # drop removed datasets
         db.dataset_timestamps.delete_many({"accession": accession})
         db.accession_to_id.delete_many({"accession": accession})
