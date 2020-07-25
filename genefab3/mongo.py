@@ -1,5 +1,5 @@
 from functools import wraps, partial
-from genefab3.config import MAX_JSON_AGE, COLD_SEARCH_MASK
+from genefab3.config import MAX_DATASETS, MAX_JSON_AGE, COLD_SEARCH_MASK
 from datetime import datetime
 from genefab3.utils import download_cold_json
 from genefab3.exceptions import GeneLabJSONException
@@ -59,38 +59,72 @@ def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE):
             return json
 
 
+def refresh_dataset_json_store(db, accession):
+    """Refresh dataset JSONs in database"""
+    gfj = partial(get_fresh_json, db)
+    glds = None
+    glds_json = gfj(accession, "glds")
+    fileurls_json = gfj(accession, "fileurls")
+    # internal _id is only found through dataset JSON, but may be cached:
+    _id_search = db.accession_to_id.find_one({"accession": accession})
+    if (_id_search is None) or ("cold_id" not in _id_search):
+        # internal _id not cached, initialize dataset to find it:
+        glds = CSD(accession, glds_json, fileurls_json, filedates_json=None)
+        replace_doc(
+            db.accession_to_id, {"accession": accession}, cold_id=glds._id,
+        )
+        filedates_json = gfj(glds._id, "filedates")
+    else:
+        filedates_json = gfj(_id_search["cold_id"], "filedates")
+    if glds is None: # make sure ColdStorageDataset is initialized
+        glds = CSD(accession, glds_json, fileurls_json, filedates_json)
+    replace_doc(
+        db.dataset_timestamps, {"accession": accession},
+        last_refreshed=int(datetime.now().timestamp()),
+    )
+    return glds
+
+
+def refresh_assay_property_store(db, assay):
+    """Put per-sample, per-assay factors, annotation, and metadata into database"""
+    for prop in "metadata", "annotation", "factors":
+        db.assay_properties.delete_many({
+            "accession": assay.dataset.accession,
+            "assay_name": assay.name,
+            "property": prop,
+        })
+        dataframe = getattr(assay, prop).full
+        for sample_name, row in dataframe.iterrows():
+            for (field, internal_field), value in row.iteritems():
+                db.assay_properties.insert_one({
+                    "accession": assay.dataset.accession,
+                    "assay_name": assay.name,
+                    "sample_name": sample_name,
+                    "property": prop,
+                    "field": field,
+                    "internal_field": internal_field,
+                    "value": value,
+                })
+
+
 def refresh_json_store_inner(db):
     """Iterate over datasets in cold storage, put updated JSONs into database"""
     fresh, stale = get_fresh_and_stale_accessions(db)
+    # TODO: only cascade JSON update if top-level JSON has changed!! XXX XXX XXX
     gfj = partial(get_fresh_json, db)
     try: # get number of datasets in database, and then all dataset JSONs
-        url = COLD_SEARCH_MASK.format(0)
-        n_datasets = gfj(url)["hits"]["total"]
+        n_datasets = min(
+            gfj(COLD_SEARCH_MASK.format(0))["hits"]["total"], MAX_DATASETS,
+        )
         url = COLD_SEARCH_MASK.format(n_datasets)
         raw_datasets_json = gfj(url)["hits"]["hits"]
         all_accessions = {raw_json["_id"] for raw_json in raw_datasets_json}
     except KeyError:
         raise GeneLabJSONException("Malformed search JSON")
     for accession in all_accessions - fresh: # update stale JSONs
-        glds_json, glds = gfj(accession, "glds"), None
-        fileurls_json = gfj(accession, "fileurls")
-        # internal _id is only found through dataset JSON, but may be cached:
-        _id_search = db.accession_to_id.find_one({"accession": accession})
-        if (_id_search is None) or ("cold_id" not in _id_search):
-            # internal _id not cached, initialize dataset to find it:
-            glds = CSD(accession, glds_json, fileurls_json, filedates_json=None)
-            replace_doc(
-                db.accession_to_id, {"accession": accession}, cold_id=glds._id,
-            )
-            filedates_json = gfj(glds._id, "filedates")
-        else:
-            filedates_json = gfj(_id_search["cold_id"], "filedates")
-        if glds is None: # make sure ColdStorageDataset is initialized
-            glds = CSD(accession, glds_json, fileurls_json, filedates_json)
-        replace_doc(
-            db.dataset_timestamps, {"accession": accession},
-            last_refreshed=int(datetime.now().timestamp()),
-        )
+        glds = refresh_dataset_json_store(db, accession)
+        for assay in glds.assays.values():
+            refresh_assay_property_store(db, assay)
     for accession in (fresh | stale) - all_accessions: # drop removed datasets
         db.dataset_timestamps.delete_many({"accession": accession})
         db.accession_to_id.delete_many({"accession": accession})

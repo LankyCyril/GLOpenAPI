@@ -17,6 +17,7 @@ COLD_FILEDATES_MASK = COLD_API_ROOT + "/data/study/filelistings/{}"
 INDEX_BY = "Sample Name"
 TIMESTAMP_FMT = "%a %b %d %H:%M:%S %Z %Y"
 
+MAX_DATASETS = float("inf")
 MAX_JSON_AGE = 10800 # 3 hours (in seconds)
 
 DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'
