@@ -146,6 +146,7 @@ def refresh_json_store_inner(db):
             _, glds_changed = future.result()
             accession = future_to_accession[future]
             if glds_changed:
+                # TODO: use ThreadPoolExecutor
                 glds = get_dataset_with_caching(db, accession)
                 for assay in glds.assays.values():
                     refresh_assay_property_store(db, assay)

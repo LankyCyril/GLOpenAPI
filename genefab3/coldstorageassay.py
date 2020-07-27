@@ -3,21 +3,23 @@ from genefab3.config import INDEX_BY
 from genefab3.utils import force_default_name_delimiter
 from collections import defaultdict
 from pandas import Series, DataFrame, concat, merge, read_csv
-from re import search, fullmatch, split, IGNORECASE
+from re import search, fullmatch, split, sub, IGNORECASE
 from copy import copy, deepcopy
 from urllib.request import urlopen
 
 
-def filter_json(json, field_mask):
+def filter_json(json, marker):
     """Reduce metadata-like JSON to 'header' fields matching `field_mask`"""
     try:
-        return {
-            "raw": deepcopy(json["raw"]),
-            "header": [
-                deepcopy(e) for e in json["header"]
-                if search(field_mask, e["title"]) or (e["title"] == INDEX_BY)
-            ]
-        }
+        header_content = []
+        for entry in json["header"]:
+            if search(marker, entry["title"]):
+                modified_entry = deepcopy(entry)
+                modified_entry["title"] = sub(marker, "", entry["title"])
+                header_content.append(modified_entry)
+            elif (entry["title"] == INDEX_BY):
+                header_content.append(entry)
+        return {"raw": deepcopy(json["raw"]), "header": header_content}
     except KeyError:
         raise GeneLabJSONException("Malformed assay JSON: header and/or raw")
 
@@ -133,12 +135,12 @@ class MetadataLike():
     """Stores assay fields and metadata in raw and processed form"""
     indexed_by, internally_indexed_by = None, None
  
-    def __init__(self, json, field_mask=None):
+    def __init__(self, json, marker=None):
         """Convert assay JSON to metadata object"""
-        if field_mask is None:
+        if marker is None:
             filtered_json = json
         else:
-            filtered_json = filter_json(json, field_mask)
+            filtered_json = filter_json(json, marker)
         self.fields, self.field2title = parse_assay_json_fields(filtered_json)
         self.raw_dataframe, self.indexed_by, self.internally_indexed_by = (
             parse_metadatalike_json(self, filtered_json)
@@ -188,7 +190,7 @@ class ColdStorageAssay():
         try:
             self.metadata = MetadataLike(assay_json)
             self.annotation = MetadataLike(sample_json)
-            self.factors = MetadataLike(sample_json, r'^Factor Value')
+            self.factors = MetadataLike(sample_json, r'^Factor Value:\s*')
         except IndexError as e:
             msg = "{}, {}: {}".format(dataset.accession, name, e)
             raise GeneLabJSONException(msg)
