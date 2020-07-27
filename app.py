@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError
-from genefab3.exceptions import GeneLabDatabaseException
+from genefab3.exceptions import GeneLabException, GeneLabDatabaseException
 from genefab3.config import MONGO_DB_NAME, DEBUG_MARKERS, COMPRESSIBLE_MIMETYPES
 from flask import Flask, request
 from flask_compress import Compress
@@ -42,6 +42,35 @@ def favicon(imgtype):
 def landing_page():
     """Hello, Space!"""
     return interactive_doc(url_root=request.url_root.rstrip("/"))
+
+
+@app.route("/assays/", methods=["GET"])
+def assays():
+    """Select assays based on annotation filters"""
+    unknown_args = set(request.args) - {
+        "factors", "comments", "characteristics", "properties",
+    }
+    if unknown_args:
+        raise GeneLabException("Unrecognized arguments: {}".format(
+            ", ".join(sorted(unknown_args))
+        ))
+    try:
+        datasets_and_assays = set.intersection(*(
+            {
+                (entry["accession"], entry["assay_name"]) for entry in
+                db.assay_properties.find({
+                    "property": "factors",
+                    "field": {"$in": factors_any.split("|")},
+                })
+            }
+            for factors_any in request.args.getlist("factors")
+        ))
+    except TypeError:
+        datasets_and_assays = {}
+    return "<pre>Dataset  \tAssay\n" + "\n".join([
+        "{} \t{}".format(accession, assay_name)
+        for accession, assay_name in sorted(datasets_and_assays)
+    ])
 
 
 @app.route("/debug", methods=["GET"])
