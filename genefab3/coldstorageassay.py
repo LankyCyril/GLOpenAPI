@@ -134,15 +134,15 @@ def get_variable_subset_of_dataframe(df):
     return df.loc[:, df.apply(lambda r: len(set(r.values))>1)]
 
 
-def get_minimal_dataframe(df, index_name=None):
+def make_named_metadatalike_dataframe(df, index_name=None):
     """Keep only named (known) variable columns, drop internal field names"""
     fields = df.columns.get_level_values(0)
-    minimal_df = df.loc[:, [f != "Unknown" for f in fields]].copy()
-    minimal_df.columns = minimal_df.columns.droplevel(1)
-    minimal_df.columns.name = None
+    named_df = df.loc[:, [f != "Unknown" for f in fields]].copy()
+    named_df.columns = named_df.columns.droplevel(1)
+    named_df.columns.name = None
     if index_name:
-        minimal_df.index.name = index_name
-    return minimal_df
+        named_df.index.name = index_name
+    return named_df
 
 
 class MetadataLike():
@@ -165,8 +165,9 @@ class MetadataLike():
         )
         del self.fields[self.indexed_by]
         self.full = make_metadatalike_dataframe(self)
-        self.differential = get_variable_subset_of_dataframe(self.full)
-        self.minimal = get_minimal_dataframe(self.differential, self.indexed_by)
+        self.named = make_named_metadatalike_dataframe(
+            self.full, self.indexed_by,
+        )
  
     def match_field_titles(self, pattern, flags=IGNORECASE, method=search):
         """Find fields matching pattern"""
