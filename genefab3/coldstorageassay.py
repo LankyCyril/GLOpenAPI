@@ -8,17 +8,31 @@ from copy import copy, deepcopy
 from urllib.request import urlopen
 
 
-def filter_json(json, marker):
+def filter_json(json, use=None, discard=None):
     """Reduce metadata-like JSON to 'header' fields matching `field_mask`"""
     try:
         header_content = []
-        for entry in json["header"]:
-            if search(marker, entry["title"]):
-                modified_entry = deepcopy(entry)
-                modified_entry["title"] = sub(marker, "", entry["title"])
-                header_content.append(modified_entry)
-            elif (entry["title"] == INDEX_BY):
-                header_content.append(entry)
+        if use:
+            marker = r'^{}:\s*'.format(use)
+            for entry in json["header"]:
+                if search(marker, entry["title"], flags=IGNORECASE):
+                    modified_entry = deepcopy(entry)
+                    raw_converted_title = sub(
+                        marker, "", entry["title"], flags=IGNORECASE,
+                    )
+                    modified_entry["title"] = sub(
+                        r'_', " ", raw_converted_title.lower(),
+                    )
+                    header_content.append(modified_entry)
+                elif (entry["title"] == INDEX_BY):
+                    header_content.append(entry)
+        elif discard:
+            marker = r'^({}):\s*'.format("|".join(discard))
+            for entry in json["header"]:
+                if not search(marker, entry["title"], flags=IGNORECASE):
+                    header_content.append(entry)
+                elif (entry["title"] == INDEX_BY):
+                    header_content.append(entry)
         return {"raw": deepcopy(json["raw"]), "header": header_content}
     except KeyError:
         raise GeneLabJSONException("Malformed assay JSON: header and/or raw")
@@ -135,12 +149,16 @@ class MetadataLike():
     """Stores assay fields and metadata in raw and processed form"""
     indexed_by, internally_indexed_by = None, None
  
-    def __init__(self, json, marker=None):
+    def __init__(self, json, use=None, discard=None):
         """Convert assay JSON to metadata object"""
-        if marker is None:
+        if (use is None) and (discard is None):
             filtered_json = json
+        elif use:
+            filtered_json = filter_json(json, use=use)
+        elif discard:
+            filtered_json = filter_json(json, discard=discard)
         else:
-            filtered_json = filter_json(json, marker)
+            raise GeneLabException("MetadataLike can only 'use' XOR 'discard'")
         self.fields, self.field2title = parse_assay_json_fields(filtered_json)
         self.raw_dataframe, self.indexed_by, self.internally_indexed_by = (
             parse_metadatalike_json(self, filtered_json)
@@ -183,14 +201,20 @@ class ColdStorageAssay():
         try:
             _ = dataset.assays[name]
         except (AttributeError, KeyError):
-            msg = "Attempt to associate an assay with a wrong dataset"
+            msg = "Attempt to associate an assay with the wrong dataset"
             raise GeneLabException(msg)
         self.name = name
         self.dataset = dataset
         try:
-            self.metadata = MetadataLike(assay_json)
-            self.annotation = MetadataLike(sample_json)
-            self.factors = MetadataLike(sample_json, r'^Factor Value:\s*')
+            ML = MetadataLike
+            self.metadata = ML(assay_json)
+            self.factors = ML(sample_json, use="factor value")
+            self.parameters = ML(sample_json, use="parameter value")
+            self.characteristics = ML(sample_json, use="characteristics")
+            self.comments = ML(sample_json, use="comment")
+            self.properties = ML(sample_json, discard={
+                "factor value", "parameter value", "characteristics", "comment",
+            })
         except IndexError as e:
             msg = "{}, {}: {}".format(dataset.accession, name, e)
             raise GeneLabJSONException(msg)

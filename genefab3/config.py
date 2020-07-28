@@ -21,6 +21,11 @@ MAX_AUTOUPDATED_DATASETS = float("inf")
 MAX_JSON_AGE = 10800 # 3 hours (in seconds)
 MAX_JSON_THREADS = 24
 
+ASSAY_METADATALIKES = {
+    "metadata", "factors", "parameters",
+    "characteristics", "comments", "properties",
+}
+
 DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'
 VIZ_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table.csv$'
 PCA_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$'

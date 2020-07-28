@@ -1,6 +1,8 @@
-from functools import wraps
+from os import environ
+from sys import stderr
 from genefab3.config import MAX_AUTOUPDATED_DATASETS, COLD_SEARCH_MASK
 from genefab3.config import MAX_JSON_AGE, MAX_JSON_THREADS
+from genefab3.config import ASSAY_METADATALIKES
 from genefab3.utils import download_cold_json
 from genefab3.exceptions import GeneLabJSONException
 from genefab3.coldstoragedataset import ColdStorageDataset
@@ -8,6 +10,9 @@ from datetime import datetime
 from pymongo import DESCENDING
 from pandas import Series
 from concurrent.futures import as_completed, ThreadPoolExecutor
+
+
+DEBUG = (environ.get("FLASK_ENV", None) == "development")
 
 
 def replace_doc(db, query, **kwargs):
@@ -59,8 +64,10 @@ def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, compare=F
                 db.json_cache, {"identifier": identifier, "kind": kind},
                 last_refreshed=int(datetime.now().timestamp()), raw=fresh_json,
             )
-            if compare:
+            if compare and json_cache_info:
                 json_changed = (fresh_json != json_cache_info.get("raw", {}))
+            elif compare:
+                json_changed = True
     if compare:
         return fresh_json, json_changed
     else:
@@ -102,29 +109,63 @@ def get_dataset_with_caching(db, accession):
     return glds
 
 
-def refresh_assay_property_store(db, assay):
+def refresh_many_datasets(db, accessions, max_workers=MAX_JSON_THREADS):
+    """Update stale GLDS JSONs and database entries"""
+    datasets_with_assays_to_update = []
+    with ThreadPoolExecutor(max_workers=MAX_JSON_THREADS) as pool:
+        future_to_accession = {
+            pool.submit(refresh_dataset_json_store, db, accession): accession
+            for accession in accessions
+        }
+        for future in as_completed(future_to_accession):
+            _, glds_changed = future.result()
+            accession = future_to_accession[future]
+            if DEBUG:
+                print("Refreshed JSON for dataset:", accession, file=stderr)
+            if glds_changed:
+                print("JSON changed for dataset:", accession, file=stderr)
+                datasets_with_assays_to_update.append(accession)
+    return datasets_with_assays_to_update
+
+
+def refresh_assay_meta_stores(db, accession):
     """Put per-sample, per-assay factors, annotation, and metadata into database"""
-    for prop in "metadata", "annotation", "factors":
-        db.assay_properties.delete_many({
-            "accession": assay.dataset.accession,
-            "assay_name": assay.name,
-            "property": prop,
-        })
-        dataframe = getattr(assay, prop).full
-        for sample_name, row in dataframe.iterrows():
-            for (field, internal_field), value in row.iteritems():
-                db.assay_properties.insert_one({
-                    "accession": assay.dataset.accession,
-                    "assay_name": assay.name,
-                    "sample_name": sample_name,
-                    "property": prop,
-                    "field": field,
-                    "internal_field": internal_field,
-                    "value": value,
-                })
+    glds = get_dataset_with_caching(db, accession)
+    for assay in glds.assays.values():
+        for meta in ASSAY_METADATALIKES:
+            db.assay_meta.delete_many({
+                "accession": assay.dataset.accession,
+                "assay_name": assay.name,
+                "meta": meta,
+            })
+            dataframe = getattr(assay, meta).full
+            for sample_name, row in dataframe.iterrows():
+                for (field, internal_field), value in row.iteritems():
+                    db.assay_meta.insert_one({
+                        "accession": assay.dataset.accession,
+                        "assay_name": assay.name,
+                        "sample_name": sample_name,
+                        "meta": meta,
+                        "field": field,
+                        "internal_field": internal_field,
+                        "value": value,
+                    })
 
 
-def refresh_json_store_inner(db):
+def refresh_many_assays(db, datasets_with_assays_to_update, max_workers=MAX_JSON_THREADS):
+    """Update stale assay JSONs and db entries"""
+    with ThreadPoolExecutor(max_workers=MAX_JSON_THREADS) as pool:
+        future_to_accession = {
+            pool.submit(refresh_assay_meta_stores, db, accession):
+            accession for accession in datasets_with_assays_to_update
+        }
+        for future in as_completed(future_to_accession):
+            if DEBUG:
+                acc = future_to_accession[future]
+                print("Refreshed JSON for assays in:", acc, file=stderr)
+
+
+def refresh_database_metadata(db):
     """Iterate over datasets in cold storage, put updated JSONs into database"""
     fresh, stale = get_fresh_and_stale_accessions(db)
     try: # get number of datasets in database, and then all dataset JSONs
@@ -137,31 +178,13 @@ def refresh_json_store_inner(db):
         all_accessions = {raw_json["_id"] for raw_json in raw_datasets_json}
     except KeyError:
         raise GeneLabJSONException("Malformed search JSON")
-    with ThreadPoolExecutor(max_workers=MAX_JSON_THREADS) as pool:
-        future_to_accession = { # update stale JSONs
-            pool.submit(refresh_dataset_json_store, db, accession): accession
-            for accession in all_accessions - fresh
-        }
-        for future in as_completed(future_to_accession):
-            _, glds_changed = future.result()
-            accession = future_to_accession[future]
-            if glds_changed:
-                # TODO: use ThreadPoolExecutor
-                glds = get_dataset_with_caching(db, accession)
-                for assay in glds.assays.values():
-                    refresh_assay_property_store(db, assay)
+    datasets_with_assays_to_update = refresh_many_datasets(
+        db, all_accessions - fresh, max_workers=MAX_JSON_THREADS,
+    )
+    refresh_many_assays(
+        db, datasets_with_assays_to_update, max_workers=MAX_JSON_THREADS,
+    )
     for accession in (fresh | stale) - all_accessions: # drop removed datasets
         db.dataset_timestamps.delete_many({"accession": accession})
         db.accession_to_id.delete_many({"accession": accession})
-    return all_accessions, fresh, stale
-
-
-def refresh_json_store(db):
-    """Keep all dataset and assay metadata up to date"""
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            _ = refresh_json_store_inner(db)
-            return func(*args, **kwargs)
-        return wrapper
-    return decorator
+    return all_accessions, fresh, stale, datasets_with_assays_to_update
