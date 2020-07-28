@@ -3,7 +3,7 @@ from genefab3.exceptions import GeneLabException, GeneLabJSONException
 from genefab3.config import GENELAB_ROOT
 from genefab3.utils import download_cold_json as dl_json
 from genefab3.utils import extract_file_timestamp, levenshtein_distance
-from genefab3.coldstorageassay import ColdStorageAssay
+from genefab3.coldstorage.assay import ColdStorageAssay
 from pandas import DataFrame, concat
 from argparse import Namespace
 

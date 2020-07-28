@@ -5,7 +5,7 @@ from genefab3.config import MAX_JSON_AGE, MAX_JSON_THREADS
 from genefab3.config import ASSAY_METADATALIKES
 from genefab3.utils import download_cold_json
 from genefab3.exceptions import GeneLabJSONException
-from genefab3.coldstoragedataset import ColdStorageDataset
+from genefab3.coldstorage.dataset import ColdStorageDataset
 from datetime import datetime
 from pymongo import DESCENDING
 from pandas import Series

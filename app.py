@@ -8,7 +8,7 @@ from flask import Flask, request
 from flask_compress import Compress
 from os import environ
 from genefab3.exceptions import traceback_printer, exception_catcher
-from genefab3.mongo import refresh_database_metadata
+from genefab3.mongo.meta import refresh_database_metadata
 from genefab3.docs import interactive_doc
 
 
