@@ -42,8 +42,8 @@ def documentation():
 def assays(**kwargs):
     """Select assays based on annotation filters"""
     refresh_database_metadata(db)
-    from genefab3.flask.assays import get_by_meta
-    return get_by_meta(db, **kwargs, rargs=request.args)
+    from genefab3.flask.assays import get_assays_by_metas
+    return get_assays_by_metas(db, **kwargs, rargs=request.args)
 
 @app.route("/favicon.<imgtype>")
 def favicon(**kwargs):
