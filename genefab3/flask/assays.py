@@ -63,6 +63,7 @@ def get_assays_by_one_meta(db, meta, rargs, ignore={"Unknown"}):
 
 
 def sorted_human(assays_by_metas):
+    """See: https://stackoverflow.com/a/29582718/590676"""
     reindexed = assays_by_metas[
         ["accession", "assay_name"] + sorted(assays_by_metas.columns[2:])
     ]

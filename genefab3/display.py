@@ -10,12 +10,16 @@ DF_CSS = """<style>
         border-left: 1pt solid black; border-top: 1pt solid black;
     }
     th, td {
-        font-family: sans; padding-right: 16pt; white-space: nowrap;
-        text-align: left;
+        font-family: sans; font-size: 12pt;
+        text-align: left; padding-right: 16pt; white-space: nowrap;
         border-right: 1pt solid black; border-bottom: 1pt solid black;
     }
     th {
         background: #DDD;
+        position: sticky; position: -webkit-sticky; top: 0;
+    }
+    td:first-child, td:nth-child(2) {
+        background: #F2F2F2;
     }
 </style>"""
 
