@@ -1,7 +1,8 @@
 from genefab3.config import ASSAY_METADATALIKES
 from genefab3.exceptions import GeneLabException
-from werkzeug.datastructures import ImmutableMultiDict
+from werkzeug.datastructures import ImmutableMultiDict, MultiDict
 from pandas import DataFrame, concat, merge
+from natsort import natsorted
 
 
 def lookup_meta(db, keys, value, matcher):
@@ -61,19 +62,30 @@ def get_assays_by_one_meta(db, meta, rargs, ignore={"Unknown"}):
         ], axis=1)
 
 
+def sorted_human(assays_by_metas):
+    reindexed = assays_by_metas[
+        ["accession", "assay_name"] + sorted(assays_by_metas.columns[2:])
+    ]
+    reindexed["accession"] = reindexed["accession"].astype("category")
+    reindexed["accession"].cat.reorder_categories(
+        natsorted(set(reindexed["accession"])), inplace=True, ordered=True,
+    )
+    return reindexed.sort_values(by=["accession", "assay_name"])
+
+
 def get_assays_by_metas(db, meta=None, rargs={}):
     """Select assays based on annotation (`meta`) filters"""
-    if meta and rargs: # impossible request
-        error_mask = "Malformed request: '{}' with extra arguments"
-        raise GeneLabException(error_mask.format(meta))
-    elif meta: # convert subpage to a meta wildcard
-        rargs = ImmutableMultiDict({meta: ""})
-    # perform intersections of unions:
-    assays_by_metas = None
-    for meta in rargs:
-        if meta not in ASSAY_METADATALIKES:
-            raise GeneLabException("Unrecognized meta: '{}'".format(meta))
+    if meta:
+        if meta in rargs:
+            error_mask = "Malformed request: '{}' redefinition"
+            raise GeneLabException(error_mask.format(meta))
         else:
+            rargs = MultiDict(rargs)
+            rargs[meta] = ""
+    # perform intersections of unions:
+    assays_by_metas, trailing_rargs = None, {}
+    for meta in rargs:
+        if meta in ASSAY_METADATALIKES:
             if assays_by_metas is None:
                 assays_by_metas = get_assays_by_one_meta(db, meta, rargs)
             else:
@@ -81,4 +93,6 @@ def get_assays_by_metas(db, meta=None, rargs={}):
                     assays_by_metas, get_assays_by_one_meta(db, meta, rargs),
                     on=["accession", "assay_name"], how="inner",
                 )
-    return assays_by_metas.to_html()
+        else:
+            trailing_rargs[meta] = rargs.getlist(meta)
+    return sorted_human(assays_by_metas), ImmutableMultiDict(trailing_rargs)

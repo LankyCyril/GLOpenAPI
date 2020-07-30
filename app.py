@@ -9,6 +9,7 @@ from os import environ
 from genefab3.exceptions import traceback_printer, exception_catcher
 from genefab3.mongo.meta import refresh_database_metadata
 from genefab3.docs import interactive_doc
+from genefab3.display import display
 
 
 app = Flask("genefab3")
@@ -41,9 +42,9 @@ def documentation():
 @app.route("/assays/<meta>/", methods=["GET"])
 def assays(**kwargs):
     """Select assays based on annotation filters"""
-    refresh_database_metadata(db)
     from genefab3.flask.assays import get_assays_by_metas
-    return get_assays_by_metas(db, **kwargs, rargs=request.args)
+    refresh_database_metadata(db)
+    return display(get_assays_by_metas(db, **kwargs, rargs=request.args))
 
 @app.route("/favicon.<imgtype>")
 def favicon(**kwargs):
