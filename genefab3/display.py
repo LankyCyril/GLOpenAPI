@@ -15,11 +15,13 @@ DF_CSS = """<style>
         text-align: left; padding-right: 16pt; white-space: nowrap;
         border-left: 1pt solid black; border-top: 1pt solid black;
     }
+    tr:hover {background: #BFB !important}
     th {background: #DDD; position: sticky; position: -webkit-sticky;}
     th.level0 {top: 0;}
     th.level1 {top: 16.25pt; border-bottom: 1pt solid black;}
     td.row0 {border-top: 0 !important;}
-    td.col0, td.col1 {background: #F2F2F2;}
+    td {background: #FFFFFF99;}
+    td.col0, td.col1 {background: #E3E3E399 !important;}
 </style>"""
 
 
