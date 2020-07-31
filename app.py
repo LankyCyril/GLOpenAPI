@@ -40,6 +40,7 @@ def documentation():
 @app.route("/<meta>/", methods=["GET"])
 def meta(**kwrags):
     """List names of particular meta"""
+    refresh_database_metadata(db)
     from genefab3.flask.meta import get_meta_names
     return display(get_meta_names(db, **kwrags, rargs=request.args))
 
@@ -50,6 +51,13 @@ def assays(**kwargs):
     refresh_database_metadata(db)
     from genefab3.flask.assays import get_assays_by_metas
     return display(get_assays_by_metas(db, **kwargs, rargs=request.args))
+
+@app.route("/data/", methods=["GET"])
+def data(**kwargs):
+    """Select data based on annotation filters"""
+    refresh_database_metadata(db)
+    from genefab3.flask.data import get_data_by_metas
+    return display(get_data_by_metas(db, **kwargs, rargs=request.args))
 
 @app.route("/favicon.<imgtype>")
 def favicon(**kwargs):
