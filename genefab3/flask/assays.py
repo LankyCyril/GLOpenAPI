@@ -3,62 +3,45 @@ from genefab3.exceptions import GeneLabException
 from werkzeug.datastructures import ImmutableMultiDict, MultiDict
 from pandas import DataFrame, concat, merge
 from natsort import natsorted
+from collections import defaultdict
 
 
-def lookup_meta(db, keys, value, matcher):
-    """Match-group-aggregate in MongoDB and represent result as DataFrame"""
-    aggregator = db.assay_meta.aggregate([
-        {"$match": matcher},
-        {"$group": {"_id": {kv: "$"+kv for kv in keys+[value]}}},
-    ])
-    keys_to_values_lookup = {
-        tuple(entry[k] for k in keys): entry[value]
-        for entry in map(lambda e: e["_id"], aggregator)
-    }
-    keys_to_values_dataframe = DataFrame(keys_to_values_lookup, index=[value]).T
-    keys_to_values_dataframe.index = keys_to_values_dataframe.index.rename(keys)
-    return keys_to_values_dataframe.reset_index()
+class UniversalSet(set):
+    def __and__(self, x): return x
+    def __rand__(self, x): return x
+    def __contains__(self, x): return True
 
 
-def pivot_by(dataframe, by, drop=None, groupby=None, ignore=set()):
-    """Pseudo-pivot dataframe by values of single column"""
-    if drop:
-        pivoted_dataframe = dataframe.drop(columns=[by, drop]).copy()
-    else:
-        pivoted_dataframe = dataframe.drop(columns=by).copy()
-    for value in set(dataframe[by].drop_duplicates()) - set(ignore):
-        pivoted_dataframe[value] = (dataframe[by] == value)
-    if groupby:
-        return pivoted_dataframe.groupby(groupby, as_index=False).max()
-    else:
-        return pivoted_dataframe
-
-
-def get_assays_by_one_meta_any(db, meta, meta_any):
-    """Generate dataframe of assays matching ANY of the `meta` values (e.g., "factors" in {"spaceflight" OR "microgravity"})"""
-    dataframe_by_meta = lookup_meta(
-        db, keys=["accession", "assay name"], value="field",
-        matcher={"meta": meta, "field": {"$in": meta_any.split("|")}},
-    )
-    return pivot_by(dataframe_by_meta, "field")
+def lookup_meta_keys(collection, targets, skip=set(), target_fields=UniversalSet()):
+    skip_downstream = set(skip) | {"_id"} | set(targets)
+    unique_descriptors = defaultdict(dict)
+    for entry in collection.find():
+        for key in set(entry.keys()) - skip_downstream:
+            if key in target_fields:
+                unique_descriptors[tuple(entry[t] for t in targets)][key] = True
+    dataframe_by_metas = DataFrame(unique_descriptors).T
+    dataframe_by_metas.index = dataframe_by_metas.index.rename(targets)
+    return dataframe_by_metas.fillna(False).reset_index()
 
 
 def get_assays_by_one_meta(db, meta, rargs, ignore={"Unknown"}):
     """Generate dataframe of assays matching (AND) multiple `meta` lookups (OR)"""
-    set_of_meta_anys = set(rargs.getlist(meta))
-    if set_of_meta_anys == {""}: # wildcard, get all info
-        dataframe_by_metas = lookup_meta(
-            db, keys=["accession", "assay name", "field"], value="meta",
-            matcher={"meta": meta},
+    collection = getattr(db, meta)
+    set_of_or_expression_values = set(rargs.getlist(meta))
+    if set_of_or_expression_values == {""}: # wildcard, get all info
+        dataframe_by_metas = lookup_meta_keys(
+            collection, targets=["accession", "assay name"],
+            skip={"sample name"},
         )
-        return pivot_by(
-            dataframe_by_metas, drop="meta", ignore=ignore,
-            by="field", groupby=["accession", "assay name"],
-        )
+        return dataframe_by_metas
     else: # perform ANDs on ORs
         return concat([
-            get_assays_by_one_meta_any(db, meta, meta_any)
-            for meta_any in set_of_meta_anys
+            lookup_meta_keys(
+                collection, targets=["accession", "assay name"],
+                skip={"sample name"},
+                target_fields=set(or_expression_values.split("|")),
+            )
+            for or_expression_values in set_of_or_expression_values
         ], axis=1)
 
 

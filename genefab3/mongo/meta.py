@@ -133,22 +133,17 @@ def refresh_assay_meta_stores(db, accession):
     glds = get_dataset_with_caching(db, accession)
     for assay in glds.assays.values():
         for meta in ASSAY_METADATALIKES:
-            db.assay_meta.delete_many({
-                "accession": assay.dataset.accession,
-                "assay name": assay.name,
-                "meta": meta,
+            collection = getattr(db, meta)
+            dataframe = getattr(assay, meta).named
+            collection.delete_many({
+                "accession": assay.dataset.accession, "assay name": assay.name,
             })
-            dataframe = getattr(assay, meta).full
             for sample_name, row in dataframe.iterrows():
-                for (field, internal_field), value in row.iteritems():
-                    db.assay_meta.insert_one({
+                for field, value in row.iteritems():
+                    collection.insert_one({
                         "accession": assay.dataset.accession,
                         "assay name": assay.name,
-                        "sample_name": sample_name,
-                        "meta": meta,
-                        "field": field,
-                        "internal_field": internal_field,
-                        "value": value,
+                        "sample name": sample_name, field: value,
                     })
 
 
