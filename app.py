@@ -8,7 +8,6 @@ from flask_compress import Compress
 from os import environ
 from genefab3.exceptions import traceback_printer, exception_catcher
 from genefab3.mongo.meta import refresh_database_metadata
-from genefab3.docs import interactive_doc
 from genefab3.display import display
 
 
@@ -35,7 +34,7 @@ else:
 @app.route("/", methods=["GET"])
 def documentation():
     """Hello, Space!"""
-    refresh_database_metadata(db)
+    from genefab3.docs import interactive_doc
     return interactive_doc(url_root=request.url_root.rstrip("/"))
 
 @app.route("/assays/", methods=["GET"])
@@ -54,8 +53,5 @@ def favicon(**kwargs):
 @app.route("/debug/")
 def debug():
     """Debug"""
-    if environ.get("FLASK_ENV", None) not in DEBUG_MARKERS:
-        return "Production server, debug disabled"
-    else:
-        from genefab3.flask.debug import debug
-        return debug(db)
+    from genefab3.flask.debug import debug
+    return debug(db)
