@@ -6,6 +6,9 @@ from werkzeug.datastructures import ImmutableMultiDict, MultiDict
 from pandas import concat, merge
 
 
+ASSAY_META_INFO_COLS = [("info", "accession"), ("info", "assay name")]
+
+
 def get_assays_by_one_meta(db, meta, or_expression):
     """Generate dataframe of assays matching (AND) multiple `meta` lookups (OR)"""
     if or_expression == "": # wildcard, get all info
@@ -42,13 +45,15 @@ def get_assays_by_metas(db, meta=None, rargs={}):
                 else: # perform AND
                     assays_by_metas = merge(
                         assays_by_metas, get_assays_by_one_meta(db, meta, expr),
-                        on=[("info", "accession"), ("info", "assay name")],
-                        how="inner",
+                        on=ASSAY_META_INFO_COLS, how="inner",
                     )
         else:
             trailing_rargs[meta] = rargs.getlist(meta)
     # sort presentation:
     natsorted_assays_by_metas = natsorted_dataframe(
-        assays_by_metas, by=[("info", "accession"), ("info", "assay name")],
+        assays_by_metas[
+            ASSAY_META_INFO_COLS + sorted(assays_by_metas.columns[2:])
+        ],
+        by=ASSAY_META_INFO_COLS,
     )
     return natsorted_assays_by_metas, ImmutableMultiDict(trailing_rargs)
