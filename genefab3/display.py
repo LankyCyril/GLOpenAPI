@@ -7,20 +7,19 @@ DF_KWS = dict(index=False, na_rep="NA")
 DF_CSS = """<style>
     table {
         border-spacing: 0;
-        border-left: 1pt solid black; border-top: 1pt solid black;
+        border-right: 1pt solid black; border-bottom: 1pt solid black;
     }
     th, td {
         font-family: sans; font-size: 12pt;
+        height: 16pt; min-height: 16pt; max-height: 16pt;
         text-align: left; padding-right: 16pt; white-space: nowrap;
-        border-right: 1pt solid black; border-bottom: 1pt solid black;
+        border-left: 1pt solid black; border-top: 1pt solid black;
     }
-    th {
-        background: #DDD;
-        position: sticky; position: -webkit-sticky; top: 0;
-    }
-    td:first-child, td:nth-child(2) {
-        background: #F2F2F2;
-    }
+    th {background: #DDD; position: sticky; position: -webkit-sticky;}
+    th.level0 {top: 0;}
+    th.level1 {top: 16.25pt; border-bottom: 1pt solid black;}
+    td.row0 {border-top: 0 !important;}
+    td.col0, td.col1 {background: #F2F2F2;}
 </style>"""
 
 

@@ -3,8 +3,7 @@ from genefab3.exceptions import GeneLabException
 from genefab3.utils import UniversalSet, natsorted_dataframe
 from genefab3.mongo.utils import get_collection_keys_as_dataframe
 from werkzeug.datastructures import ImmutableMultiDict, MultiDict
-from pandas import merge
-from natsort import natsorted
+from pandas import concat, merge
 
 
 def get_assays_by_one_meta(db, meta, or_expression):
@@ -13,10 +12,15 @@ def get_assays_by_one_meta(db, meta, or_expression):
         constrain_fields = UniversalSet()
     else:
         constrain_fields = set(or_expression.split("|"))
-    return get_collection_keys_as_dataframe(
+    assays_by_one_meta = get_collection_keys_as_dataframe(
         collection=getattr(db, meta), constrain_fields=constrain_fields,
         targets=["accession", "assay name"], skip={"sample name"},
     )
+    # prepend column level, see: https://stackoverflow.com/a/42094658/590676
+    return concat({
+        "info": assays_by_one_meta[["accession", "assay name"]],
+        meta: assays_by_one_meta.iloc[:,2:],
+    }, axis=1)
 
 
 def get_assays_by_metas(db, meta=None, rargs={}):
@@ -38,15 +42,13 @@ def get_assays_by_metas(db, meta=None, rargs={}):
                 else: # perform AND
                     assays_by_metas = merge(
                         assays_by_metas, get_assays_by_one_meta(db, meta, expr),
-                        on=["accession", "assay name"], how="inner",
+                        on=[("info", "accession"), ("info", "assay name")],
+                        how="inner",
                     )
         else:
             trailing_rargs[meta] = rargs.getlist(meta)
     # sort presentation:
     natsorted_assays_by_metas = natsorted_dataframe(
-        assays_by_metas[
-            ["accession", "assay name"] + natsorted(assays_by_metas.columns[2:])
-        ],
-        by=["accession", "assay name"],
+        assays_by_metas, by=[("info", "accession"), ("info", "assay name")],
     )
     return natsorted_assays_by_metas, ImmutableMultiDict(trailing_rargs)
