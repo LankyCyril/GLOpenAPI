@@ -1,7 +1,7 @@
 from genefab3.config import ASSAY_METADATALIKES
 from genefab3.exceptions import GeneLabException
 from werkzeug.datastructures import ImmutableMultiDict, MultiDict
-from pandas import DataFrame, concat, merge
+from pandas import DataFrame, merge
 from natsort import natsorted
 from collections import defaultdict
 
@@ -12,37 +12,29 @@ class UniversalSet(set):
     def __contains__(self, x): return True
 
 
-def lookup_meta_keys(collection, targets, skip=set(), target_fields=UniversalSet()):
+def get_collection_keys_dataframe(collection, targets, skip=set(), constrain_fields=UniversalSet()):
     skip_downstream = set(skip) | {"_id"} | set(targets)
     unique_descriptors = defaultdict(dict)
     for entry in collection.find():
         for key in set(entry.keys()) - skip_downstream:
-            if key in target_fields:
+            if key in constrain_fields:
                 unique_descriptors[tuple(entry[t] for t in targets)][key] = True
     dataframe_by_metas = DataFrame(unique_descriptors).T
     dataframe_by_metas.index = dataframe_by_metas.index.rename(targets)
     return dataframe_by_metas.fillna(False).reset_index()
 
 
-def get_assays_by_one_meta(db, meta, rargs, ignore={"Unknown"}):
+def get_assays_by_one_meta(db, meta, or_expression):
     """Generate dataframe of assays matching (AND) multiple `meta` lookups (OR)"""
-    collection = getattr(db, meta)
-    set_of_or_expression_values = set(rargs.getlist(meta))
-    if set_of_or_expression_values == {""}: # wildcard, get all info
-        dataframe_by_metas = lookup_meta_keys(
-            collection, targets=["accession", "assay name"],
-            skip={"sample name"},
-        )
-        return dataframe_by_metas
-    else: # perform ANDs on ORs
-        return concat([
-            lookup_meta_keys(
-                collection, targets=["accession", "assay name"],
-                skip={"sample name"},
-                target_fields=set(or_expression_values.split("|")),
-            )
-            for or_expression_values in set_of_or_expression_values
-        ], axis=1)
+    if or_expression == "": # wildcard, get all info
+        constrain_fields = UniversalSet()
+    else:
+        constrain_fields = set(or_expression.split("|"))
+    return get_collection_keys_dataframe(
+        collection=getattr(db, meta),
+        targets=["accession", "assay name"], skip={"sample name"},
+        constrain_fields=constrain_fields,
+    )
 
 
 def sorted_human(assays_by_metas):
@@ -70,13 +62,14 @@ def get_assays_by_metas(db, meta=None, rargs={}):
     assays_by_metas, trailing_rargs = None, {}
     for meta in rargs:
         if meta in ASSAY_METADATALIKES:
-            if assays_by_metas is None:
-                assays_by_metas = get_assays_by_one_meta(db, meta, rargs)
-            else:
-                assays_by_metas = merge(
-                    assays_by_metas, get_assays_by_one_meta(db, meta, rargs),
-                    on=["accession", "assay name"], how="inner",
-                )
+            for expr in rargs.getlist(meta):
+                if assays_by_metas is None: # populate with first result
+                    assays_by_metas = get_assays_by_one_meta(db, meta, expr)
+                else: # perform AND
+                    assays_by_metas = merge(
+                        assays_by_metas, get_assays_by_one_meta(db, meta, expr),
+                        on=["accession", "assay name"], how="inner",
+                    )
         else:
             trailing_rargs[meta] = rargs.getlist(meta)
     return sorted_human(assays_by_metas), ImmutableMultiDict(trailing_rargs)
