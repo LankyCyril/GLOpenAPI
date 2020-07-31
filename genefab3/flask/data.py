@@ -28,8 +28,8 @@ def get_samples_by_one_meta(db, meta, or_expression, query={}):
     }, axis=1)
 
 
-def get_data_by_metas(db, rargs={}):
-    """Select data based on annotation filters"""
+def get_samples_by_metas(db, rargs={}):
+    """Select samples based on annotation filters"""
     samples_by_metas, trailing_rargs = None, {}
     for meta_query in rargs:
         # process queries like e.g. "factors=age" and "factors:age=1|2":
@@ -58,3 +58,12 @@ def get_data_by_metas(db, rargs={}):
         else:
             trailing_rargs[meta_query] = rargs.getlist(meta_query)
     return samples_by_metas, ImmutableMultiDict(trailing_rargs)
+
+
+def get_data_by_metas(db, rargs={}):
+    """Select data based on annotation filters"""
+    samples_by_metas, trailing_rargs = get_samples_by_metas(db, rargs)
+    sample_index = samples_by_metas[SAMPLE_META_INFO_COLS].set_index(
+        SAMPLE_META_INFO_COLS
+    ).T
+    return sample_index, ImmutableMultiDict(trailing_rargs)

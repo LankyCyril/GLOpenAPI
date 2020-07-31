@@ -52,6 +52,13 @@ def assays(**kwargs):
     from genefab3.flask.assays import get_assays_by_metas
     return display(get_assays_by_metas(db, **kwargs, rargs=request.args))
 
+@app.route("/samples/", methods=["GET"])
+def samples(**kwargs):
+    """Select samples based on annotation filters"""
+    refresh_database_metadata(db)
+    from genefab3.flask.data import get_samples_by_metas
+    return display(get_samples_by_metas(db, **kwargs, rargs=request.args))
+
 @app.route("/data/", methods=["GET"])
 def data(**kwargs):
     """Select data based on annotation filters"""
