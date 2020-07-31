@@ -135,7 +135,7 @@ def refresh_assay_meta_stores(db, accession):
         for meta in ASSAY_METADATALIKES:
             db.assay_meta.delete_many({
                 "accession": assay.dataset.accession,
-                "assay_name": assay.name,
+                "assay name": assay.name,
                 "meta": meta,
             })
             dataframe = getattr(assay, meta).full
@@ -143,7 +143,7 @@ def refresh_assay_meta_stores(db, accession):
                 for (field, internal_field), value in row.iteritems():
                     db.assay_meta.insert_one({
                         "accession": assay.dataset.accession,
-                        "assay_name": assay.name,
+                        "assay name": assay.name,
                         "sample_name": sample_name,
                         "meta": meta,
                         "field": field,

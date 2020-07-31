@@ -37,7 +37,7 @@ def pivot_by(dataframe, by, drop=None, groupby=None, ignore=set()):
 def get_assays_by_one_meta_any(db, meta, meta_any):
     """Generate dataframe of assays matching ANY of the `meta` values (e.g., "factors" in {"spaceflight" OR "microgravity"})"""
     dataframe_by_meta = lookup_meta(
-        db, keys=["accession", "assay_name"], value="field",
+        db, keys=["accession", "assay name"], value="field",
         matcher={"meta": meta, "field": {"$in": meta_any.split("|")}},
     )
     return pivot_by(dataframe_by_meta, "field")
@@ -48,12 +48,12 @@ def get_assays_by_one_meta(db, meta, rargs, ignore={"Unknown"}):
     set_of_meta_anys = set(rargs.getlist(meta))
     if set_of_meta_anys == {""}: # wildcard, get all info
         dataframe_by_metas = lookup_meta(
-            db, keys=["accession", "assay_name", "field"], value="meta",
+            db, keys=["accession", "assay name", "field"], value="meta",
             matcher={"meta": meta},
         )
         return pivot_by(
             dataframe_by_metas, drop="meta", ignore=ignore,
-            by="field", groupby=["accession", "assay_name"],
+            by="field", groupby=["accession", "assay name"],
         )
     else: # perform ANDs on ORs
         return concat([
@@ -65,13 +65,13 @@ def get_assays_by_one_meta(db, meta, rargs, ignore={"Unknown"}):
 def sorted_human(assays_by_metas):
     """See: https://stackoverflow.com/a/29582718/590676"""
     reindexed = assays_by_metas[
-        ["accession", "assay_name"] + sorted(assays_by_metas.columns[2:])
+        ["accession", "assay name"] + sorted(assays_by_metas.columns[2:])
     ]
     reindexed["accession"] = reindexed["accession"].astype("category")
     reindexed["accession"].cat.reorder_categories(
         natsorted(set(reindexed["accession"])), inplace=True, ordered=True,
     )
-    return reindexed.sort_values(by=["accession", "assay_name"])
+    return reindexed.sort_values(by=["accession", "assay name"])
 
 
 def get_assays_by_metas(db, meta=None, rargs={}):
@@ -92,7 +92,7 @@ def get_assays_by_metas(db, meta=None, rargs={}):
             else:
                 assays_by_metas = merge(
                     assays_by_metas, get_assays_by_one_meta(db, meta, rargs),
-                    on=["accession", "assay_name"], how="inner",
+                    on=["accession", "assay name"], how="inner",
                 )
         else:
             trailing_rargs[meta] = rargs.getlist(meta)
