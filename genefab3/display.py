@@ -1,5 +1,5 @@
 from flask import Response
-from pandas import DataFrame
+from pandas import DataFrame, isnull
 from re import sub
 
 
@@ -37,11 +37,13 @@ def annotated_cols(dataframe, sep):
 
 
 def color_bool(x):
-    """Highlight True in green and False in pale red, keep everything else as-is"""
+    """Highlight True in green and False in pale red, NA in lightgray italics, keep everything else as-is"""
     if x == True:
         return "color: green"
     elif x == False:
         return "color: #FAA"
+    elif isnull(x):
+        return "color: #BBB; font-style: italic;"
     else:
         return ""
 
@@ -55,7 +57,10 @@ def display_dataframe(df, fmt):
         content = annotated_cols(df, sep=",") + df.to_csv(sep=",", **DF_KWS)
         mimetype = "text/plain"
     elif fmt == "html":
-        content = DF_CSS + df.style.applymap(color_bool).hide_index().render()
+        content = DF_CSS + (
+            df.style.format(None, na_rep="NA").applymap(color_bool)
+            .hide_index().render()
+        )
         mimetype = "text/html"
     else:
         raise NotImplementedError("fmt='{}'".format(fmt))

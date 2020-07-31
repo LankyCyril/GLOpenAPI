@@ -31,4 +31,4 @@ def get_collection_fields_as_dataframe(collection, targets, query={}, skip=set()
                 )
     dataframe_by_metas = DataFrame(unique_descriptors).T
     dataframe_by_metas.index = dataframe_by_metas.index.rename(targets)
-    return dataframe_by_metas.fillna(False).reset_index()
+    return dataframe_by_metas.reset_index()
