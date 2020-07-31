@@ -17,8 +17,8 @@ DF_CSS = """<style>
     }
     tr:hover {background: #BFB !important}
     th {background: #DDD; position: sticky; position: -webkit-sticky;}
-    th.level0 {top: 0;}
-    th.level1 {top: 16.25pt; border-bottom: 1pt solid black;}
+    th.level0 {top: 0; border-bottom: 1pt solid black;}
+    th.level1 {top: 17pt; border-top: 0; border-bottom: 1pt solid black;}
     td.row0 {border-top: 0 !important;}
     td {background: #FFFFFF99;}
     td.col0, td.col1 {background: #E3E3E399 !important;}

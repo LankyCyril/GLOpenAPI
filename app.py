@@ -37,6 +37,12 @@ def documentation():
     from genefab3.docs import interactive_doc
     return interactive_doc(url_root=request.url_root.rstrip("/"))
 
+@app.route("/<meta>/", methods=["GET"])
+def meta(**kwrags):
+    """List names of particular meta"""
+    from genefab3.flask.meta import get_meta_names
+    return display(get_meta_names(db, **kwrags, rargs=request.args))
+
 @app.route("/assays/", methods=["GET"])
 @app.route("/assays/<meta>/", methods=["GET"])
 def assays(**kwargs):
