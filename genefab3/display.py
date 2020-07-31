@@ -1,8 +1,9 @@
 from flask import Response
 from pandas import DataFrame
+from re import sub
 
 
-DF_KWS = dict(index=False, na_rep="NA")
+DF_KWS = dict(index=False, header=False, na_rep="NA")
 
 DF_CSS = """<style>
     table {
@@ -25,6 +26,16 @@ DF_CSS = """<style>
 </style>"""
 
 
+def annotated_cols(dataframe, sep):
+    """Format (multi)-columns of dataframe with '#' prepended"""
+    return sub(
+        r'^', "#", sub(
+            r'\n(.)', r'\n#\1',
+            dataframe.columns.to_frame().T.to_csv(sep=sep, **DF_KWS),
+        ),
+    )
+
+
 def color_bool(x):
     """Highlight True in green and False in pale red, keep everything else as-is"""
     if x == True:
@@ -38,14 +49,17 @@ def color_bool(x):
 def display_dataframe(df, fmt):
     """Display dataframe with specified format"""
     if fmt == "tsv":
-        return Response(df.to_csv(sep="\t", **DF_KWS), mimetype="text/plain")
+        content = annotated_cols(df, sep="\t") + df.to_csv(sep="\t", **DF_KWS)
+        mimetype = "text/plain"
     elif fmt == "csv":
-        return Response(df.to_csv(sep=",", **DF_KWS), mimetype="text/plain")
+        content = annotated_cols(df, sep=",") + df.to_csv(sep=",", **DF_KWS)
+        mimetype = "text/plain"
     elif fmt == "html":
-        html = df.style.applymap(color_bool).hide_index().render()
-        return Response(DF_CSS + html, mimetype="text/html")
+        content = DF_CSS + df.style.applymap(color_bool).hide_index().render()
+        mimetype = "text/html"
     else:
         raise NotImplementedError("fmt='{}'".format(fmt))
+    return Response(content, mimetype=mimetype)
 
 
 def display(obj_and_rargs):
