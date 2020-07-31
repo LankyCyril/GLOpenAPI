@@ -1,5 +1,5 @@
 from genefab3.config import ASSAY_METADATALIKES
-from genefab3.utils import UniversalSet
+from genefab3.utils import UniversalSet, natsorted_dataframe
 from genefab3.mongo.utils import get_collection_fields_as_dataframe
 from pandas import concat, merge
 from werkzeug.datastructures import ImmutableMultiDict
@@ -57,7 +57,13 @@ def get_samples_by_metas(db, rargs={}):
                     )
         else:
             trailing_rargs[meta_query] = rargs.getlist(meta_query)
-    return samples_by_metas, ImmutableMultiDict(trailing_rargs)
+    natsorted_samples_by_metas = natsorted_dataframe(
+        samples_by_metas[
+            SAMPLE_META_INFO_COLS + sorted(samples_by_metas.columns[3:])
+        ],
+        by=SAMPLE_META_INFO_COLS,
+    )
+    return natsorted_samples_by_metas, ImmutableMultiDict(trailing_rargs)
 
 
 def get_data_by_metas(db, rargs={}):
