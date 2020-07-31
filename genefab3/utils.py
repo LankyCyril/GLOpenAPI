@@ -6,7 +6,26 @@ from re import search, sub
 from genefab3.exceptions import GeneLabException, GeneLabJSONException
 from datetime import datetime
 from numpy import zeros
+from natsort import natsorted
 from functools import lru_cache
+
+
+class UniversalSet(set):
+    """Naive universal set"""
+    def __and__(self, x): return x
+    def __rand__(self, x): return x
+    def __contains__(self, x): return True
+
+
+def natsorted_dataframe(dataframe, by, ascending=True):
+    """See: https://stackoverflow.com/a/29582718/590676"""
+    ns_df = dataframe.copy()
+    for column in by:
+        ns_df[column] = ns_df[column].astype("category")
+        ns_df[column].cat.reorder_categories(
+            natsorted(set(ns_df[column])), inplace=True, ordered=True,
+        )
+    return ns_df.sort_values(by=by, ascending=ascending)
 
 
 def download_cold_json(identifier, kind="other"):

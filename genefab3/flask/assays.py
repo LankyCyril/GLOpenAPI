@@ -1,27 +1,10 @@
 from genefab3.config import ASSAY_METADATALIKES
 from genefab3.exceptions import GeneLabException
+from genefab3.utils import UniversalSet, natsorted_dataframe
+from genefab3.mongo.utils import get_collection_keys_as_dataframe
 from werkzeug.datastructures import ImmutableMultiDict, MultiDict
-from pandas import DataFrame, merge
+from pandas import merge
 from natsort import natsorted
-from collections import defaultdict
-
-
-class UniversalSet(set):
-    def __and__(self, x): return x
-    def __rand__(self, x): return x
-    def __contains__(self, x): return True
-
-
-def get_collection_keys_dataframe(collection, targets, skip=set(), constrain_fields=UniversalSet()):
-    skip_downstream = set(skip) | {"_id"} | set(targets)
-    unique_descriptors = defaultdict(dict)
-    for entry in collection.find():
-        for key in set(entry.keys()) - skip_downstream:
-            if key in constrain_fields:
-                unique_descriptors[tuple(entry[t] for t in targets)][key] = True
-    dataframe_by_metas = DataFrame(unique_descriptors).T
-    dataframe_by_metas.index = dataframe_by_metas.index.rename(targets)
-    return dataframe_by_metas.fillna(False).reset_index()
 
 
 def get_assays_by_one_meta(db, meta, or_expression):
@@ -30,23 +13,10 @@ def get_assays_by_one_meta(db, meta, or_expression):
         constrain_fields = UniversalSet()
     else:
         constrain_fields = set(or_expression.split("|"))
-    return get_collection_keys_dataframe(
-        collection=getattr(db, meta),
+    return get_collection_keys_as_dataframe(
+        collection=getattr(db, meta), constrain_fields=constrain_fields,
         targets=["accession", "assay name"], skip={"sample name"},
-        constrain_fields=constrain_fields,
     )
-
-
-def sorted_human(assays_by_metas):
-    """See: https://stackoverflow.com/a/29582718/590676"""
-    reindexed = assays_by_metas[
-        ["accession", "assay name"] + sorted(assays_by_metas.columns[2:])
-    ]
-    reindexed["accession"] = reindexed["accession"].astype("category")
-    reindexed["accession"].cat.reorder_categories(
-        natsorted(set(reindexed["accession"])), inplace=True, ordered=True,
-    )
-    return reindexed.sort_values(by=["accession", "assay name"])
 
 
 def get_assays_by_metas(db, meta=None, rargs={}):
@@ -72,4 +42,11 @@ def get_assays_by_metas(db, meta=None, rargs={}):
                     )
         else:
             trailing_rargs[meta] = rargs.getlist(meta)
-    return sorted_human(assays_by_metas), ImmutableMultiDict(trailing_rargs)
+    # sort presentation:
+    natsorted_assays_by_metas = natsorted_dataframe(
+        assays_by_metas[
+            ["accession", "assay name"] + natsorted(assays_by_metas.columns[2:])
+        ],
+        by=["accession", "assay name"],
+    )
+    return natsorted_assays_by_metas, ImmutableMultiDict(trailing_rargs)

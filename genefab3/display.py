@@ -25,6 +25,7 @@ DF_CSS = """<style>
 
 
 def color_bool(x):
+    """Highlight True in green and False in pale red, keep everything else as-is"""
     if x == True:
         return "color: green"
     elif x == False:

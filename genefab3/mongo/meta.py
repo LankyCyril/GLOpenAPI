@@ -4,6 +4,7 @@ from genefab3.config import MAX_AUTOUPDATED_DATASETS, COLD_SEARCH_MASK
 from genefab3.config import MAX_JSON_AGE, MAX_JSON_THREADS
 from genefab3.config import ASSAY_METADATALIKES
 from genefab3.utils import download_cold_json
+from genefab3.mongo.utils import replace_doc
 from genefab3.exceptions import GeneLabJSONException
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from datetime import datetime
@@ -13,12 +14,6 @@ from concurrent.futures import as_completed, ThreadPoolExecutor
 
 
 DEBUG = (environ.get("FLASK_ENV", None) == "development")
-
-
-def replace_doc(db, query, **kwargs):
-    """Shortcut to drop all instances and replace with updated instance"""
-    db.delete_many(query)
-    db.insert_one({**query, **kwargs})
 
 
 def get_fresh_and_stale_accessions(db, max_age=MAX_JSON_AGE):
