@@ -19,11 +19,11 @@ def get_collection_fields(collection, skip=set()):
     return set(reduced.distinct("_id")) - {"_id"} - skip
 
 
-def get_collection_fields_as_dataframe(collection, targets, skip=set(), constrain_fields=UniversalSet(), store_value=True):
+def get_collection_fields_as_dataframe(collection, targets, query={}, skip=set(), constrain_fields=UniversalSet(), store_value=True):
     """Parse collection for keys accompanying targets"""
     skip_downstream = set(skip) | {"_id"} | set(targets)
     unique_descriptors = defaultdict(dict)
-    for entry in collection.find():
+    for entry in collection.find(query):
         for key in set(entry.keys()) - skip_downstream:
             if key in constrain_fields:
                 unique_descriptors[tuple(entry[t] for t in targets)][key] = (
