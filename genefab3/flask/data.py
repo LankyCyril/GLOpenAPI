@@ -1,6 +1,7 @@
 from genefab3.config import ASSAY_METADATALIKES
 from genefab3.utils import UniversalSet, natsorted_dataframe
 from genefab3.mongo.utils import get_collection_fields_as_dataframe
+from genefab3.mongo.data import query_data
 from pandas import concat, merge
 from werkzeug.datastructures import ImmutableMultiDict
 
@@ -67,7 +68,8 @@ def get_samples_by_metas(db, rargs={}):
 def get_data_by_metas(db, rargs={}):
     """Select data based on annotation filters"""
     samples_by_metas, trailing_rargs = get_samples_by_metas(db, rargs)
-    sample_index = samples_by_metas[SAMPLE_META_MULTIINDEX].set_index(
+    sample_columns = samples_by_metas[SAMPLE_META_MULTIINDEX].set_index(
         SAMPLE_META_MULTIINDEX
-    ).T
-    return sample_index, ImmutableMultiDict(trailing_rargs)
+    ).index
+    sample_data = query_data(sample_columns)
+    return sample_data, ImmutableMultiDict(trailing_rargs)
