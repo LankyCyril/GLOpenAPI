@@ -1,8 +1,9 @@
 from pandas import Series, concat
+from numpy import nan
 
 
 def get_single_sample_data(triple):
-    return Series(map(str.upper, triple))
+    return Series([nan]*16)
 
 
 def query_data(sample_columns, gene_rows=None):
