@@ -1,6 +1,9 @@
 from os import environ
 from genefab3.config import DEBUG_MARKERS
 from genefab3.mongo.meta import refresh_database_metadata
+from genefab3.mongo.meta import refresh_database_metadata_for_one_dataset
+from genefab3.mongo.meta import get_dataset_with_caching
+from genefab3.exceptions import GeneLabException
 
 
 def debug(db):
@@ -14,3 +17,13 @@ def debug(db):
             "Stale accessions:<br>" + ", ".join(sorted(stale)),
             "Assays updated for:<br>" + ", ".join(sorted(auf)),
         ])
+
+
+def get_assay_metadata(db, accession, assay_name, meta, rargs={}):
+    refresh_database_metadata_for_one_dataset(db, accession)
+    glds = get_dataset_with_caching(db, accession)
+    assay = glds.assays[assay_name]
+    try:
+        return getattr(assay, meta).full.reset_index(), rargs
+    except AttributeError:
+        raise GeneLabException("Unknown meta: '{}'".format(meta))

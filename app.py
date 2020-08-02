@@ -66,6 +66,12 @@ def data(**kwargs):
     from genefab3.flask.data import get_data_by_metas
     return display(get_data_by_metas(db, **kwargs, rargs=request.args))
 
+@app.route("/<accession>/<assay_name>/<meta>/", methods=["GET"])
+def assay_metadata(**kwargs):
+    """Display assay metadata"""
+    from genefab3.flask.debug import get_assay_metadata
+    return display(get_assay_metadata(db, **kwargs, rargs=request.args))
+
 @app.route("/favicon.<imgtype>")
 def favicon(**kwargs):
     """Catch request for favicons"""

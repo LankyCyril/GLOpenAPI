@@ -178,3 +178,13 @@ def refresh_database_metadata(db):
         db.dataset_timestamps.delete_many({"accession": accession})
         db.accession_to_id.delete_many({"accession": accession})
     return all_accessions, fresh, stale, datasets_with_assays_to_update
+
+
+def refresh_database_metadata_for_one_dataset(db, accession):
+    """Put updated JSONs for one dataset and its assays into database"""
+    datasets_with_assays_to_update = refresh_many_datasets(
+        db, {accession}, max_workers=MAX_JSON_THREADS,
+    )
+    refresh_many_assays(
+        db, datasets_with_assays_to_update, max_workers=MAX_JSON_THREADS,
+    )

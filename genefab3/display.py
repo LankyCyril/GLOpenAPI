@@ -32,7 +32,6 @@ def get_dataframe_css(columns):
     """Add shading of 'info' columns to default DF_CSS"""
     shading_css_lines = []
     for i, col in enumerate(columns.get_level_values(0)):
-        print(col)
         if col == "info":
             shading_css_lines.append(DF_CSS_SHADING.format(i))
         else:
