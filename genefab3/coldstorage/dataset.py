@@ -163,3 +163,10 @@ class ColdStorageAssayDispatcher(dict):
                 )
         except KeyError:
             raise GeneLabJSONException("Malformed assay JSON")
+ 
+    def __getitem__(self, assay_name):
+        """Get assay by name or alias"""
+        if (assay_name == "assay") and (len(self) == 1):
+            return dict.__getitem__(self, next(iter(self)))
+        else:
+            return dict.__getitem__(self, assay_name)
