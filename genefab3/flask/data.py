@@ -5,9 +5,8 @@ from pandas import concat, merge
 from werkzeug.datastructures import ImmutableMultiDict
 
 
-SAMPLE_META_INFO_COLS = [
-    ("info", "accession"), ("info", "assay name"), ("info", "sample name"),
-]
+SAMPLE_META_INFO_COLS = ["accession", "assay name", "sample name"]
+SAMPLE_META_MULTIINDEX = [("info", col) for col in SAMPLE_META_INFO_COLS]
 
 
 def get_samples_by_one_meta(db, meta, or_expression, query={}):
@@ -18,12 +17,11 @@ def get_samples_by_one_meta(db, meta, or_expression, query={}):
         constrain_fields = set(or_expression.split("|"))
     samples_by_one_meta = get_collection_fields_as_dataframe(
         collection=getattr(db, meta), constrain_fields=constrain_fields,
-        targets=["accession", "assay name", "sample name"],
-        store_value=True, query=query,
+        targets=SAMPLE_META_INFO_COLS, store_value=True, query=query,
     )
     # prepend column level, see: https://stackoverflow.com/a/42094658/590676
     return concat({
-        "info": samples_by_one_meta[["accession", "assay name", "sample name"]],
+        "info": samples_by_one_meta[SAMPLE_META_INFO_COLS],
         meta: samples_by_one_meta.iloc[:,3:],
     }, axis=1)
 
@@ -53,15 +51,15 @@ def get_samples_by_metas(db, rargs={}):
                     samples_by_metas = merge(
                         samples_by_metas,
                         get_samples_by_one_meta(db, meta, expr, query),
-                        on=SAMPLE_META_INFO_COLS, how="inner",
+                        on=SAMPLE_META_MULTIINDEX, how="inner",
                     )
         else:
             trailing_rargs[meta_query] = rargs.getlist(meta_query)
     natsorted_samples_by_metas = natsorted_dataframe(
         samples_by_metas[
-            SAMPLE_META_INFO_COLS + sorted(samples_by_metas.columns[3:])
+            SAMPLE_META_MULTIINDEX + sorted(samples_by_metas.columns[3:])
         ],
-        by=SAMPLE_META_INFO_COLS,
+        by=SAMPLE_META_MULTIINDEX,
     )
     return natsorted_samples_by_metas, ImmutableMultiDict(trailing_rargs)
 
@@ -69,7 +67,7 @@ def get_samples_by_metas(db, rargs={}):
 def get_data_by_metas(db, rargs={}):
     """Select data based on annotation filters"""
     samples_by_metas, trailing_rargs = get_samples_by_metas(db, rargs)
-    sample_index = samples_by_metas[SAMPLE_META_INFO_COLS].set_index(
-        SAMPLE_META_INFO_COLS
+    sample_index = samples_by_metas[SAMPLE_META_MULTIINDEX].set_index(
+        SAMPLE_META_MULTIINDEX
     ).T
     return sample_index, ImmutableMultiDict(trailing_rargs)

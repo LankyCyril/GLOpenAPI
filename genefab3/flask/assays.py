@@ -6,7 +6,8 @@ from werkzeug.datastructures import ImmutableMultiDict, MultiDict
 from pandas import concat, merge
 
 
-ASSAY_META_INFO_COLS = [("info", "accession"), ("info", "assay name")]
+ASSAY_META_INFO_COLS = ["accession", "assay name"]
+ASSAY_META_MULTIINDEX = [("info", col) for col in ASSAY_META_INFO_COLS]
 
 
 def get_assays_by_one_meta(db, meta, or_expression):
@@ -17,12 +18,12 @@ def get_assays_by_one_meta(db, meta, or_expression):
         constrain_fields = set(or_expression.split("|"))
     assays_by_one_meta = get_collection_fields_as_dataframe(
         collection=getattr(db, meta), constrain_fields=constrain_fields,
-        targets=["accession", "assay name"], skip={"sample name"},
+        targets=ASSAY_META_INFO_COLS, skip={"sample name"},
         store_value=False,
     )
     # prepend column level, see: https://stackoverflow.com/a/42094658/590676
     return concat({
-        "info": assays_by_one_meta[["accession", "assay name"]],
+        "info": assays_by_one_meta[ASSAY_META_INFO_COLS],
         meta: assays_by_one_meta.iloc[:,2:],
     }, axis=1)
 
@@ -46,15 +47,15 @@ def get_assays_by_metas(db, meta=None, rargs={}):
                 else: # perform AND
                     assays_by_metas = merge(
                         assays_by_metas, get_assays_by_one_meta(db, meta, expr),
-                        on=ASSAY_META_INFO_COLS, how="inner",
+                        on=ASSAY_META_MULTIINDEX, how="inner",
                     )
         else:
             trailing_rargs[meta] = rargs.getlist(meta)
     # sort presentation:
     natsorted_assays_by_metas = natsorted_dataframe(
         assays_by_metas[
-            ASSAY_META_INFO_COLS + sorted(assays_by_metas.columns[2:])
+            ASSAY_META_MULTIINDEX + sorted(assays_by_metas.columns[2:])
         ],
-        by=ASSAY_META_INFO_COLS,
+        by=ASSAY_META_MULTIINDEX,
     )
     return natsorted_assays_by_metas, ImmutableMultiDict(trailing_rargs)
