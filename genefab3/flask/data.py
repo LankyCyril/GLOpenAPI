@@ -56,11 +56,9 @@ def get_samples_by_metas(db, rargs={}):
                     )
         else:
             trailing_rargs[meta_query] = rargs.getlist(meta_query)
+    # sort presentation:
     natsorted_samples_by_metas = natsorted_dataframe(
-        samples_by_metas[
-            SAMPLE_META_MULTIINDEX + sorted(samples_by_metas.columns[3:])
-        ],
-        by=SAMPLE_META_MULTIINDEX,
+        samples_by_metas, by=SAMPLE_META_MULTIINDEX, sort_trailing_columns=True,
     )
     return natsorted_samples_by_metas, ImmutableMultiDict(trailing_rargs)
 

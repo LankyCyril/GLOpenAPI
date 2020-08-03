@@ -53,9 +53,6 @@ def get_assays_by_metas(db, meta=None, rargs={}):
             trailing_rargs[meta] = rargs.getlist(meta)
     # sort presentation:
     natsorted_assays_by_metas = natsorted_dataframe(
-        assays_by_metas[
-            ASSAY_META_MULTIINDEX + sorted(assays_by_metas.columns[2:])
-        ],
-        by=ASSAY_META_MULTIINDEX,
+        assays_by_metas, by=ASSAY_META_MULTIINDEX, sort_trailing_columns=True,
     )
     return natsorted_assays_by_metas, ImmutableMultiDict(trailing_rargs)

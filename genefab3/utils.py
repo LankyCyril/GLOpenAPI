@@ -17,9 +17,12 @@ class UniversalSet(set):
     def __contains__(self, x): return True
 
 
-def natsorted_dataframe(dataframe, by, ascending=True):
+def natsorted_dataframe(dataframe, by, ascending=True, sort_trailing_columns=False):
     """See: https://stackoverflow.com/a/29582718/590676"""
-    ns_df = dataframe.copy()
+    if sort_trailing_columns:
+        ns_df = dataframe[by + natsorted(dataframe.columns[len(by):])].copy()
+    else:
+        ns_df = dataframe.copy()
     for column in by:
         ns_df[column] = ns_df[column].astype("category")
         ns_df[column].cat.reorder_categories(
