@@ -1,6 +1,7 @@
 from genefab3.config import ASSAY_METADATALIKES
 from genefab3.utils import UniversalSet, natsorted_dataframe
 from genefab3.mongo.utils import get_collection_fields_as_dataframe
+from genefab3.mongo.meta import parse_assay_selection
 from genefab3.mongo.data import query_data
 from pandas import concat, merge
 from werkzeug.datastructures import ImmutableMultiDict
@@ -30,6 +31,7 @@ def get_samples_by_one_meta(db, meta, or_expression, query={}):
 def get_samples_by_metas(db, rargs={}):
     """Select samples based on annotation filters"""
     samples_by_metas, trailing_rargs = None, {}
+    assay_query = parse_assay_selection(rargs.getlist("select"), as_query=True)
     for meta_query in rargs:
         # process queries like e.g. "factors=age" and "factors:age=1|2":
         query_cc = meta_query.split(":")
@@ -40,10 +42,12 @@ def get_samples_by_metas(db, rargs={}):
         if meta in ASSAY_METADATALIKES:
             for expr in rargs.getlist(meta_query):
                 if queried_field: # e.g. {"age": {"$in": [1, 2]}}
-                    query = {queried_field: {"$in": expr.split("|")}}
+                    query = {
+                        queried_field: {"$in": expr.split("|")}, **assay_query,
+                    }
                     expr = queried_field
                 else: # lookup just by meta name:
-                    query = {}
+                    query = assay_query
                 if samples_by_metas is None: # populate with first result
                     samples_by_metas = get_samples_by_one_meta(
                         db, meta, expr, query,
