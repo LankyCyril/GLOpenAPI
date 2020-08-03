@@ -223,7 +223,7 @@ def refresh_database_metadata_for_all_datasets(db):
 
 def refresh_database_metadata(db, assay_selection=None):
     if assay_selection is None:
-        refresh_database_metadata_for_all_datasets(db)
+        return refresh_database_metadata_for_all_datasets(db)
     else:
         datasets_with_assays_to_update = refresh_many_datasets(
             db, set(assay_selection), max_workers=MAX_JSON_THREADS,
@@ -231,3 +231,4 @@ def refresh_database_metadata(db, assay_selection=None):
         refresh_many_assays(
             db, datasets_with_assays_to_update, max_workers=MAX_JSON_THREADS,
         )
+        return None

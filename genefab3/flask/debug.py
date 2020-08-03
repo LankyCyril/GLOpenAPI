@@ -6,7 +6,7 @@ from genefab3.mongo.meta import get_dataset_with_caching
 from genefab3.exceptions import GeneLabException
 
 
-def debug(db):
+def debug(db, rargs={}):
     if environ.get("FLASK_ENV", None) not in DEBUG_MARKERS:
         return "Production server, debug disabled"
     else:
