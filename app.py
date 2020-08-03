@@ -7,7 +7,7 @@ from flask import Flask, request
 from flask_compress import Compress
 from os import environ
 from genefab3.exceptions import traceback_printer, exception_catcher
-from genefab3.mongo.meta import refresh_database_metadata
+from genefab3.mongo.meta import parse_assay_selection, refresh_database_metadata
 from genefab3.display import display
 
 
@@ -48,7 +48,8 @@ def meta(**kwrags):
 @app.route("/assays/<meta>/", methods=["GET"])
 def assays(**kwargs):
     """Select assays based on annotation filters"""
-    refresh_database_metadata(db)
+    assay_selection = parse_assay_selection(request.args.getlist("select"))
+    refresh_database_metadata(db, assay_selection)
     from genefab3.flask.assays import get_assays_by_metas
     return display(get_assays_by_metas(db, **kwargs, rargs=request.args))
 

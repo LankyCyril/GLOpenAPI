@@ -5,7 +5,7 @@ from genefab3.config import MAX_JSON_AGE, MAX_JSON_THREADS
 from genefab3.config import ASSAY_METADATALIKES
 from genefab3.utils import download_cold_json
 from genefab3.mongo.utils import replace_doc
-from genefab3.exceptions import GeneLabJSONException
+from genefab3.exceptions import GeneLabException, GeneLabJSONException
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from datetime import datetime
 from pymongo import DESCENDING
@@ -155,7 +155,34 @@ def refresh_many_assays(db, datasets_with_assays_to_update, max_workers=MAX_JSON
                 print("Refreshed JSON for assays in:", acc, file=stderr)
 
 
-def refresh_database_metadata(db):
+def parse_assay_selection(rargs_select_list):
+    """Parse 'select' request argument"""
+    if len(rargs_select_list) == 0:
+        return None
+    elif len(rargs_select_list) == 1:
+        selection = {}
+        for query in rargs_select_list[0].split("|"):
+            query_components = query.split(":", 1)
+            if len(query_components) == 1:
+                selection[query] = None
+            else:
+                selection[query_components[0]] = query_components[1]
+        return selection
+    else:
+        raise GeneLabException("'select' can be used no more than once")
+
+
+def refresh_database_metadata_for_one_dataset(db, accession):
+    """Put updated JSONs for one dataset and its assays into database"""
+    datasets_with_assays_to_update = refresh_many_datasets(
+        db, {accession}, max_workers=MAX_JSON_THREADS,
+    )
+    refresh_many_assays(
+        db, datasets_with_assays_to_update, max_workers=MAX_JSON_THREADS,
+    )
+
+
+def refresh_database_metadata_for_all_datasets(db):
     """Iterate over datasets in cold storage, put updated JSONs into database"""
     fresh, stale = get_fresh_and_stale_accessions(db)
     try: # get number of datasets in database, and then all dataset JSONs
@@ -180,11 +207,13 @@ def refresh_database_metadata(db):
     return all_accessions, fresh, stale, datasets_with_assays_to_update
 
 
-def refresh_database_metadata_for_one_dataset(db, accession):
-    """Put updated JSONs for one dataset and its assays into database"""
-    datasets_with_assays_to_update = refresh_many_datasets(
-        db, {accession}, max_workers=MAX_JSON_THREADS,
-    )
-    refresh_many_assays(
-        db, datasets_with_assays_to_update, max_workers=MAX_JSON_THREADS,
-    )
+def refresh_database_metadata(db, assay_selection=None):
+    if assay_selection is None:
+        refresh_database_metadata_for_all_datasets(db)
+    else:
+        datasets_with_assays_to_update = refresh_many_datasets(
+            db, set(assay_selection), max_workers=MAX_JSON_THREADS,
+        )
+        refresh_many_assays(
+            db, datasets_with_assays_to_update, max_workers=MAX_JSON_THREADS,
+        )
