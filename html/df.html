@@ -9,7 +9,17 @@
     <style>
         html, body {margin: 0; padding: 0; background: #FFF; overflow: auto}
         body {font-size: 10pt; font-family: "Oxygen Mono", monospace}
-        #grid {position: absolute; top: 0; left: 0; right: 0; bottom: 0}
+        #preface {
+            position: absolute; top: 0; left: 0; right: 0;
+            min-height: 22pt; max-height: 22pt; height: 22pt;
+            background: #CDF; padding: 2pt !important;
+            line-height: 1.1; overflow: auto
+        }
+        #grid {
+            position: absolute; top: 25pt; left: 0; right: 0; bottom: 0;
+            border: .25pt solid black
+        }
+        #noscript {padding: 2pt !important}
         .slick-header-column {background: #DDD; font-weight: 600; border: .5pt solid black !important}
         .slick-cell {line-height: 1.65; background: #FFFFFF99; border: .25pt solid black}
         .slick-cell.frozen {font-weight: 600}
@@ -22,7 +32,26 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/6pac-slickgrid/2.4.27/slick.grid.min.js"></script>
 </head>
 
-<body><div id="grid"></div></body></html>
+<body>
+    <div id="preface">
+        <b>Navigate:</b>
+        (Shift-)click headers to sort.
+        Hover to highlight equal values.
+        Click values to subset.<br>
+        <b>Download:</b> as
+        <a style="color:#D10" href="CSVLINK">csv</a>,
+        <a style="color:#D10" href="TSVLINK">tsv</a>.
+    </div>
+    <div id="grid">
+        <div id="noscript">
+            Loading data... You may view it as
+            <a style="color:#D10" href="HTMLINK">static HTML</a>
+            instead, or use the csv and tsv links above.
+            Note: the static HTML view may be slow or disabled altogether
+            for large tables.
+        </div>
+    </div>
+</body>
 
 <script>
 
@@ -146,3 +175,5 @@ grid.onMouseEnter.subscribe(function (e, args) {
 $("title").text(window.location.href.split("?")[1] || "genefab3");
 
 </script>
+
+</html>
