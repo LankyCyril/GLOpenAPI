@@ -122,10 +122,9 @@ def display_dataframe(df, fmt):
     return Response(content, mimetype=mimetype)
 
 
-def display(obj_and_rargs):
+def display(obj, request):
     """Dispatch object and trailing request arguments to display handler"""
-    obj, rargs = obj_and_rargs
-    fmt = rargs.get("fmt", "tsv")
+    fmt = request.args.get("fmt", "tsv")
     if isinstance(obj, DataFrame):
         return display_dataframe(obj, fmt)
     else:

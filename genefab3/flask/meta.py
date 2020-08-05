@@ -3,15 +3,14 @@ from genefab3.exceptions import GeneLabException
 from genefab3.mongo.utils import get_collection_fields
 from pandas import DataFrame
 from natsort import natsorted
-from werkzeug.datastructures import ImmutableMultiDict
 
 
-def get_meta_names(db, meta, rargs={}):
+def get_meta_names(db, meta, rargs=None):
     """List names of particular meta"""
     if meta not in ASSAY_METADATALIKES:
         raise GeneLabException("Unknown request: '{}'".format(meta))
     else:
-        meta_names = DataFrame(
+        return DataFrame(
             data=natsorted(
                 get_collection_fields(
                     collection=getattr(db, meta),
@@ -20,4 +19,3 @@ def get_meta_names(db, meta, rargs={}):
             ),
             columns=[meta],
         )
-        return meta_names, ImmutableMultiDict(rargs)

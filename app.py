@@ -41,8 +41,8 @@ def documentation():
 def meta(**kwrags):
     """List names of particular meta"""
     refresh_database_metadata(db)
-    from genefab3.flask.meta import get_meta_names
-    return display(get_meta_names(db, **kwrags, rargs=request.args))
+    from genefab3.flask.meta import get_meta_names as getter
+    return display(getter(db, **kwrags, rargs=request.args), request)
 
 @app.route("/assays/", methods=["GET"])
 @app.route("/assays/<meta>/", methods=["GET"])
@@ -50,28 +50,28 @@ def assays(**kwargs):
     """Select assays based on annotation filters"""
     assay_selection = parse_assay_selection(request.args.getlist("select"))
     refresh_database_metadata(db, assay_selection)
-    from genefab3.flask.assays import get_assays_by_metas
-    return display(get_assays_by_metas(db, **kwargs, rargs=request.args))
+    from genefab3.flask.assays import get_assays_by_metas as getter
+    return display(getter(db, **kwargs, rargs=request.args), request)
 
 @app.route("/samples/", methods=["GET"])
 def samples(**kwargs):
     """Select samples based on annotation filters"""
     refresh_database_metadata(db)
-    from genefab3.flask.data import get_samples_by_metas
-    return display(get_samples_by_metas(db, **kwargs, rargs=request.args))
+    from genefab3.flask.data import get_samples_by_metas as getter
+    return display(getter(db, **kwargs, rargs=request.args), request)
 
 @app.route("/data/", methods=["GET"])
 def data(**kwargs):
     """Select data based on annotation filters"""
     refresh_database_metadata(db)
-    from genefab3.flask.data import get_data_by_metas
-    return display(get_data_by_metas(db, **kwargs, rargs=request.args))
+    from genefab3.flask.data import get_data_by_metas as getter
+    return display(getter(db, **kwargs, rargs=request.args), request)
 
 @app.route("/<accession>/<assay_name>/<meta>/", methods=["GET"])
 def assay_metadata(**kwargs):
     """Display assay metadata"""
-    from genefab3.flask.debug import get_assay_metadata
-    return display(get_assay_metadata(db, **kwargs, rargs=request.args))
+    from genefab3.flask.debug import get_assay_metadata as getter
+    return display(getter(db, **kwargs, rargs=request.args), request)
 
 @app.route("/favicon.<imgtype>")
 def favicon(**kwargs):

@@ -3,7 +3,7 @@ from genefab3.exceptions import GeneLabException
 from genefab3.utils import UniversalSet, natsorted_dataframe
 from genefab3.mongo.utils import get_collection_fields_as_dataframe
 from genefab3.mongo.meta import parse_assay_selection
-from werkzeug.datastructures import ImmutableMultiDict, MultiDict
+from werkzeug.datastructures import MultiDict
 from pandas import concat, merge
 
 
@@ -39,7 +39,7 @@ def get_assays_by_metas(db, meta=None, rargs={}):
             rargs = MultiDict(rargs)
             rargs[meta] = ""
     # perform intersections of unions:
-    assays_by_metas, trailing_rargs = None, {}
+    assays_by_metas = None
     assay_query = parse_assay_selection(rargs.getlist("select"), as_query=True)
     for meta in rargs:
         if meta in ASSAY_METADATALIKES:
@@ -54,10 +54,7 @@ def get_assays_by_metas(db, meta=None, rargs={}):
                         get_assays_by_one_meta(db, meta, expr, assay_query),
                         on=ASSAY_META_MULTIINDEX, how="inner",
                     )
-        else:
-            trailing_rargs[meta] = rargs.getlist(meta)
     # sort presentation:
-    natsorted_assays_by_metas = natsorted_dataframe(
+    return natsorted_dataframe(
         assays_by_metas, by=ASSAY_META_MULTIINDEX, sort_trailing_columns=True,
     )
-    return natsorted_assays_by_metas, ImmutableMultiDict(trailing_rargs)

@@ -4,7 +4,6 @@ from genefab3.mongo.utils import get_collection_fields_as_dataframe
 from genefab3.mongo.meta import parse_assay_selection
 from genefab3.mongo.data import query_data
 from pandas import concat, merge
-from werkzeug.datastructures import ImmutableMultiDict
 
 
 SAMPLE_META_INFO_COLS = ["accession", "assay name", "sample name"]
@@ -30,7 +29,7 @@ def get_samples_by_one_meta(db, meta, or_expression, query={}):
 
 def get_samples_by_metas(db, rargs={}):
     """Select samples based on annotation filters"""
-    samples_by_metas, trailing_rargs = None, {}
+    samples_by_metas = None
     assay_query = parse_assay_selection(rargs.getlist("select"), as_query=True)
     for meta_query in rargs:
         # process queries like e.g. "factors=age" and "factors:age=1|2":
@@ -58,20 +57,16 @@ def get_samples_by_metas(db, rargs={}):
                         get_samples_by_one_meta(db, meta, expr, query),
                         on=SAMPLE_META_MULTIINDEX, how="inner",
                     )
-        else:
-            trailing_rargs[meta_query] = rargs.getlist(meta_query)
     # sort presentation:
-    natsorted_samples_by_metas = natsorted_dataframe(
+    return natsorted_dataframe(
         samples_by_metas, by=SAMPLE_META_MULTIINDEX, sort_trailing_columns=True,
     )
-    return natsorted_samples_by_metas, ImmutableMultiDict(trailing_rargs)
 
 
 def get_data_by_metas(db, rargs={}):
     """Select data based on annotation filters"""
-    samples_by_metas, trailing_rargs = get_samples_by_metas(db, rargs)
+    samples_by_metas = get_samples_by_metas(db, rargs)
     sample_columns = samples_by_metas[SAMPLE_META_MULTIINDEX].set_index(
         SAMPLE_META_MULTIINDEX
     ).index
-    sample_data = query_data(sample_columns)
-    return sample_data, ImmutableMultiDict(trailing_rargs)
+    return query_data(sample_columns)

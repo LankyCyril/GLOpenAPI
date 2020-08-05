@@ -24,6 +24,6 @@ def get_assay_metadata(db, accession, assay_name, meta, rargs={}):
     glds = get_dataset_with_caching(db, accession)
     assay = glds.assays[assay_name]
     try:
-        return getattr(assay, meta).full.reset_index(), rargs
+        return getattr(assay, meta).full.reset_index()
     except AttributeError:
         raise GeneLabException("Unknown meta: '{}'".format(meta))
