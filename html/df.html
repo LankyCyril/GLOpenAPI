@@ -35,13 +35,16 @@ var columns = [
 ];
 
 for (var i = 0, l = columns.length; i < l; i++) {
-    columns[i].formatter = function(r,c,v,d,x) {
+    var formatter = function(r,c,v,d,x) {
         return (v == "True") ? "<font color=green>"+v+"</font>" : (
             (v == "NA") ? "<i style='color:#BBB'>"+v+"</i>" : v
         )
     };
     columns[i].sortable = true;
     columns[i].resizable = false;
+    columns[i].formatter = formatter;
+    columns[i].defaultFormatter = formatter;
+    columns[i].momentarilyFormattable = true;
 }
 // FORMATTERS
 
@@ -111,6 +114,40 @@ grid.onSort.subscribe(column_sort);
 var bound = options.frozenColumn + 1;
 render_header_groups($(grid.getPreHeaderPanelLeft()), 0, bound);
 render_header_groups($(grid.getPreHeaderPanelRight()), bound, columns.length);
+
+var momentarily_formatted = [];
+
+grid.onMouseEnter.subscribe(function (e, args) {
+    var g = args.grid;
+    var cell = g.getCellFromEvent(e);
+    var r = cell.row, c = cell.cell;
+    var col = columns[c], mfc = momentarily_formatted[c];
+    var grid_to_invalidate = false;
+    for (var i = 0, l = columns.length; i < l; i++) {
+        if (momentarily_formatted[i] === true) {
+            columns[i].formatter = columns[i].defaultFormatter;
+            grid_to_invalidate = true;
+        }
+    }
+    if ((col.momentarilyFormattable) || (mfc !== undefined)) {
+        momentarily_formatted[c] = true;
+        var value = data[r][columns[c].field];
+        columns[c].formatter = function(r,c,v,d,x) {
+            return (v == value)
+                ? "<font style='background:yellow'>"+v+"</font>"
+                : columns[c].defaultFormatter(r,c,v,d,x);
+        }
+        if (grid_to_invalidate === false) {
+            for (var i = 0, l = data.length; i < l; i++) {
+                g.updateCell(i, c);
+            }
+        }
+    }
+    if (grid_to_invalidate) {
+        g.invalidate();
+        g.render();
+    }
+});
 
 $("title").text(window.location.href.split("?")[1] || "genefab3");
 

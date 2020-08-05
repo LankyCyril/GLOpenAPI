@@ -33,11 +33,13 @@ with open(join(split(split(abspath(__file__))[0])[0], "html/df.html")) as html:
 
 DF_DYNAMIC_FORMATTER_GLDS_MASK = """columns[0].formatter=function(r,c,v,d,x){{
     return "<a href='{}&select="+v+"'>"+v+"</a>";
-}};"""
+}};
+columns[0].momentarilyFormattable = false;"""
 
 DF_DYNAMIC_FORMATTER_ASSAY_MASK = """columns[1].formatter=function(r,c,v,d,x){{
     return "<a href='{}&select="+data[r]["{}"]+":"+v+"'>"+v+"</a>";
-}};"""
+}};
+columns[1].momentarilyFormattable = false;"""
 
 
 def get_dataframe_css(columns):
