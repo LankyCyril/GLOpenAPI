@@ -33,11 +33,11 @@ with open(join(split(split(abspath(__file__))[0])[0], "html/df.html")) as html:
 
 DF_DYNAMIC_FORMATTER_GLDS_MASK = """columns[0].formatter=function(r,c,v,d,x){{
     return "<a href='{}&select="+v+"'>"+v+"</a>";
-}}"""
+}};"""
 
 DF_DYNAMIC_FORMATTER_ASSAY_MASK = """columns[1].formatter=function(r,c,v,d,x){{
     return "<a href='{}&select="+data[r]["{}"]+":"+v+"'>"+v+"</a>";
-}}"""
+}};"""
 
 
 def get_dataframe_css(columns):
@@ -95,8 +95,8 @@ def get_dynamic_dataframe_html(df, cur_url):
             .to_json(orient="records")
         )
         columndata = "\n".join((
-            "{{id:'{}',field:'{}',columnGroup:'{}',name:'{}',{}}},".format(
-                sn, sn, level0, level1, "sortable:true,resizable:false",
+            "{{id:'{}',field:'{}',columnGroup:'{}',name:'{}'}},".format(
+                sn, sn, level0, level1,
             )
             for (level0, level1), sn in zip(df.columns, shortnames)
         ))
