@@ -2,12 +2,12 @@ from os.path import join, split, abspath
 from re import sub
 
 
-def interactive_doc(html_path=None, document="index.html", url_root="/"):
+def interactive_doc(html_path=None, document="docs.html", url_root="/"):
     """Serve an interactive documentation page"""
     if html_path is None:
         html_path = join(
             split(split(abspath(__file__))[0])[0],
-            "docs", document
+            "html", document
         )
     try:
         with open(html_path, mode="rt") as handle:
