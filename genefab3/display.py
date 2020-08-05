@@ -1,3 +1,4 @@
+from os.path import join, split, abspath
 from flask import Response
 from pandas import DataFrame, isnull
 from re import sub
@@ -5,7 +6,7 @@ from re import sub
 
 DF_KWS = dict(index=False, header=False, na_rep="NA")
 
-DF_CSS = """<style>
+DF_STATIC_CSS = """<style>
     table {
         border-spacing: 0;
         border-right: 1pt solid black; border-bottom: 1pt solid black;
@@ -25,23 +26,27 @@ DF_CSS = """<style>
     /* SHADEDCOLS */
 </style>"""
 
-DF_CSS_SHADING = "    td.col{} {{background: #E3E3E399 !important;}}"
+DF_STATIC_CSS_SHADING = "    td.col{} {{background: #E3E3E399 !important;}}"
+
+with open(join(split(split(abspath(__file__))[0])[0], "html/df.html")) as html:
+    DF_DYNAMIC_HTML = html.read()
 
 
 def get_dataframe_css(columns):
-    """Add shading of 'info' columns to default DF_CSS"""
+    """Add shading of 'info' columns to default DF_STATIC_CSS"""
     shading_css_lines = []
     for i, col in enumerate(columns.get_level_values(0)):
         if col == "info":
-            shading_css_lines.append(DF_CSS_SHADING.format(i))
+            shading_css_lines.append(DF_STATIC_CSS_SHADING.format(i))
         else:
             break
     if shading_css_lines:
         return sub(
-            r'    \/\* SHADEDCOLS \*\/', "\n".join(shading_css_lines), DF_CSS,
+            r'    \/\* SHADEDCOLS \*\/', "\n".join(shading_css_lines),
+            DF_STATIC_CSS,
         )
     else:
-        return DF_CSS
+        return DF_STATIC_CSS
 
 
 def annotated_cols(dataframe, sep):
@@ -66,6 +71,35 @@ def color_bool(x):
         return ""
 
 
+def get_dynamic_dataframe_html(df):
+    """Display dataframe using SlickGrid"""
+    shortnames = []
+    def generate_short_names(*args):
+        s, j = "", len(shortnames) + 1
+        while j > 0:
+            s, j = chr(((j % 26) or 26) + 96) + s, (j - 1) // 26
+        shortnames.append(s)
+        return s
+    if df.columns.nlevels == 2:
+        data = (
+            df.droplevel(0, axis=1).rename(generate_short_names, axis=1)
+            .applymap(str).to_json(orient="records")
+        )
+        columns_repr = "\n".join((
+            "{{id:'{}',field:'{}',columnGroup:'{}',name:'{}',{}}},".format(
+                sn, sn, level0, level1, "sortable:true,resizable:false",
+            )
+            for (level0, level1), sn in zip(df.columns, shortnames)
+        ))
+    else:
+        raise NotImplementedError("Laterz")
+    return sub(
+        r'    \/\/ COLUMNDATA', columns_repr, sub(
+            r'    \/\/ ROWDATA', data, DF_DYNAMIC_HTML,
+        )
+    )
+
+
 def display_dataframe(df, fmt):
     """Display dataframe with specified format"""
     if fmt == "tsv":
@@ -79,6 +113,9 @@ def display_dataframe(df, fmt):
             df.style.format(None, na_rep="NA").applymap(color_bool)
             .hide_index().render()
         )
+        mimetype = "text/html"
+    elif fmt == "interactive":
+        content = get_dynamic_dataframe_html(df)
         mimetype = "text/html"
     else:
         raise NotImplementedError("fmt='{}'".format(fmt))

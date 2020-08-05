@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <title>genefab3</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/6pac-slickgrid/2.4.27/slick.grid.min.css" type="text/css"/>
+    <link href="https://fonts.googleapis.com/css2?family=Oxygen+Mono&display=swap" rel="stylesheet">
+    <style>
+        html, body {margin: 0; padding: 0; background: #FFF; overflow: auto}
+        body {font-size: 10pt; font-family: "Oxygen Mono", monospace}
+        #grid {position: absolute; top: 0; left: 0; right: 0; bottom: 0}
+        .slick-header-column {background: #DDD; font-weight: 600; border: .5pt solid black !important}
+        .slick-cell {line-height: 1.65; background: #FFFFFF99; border: .25pt solid black}
+        .slick-row.odd {background: #E8E8E8}
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/6pac-slickgrid/2.4.27/lib/jquery.event.drag-2.3.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/6pac-slickgrid/2.4.27/slick.core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/6pac-slickgrid/2.4.27/slick.grid.min.js"></script>
+</head>
+
+<body><div id="grid"></div></body></html>
+
+<script>
+
+var columns = [
+    // COLUMNDATA
+];
+
+var data =
+    // ROWDATA
+;
+
+var options = {
+    createPreHeaderPanel: true, showPreHeaderPanel: true,
+    defaultColumnWidth: 120, frozenColumn: 0, multiColumnSort: true,
+    enableTextSelectionOnCells: true, enableColumnReorder: false,
+};
+
+function column_sort(e, args) {
+    var sortcols = args.sortCols;
+    data.sort(function (r1, r2) {
+        for (var i = 0, l = sortcols.length; i < l; i++) {
+            var f = sortcols[i].sortCol.field;
+            var v1 = r1[f], v2 = r2[f];
+            var sign = sortcols[i].sortAsc ? 1 : -1;
+            var ans = v1.localeCompare(v2, undefined, {numeric: true}) * sign;
+            if (ans != 0) return ans;
+        }
+        return 0;
+    });
+    args.grid.invalidate();
+    args.grid.render();
+}
+
+function render_header_groups(pre_header_panel, start, end) {
+    pre_header_panel
+        .empty() .addClass("slick-header-columns")
+        .css("left", "-1000px") .width(grid.getHeadersWidth());
+    pre_header_panel.parent().addClass("slick-header");
+    var hc_width_delta = grid.getHeaderColumnWidthDiff();
+    var m, header, last_group = "", total_width = 0;
+    for (var i = start; i < end; i++) {
+        m = columns[i];
+        if (last_group === m.columnGroup && i > 0) {
+            total_width += m.width;
+            header.width(total_width - hc_width_delta);
+        }
+        else {
+            total_width = m.width;
+            var mcg = m.columnGroup || "";
+            header = $("<div class='ui-state-default slick-header-column' />")
+                .html("<span class='slick-column-name'>" + mcg + "</span>")
+                .width(m.width - hc_width_delta)
+                .appendTo(pre_header_panel);
+        }
+        last_group = m.columnGroup;
+    }
+}
+
+for (var i = 0, cl = columns.length; i < cl; i++) {
+    var field = columns[i].field, longest = columns[i].name;
+    for (var j = 0, dl = data.length; j < dl; j++) {
+        var value = data[j][field];
+        if (value.length > longest.length)
+            longest = value;
+    }
+    var testspan = $("<span>" + longest + "</span>").hide();
+    $("body").append(testspan);
+    columns[i].width = testspan.width() + 40;
+    testspan.remove();
+}
+
+var grid = new Slick.Grid("#grid", data, columns, options);
+grid.onSort.subscribe(column_sort);
+
+var bound = options.frozenColumn + 1;
+render_header_groups($(grid.getPreHeaderPanelLeft()), 0, bound);
+render_header_groups($(grid.getPreHeaderPanelRight()), bound, columns.length);
+
+$("title").text(window.location.href.split("?")[1] || "genefab3");
+
+</script>
