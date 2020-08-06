@@ -121,7 +121,10 @@ function render_header_groups(pre_header_panel, start, end) {
 }
 
 for (var i = 0, cl = columns.length; i < cl; i++) {
-    var field = columns[i].field, longest = columns[i].name;
+    c = columns[i];
+    var field = c.field;
+    var longest = (c.name.length > c.columnGroup.length)
+        ? c.name : c.columnGroup;
     for (var j = 0, dl = data.length; j < dl; j++) {
         var value = data[j][field];
         if (value.length > longest.length)
