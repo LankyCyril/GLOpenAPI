@@ -83,29 +83,6 @@ var options = {
     enableTextSelectionOnCells: true, enableColumnReorder: false,
 };
 
-function column_sort(e, args) {
-    var sortcols = args.sortCols;
-    data.sort(function (r1, r2) {
-        for (var i = 0, l = sortcols.length; i < l; i++) {
-            var f = sortcols[i].sortCol.field;
-            var v1 = r1[f], v2 = r2[f];
-            var sign = sortcols[i].sortAsc ? 1 : -1;
-            var ans = sign * (
-                (v1 == "NA")
-                ? ((v2 == "NA") ? 0 : -1)
-                : ((v2 == "NA")
-                    ? 1
-                    : v1.localeCompare(v2, undefined, {numeric: true})
-                )
-            );
-            if (ans != 0) return ans;
-        }
-        return 0;
-    });
-    args.grid.invalidate();
-    args.grid.render();
-}
-
 function render_header_groups(pre_header_panel, start, end) {
     pre_header_panel
         .empty() .addClass("slick-header-columns")
@@ -129,6 +106,32 @@ function render_header_groups(pre_header_panel, start, end) {
         }
         last_group = m.columnGroup;
     }
+}
+
+function column_sort(e, args) {
+    var sortcols = args.sortCols;
+    data.sort(function (r1, r2) {
+        for (var i = 0, l = sortcols.length; i < l; i++) {
+            var f = sortcols[i].sortCol.field;
+            var v1 = r1[f], v2 = r2[f];
+            var sign = sortcols[i].sortAsc ? 1 : -1;
+            var ans = sign * (
+                (v1 == "NA")
+                ? ((v2 == "NA") ? 0 : -1)
+                : ((v2 == "NA")
+                    ? 1
+                    : v1.localeCompare(v2, undefined, {numeric: true})
+                )
+            );
+            if (ans != 0) return ans;
+        }
+        return 0;
+    });
+    args.grid.invalidate();
+    args.grid.render();
+    render_header_groups(
+        $(grid.getPreHeaderPanelLeft()), 0, options.frozenColumn+1,
+    );
 }
 
 for (var i = 0, cl = columns.length; i < cl; i++) {
