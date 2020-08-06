@@ -45,7 +45,6 @@ def meta(**kwrags):
     return display(getter(db, **kwrags, rargs=request.args), request)
 
 @app.route("/assays/", methods=["GET"])
-@app.route("/assays/<meta>/", methods=["GET"])
 def assays(**kwargs):
     """Select assays based on annotation filters"""
     assay_selection = parse_assay_selection(request.args.getlist("select"))

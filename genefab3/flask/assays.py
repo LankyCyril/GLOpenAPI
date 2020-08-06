@@ -29,16 +29,8 @@ def get_assays_by_one_meta(db, meta, or_expression, assay_query={}):
     }, axis=1)
 
 
-def get_assays_by_metas(db, meta=None, rargs={}):
+def get_assays_by_metas(db, rargs={}):
     """Select assays based on annotation (`meta`) filters"""
-    if meta:
-        if meta in rargs:
-            error_mask = "Malformed request: '{}' redefinition"
-            raise GeneLabException(error_mask.format(meta))
-        else:
-            rargs = MultiDict(rargs)
-            rargs[meta] = ""
-    # perform intersections of unions:
     assays_by_metas = None
     assay_query = parse_assay_selection(rargs.getlist("select"), as_query=True)
     for meta in rargs:
