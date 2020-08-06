@@ -89,23 +89,25 @@ def build_url(request, replace={}, drop=set()):
 
 def get_dynamic_glds_formatter(request):
     """Get SlickGrid formatter for column 'accession'"""
-    mask = """columns[0].formatter=function(r,c,v,d,x){{
+    mask = "columns[0].formatter={}; columns[0].defaultFormatter={};"
+    formatter_mask = """columns[0].formatter=function(r,c,v,d,x){{
         return "<a href='{}select="+v+"'>"+v+"</a>";
-    }};
-    columns[0].momentarilyFormattable = false;"""
-    return mask.format(build_url(request, drop={"select"}))
+    }};"""
+    formatter = formatter_mask.format(build_url(request, drop={"select"}))
+    return mask.format(formatter, formatter)
 
 
 def get_dynamic_assay_formatter(request, shortnames):
     """Get SlickGrid formatter for column 'assay name'"""
-    mask = """columns[1].formatter=function(r,c,v,d,x){{
+    mask = "columns[1].formatter={}; columns[1].defaultFormatter={};"
+    formatter_mask = """function(r,c,v,d,x){{
         return "<a href='{}select="+data[r]["{}"]+":"+v+"'>"+v+"</a>";
-    }};
-    columns[1].momentarilyFormattable = false;"""
-    return mask.format(
+    }};"""
+    formatter = formatter_mask.format(
         build_url(request, replace={"/assays/": "/samples/"}, drop={"select"}),
         shortnames[0],
     )
+    return mask.format(formatter, formatter)
 
 
 def get_dynamic_twolevel_dataframe_html(df, request):

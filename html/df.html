@@ -146,9 +146,9 @@ grid.onMouseEnter.subscribe(function (e, args) {
         momentarily_formatted[c] = true;
         var value = data[r][columns[c].field];
         columns[c].formatter = function(r,c,v,d,t) {
+            var fmt = columns[c].defaultFormatter(r,c,v,d,t)
             return (v == value)
-                ? "<font style='background:yellow'>"+v+"</font>"
-                : columns[c].defaultFormatter(r,c,v,d,t);
+                ? "<font style='background:yellow'>"+fmt+"</font>" : fmt;
         }
         for (var y = 0, l = data.length; y < l; y++)
             g.updateCell(y, c);
