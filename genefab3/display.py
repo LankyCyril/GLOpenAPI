@@ -110,7 +110,7 @@ def get_dynamic_assay_formatter(request, shortnames):
     return mask.format(formatter, formatter)
 
 
-def get_dynamic_twolevel_dataframe_html(df, request):
+def get_dynamic_twolevel_dataframe_html(df, request, frozen=0):
     """Display dataframe with two-level columns using SlickGrid"""
     shortnames = []
     def generate_short_names(*args):
@@ -139,10 +139,23 @@ def get_dynamic_twolevel_dataframe_html(df, request):
     csvlink = build_url(request, drop={"fmt"}) + "fmt=csv"
     tsvlink = build_url(request, drop={"fmt"}) + "fmt=tsv"
     return (
-        DF_DYNAMIC_HTML
+        DF_DYNAMIC_HTML.replace("// FROZENCOLUMN", str(frozen))
         .replace("// FORMATTERS", formatters).replace("HTMLINK", htmlink)
         .replace("CSVLINK", csvlink).replace("TSVLINK", tsvlink)
         .replace("// COLUMNDATA", columndata).replace("// ROWDATA", rowdata)
+    )
+
+
+def get_dynamic_threelevel_dataframe_html(df, request):
+    def renamer_generator():
+        for l0, l1, _ in df.columns:
+            yield "{}:{}".format(l0, l1)
+    renamer = renamer_generator()
+    def renamer_wrapper(*args):
+        return next(renamer)
+    return get_dynamic_twolevel_dataframe_html(
+        df.droplevel(0, axis=1).rename(renamer_wrapper, axis=1, level=0),
+        request, frozen="undefined",
     )
 
 
@@ -150,8 +163,12 @@ def get_dynamic_dataframe_html(df, request):
     """Display dataframe using SlickGrid"""
     if df.columns.nlevels == 2:
         return get_dynamic_twolevel_dataframe_html(df, request)
+    elif df.columns.nlevels == 3:
+        return get_dynamic_threelevel_dataframe_html(df, request)
     else:
-        raise NotImplementedError("Non-two-level interactive dataframe")
+        raise NotImplementedError("Dataframe with {} column levels".format(
+            df.columns.nlevels,
+        ))
 
 
 def display_dataframe(df, request):
