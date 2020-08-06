@@ -45,6 +45,7 @@ def duplicate_aware_merge(df1, df2, on, how="inner"):
 
 def get_samples_by_metas(db, rargs={}):
     """Select samples based on annotation filters"""
+    # TODO: deprecate some of the logic in favor of requestparser
     samples_by_metas = None
     assay_query = parse_assay_selection(rargs.getlist("select"), as_query=True)
     for meta_query in rargs:

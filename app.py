@@ -8,6 +8,7 @@ from flask_compress import Compress
 from os import environ
 from genefab3.exceptions import traceback_printer, exception_catcher
 from genefab3.mongo.meta import parse_assay_selection, refresh_database_metadata
+from genefab3.flask.requestparser import parse_request_args
 from genefab3.display import display
 
 
@@ -57,6 +58,7 @@ def assays(**kwargs):
 def samples(**kwargs):
     """Select samples based on annotation filters"""
     refresh_database_metadata(db)
+    parse_request_args(request.args)
     from genefab3.flask.data import get_samples_by_metas as getter
     return display(getter(db, **kwargs, rargs=request.args), request)
 
@@ -64,6 +66,7 @@ def samples(**kwargs):
 def data(**kwargs):
     """Select data based on annotation filters"""
     refresh_database_metadata(db)
+    parse_request_args(request.args)
     from genefab3.flask.data import get_data_by_metas as getter
     return display(getter(db, **kwargs, rargs=request.args), request)
 

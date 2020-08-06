@@ -157,6 +157,7 @@ def refresh_many_assays(db, datasets_with_assays_to_update, max_workers=MAX_JSON
 
 def parse_assay_selection(rargs_select_list, as_query=False):
     """Parse 'select' request argument"""
+    # TODO: deprecate in favor of requestparser
     if len(rargs_select_list) == 0:
         selection = None
     elif len(rargs_select_list) == 1:
