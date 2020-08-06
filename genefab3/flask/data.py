@@ -4,6 +4,8 @@ from genefab3.mongo.utils import get_collection_fields_as_dataframe
 from genefab3.mongo.meta import parse_assay_selection
 from genefab3.mongo.data import query_data
 from pandas import concat, merge
+from re import search
+from genefab3.exceptions import GeneLabException
 
 
 SAMPLE_META_INFO_COLS = ["accession", "assay name", "sample name"]
@@ -25,6 +27,20 @@ def get_samples_by_one_meta(db, meta, or_expression, query={}):
         "info": samples_by_one_meta[SAMPLE_META_INFO_COLS],
         meta: samples_by_one_meta.iloc[:,3:],
     }, axis=1)
+
+
+def duplicate_aware_merge(df1, df2, on, how="inner"):
+    """Merge dataframes on specific columns, also check duplicates among other columns"""
+    merged_df = merge(df1, df2, on=on, how=how, suffixes=("[DUPLICATE]", ""))
+    for level0, level1 in merged_df.columns:
+        match = search(r'(.+)\[DUPLICATE\]', level0)
+        if match:
+            indexer = match.group(1), level1
+            if (merged_df[indexer] == merged_df[(level0, level1)]).all():
+                merged_df.drop(columns=[(level0, level1)], inplace=True)
+            else:
+                raise GeneLabException("Failed to merge columns")
+    return merged_df
 
 
 def get_samples_by_metas(db, rargs={}):
@@ -52,7 +68,7 @@ def get_samples_by_metas(db, rargs={}):
                         db, meta, expr, query,
                     )
                 else: # perform AND
-                    samples_by_metas = merge(
+                    samples_by_metas = duplicate_aware_merge(
                         samples_by_metas,
                         get_samples_by_one_meta(db, meta, expr, query),
                         on=SAMPLE_META_MULTIINDEX, how="inner",
