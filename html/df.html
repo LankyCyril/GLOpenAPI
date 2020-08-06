@@ -90,7 +90,14 @@ function column_sort(e, args) {
             var f = sortcols[i].sortCol.field;
             var v1 = r1[f], v2 = r2[f];
             var sign = sortcols[i].sortAsc ? 1 : -1;
-            var ans = v1.localeCompare(v2, undefined, {numeric: true}) * sign;
+            var ans = sign * (
+                (v1 == "NA")
+                ? ((v2 == "NA") ? 0 : -1)
+                : ((v2 == "NA")
+                    ? 1
+                    : v1.localeCompare(v2, undefined, {numeric: true})
+                )
+            );
             if (ans != 0) return ans;
         }
         return 0;
