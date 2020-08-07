@@ -183,6 +183,7 @@ def get_dynamic_twolevel_dataframe_html(df, context, frozen=0):
 
 
 def get_dynamic_threelevel_dataframe_html(df, context):
+    """Squash two top levels of dataframe columns and display as two-level"""
     def renamer_generator():
         for l0, l1, _ in df.columns:
             yield "{}:{}".format(l0, l1)
