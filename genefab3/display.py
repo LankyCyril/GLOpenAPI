@@ -1,7 +1,8 @@
 from os.path import join, split, abspath
 from flask import Response
 from pandas import DataFrame, isnull
-from re import sub
+from re import sub, escape
+from genefab3.utils import map_replace
 
 
 DF_KWS = dict(index=False, header=False, na_rep="NA")
@@ -110,6 +111,16 @@ def get_dynamic_assay_formatter(request, shortnames):
     return mask.format(formatter, formatter)
 
 
+def get_dynamic_dataframe_formatters(df, request, shortnames):
+    if all(df.columns.get_level_values(1)[:2] == ["accession", "assay name"]):
+        return "\n".join([
+            get_dynamic_glds_formatter(request),
+            get_dynamic_assay_formatter(request, shortnames),
+        ])
+    else:
+        return ""
+
+
 def get_dynamic_twolevel_dataframe_html(df, request, frozen=0):
     """Display dataframe with two-level columns using SlickGrid"""
     shortnames = []
@@ -128,21 +139,21 @@ def get_dynamic_twolevel_dataframe_html(df, request, frozen=0):
     columndata = "\n".join(
         cdm.format(n, n, a, b) for (a, b), n in zip(df.columns, shortnames)
     )
-    if all(df.columns.get_level_values(1)[:2] == ["accession", "assay name"]):
-        formatters = "\n".join([
-            get_dynamic_glds_formatter(request),
-            get_dynamic_assay_formatter(request, shortnames),
-        ])
-    else:
-        formatters = ""
-    htmlink = build_url(request, drop={"fmt"}) + "fmt=html"
-    csvlink = build_url(request, drop={"fmt"}) + "fmt=csv"
-    tsvlink = build_url(request, drop={"fmt"}) + "fmt=tsv"
-    return (
-        DF_DYNAMIC_HTML.replace("// FROZENCOLUMN", str(frozen))
-        .replace("// FORMATTERS", formatters).replace("HTMLINK", htmlink)
-        .replace("CSVLINK", csvlink).replace("TSVLINK", tsvlink)
-        .replace("// COLUMNDATA", columndata).replace("// ROWDATA", rowdata)
+    this_view = "/{}/".format(
+        sub(escape(request.url_root), "", request.base_url).strip("/")
+    )
+    formatters = get_dynamic_dataframe_formatters(df, request, shortnames)
+    return map_replace(
+        DF_DYNAMIC_HTML, {
+            "// FROZENCOLUMN": str(frozen), "// FORMATTERS": formatters,
+            "HTMLINK": build_url(request, drop={"fmt"}) + "fmt=html",
+            "CSVLINK": build_url(request, drop={"fmt"}) + "fmt=csv",
+            "TSVLINK": build_url(request, drop={"fmt"}) + "fmt=tsv",
+            "ASSAYSVIEW": build_url(request, replace={this_view: "/assays/"}),
+            "SAMPLESVIEW": build_url(request, replace={this_view: "/samples/"}),
+            "DATAVIEW": build_url(request, replace={this_view: "/data/"}),
+            "// COLUMNDATA": columndata, "// ROWDATA": rowdata,
+        }
     )
 
 
