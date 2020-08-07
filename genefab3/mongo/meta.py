@@ -193,9 +193,9 @@ def refresh_database_metadata_for_all_datasets(db):
     return all_accessions, fresh, stale, updated_assays
 
 
-def refresh_database_metadata(db, assay_selection=None):
-    if assay_selection is None:
+def refresh_database_metadata(db, context_select=None):
+    if context_select is None:
         return refresh_database_metadata_for_all_datasets(db)
     else:
-        refresh_database_metadata_for_some_datasets(db, set(assay_selection))
+        refresh_database_metadata_for_some_datasets(db, set(context_select))
         return None

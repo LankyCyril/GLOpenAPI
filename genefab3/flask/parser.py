@@ -20,25 +20,21 @@ def assay_selection_to_query(selection):
         return {}
 
 
-def parse_assay_selection(rargs_select_list, as_query=False):
+def parse_assay_selection(rargs_select_list):
     """Parse 'select' request argument"""
-    # TODO: deprecate as_query in favor of `context`
     if len(rargs_select_list) == 0:
-        selection = None
+        return None
     elif len(rargs_select_list) == 1:
-        selection = {}
+        context_select = {}
         for query in rargs_select_list[0].split("|"):
             query_components = query.split(":", 1)
             if len(query_components) == 1:
-                selection[query] = None
+                context_select[query] = None
             else:
-                selection[query_components[0]] = query_components[1]
+                context_select[query_components[0]] = query_components[1]
+        return context_select
     else:
         raise GeneLabException("'select' can be used no more than once")
-    if as_query:
-        return assay_selection_to_query(selection)
-    else:
-        return selection
 
 
 def parse_meta_queries(key, expressions):
@@ -74,7 +70,9 @@ def parse_request(request):
     )
     context.queries.select = assay_selection_to_query(context.select)
     for key in request.args:
-        meta, meta_queries = parse_meta_queries(key, request.args.getlist(key))
+        meta, meta_queries = parse_meta_queries(
+            key, set(request.args.getlist(key)),
+        )
         if meta:
             if getattr(context.queries, meta, None):
                 getattr(context.queries, meta).extend(meta_queries)
