@@ -96,7 +96,7 @@ def get_dynamic_glds_formatter(context):
     """Get SlickGrid formatter for column 'accession'"""
     mask = "columns[0].formatter={}; columns[0].defaultFormatter={};"
     formatter_mask = """columns[0].formatter=function(r,c,v,d,x){{
-        return "<a href='{}select="+v+"'>"+v+"</a>";
+        return "<a href='{}select="+escape(v)+"'>"+v+"</a>";
     }};"""
     formatter = formatter_mask.format(build_url(context, drop={"select"}))
     return mask.format(formatter, formatter)
@@ -106,7 +106,7 @@ def get_dynamic_assay_formatter(context, shortnames):
     """Get SlickGrid formatter for column 'assay name'"""
     mask = "columns[1].formatter={}; columns[1].defaultFormatter={};"
     formatter_mask = """function(r,c,v,d,x){{
-        return "<a href='{}select="+data[r]["{}"]+":"+v+"'>"+v+"</a>";
+        return "<a href='{}select="+data[r]["{}"]+":"+escape(v)+"'>"+v+"</a>";
     }};"""
     formatter = formatter_mask.format(
         build_url(context, "/samples/", drop={"select"}),
@@ -121,14 +121,14 @@ def get_dynamic_meta_formatter(context, i, meta, meta_name):
     if context.view == "/assays/":
         formatter_mask = """function(r,c,v,d,x){{
             return (v == "NA")
-                ? "<i style='color:#BBB'>"+v+"</i>"
-                : "<a href='{}{}={}' style='color:green'>"+v+"</a>";
+            ? "<i style='color:#BBB'>"+v+"</i>"
+            : "<a href='{}{}="+escape("{}")+"' style='color:green'>"+v+"</a>";
         }};"""
     else:
         formatter_mask = """function(r,c,v,d,x){{
             return (v == "NA")
-                ? "<i style='color:#BBB'>"+v+"</i>"
-                : "<a href='{}{}:{}="+v+"'>"+v+"</a>";
+            ? "<i style='color:#BBB'>"+v+"</i>"
+            : "<a href='{}{}:"+escape("{}")+"="+escape(v)+"'>"+v+"</a>";
         }};"""
     formatter = formatter_mask.format(build_url(context), meta, meta_name)
     return mask.format(i, formatter, i, formatter)
