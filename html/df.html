@@ -48,7 +48,7 @@
         (Shift-)click headers to sort.
         Hover to highlight equal values.
         Click values to subset.
-        Press CTRL to toggle crosshairs.<br>
+        <a style="color:#D10" href="#" id="crosshair-toggle">Toggle crosshairs</a>.<br>
         <b>Download:</b> as
         <a style="color:#D10" href="CSVLINK">csv</a>,
         <a style="color:#D10" href="TSVLINK">tsv</a>.
@@ -209,11 +209,10 @@ grid.onSort.subscribe(function(e, args) {
 
 $(document).ready(function() {
     var ch = $("#crosshair-h"), cv = $("#crosshair-v");
-    var hair = $(".crosshair");
     $(this).on("mousemove touchmove", function(e) {
         ch.css("top", e.pageY); cv.css("left", e.pageX);
     });
-    $(document).keydown(function(e) {if (e.ctrlKey) {hair.toggle()}});
+    $("#crosshair-toggle").attr("href", "javascript:$('.crosshair').toggle()");
 });
 
 $("title").text(window.location.href.split("?")[1] || "genefab3");
