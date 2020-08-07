@@ -58,19 +58,32 @@ def get_annotation_by_one_meta(db, meta, or_expression, query={}, sample_level=T
     }, axis=1)
 
 
+def safe_merge_with_all(constrained_df, unconstrained_df):
+    """Merge constrained annotation with single-meta-unconstrained annotation"""
+    cols_to_ignore = [
+        (l0, l1) for l0, l1 in constrained_df.columns
+        if (l0 != "info") and (l0, l1) in unconstrained_df
+    ]
+    return merge(constrained_df, unconstrained_df.drop(columns=cols_to_ignore))
+
+
 def get_annotation_by_metas(db, context, sample_level=True):
     """Select samples based on annotation filters"""
     annotation_by_metas = None
     for meta in ASSAY_METADATALIKES:
         for expression, query in getattr(context.queries, meta, []):
-            annotation_by_one_meta= get_annotation_by_one_meta(
+            annotation_by_one_meta = get_annotation_by_one_meta(
                 db, meta, expression, {**query, **context.queries.select},
                 sample_level=sample_level,
             )
             if annotation_by_metas is None: # populate with first result
                 annotation_by_metas = annotation_by_one_meta
-            else: # perform AND
+            elif expression != "": # perform inner join (AND)
                 annotation_by_metas = merge(
+                    annotation_by_metas, annotation_by_one_meta,
+                )
+            else:
+                annotation_by_metas = safe_merge_with_all(
                     annotation_by_metas, annotation_by_one_meta,
                 )
     # reduce and sort presentation:

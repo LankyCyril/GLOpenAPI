@@ -78,4 +78,10 @@ def parse_request(request):
                 getattr(context.queries, meta).extend(meta_queries)
             else:
                 setattr(context.queries, meta, meta_queries)
+    for meta in ASSAY_METADATALIKES:
+        if getattr(context.queries, meta, None):
+            setattr(
+                context.queries, meta,
+                sorted(getattr(context.queries, meta), reverse=True),
+            )
     return context
