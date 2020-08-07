@@ -3,6 +3,7 @@ from flask import Response
 from pandas import DataFrame, isnull
 from re import sub, escape
 from genefab3.utils import map_replace
+from genefab3.config import ASSAY_METADATALIKES
 
 
 DF_KWS = dict(index=False, header=False, na_rep="NA")
@@ -111,14 +112,40 @@ def get_dynamic_assay_formatter(request, shortnames):
     return mask.format(formatter, formatter)
 
 
-def get_dynamic_dataframe_formatters(df, request, shortnames):
-    if all(df.columns.get_level_values(1)[:2] == ["accession", "assay name"]):
-        return "\n".join([
-            get_dynamic_glds_formatter(request),
-            get_dynamic_assay_formatter(request, shortnames),
-        ])
+def get_dynamic_meta_formatter(request, this_view, i, meta, meta_name):
+    """Get SlickGrid formatter for meta column"""
+    mask = "columns[{}].formatter={}; columns[{}].defaultFormatter={};"
+    if this_view == "/assays/":
+        formatter_mask = """function(r,c,v,d,x){{
+            return (v == "NA")
+                ? "<i style='color:#BBB'>"+v+"</i>"
+                : "<a href='{}{}={}' style='color:green'>"+v+"</a>";
+        }};"""
     else:
-        return ""
+        formatter_mask = """function(r,c,v,d,x){{
+            return (v == "NA")
+                ? "<i style='color:#BBB'>"+v+"</i>"
+                : "<a href='{}{}:{}="+v+"'>"+v+"</a>";
+        }};"""
+    formatter = formatter_mask.format(build_url(request), meta, meta_name)
+    return mask.format(i, formatter, i, formatter)
+
+
+def get_dynamic_dataframe_formatters(df, request, shortnames, this_view):
+    """GEt SlickGrid formatters for columns"""
+    formatters = []
+    if df.columns[0] == ("info", "accession"):
+        formatters.append(get_dynamic_glds_formatter(request))
+    if df.columns[1] == ("info", "assay name"):
+        formatters.append(get_dynamic_assay_formatter(request, shortnames))
+    for i, (meta, meta_name) in enumerate(df.columns):
+        if meta in ASSAY_METADATALIKES:
+            formatters.append(
+                get_dynamic_meta_formatter(
+                    request, this_view, i, meta, meta_name,
+                )
+            )
+    return "\n".join(formatters)
 
 
 def get_dynamic_twolevel_dataframe_html(df, request, frozen=0):
@@ -142,7 +169,9 @@ def get_dynamic_twolevel_dataframe_html(df, request, frozen=0):
     this_view = "/{}/".format(
         sub(escape(request.url_root), "", request.base_url).strip("/")
     )
-    formatters = get_dynamic_dataframe_formatters(df, request, shortnames)
+    formatters = get_dynamic_dataframe_formatters(
+        df, request, shortnames, this_view,
+    )
     return map_replace(
         DF_DYNAMIC_HTML, {
             "// FROZENCOLUMN": str(frozen), "// FORMATTERS": formatters,

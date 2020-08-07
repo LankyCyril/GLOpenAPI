@@ -7,7 +7,6 @@ from natsort import natsorted
 from genefab3.utils import UniversalSet, natsorted_dataframe
 from genefab3.mongo.utils import get_collection_fields_as_dataframe
 from pandas import concat, merge
-from re import search
 
 
 def get_meta_names(db, meta, rargs=None):
@@ -60,20 +59,6 @@ def get_annotation_by_one_meta(db, meta, or_expression, query={}, sample_level=T
     }, axis=1)
 
 
-def duplicate_aware_merge(df1, df2, on, how="inner"):
-    """Merge dataframes on specific columns, also check duplicates among other columns"""
-    merged_df = merge(df1, df2, on=on, how=how, suffixes=("[DUPLICATE]", ""))
-    for level0, level1 in merged_df.columns:
-        match = search(r'(.+)\[DUPLICATE\]', level0)
-        if match:
-            indexer = match.group(1), level1
-            if (merged_df[indexer] == merged_df[(level0, level1)]).all():
-                merged_df.drop(columns=[(level0, level1)], inplace=True)
-            else:
-                raise GeneLabException("Failed to merge columns")
-    return merged_df
-
-
 def get_annotation_by_metas(db, sample_level=True, rargs={}):
     """Select samples based on annotation filters"""
     annotation_by_metas = None
@@ -100,17 +85,16 @@ def get_annotation_by_metas(db, sample_level=True, rargs={}):
                         db, meta, expr, query, sample_level=sample_level,
                     )
                 else: # perform AND
-                    annotation_by_metas = duplicate_aware_merge(
+                    annotation_by_metas = merge(
                         annotation_by_metas,
                         get_annotation_by_one_meta(
                             db, meta, expr, query, sample_level=sample_level,
                         ),
-                        on=info_multicols, how="inner",
                     )
-    # sort presentation:
+    # reduce and sort presentation:
     return natsorted_dataframe(
-        annotation_by_metas, by=info_multicols,
-        sort_trailing_columns=True,
+        annotation_by_metas.loc[:,~annotation_by_metas.columns.duplicated()],
+        by=info_multicols, sort_trailing_columns=True,
     )
 
 
