@@ -2,22 +2,7 @@ from genefab3.exceptions import GeneLabException
 from re import sub, escape
 from argparse import Namespace
 from genefab3.config import ASSAY_METADATALIKES
-
-
-def assay_selection_to_query(selection):
-    """Convert 'select' dictionary into MongoDB query"""
-    if selection:
-        query = {"$or": []}
-        for accession, assay_name in selection.items():
-            if assay_name:
-                query["$or"].append({
-                    "accession": accession, "assay name": assay_name,
-                })
-            else:
-                query["$or"].append({"accession": accession})
-        return query
-    else:
-        return {}
+from collections import defaultdict
 
 
 def parse_assay_selection(rargs_select_list):
@@ -25,16 +10,33 @@ def parse_assay_selection(rargs_select_list):
     if len(rargs_select_list) == 0:
         return None
     elif len(rargs_select_list) == 1:
-        context_select = {}
+        context_select = defaultdict(set)
         for query in rargs_select_list[0].split("|"):
             query_components = query.split(":", 1)
             if len(query_components) == 1:
-                context_select[query] = None
+                context_select[query_components[0]].add(None)
             else:
-                context_select[query_components[0]] = query_components[1]
+                context_select[query_components[0]].add(query_components[1])
         return context_select
     else:
         raise GeneLabException("'select' can be used no more than once")
+
+
+def assay_selection_to_query(selection):
+    """Convert 'select' dictionary into MongoDB query"""
+    if selection:
+        query = {"$or": []}
+        for accession, assay_names in selection.items():
+            for assay_name in assay_names:
+                if assay_name:
+                    query["$or"].append({
+                        "accession": accession, "assay name": assay_name,
+                    })
+                else:
+                    query["$or"].append({"accession": accession})
+        return query
+    else:
+        return {}
 
 
 def parse_meta_queries(key, expressions):
