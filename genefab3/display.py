@@ -1,7 +1,9 @@
 from os.path import join, split, abspath
 from flask import Response
 from pandas import DataFrame, isnull
-from re import sub
+from re import sub, escape
+from genefab3.utils import map_replace
+from genefab3.config import ASSAY_METADATALIKES
 
 
 DF_KWS = dict(index=False, header=False, na_rep="NA")
@@ -110,7 +112,43 @@ def get_dynamic_assay_formatter(request, shortnames):
     return mask.format(formatter, formatter)
 
 
-def get_dynamic_twolevel_dataframe_html(df, request):
+def get_dynamic_meta_formatter(request, this_view, i, meta, meta_name):
+    """Get SlickGrid formatter for meta column"""
+    mask = "columns[{}].formatter={}; columns[{}].defaultFormatter={};"
+    if this_view == "/assays/":
+        formatter_mask = """function(r,c,v,d,x){{
+            return (v == "NA")
+                ? "<i style='color:#BBB'>"+v+"</i>"
+                : "<a href='{}{}={}' style='color:green'>"+v+"</a>";
+        }};"""
+    else:
+        formatter_mask = """function(r,c,v,d,x){{
+            return (v == "NA")
+                ? "<i style='color:#BBB'>"+v+"</i>"
+                : "<a href='{}{}:{}="+v+"'>"+v+"</a>";
+        }};"""
+    formatter = formatter_mask.format(build_url(request), meta, meta_name)
+    return mask.format(i, formatter, i, formatter)
+
+
+def get_dynamic_dataframe_formatters(df, request, shortnames, this_view):
+    """GEt SlickGrid formatters for columns"""
+    formatters = []
+    if df.columns[0] == ("info", "accession"):
+        formatters.append(get_dynamic_glds_formatter(request))
+    if df.columns[1] == ("info", "assay name"):
+        formatters.append(get_dynamic_assay_formatter(request, shortnames))
+    for i, (meta, meta_name) in enumerate(df.columns):
+        if meta in ASSAY_METADATALIKES:
+            formatters.append(
+                get_dynamic_meta_formatter(
+                    request, this_view, i, meta, meta_name,
+                )
+            )
+    return "\n".join(formatters)
+
+
+def get_dynamic_twolevel_dataframe_html(df, request, frozen=0):
     """Display dataframe with two-level columns using SlickGrid"""
     shortnames = []
     def generate_short_names(*args):
@@ -128,21 +166,36 @@ def get_dynamic_twolevel_dataframe_html(df, request):
     columndata = "\n".join(
         cdm.format(n, n, a, b) for (a, b), n in zip(df.columns, shortnames)
     )
-    if all(df.columns.get_level_values(1)[:2] == ["accession", "assay name"]):
-        formatters = "\n".join([
-            get_dynamic_glds_formatter(request),
-            get_dynamic_assay_formatter(request, shortnames),
-        ])
-    else:
-        formatters = ""
-    htmlink = build_url(request, drop={"fmt"}) + "fmt=html"
-    csvlink = build_url(request, drop={"fmt"}) + "fmt=csv"
-    tsvlink = build_url(request, drop={"fmt"}) + "fmt=tsv"
-    return (
-        DF_DYNAMIC_HTML
-        .replace("// FORMATTERS", formatters).replace("HTMLINK", htmlink)
-        .replace("CSVLINK", csvlink).replace("TSVLINK", tsvlink)
-        .replace("// COLUMNDATA", columndata).replace("// ROWDATA", rowdata)
+    this_view = "/{}/".format(
+        sub(escape(request.url_root), "", request.base_url).strip("/")
+    )
+    formatters = get_dynamic_dataframe_formatters(
+        df, request, shortnames, this_view,
+    )
+    return map_replace(
+        DF_DYNAMIC_HTML, {
+            "// FROZENCOLUMN": str(frozen), "// FORMATTERS": formatters,
+            "HTMLINK": build_url(request, drop={"fmt"}) + "fmt=html",
+            "CSVLINK": build_url(request, drop={"fmt"}) + "fmt=csv",
+            "TSVLINK": build_url(request, drop={"fmt"}) + "fmt=tsv",
+            "ASSAYSVIEW": build_url(request, replace={this_view: "/assays/"}),
+            "SAMPLESVIEW": build_url(request, replace={this_view: "/samples/"}),
+            "DATAVIEW": build_url(request, replace={this_view: "/data/"}),
+            "// COLUMNDATA": columndata, "// ROWDATA": rowdata,
+        }
+    )
+
+
+def get_dynamic_threelevel_dataframe_html(df, request):
+    def renamer_generator():
+        for l0, l1, _ in df.columns:
+            yield "{}:{}".format(l0, l1)
+    renamer = renamer_generator()
+    def renamer_wrapper(*args):
+        return next(renamer)
+    return get_dynamic_twolevel_dataframe_html(
+        df.droplevel(0, axis=1).rename(renamer_wrapper, axis=1, level=0),
+        request, frozen="undefined",
     )
 
 
@@ -150,8 +203,12 @@ def get_dynamic_dataframe_html(df, request):
     """Display dataframe using SlickGrid"""
     if df.columns.nlevels == 2:
         return get_dynamic_twolevel_dataframe_html(df, request)
+    elif df.columns.nlevels == 3:
+        return get_dynamic_threelevel_dataframe_html(df, request)
     else:
-        raise NotImplementedError("Non-two-level interactive dataframe")
+        raise NotImplementedError("Dataframe with {} column levels".format(
+            df.columns.nlevels,
+        ))
 
 
 def display_dataframe(df, request):

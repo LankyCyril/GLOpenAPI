@@ -186,14 +186,20 @@ def parse_assay_selection(rargs_select_list, as_query=False):
         return selection
 
 
-def refresh_database_metadata_for_one_dataset(db, accession):
-    """Put updated JSONs for one dataset and its assays into database"""
+def refresh_database_metadata_for_some_datasets(db, accessions):
+    """Put updated JSONs for datasets with {accessions} and their assays into database"""
     datasets_with_assays_to_update = refresh_many_datasets(
-        db, {accession}, max_workers=MAX_JSON_THREADS,
+        db, accessions, max_workers=MAX_JSON_THREADS,
     )
     refresh_many_assays(
         db, datasets_with_assays_to_update, max_workers=MAX_JSON_THREADS,
     )
+    return datasets_with_assays_to_update
+
+
+def refresh_database_metadata_for_one_dataset(db, accession):
+    """Put updated JSONs for one dataset and its assays into database"""
+    return refresh_database_metadata_for_some_datasets(db, {accession})
 
 
 def refresh_database_metadata_for_all_datasets(db):
@@ -209,26 +215,18 @@ def refresh_database_metadata_for_all_datasets(db):
         all_accessions = {raw_json["_id"] for raw_json in raw_datasets_json}
     except KeyError:
         raise GeneLabJSONException("Malformed search JSON")
-    datasets_with_assays_to_update = refresh_many_datasets(
-        db, all_accessions - fresh, max_workers=MAX_JSON_THREADS,
-    )
-    refresh_many_assays(
-        db, datasets_with_assays_to_update, max_workers=MAX_JSON_THREADS,
+    updated_assays = refresh_database_metadata_for_some_datasets(
+        db, all_accessions - fresh,
     )
     for accession in (fresh | stale) - all_accessions: # drop removed datasets
         db.dataset_timestamps.delete_many({"accession": accession})
         db.accession_to_id.delete_many({"accession": accession})
-    return all_accessions, fresh, stale, datasets_with_assays_to_update
+    return all_accessions, fresh, stale, updated_assays
 
 
 def refresh_database_metadata(db, assay_selection=None):
     if assay_selection is None:
         return refresh_database_metadata_for_all_datasets(db)
     else:
-        datasets_with_assays_to_update = refresh_many_datasets(
-            db, set(assay_selection), max_workers=MAX_JSON_THREADS,
-        )
-        refresh_many_assays(
-            db, datasets_with_assays_to_update, max_workers=MAX_JSON_THREADS,
-        )
+        refresh_database_metadata_for_some_datasets(db, set(assay_selection))
         return None

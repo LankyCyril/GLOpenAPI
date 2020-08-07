@@ -33,7 +33,8 @@
         .slick-cell {line-height: 1.65; background: #FFFFFF99; border: .25pt solid black}
         .slick-cell.frozen {font-weight: 600}
         .slick-row.odd {background: #E8E8E8}
-        a {text-decoration: none; color: navy}
+        a {text-decoration: none; color: black}
+        a:hover {text-decoration: underline; color: blue}
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/6pac-slickgrid/2.4.27/lib/jquery.event.drag-2.3.0.min.js"></script>
@@ -47,10 +48,14 @@
         (Shift-)click headers to sort.
         Hover to highlight equal values.
         Click values to subset.
-        Press CTRL to toggle crosshairs.<br>
+        <a style="color:#D10" href="#" id="crosshair-toggle">Toggle crosshairs</a>.<br>
         <b>Download:</b> as
         <a style="color:#D10" href="CSVLINK">csv</a>,
         <a style="color:#D10" href="TSVLINK">tsv</a>.
+        <b>Switch view level:</b>
+        <a style="color:#D10" href="ASSAYSVIEW">assays</a>,
+        <a style="color:#D10" href="SAMPLESVIEW">samples</a>,
+        <a style="color:#D10" href="DATAVIEW">data</a>.
     </div>
     <div id="grid">
         <div id="noscript">
@@ -91,8 +96,9 @@ for (var i = 0, l = columns.length; i < l; i++) {
 
 var options = {
     createPreHeaderPanel: true, showPreHeaderPanel: true,
-    defaultColumnWidth: 120, frozenColumn: 0, multiColumnSort: true,
+    defaultColumnWidth: 120, multiColumnSort: true,
     enableTextSelectionOnCells: true, enableColumnReorder: false,
+    frozenColumn: // FROZENCOLUMN
 };
 
 function render_header_groups(pre_header_panel, start, end) {
@@ -138,9 +144,14 @@ for (var i = 0, cl = columns.length; i < cl; i++) {
 
 var grid = new Slick.Grid("#grid", data, columns, options);
 
-var bound = options.frozenColumn + 1;
-render_header_groups($(grid.getPreHeaderPanelLeft()), 0, bound);
-render_header_groups($(grid.getPreHeaderPanelRight()), bound, columns.length);
+if (options.frozenColumn !== undefined) {
+    var b = options.frozenColumn + 1;
+    render_header_groups($(grid.getPreHeaderPanelLeft()), 0, b);
+    render_header_groups($(grid.getPreHeaderPanelRight()), b, columns.length);
+}
+else {
+    render_header_groups($(grid.getPreHeaderPanel()), 0, columns.length);
+}
 
 var momentarily_formatted = [];
 
@@ -163,7 +174,7 @@ grid.onMouseEnter.subscribe(function (e, args) {
         columns[c].formatter = function(r,c,v,d,t) {
             var fmt = columns[c].defaultFormatter(r,c,v,d,t)
             return (v == value)
-                ? "<font style='background:yellow'>"+fmt+"</font>" : fmt;
+                ? "<font style='background:#FF8'>"+fmt+"</font>" : fmt;
         }
         for (var y = 0, l = data.length; y < l; y++)
             g.updateCell(y, c);
@@ -198,11 +209,10 @@ grid.onSort.subscribe(function(e, args) {
 
 $(document).ready(function() {
     var ch = $("#crosshair-h"), cv = $("#crosshair-v");
-    var hair = $(".crosshair");
     $(this).on("mousemove touchmove", function(e) {
         ch.css("top", e.pageY); cv.css("left", e.pageX);
     });
-    $(document).keydown(function(e) {if (e.ctrlKey) {hair.toggle()}});
+    $("#crosshair-toggle").attr("href", "javascript:$('.crosshair').toggle()");
 });
 
 $("title").text(window.location.href.split("?")[1] || "genefab3");
