@@ -8,7 +8,7 @@ from genefab3.mongo.utils import get_collection_fields_as_dataframe
 from pandas import concat, merge
 
 
-def get_meta_names(db, meta, rargs=None):
+def get_meta_names(db, meta, context):
     """List names of particular meta"""
     if meta not in ASSAY_METADATALIKES:
         raise GeneLabException("Unknown request: '{}'".format(meta))

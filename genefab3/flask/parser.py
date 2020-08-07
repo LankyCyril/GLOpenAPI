@@ -69,6 +69,7 @@ def parse_request(request):
     context = Namespace(
         view="/"+sub(url_root, "", base_url).strip("/")+"/",
         select=parse_assay_selection(request.args.getlist("select")),
+        args=request.args,
         queries=Namespace(),
     )
     context.queries.select = assay_selection_to_query(context.select)
