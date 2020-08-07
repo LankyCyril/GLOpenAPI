@@ -7,7 +7,8 @@ from flask import Flask, request
 from flask_compress import Compress
 from os import environ
 from genefab3.exceptions import traceback_printer, exception_catcher
-from genefab3.mongo.meta import parse_assay_selection, refresh_database_metadata
+from genefab3.flask.parser import parse_request
+from genefab3.mongo.meta import refresh_database_metadata
 from genefab3.display import display
 
 
@@ -47,26 +48,26 @@ def meta(**kwrags):
 @app.route("/assays/", methods=["GET"])
 def assays(**kwargs):
     """Select assays based on annotation filters"""
-    assay_selection = parse_assay_selection(request.args.getlist("select"))
-    refresh_database_metadata(db, assay_selection)
+    context = parse_request(request)
+    refresh_database_metadata(db, context.select)
     from genefab3.flask.meta import get_assays_by_metas as getter
-    return display(getter(db, **kwargs, rargs=request.args), request)
+    return display(getter(db, context), request)
 
 @app.route("/samples/", methods=["GET"])
 def samples(**kwargs):
     """Select samples based on annotation filters"""
-    assay_selection = parse_assay_selection(request.args.getlist("select"))
-    refresh_database_metadata(db, assay_selection)
+    context = parse_request(request)
+    refresh_database_metadata(db, context.select)
     from genefab3.flask.meta import get_samples_by_metas as getter
-    return display(getter(db, **kwargs, rargs=request.args), request)
+    return display(getter(db, context), request)
 
 @app.route("/data/", methods=["GET"])
 def data(**kwargs):
     """Select data based on annotation filters"""
-    assay_selection = parse_assay_selection(request.args.getlist("select"))
-    refresh_database_metadata(db, assay_selection)
+    context = parse_request(request)
+    refresh_database_metadata(db, context.select)
     from genefab3.flask.data import get_data_by_metas as getter
-    return display(getter(db, **kwargs, rargs=request.args), request)
+    return display(getter(db, context), request)
 
 @app.route("/<accession>/<assay_name>/<meta>/", methods=["GET"])
 def assay_metadata(**kwargs):

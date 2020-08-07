@@ -1,7 +1,6 @@
 from genefab3.config import ASSAY_METADATALIKES
 from genefab3.exceptions import GeneLabException
 from genefab3.mongo.utils import get_collection_fields
-from genefab3.mongo.meta import parse_assay_selection
 from pandas import DataFrame
 from natsort import natsorted
 from genefab3.utils import UniversalSet, natsorted_dataframe
@@ -59,48 +58,32 @@ def get_annotation_by_one_meta(db, meta, or_expression, query={}, sample_level=T
     }, axis=1)
 
 
-def get_annotation_by_metas(db, sample_level=True, rargs={}):
+def get_annotation_by_metas(db, context, sample_level=True):
     """Select samples based on annotation filters"""
     annotation_by_metas = None
-    assay_query = parse_assay_selection(rargs.getlist("select"), as_query=True)
-    _, info_multicols = get_info_cols(sample_level=sample_level)
-    for meta_query in rargs:
-        # process queries like e.g. "factors=age" and "factors:age=1|2":
-        query_cc = meta_query.split(":")
-        if (len(query_cc) == 2) and (query_cc[0] in ASSAY_METADATALIKES):
-            meta, queried_field = query_cc # e.g. "factors" and "age"
-        else:
-            meta, queried_field = meta_query, None # e.g. "factors"
-        if meta in ASSAY_METADATALIKES:
-            for expr in rargs.getlist(meta_query):
-                if queried_field: # e.g. {"age": {"$in": [1, 2]}}
-                    query = {
-                        queried_field: {"$in": expr.split("|")}, **assay_query,
-                    }
-                    expr = queried_field
-                else: # lookup just by meta name:
-                    query = assay_query
-                if annotation_by_metas is None: # populate with first result
-                    annotation_by_metas = get_annotation_by_one_meta(
-                        db, meta, expr, query, sample_level=sample_level,
-                    )
-                else: # perform AND
-                    annotation_by_metas = merge(
-                        annotation_by_metas,
-                        get_annotation_by_one_meta(
-                            db, meta, expr, query, sample_level=sample_level,
-                        ),
-                    )
+    for meta in ASSAY_METADATALIKES:
+        for expression, query in getattr(context.queries, meta, []):
+            annotation_by_one_meta= get_annotation_by_one_meta(
+                db, meta, expression, {**query, **context.queries.select},
+                sample_level=sample_level,
+            )
+            if annotation_by_metas is None: # populate with first result
+                annotation_by_metas = annotation_by_one_meta
+            else: # perform AND
+                annotation_by_metas = merge(
+                    annotation_by_metas, annotation_by_one_meta,
+                )
     # reduce and sort presentation:
+    _, info_multicols = get_info_cols(sample_level=sample_level)
     return natsorted_dataframe(
         annotation_by_metas.loc[:,~annotation_by_metas.columns.duplicated()],
         by=info_multicols, sort_trailing_columns=True,
     )
 
 
-def get_assays_by_metas(db, rargs={}):
-    return get_annotation_by_metas(db, sample_level=False, rargs=rargs)
+def get_assays_by_metas(db, context):
+    return get_annotation_by_metas(db, context, sample_level=False)
 
 
-def get_samples_by_metas(db, rargs={}):
-    return get_annotation_by_metas(db, sample_level=True, rargs=rargs)
+def get_samples_by_metas(db, context):
+    return get_annotation_by_metas(db, context, sample_level=True)

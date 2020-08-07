@@ -155,37 +155,6 @@ def refresh_many_assays(db, datasets_with_assays_to_update, max_workers=MAX_JSON
                 print("Refreshed JSON for assays in:", acc, file=stderr)
 
 
-def parse_assay_selection(rargs_select_list, as_query=False):
-    """Parse 'select' request argument"""
-    if len(rargs_select_list) == 0:
-        selection = None
-    elif len(rargs_select_list) == 1:
-        selection = {}
-        for query in rargs_select_list[0].split("|"):
-            query_components = query.split(":", 1)
-            if len(query_components) == 1:
-                selection[query] = None
-            else:
-                selection[query_components[0]] = query_components[1]
-    else:
-        raise GeneLabException("'select' can be used no more than once")
-    if as_query:
-        if selection:
-            query = {"$or": []}
-            for accession, assay_name in selection.items():
-                if assay_name:
-                    query["$or"].append({
-                        "accession": accession, "assay name": assay_name,
-                    })
-                else:
-                    query["$or"].append({"accession": accession})
-            return query
-        else:
-            return {}
-    else:
-        return selection
-
-
 def refresh_database_metadata_for_some_datasets(db, accessions):
     """Put updated JSONs for datasets with {accessions} and their assays into database"""
     datasets_with_assays_to_update = refresh_many_datasets(
