@@ -103,6 +103,7 @@ var options = {
     enableTextSelectionOnCells: true, enableColumnReorder: false,
     frozenColumn: // FROZENCOLUMN
 };
+options.defaultFrozenColumn = options.frozenColumn;
 
 function render_header_groups(pre_header_panel, start, end) {
     pre_header_panel
@@ -217,7 +218,18 @@ $(document).ready(function() {
     $("#crosshair-toggle").attr("href", "javascript:$('.crosshair').toggle()");
 });
 
+function add_removers() {
 // REMOVERS
+}
+
+add_removers();
+
+$(window).resize(function() {
+    grid.setOptions({frozenColumn: false});
+    grid.setOptions({frozenColumn: options.defaultFrozenColumn});
+    add_removers();
+});
+
 
 $("title").text(window.location.href.split("?")[1] || "genefab3");
 
