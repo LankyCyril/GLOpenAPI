@@ -36,6 +36,8 @@
         .slick-row.odd {background: #E8E8E8}
         a {text-decoration: none; color: black}
         a:hover {text-decoration: underline; color: blue}
+        a.remover {opacity: .1}
+        a.remover:hover {opacity: 1; text-decoration: none}
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/6pac-slickgrid/2.4.27/lib/jquery.event.drag-2.3.0.min.js"></script>
@@ -215,6 +217,8 @@ $(document).ready(function() {
     });
     $("#crosshair-toggle").attr("href", "javascript:$('.crosshair').toggle()");
 });
+
+// REMOVERS
 
 $("title").text(window.location.href.split("?")[1] || "genefab3");
 

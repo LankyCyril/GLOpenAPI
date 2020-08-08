@@ -44,6 +44,16 @@ def parse_meta_queries(key, expressions):
     query_cc = key.split(":")
     if (len(query_cc) == 2) and (query_cc[0] in ASSAY_METADATALIKES):
         meta, queried_field = query_cc # e.g. "factors" and "age"
+    elif (key[-1] == "!") and (key[:-1] in ASSAY_METADATALIKES):
+        to_remove = set()
+        for expression in expressions:
+            if "|" in expression:
+                raise GeneLabException("Malformed argument: {}={}".format(
+                    key, expression,
+                ))
+            else:
+                to_remove.add(expression)
+        return False, key[:-1], to_remove
     else:
         meta, queried_field = key, None # e.g. "factors"
     meta_queries = []
@@ -55,9 +65,9 @@ def parse_meta_queries(key, expressions):
             else: # lookup just by meta name:
                 query = {}
             meta_queries.append((expression, query))
-        return meta, meta_queries
+        return True, meta, meta_queries
     else:
-        return None, None
+        return None, None, None
 
 
 def parse_request(request):
@@ -69,17 +79,21 @@ def parse_request(request):
         select=parse_assay_selection(request.args.getlist("select")),
         args=request.args,
         queries=Namespace(),
+        removers=Namespace(),
     )
     context.queries.select = assay_selection_to_query(context.select)
     for key in request.args:
-        meta, meta_queries = parse_meta_queries(
+        add, meta, meta_queries = parse_meta_queries(
             key, set(request.args.getlist(key)),
         )
-        if meta:
-            if getattr(context.queries, meta, None):
-                getattr(context.queries, meta).extend(meta_queries)
-            else:
-                setattr(context.queries, meta, meta_queries)
+        if add is True:
+            if meta_queries is not False:
+                if getattr(context.queries, meta, None):
+                    getattr(context.queries, meta).extend(meta_queries)
+                else:
+                    setattr(context.queries, meta, meta_queries)
+        elif add is False:
+            setattr(context.removers, meta, meta_queries)
     for meta in ASSAY_METADATALIKES:
         if getattr(context.queries, meta, None):
             setattr(

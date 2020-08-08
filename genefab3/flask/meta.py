@@ -33,7 +33,7 @@ def get_info_cols(sample_level=True):
     return info_cols, info_multicols
 
 
-def get_annotation_by_one_meta(db, meta, or_expression, query={}, sample_level=True):
+def get_annotation_by_one_meta(db, meta, or_expression, query={}, to_remove=set(), sample_level=True):
     """Generate dataframe of assays matching (AND) multiple `meta` lookups (OR)"""
     if or_expression == "": # wildcard, get all info
         constrain_fields = UniversalSet()
@@ -41,21 +41,24 @@ def get_annotation_by_one_meta(db, meta, or_expression, query={}, sample_level=T
         constrain_fields = set(or_expression.split("|"))
     if sample_level:
         store_value = True
-        skip = set()
+        skip = to_remove
         info_cols, _ = get_info_cols(sample_level=True)
     else:
         store_value = False
-        skip = {"sample name"}
+        skip = {"sample name"} | to_remove
         info_cols, _ = get_info_cols(sample_level=False)
     annotation_by_one_meta = get_collection_fields_as_dataframe(
         collection=getattr(db, meta), constrain_fields=constrain_fields,
         targets=info_cols, skip=skip, store_value=store_value, query=query,
     )
-    # prepend column level, see: https://stackoverflow.com/a/42094658/590676
-    return concat({
-        "info": annotation_by_one_meta[info_cols],
-        meta: annotation_by_one_meta.iloc[:,len(info_cols):],
-    }, axis=1)
+    if annotation_by_one_meta is None:
+        return None
+    else:
+        # prepend column level, see: https://stackoverflow.com/a/42094658/590676
+        return concat({
+            "info": annotation_by_one_meta[info_cols],
+            meta: annotation_by_one_meta.iloc[:,len(info_cols):],
+        }, axis=1)
 
 
 def safe_merge_with_all(constrained_df, unconstrained_df):
@@ -74,20 +77,22 @@ def get_annotation_by_metas(db, context, sample_level=True):
         for expression, query in getattr(context.queries, meta, []):
             annotation_by_one_meta = get_annotation_by_one_meta(
                 db, meta, expression, {**query, **context.queries.select},
+                to_remove=getattr(context.removers, meta, set()),
                 sample_level=sample_level,
             )
-            if annotation_by_metas is None: # populate with first result
-                annotation_by_metas = annotation_by_one_meta
-            elif expression != "": # perform inner join (AND)
-                annotation_by_metas = merge(
-                    annotation_by_metas, annotation_by_one_meta,
-                )
-            else: # join with unconstrained annotation
-                annotation_by_metas = safe_merge_with_all(
-                    annotation_by_metas, annotation_by_one_meta,
-                )
-            # drop empty columns:
-            annotation_by_metas.dropna(how="all", axis=1, inplace=True)
+            if annotation_by_one_meta is not None:
+                if annotation_by_metas is None: # populate with first result
+                    annotation_by_metas = annotation_by_one_meta
+                elif expression != "": # perform inner join (AND)
+                    annotation_by_metas = merge(
+                        annotation_by_metas, annotation_by_one_meta,
+                    )
+                else: # join with unconstrained annotation
+                    annotation_by_metas = safe_merge_with_all(
+                        annotation_by_metas, annotation_by_one_meta,
+                    )
+                # drop empty columns:
+                annotation_by_metas.dropna(how="all", axis=1, inplace=True)
     # reduce and sort presentation:
     _, info_multicols = get_info_cols(sample_level=sample_level)
     return natsorted_dataframe(
