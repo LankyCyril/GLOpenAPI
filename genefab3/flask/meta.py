@@ -82,10 +82,12 @@ def get_annotation_by_metas(db, context, sample_level=True):
                 annotation_by_metas = merge(
                     annotation_by_metas, annotation_by_one_meta,
                 )
-            else:
+            else: # join with unconstrained annotation
                 annotation_by_metas = safe_merge_with_all(
                     annotation_by_metas, annotation_by_one_meta,
                 )
+            # drop empty columns:
+            annotation_by_metas.dropna(how="all", axis=1, inplace=True)
     # reduce and sort presentation:
     _, info_multicols = get_info_cols(sample_level=sample_level)
     return natsorted_dataframe(
