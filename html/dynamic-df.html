@@ -132,17 +132,16 @@ function render_header_groups(pre_header_panel, start, end) {
 for (var i = 0, cl = columns.length; i < cl; i++) {
     c = columns[i];
     var field = c.field;
-    var longest = (c.name.length > c.columnGroup.length)
-        ? c.name : c.columnGroup;
+    var longest = c.name;
     for (var j = 0, dl = data.length; j < dl; j++) {
         var value = data[j][field];
         if (value.length > longest.length)
             longest = value;
     }
-    var testspan = $("<span>" + longest + "</span>").hide();
-    $("body").append(testspan);
-    columns[i].width = testspan.width() + 40;
-    testspan.remove();
+    var widthchecker = $("<span>"+longest+"&nbsp;&times;</span>").hide();
+    $("body").append(widthchecker);
+    columns[i].width = widthchecker.width() + 40;
+    widthchecker.remove();
 }
 
 var grid = new Slick.Grid("#grid", data, columns, options);
