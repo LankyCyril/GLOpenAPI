@@ -157,7 +157,7 @@ def get_dynamic_twolevel_dataframe_removers():
         if (meta !== "info") {
             $(this).append(
                 "&nbsp;<a class='remover' href='"+
-                window.location.href+"&"+meta+"!="+name+"'>&times;</a>"
+                window.location.href+"&"+meta+"!="+escape(name)+"'>&times;</a>"
             );
         };
         ci += 1;
