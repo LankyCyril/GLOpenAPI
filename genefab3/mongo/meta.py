@@ -5,7 +5,7 @@ from genefab3.config import MAX_JSON_AGE, MAX_JSON_THREADS
 from genefab3.config import ASSAY_METADATALIKES
 from genefab3.utils import download_cold_json
 from genefab3.mongo.utils import replace_doc
-from genefab3.exceptions import GeneLabException, GeneLabJSONException
+from genefab3.exceptions import GeneLabJSONException
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from datetime import datetime
 from pymongo import DESCENDING
@@ -155,37 +155,6 @@ def refresh_many_assays(db, datasets_with_assays_to_update, max_workers=MAX_JSON
                 print("Refreshed JSON for assays in:", acc, file=stderr)
 
 
-def parse_assay_selection(rargs_select_list, as_query=False):
-    """Parse 'select' request argument"""
-    if len(rargs_select_list) == 0:
-        selection = None
-    elif len(rargs_select_list) == 1:
-        selection = {}
-        for query in rargs_select_list[0].split("|"):
-            query_components = query.split(":", 1)
-            if len(query_components) == 1:
-                selection[query] = None
-            else:
-                selection[query_components[0]] = query_components[1]
-    else:
-        raise GeneLabException("'select' can be used no more than once")
-    if as_query:
-        if selection:
-            query = {"$or": []}
-            for accession, assay_name in selection.items():
-                if assay_name:
-                    query["$or"].append({
-                        "accession": accession, "assay name": assay_name,
-                    })
-                else:
-                    query["$or"].append({"accession": accession})
-            return query
-        else:
-            return {}
-    else:
-        return selection
-
-
 def refresh_database_metadata_for_some_datasets(db, accessions):
     """Put updated JSONs for datasets with {accessions} and their assays into database"""
     datasets_with_assays_to_update = refresh_many_datasets(
@@ -224,9 +193,9 @@ def refresh_database_metadata_for_all_datasets(db):
     return all_accessions, fresh, stale, updated_assays
 
 
-def refresh_database_metadata(db, assay_selection=None):
-    if assay_selection is None:
+def refresh_database_metadata(db, context_select=None):
+    if context_select is None:
         return refresh_database_metadata_for_all_datasets(db)
     else:
-        refresh_database_metadata_for_some_datasets(db, set(assay_selection))
+        refresh_database_metadata_for_some_datasets(db, set(context_select))
         return None
