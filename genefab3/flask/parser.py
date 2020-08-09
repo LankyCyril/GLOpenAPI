@@ -98,6 +98,9 @@ def parse_request(request):
         if getattr(context.queries, meta, None):
             setattr(
                 context.queries, meta,
-                sorted(getattr(context.queries, meta), reverse=True),
+                sorted(
+                    getattr(context.queries, meta),
+                    reverse=True, key=lambda x:x[0],
+                ),
             )
     return context
