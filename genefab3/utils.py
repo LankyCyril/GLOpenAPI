@@ -5,7 +5,8 @@ from json import loads
 from re import search, sub, escape
 from genefab3.exceptions import GeneLabException, GeneLabJSONException
 from datetime import datetime
-from numpy import zeros
+from numpy import zeros, nan
+from pandas import DataFrame, concat
 from natsort import natsorted
 from functools import lru_cache
 
@@ -109,3 +110,11 @@ def map_replace(string, mappings):
         lambda m: mappings[m.group()],
         string,
     )
+
+
+def empty_df(columns):
+    """Generate empty DataFrame with given columns"""
+    return concat(
+        [DataFrame(columns), DataFrame([nan]*len(columns), columns=[2])],
+        axis=1,
+    ).set_index([0, 1]).T

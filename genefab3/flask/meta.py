@@ -3,7 +3,7 @@ from genefab3.exceptions import GeneLabException
 from genefab3.mongo.utils import get_collection_fields
 from pandas import DataFrame
 from natsort import natsorted
-from genefab3.utils import UniversalSet, natsorted_dataframe
+from genefab3.utils import UniversalSet, natsorted_dataframe, empty_df
 from genefab3.mongo.utils import get_collection_fields_as_dataframe
 from pandas import concat, merge
 
@@ -95,10 +95,15 @@ def get_annotation_by_metas(db, context, sample_level=True):
                 annotation_by_metas.dropna(how="all", axis=1, inplace=True)
     # reduce and sort presentation:
     _, info_multicols = get_info_cols(sample_level=sample_level)
-    return natsorted_dataframe(
-        annotation_by_metas.loc[:,~annotation_by_metas.columns.duplicated()],
-        by=info_multicols, sort_trailing_columns=True,
-    )
+    if annotation_by_metas is None:
+        return empty_df(columns=info_multicols)
+    else:
+        return natsorted_dataframe(
+            annotation_by_metas.loc[
+                :, ~annotation_by_metas.columns.duplicated()
+            ],
+            by=info_multicols, sort_trailing_columns=True,
+        )
 
 
 def get_assays_by_metas(db, context):
