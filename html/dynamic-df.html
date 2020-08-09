@@ -86,8 +86,8 @@ var columns = [
 for (var i = 0, l = columns.length; i < l; i++) {
     var formatter = function(r,c,v,d,x) {
         return (v == "True") ? "<font color=green>"+v+"</font>" : (
-            (v == "NA") ? "<i style='color:#BBB'>"+v+"</i>" : v
-        )
+               (v == "False") ? "<font color='#FAA'>"+v+"</font>" : (
+               (v == "NA") ? "<i style='color:#BBB'>"+v+"</i>" : v))
     };
     columns[i].sortable = true;
     columns[i].resizable = false;

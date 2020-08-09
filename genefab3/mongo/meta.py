@@ -134,12 +134,13 @@ def refresh_assay_meta_stores(db, accession):
                 "accession": assay.dataset.accession, "assay name": assay.name,
             })
             for sample_name, row in dataframe.iterrows():
-                for field, value in row.iteritems():
-                    collection.insert_one({
+                collection.insert_one({
+                    **{
                         "accession": assay.dataset.accession,
-                        "assay name": assay.name,
-                        "sample name": sample_name, field: value,
-                    })
+                        "assay name": assay.name, "sample name": sample_name,
+                    },
+                    **row.groupby(row.index).aggregate(list).to_dict(),
+                })
 
 
 def refresh_many_assays(db, datasets_with_assays_to_update, max_workers=MAX_JSON_THREADS):

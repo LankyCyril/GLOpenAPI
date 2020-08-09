@@ -122,7 +122,9 @@ def get_dynamic_meta_formatter(context, i, meta, meta_name):
         formatter_mask = """function(r,c,v,d,x){{
             return (v == "NA")
             ? "<i style='color:#BBB'>"+v+"</i>"
-            : "<a href='{}{}="+escape("{}")+"' style='color:green'>"+v+"</a>";
+            : ((v == "False")
+            ? "<font style='color:#FAA'>"+v+"</font>"
+            : "<a href='{}{}="+escape("{}")+"' style='color:green'>"+v+"</a>");
         }};"""
     else:
         formatter_mask = """function(r,c,v,d,x){{

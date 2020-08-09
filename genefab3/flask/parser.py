@@ -5,6 +5,9 @@ from genefab3.config import ASSAY_METADATALIKES
 from collections import defaultdict
 
 
+QUERY, WILDCARD, REMOVER = 0, 1, 2
+
+
 def parse_assay_selection(rargs_select_list):
     """Parse 'select' request argument"""
     if len(rargs_select_list) == 0:
@@ -41,33 +44,39 @@ def assay_selection_to_query(selection):
 
 def parse_meta_queries(key, expressions):
     """Process queries like e.g. 'factors=age' and 'factors:age=1|2'"""
-    query_cc = key.split(":")
-    if (len(query_cc) == 2) and (query_cc[0] in ASSAY_METADATALIKES):
-        meta, queried_field = query_cc # e.g. "factors" and "age"
-    elif (key[-1] == "!") and (key[:-1] in ASSAY_METADATALIKES):
-        to_remove = set()
-        for expression in expressions:
-            if "|" in expression:
-                raise GeneLabException("Malformed argument: {}={}".format(
-                    key, expression,
-                ))
-            else:
-                to_remove.add(expression)
-        return False, key[:-1], to_remove
+    if key[-1] == "!":
+        real_key, negation = key[:-1], True
     else:
-        meta, queried_field = key, None # e.g. "factors"
-    meta_queries = []
+        real_key, negation = key, False
+    if ":" in real_key:
+        meta, field = real_key.split(":") # e.g. "factors" and "age"
+    else:
+        meta, field = real_key, None # e.g. "factors"
     if meta in ASSAY_METADATALIKES:
         for expression in expressions:
-            if queried_field: # e.g. {"age": {"$in": [1, 2]}}
-                query = {queried_field: {"$in": expression.split("|")}}
-                expression = queried_field
-            else: # lookup just by meta name:
-                query = {}
-            meta_queries.append((expression, query))
-        return True, meta, meta_queries
-    else:
-        return None, None, None
+            malformed_err = "Malformed argument: {}={}".format(key, expression)
+            undefined_err = "Undefined behavior: {}={}".format(key, expression)
+            values = expression.split("|")
+            if negation and (len(values) > 1): # e.g. "f:a!=5|7" or "f!=a|b"
+                raise GeneLabException(undefined_err)
+            elif field: # e.g. "factors:age"
+                if expression and negation: # e.g. "factors:age!=5"
+                    yield QUERY, meta, {field: {"$ne": values[0]}}
+                elif expression: # e.g. "factors:age=7"
+                    yield QUERY, meta, {field: {"$in": values}}
+                else: # e.g. "factors:age!=" without value
+                    raise GeneLabException(malformed_err)
+            else:
+                if negation and expression: # e.g. "factors!=age"
+                    yield REMOVER, meta, values[0]
+                elif expression: # e.g. "factors=age"
+                    yield QUERY, meta, {"$or": [
+                        {value: {"$exists": True}} for value in values
+                    ]}
+                elif negation: # e.g. "factors!=" without value
+                    raise GeneLabException(malformed_err)
+                else: # e.g. "factors", i.e. all factors
+                    yield WILDCARD, meta, None
 
 
 def parse_request(request):
@@ -78,29 +87,18 @@ def parse_request(request):
         view="/"+sub(url_root, "", base_url).strip("/")+"/",
         select=parse_assay_selection(request.args.getlist("select")),
         args=request.args,
-        queries=Namespace(),
-        removers=Namespace(),
+        queries=defaultdict(list),
+        wildcards=set(),
+        removers=defaultdict(set),
     )
-    context.queries.select = assay_selection_to_query(context.select)
+    context.queries["select"] = assay_selection_to_query(context.select)
     for key in request.args:
-        add, meta, meta_queries = parse_meta_queries(
-            key, set(request.args.getlist(key)),
-        )
-        if add is True:
-            if meta_queries is not False:
-                if getattr(context.queries, meta, None):
-                    getattr(context.queries, meta).extend(meta_queries)
-                else:
-                    setattr(context.queries, meta, meta_queries)
-        elif add is False:
-            setattr(context.removers, meta, meta_queries)
-    for meta in ASSAY_METADATALIKES:
-        if getattr(context.queries, meta, None):
-            setattr(
-                context.queries, meta,
-                sorted(
-                    getattr(context.queries, meta),
-                    reverse=True, key=lambda x:x[0],
-                ),
-            )
+        parser = parse_meta_queries(key, set(request.args.getlist(key)))
+        for kind, meta, query in parser:
+            if kind == QUERY:
+                context.queries[meta].append(query)
+            elif kind == REMOVER:
+                context.removers[meta].add(query)
+            elif kind == WILDCARD:
+                context.wildcards.add(meta)
     return context
