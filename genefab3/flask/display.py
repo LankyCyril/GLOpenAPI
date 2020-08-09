@@ -2,6 +2,8 @@ from os.path import join, split, abspath
 from flask import Response
 from pandas import DataFrame, isnull
 from re import sub
+from genefab3.utils import map_replace
+from genefab3.config import ASSAY_METADATALIKES
 
 
 DF_KWS = dict(index=False, header=False, na_rep="NA")
@@ -28,7 +30,10 @@ DF_STATIC_CSS = """<style>
 
 DF_STATIC_CSS_SHADING = "    td.col{} {{background: #E3E3E399 !important;}}"
 
-with open(join(split(split(abspath(__file__))[0])[0], "html/df.html")) as html:
+DF_DYNAMIC_HTML_FILE = join(
+    split(split(split(abspath(__file__))[0])[0])[0], "html/dynamic-df.html",
+)
+with open(DF_DYNAMIC_HTML_FILE) as html:
     DF_DYNAMIC_HTML = html.read()
 
 
@@ -71,15 +76,15 @@ def static_color_bool(x):
         return ""
 
 
-def build_url(request, replace={}, drop=set()):
+def build_url(context, target_view=None, drop=set()):
     """Rebuild URL from request, alter based on `replace` and `drop`"""
-    base_url = request.base_url
-    for old, new in replace.items():
-        base_url = base_url.replace(old, new)
-    url_components = [base_url + "?"]
-    for arg in request.args:
+    if target_view is None:
+        url_components = [context.view + "?"]
+    else:
+        url_components = [target_view + "?"]
+    for arg in context.args:
         if arg not in drop:
-            for value in request.args.getlist(arg):
+            for value in context.args.getlist(arg):
                 if value == "":
                     url_components.append(arg+"&")
                 else:
@@ -87,30 +92,79 @@ def build_url(request, replace={}, drop=set()):
     return "".join(url_components)
 
 
-def get_dynamic_glds_formatter(request):
+def get_dynamic_glds_formatter(context):
     """Get SlickGrid formatter for column 'accession'"""
     mask = "columns[0].formatter={}; columns[0].defaultFormatter={};"
     formatter_mask = """columns[0].formatter=function(r,c,v,d,x){{
-        return "<a href='{}select="+v+"'>"+v+"</a>";
+        return "<a href='{}select="+escape(v)+"'>"+v+"</a>";
     }};"""
-    formatter = formatter_mask.format(build_url(request, drop={"select"}))
+    formatter = formatter_mask.format(build_url(context, drop={"select"}))
     return mask.format(formatter, formatter)
 
 
-def get_dynamic_assay_formatter(request, shortnames):
+def get_dynamic_assay_formatter(context, shortnames):
     """Get SlickGrid formatter for column 'assay name'"""
     mask = "columns[1].formatter={}; columns[1].defaultFormatter={};"
     formatter_mask = """function(r,c,v,d,x){{
-        return "<a href='{}select="+data[r]["{}"]+":"+v+"'>"+v+"</a>";
+        return "<a href='{}select="+data[r]["{}"]+":"+escape(v)+"'>"+v+"</a>";
     }};"""
     formatter = formatter_mask.format(
-        build_url(request, replace={"/assays/": "/samples/"}, drop={"select"}),
+        build_url(context, "/samples/", drop={"select"}),
         shortnames[0],
     )
     return mask.format(formatter, formatter)
 
 
-def get_dynamic_twolevel_dataframe_html(df, request):
+def get_dynamic_meta_formatter(context, i, meta, meta_name):
+    """Get SlickGrid formatter for meta column"""
+    mask = "columns[{}].formatter={}; columns[{}].defaultFormatter={};"
+    if context.view == "/assays/":
+        formatter_mask = """function(r,c,v,d,x){{
+            return (v == "NA")
+            ? "<i style='color:#BBB'>"+v+"</i>"
+            : "<a href='{}{}="+escape("{}")+"' style='color:green'>"+v+"</a>";
+        }};"""
+    else:
+        formatter_mask = """function(r,c,v,d,x){{
+            return (v == "NA")
+            ? "<i style='color:#BBB'>"+v+"</i>"
+            : "<a href='{}{}:"+escape("{}")+"="+escape(v)+"'>"+v+"</a>";
+        }};"""
+    formatter = formatter_mask.format(build_url(context), meta, meta_name)
+    return mask.format(i, formatter, i, formatter)
+
+
+def get_dynamic_dataframe_formatters(df, context, shortnames):
+    """Get SlickGrid formatters for columns"""
+    formatters = []
+    if df.columns[0] == ("info", "accession"):
+        formatters.append(get_dynamic_glds_formatter(context))
+    if df.columns[1] == ("info", "assay name"):
+        formatters.append(get_dynamic_assay_formatter(context, shortnames))
+    for i, (meta, meta_name) in enumerate(df.columns):
+        if meta in ASSAY_METADATALIKES:
+            formatters.append(
+                get_dynamic_meta_formatter(context, i, meta, meta_name)
+            )
+    return "\n".join(formatters)
+
+
+def get_dynamic_twolevel_dataframe_removers():
+    """Get SlickGrid column removers"""
+    return """var ci = 0;
+    $(".slick-header-sortable").each(function () {
+        var meta = columns[ci].columnGroup, name = columns[ci].name;
+        if (meta !== "info") {
+            $(this).append(
+                "&nbsp;<a class='remover' href='"+
+                window.location.href+"&"+meta+"!="+escape(name)+"'>&times;</a>"
+            );
+        };
+        ci += 1;
+    });"""
+
+
+def get_dynamic_twolevel_dataframe_html(df, context, frozen=0):
     """Display dataframe with two-level columns using SlickGrid"""
     shortnames = []
     def generate_short_names(*args):
@@ -128,35 +182,55 @@ def get_dynamic_twolevel_dataframe_html(df, request):
     columndata = "\n".join(
         cdm.format(n, n, a, b) for (a, b), n in zip(df.columns, shortnames)
     )
-    if all(df.columns.get_level_values(1)[:2] == ["accession", "assay name"]):
-        formatters = "\n".join([
-            get_dynamic_glds_formatter(request),
-            get_dynamic_assay_formatter(request, shortnames),
-        ])
+    formatters = get_dynamic_dataframe_formatters(df, context, shortnames)
+    if context.view in {"/assays/", "/samples/"}:
+        removers = get_dynamic_twolevel_dataframe_removers()
     else:
-        formatters = ""
-    htmlink = build_url(request, drop={"fmt"}) + "fmt=html"
-    csvlink = build_url(request, drop={"fmt"}) + "fmt=csv"
-    tsvlink = build_url(request, drop={"fmt"}) + "fmt=tsv"
-    return (
-        DF_DYNAMIC_HTML
-        .replace("// FORMATTERS", formatters).replace("HTMLINK", htmlink)
-        .replace("CSVLINK", csvlink).replace("TSVLINK", tsvlink)
-        .replace("// COLUMNDATA", columndata).replace("// ROWDATA", rowdata)
+        removers = ""
+    return map_replace(
+        DF_DYNAMIC_HTML, {
+            "// FROZENCOLUMN": str(frozen), "// FORMATTERS": formatters,
+            "// REMOVERS": removers,
+            "HTMLINK": build_url(context, drop={"fmt"}) + "fmt=html",
+            "CSVLINK": build_url(context, drop={"fmt"}) + "fmt=csv",
+            "TSVLINK": build_url(context, drop={"fmt"}) + "fmt=tsv",
+            "ASSAYSVIEW": build_url(context, "/assays/"),
+            "SAMPLESVIEW": build_url(context, "/samples/"),
+            "DATAVIEW": build_url(context, "/data/"),
+            "// COLUMNDATA": columndata, "// ROWDATA": rowdata,
+        }
     )
 
 
-def get_dynamic_dataframe_html(df, request):
+def get_dynamic_threelevel_dataframe_html(df, context):
+    """Squash two top levels of dataframe columns and display as two-level"""
+    def renamer_generator():
+        for l0, l1, _ in df.columns:
+            yield "{}:{}".format(l0, l1)
+    renamer = renamer_generator()
+    def renamer_wrapper(*args):
+        return next(renamer)
+    return get_dynamic_twolevel_dataframe_html(
+        df.droplevel(0, axis=1).rename(renamer_wrapper, axis=1, level=0),
+        context, frozen="undefined",
+    )
+
+
+def get_dynamic_dataframe_html(df, context):
     """Display dataframe using SlickGrid"""
     if df.columns.nlevels == 2:
-        return get_dynamic_twolevel_dataframe_html(df, request)
+        return get_dynamic_twolevel_dataframe_html(df, context)
+    elif df.columns.nlevels == 3:
+        return get_dynamic_threelevel_dataframe_html(df, context)
     else:
-        raise NotImplementedError("Non-two-level interactive dataframe")
+        raise NotImplementedError("Dataframe with {} column levels".format(
+            df.columns.nlevels,
+        ))
 
 
-def display_dataframe(df, request):
+def display_dataframe(df, context):
     """Display dataframe with specified format"""
-    fmt = request.args.get("fmt", "tsv")
+    fmt = context.args.get("fmt", "tsv")
     if fmt == "tsv":
         content = annotated_cols(df, sep="\t") + df.to_csv(sep="\t", **DF_KWS)
         mimetype = "text/plain"
@@ -170,17 +244,17 @@ def display_dataframe(df, request):
         )
         mimetype = "text/html"
     elif fmt == "interactive":
-        content = get_dynamic_dataframe_html(df, request)
+        content = get_dynamic_dataframe_html(df, context)
         mimetype = "text/html"
     else:
         raise NotImplementedError("fmt='{}'".format(fmt))
     return Response(content, mimetype=mimetype)
 
 
-def display(obj, request):
+def display(obj, context):
     """Dispatch object and trailing request arguments to display handler"""
     if isinstance(obj, DataFrame):
-        return display_dataframe(obj, request)
+        return display_dataframe(obj, context)
     else:
         raise NotImplementedError(
             "Display of {}".format(str(type(obj).strip("<>")))

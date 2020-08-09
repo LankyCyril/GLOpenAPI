@@ -22,13 +22,22 @@ def get_collection_fields(collection, skip=set()):
 def get_collection_fields_as_dataframe(collection, targets, query={}, skip=set(), constrain_fields=UniversalSet(), store_value=True):
     """Parse collection for keys accompanying targets"""
     skip_downstream = set(skip) | {"_id"} | set(targets)
-    unique_descriptors = defaultdict(dict)
+    unique_descriptors = defaultdict(lambda:defaultdict(set))
     for entry in collection.find(query):
         for key in set(entry.keys()) - skip_downstream:
             if key in constrain_fields:
-                unique_descriptors[tuple(entry[t] for t in targets)][key] = (
+                unique_descriptors[tuple(entry[t] for t in targets)][key].add(
                     entry[key] if store_value else True
                 )
-    dataframe_by_metas = DataFrame(unique_descriptors).T
-    dataframe_by_metas.index = dataframe_by_metas.index.rename(targets)
-    return dataframe_by_metas.reset_index()
+    if unique_descriptors:
+        for outerkey, innerdict in unique_descriptors.items():
+            for key, value in innerdict.items():
+                if len(value) == 1:
+                    unique_descriptors[outerkey][key] = value.pop()
+                else:
+                    unique_descriptors[outerkey][key] = "|".join(sorted(value))
+        dataframe_by_metas = DataFrame(unique_descriptors).T
+        dataframe_by_metas.index = dataframe_by_metas.index.rename(targets)
+        return dataframe_by_metas.reset_index()
+    else:
+        return None

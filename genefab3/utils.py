@@ -2,10 +2,11 @@ from urllib.request import urlopen
 from genefab3.config import COLD_GLDS_MASK, COLD_FILEURLS_MASK
 from genefab3.config import COLD_FILEDATES_MASK, TIMESTAMP_FMT
 from json import loads
-from re import search, sub
+from re import search, sub, escape
 from genefab3.exceptions import GeneLabException, GeneLabJSONException
 from datetime import datetime
-from numpy import zeros
+from numpy import zeros, nan
+from pandas import DataFrame, concat
 from natsort import natsorted
 from functools import lru_cache
 
@@ -100,3 +101,20 @@ def levenshtein_distance(v, w):
             else:
                 dp[i, j] = 1 + min(dp[i, j-1], dp[i-1, j], dp[i-1, j-1])
     return dp[m, n]
+
+
+def map_replace(string, mappings):
+    """Perform multiple replacements in one go"""
+    return sub(
+        r'|'.join(map(escape, mappings.keys())),
+        lambda m: mappings[m.group()],
+        string,
+    )
+
+
+def empty_df(columns):
+    """Generate empty DataFrame with given columns"""
+    return concat(
+        [DataFrame(columns), DataFrame([nan]*len(columns), columns=[2])],
+        axis=1,
+    ).set_index([0, 1]).T
