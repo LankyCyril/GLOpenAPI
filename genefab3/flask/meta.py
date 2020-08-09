@@ -36,10 +36,11 @@ def get_info_cols(sample_level=True):
 
 def get_annotation_by_one_meta(db, meta, context, drop_cols, info_cols, sample_level=True):
     """Generate dataframe of assays matching (AND) multiple `meta` queries"""
+    select = context.queries["select"]
     collection, by_one_meta = getattr(db, meta), None
     query2df = lambda query: (
         DataFrame(collection.find(query))
-        .drop(columns=drop_cols)
+        .drop(columns=drop_cols, errors="ignore")
         .dropna(how="all", axis=1)
         .applymap(
             lambda vv: "|".join(sorted(map(str, vv))) if isinstance(vv, list)
@@ -47,25 +48,26 @@ def get_annotation_by_one_meta(db, meta, context, drop_cols, info_cols, sample_l
         )
     )
     if context.queries[meta]:
-        by_one_meta = query2df({"$and": context.queries[meta]})
+        by_one_meta = query2df({"$and": context.queries[meta] + [select]})
     if meta in context.wildcards:
+        by_one_wildcard = query2df(select)
         if by_one_meta is None:
-            by_one_meta = query2df({})
+            by_one_meta = by_one_wildcard
+        elif len(by_one_meta) == 0:
+            return None
         else:
-            by_one_meta = merge(by_one_meta, query2df({}))
+            by_one_meta = merge(by_one_meta, by_one_wildcard)
     if by_one_meta is not None:
-        # drop empty columns and simplify representation:
-        by_one_meta = (
+        by_one_meta = ( # drop empty columns and simplify representation:
             by_one_meta # FIXME: what if a meta name is "accession"?
             .drop(columns=context.removers[meta])
             .dropna(how="all", axis=1)
         )
-        # make two-level:
-        return concat({
+        return concat({ # make two-level:
             "info": by_one_meta[info_cols],
             meta: by_one_meta.drop(columns=info_cols) if sample_level
                 else ~by_one_meta.drop(columns=info_cols).isnull()
-        }, axis=1)
+        }, axis=1).drop_duplicates()
     else:
         return None
 
