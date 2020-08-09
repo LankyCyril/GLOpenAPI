@@ -72,6 +72,7 @@ def safe_merge_with_all(constrained_df, unconstrained_df):
 
 def get_annotation_by_metas(db, context, sample_level=True):
     """Select samples based on annotation filters"""
+    _, info_multicols = get_info_cols(sample_level=sample_level)
     annotation_by_metas = None
     for meta in ASSAY_METADATALIKES:
         for expression, query in getattr(context.queries, meta, []):
@@ -83,6 +84,8 @@ def get_annotation_by_metas(db, context, sample_level=True):
             if annotation_by_one_meta is not None:
                 if annotation_by_metas is None: # populate with first result
                     annotation_by_metas = annotation_by_one_meta
+                elif len(annotation_by_metas) == 0: # already shrunk to nothing
+                    return empty_df(columns=info_multicols)
                 elif expression != "": # perform inner join (AND)
                     annotation_by_metas = merge(
                         annotation_by_metas, annotation_by_one_meta,
@@ -94,8 +97,7 @@ def get_annotation_by_metas(db, context, sample_level=True):
                 # drop empty columns:
                 annotation_by_metas.dropna(how="all", axis=1, inplace=True)
     # reduce and sort presentation:
-    _, info_multicols = get_info_cols(sample_level=sample_level)
-    if annotation_by_metas is None:
+    if (annotation_by_metas is None) or (len(annotation_by_metas) == 0):
         return empty_df(columns=info_multicols)
     else:
         return natsorted_dataframe(
