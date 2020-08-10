@@ -88,12 +88,11 @@ def parse_request(request):
         select=parse_assay_selection(request.args.getlist("select")),
         args=request.args,
         queries=defaultdict(list),
-        wildcards=set(),
         fields=defaultdict(set),
+        wildcards=set(),
         removers=defaultdict(set),
     )
     context.queries["select"] = assay_selection_to_query(context.select)
-    meta_has_removed_fields = defaultdict(bool)
     for key in request.args:
         parser = parse_meta_queries(key, set(request.args.getlist(key)))
         for kind, meta, fields, query in parser:
@@ -101,12 +100,8 @@ def parse_request(request):
                 context.queries[meta].append(query)
                 context.fields[meta] |= fields
             elif kind == REMOVER:
-                context.fields[meta] -= fields
                 context.removers[meta] |= fields
-                meta_has_removed_fields[meta] = True
+                context.fields[meta] -= fields
             elif kind == WILDCARD:
                 context.wildcards.add(meta)
-    for meta in ASSAY_METADATALIKES:
-        if meta_has_removed_fields[meta] and (not context.fields[meta]):
-            context.wildcards.add(meta)
     return context

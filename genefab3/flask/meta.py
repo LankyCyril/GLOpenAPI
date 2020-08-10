@@ -5,7 +5,6 @@ from pandas import DataFrame
 from natsort import natsorted
 from genefab3.utils import natsorted_dataframe, empty_df
 from pandas import concat, merge
-from functools import partial
 
 
 def get_meta_names(db, meta, context):
@@ -44,7 +43,7 @@ def get_displayable_dataframe_from_query(collection, meta, is_wildcard, context,
     if is_wildcard:
         to_drop = drop_cols
     else:
-        to_drop = drop_cols | (
+        to_drop = drop_cols | context.removers[meta] | (
             set(dataframe.columns) - set(info_cols) - context.fields[meta]
         )
     return (
