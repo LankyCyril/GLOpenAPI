@@ -36,10 +36,11 @@ def get_info_cols(sample_level=True):
 
 def get_annotation_by_one_meta(db, meta, context, drop_cols, info_cols, sample_level=True):
     """Generate dataframe of assays matching (AND) multiple `meta` queries"""
-    select = context.queries["select"]
     collection, by_one_meta = getattr(db, meta), None
-    query2df = lambda query: (
-        DataFrame(collection.find(query))
+    query2df = lambda meta_queries: (
+        DataFrame(collection.find({
+            "$and": meta_queries + [context.queries["select"]]
+        }))
         .drop(columns=drop_cols, errors="ignore")
         .dropna(how="all", axis=1)
         .applymap(
@@ -48,9 +49,9 @@ def get_annotation_by_one_meta(db, meta, context, drop_cols, info_cols, sample_l
         )
     )
     if context.queries[meta]:
-        by_one_meta = query2df({"$and": context.queries[meta] + [select]})
+        by_one_meta = query2df(context.queries[meta])
     if meta in context.wildcards:
-        by_one_wildcard = query2df(select)
+        by_one_wildcard = query2df([])
         if by_one_meta is None:
             by_one_meta = by_one_wildcard
         elif len(by_one_meta) == 0:
