@@ -11,13 +11,6 @@ from natsort import natsorted
 from functools import lru_cache
 
 
-class UniversalSet(set):
-    """Naive universal set"""
-    def __and__(self, x): return x
-    def __rand__(self, x): return x
-    def __contains__(self, x): return True
-
-
 def natsorted_dataframe(dataframe, by, ascending=True, sort_trailing_columns=False):
     """See: https://stackoverflow.com/a/29582718/590676"""
     if sort_trailing_columns:
