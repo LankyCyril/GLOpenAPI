@@ -92,6 +92,29 @@ def get_annotation_by_one_meta(db, meta, context, drop_cols, info_cols, sample_l
         return None
 
 
+def dropna_2d(annotation_by_metas, context, info_multicols, inplace=True):
+    """Drop all-NA columns, rows, observing context and fixed 'info' columns"""
+    if inplace:
+        if context.view == "/assays/":
+            annotation_by_metas = annotation_by_metas.applymap(
+                lambda x: x or nan
+            )
+        annotation_by_metas.dropna(how="all", axis=1, inplace=True)
+        try:
+            rows_to_drop = (
+                annotation_by_metas.drop(columns=info_multicols)
+                .isnull().all(axis=1)
+            )
+        except KeyError:
+            pass
+        else:
+            annotation_by_metas = annotation_by_metas.loc[~rows_to_drop,:]
+        if context.view == "/assays/":
+            annotation_by_metas.fillna(False, inplace=True)
+    else:
+        raise NotImplementedError("dropna_2d(..., inplace=False)")
+
+
 def get_annotation_by_metas(db, context, sample_level=True):
     """Select assays/samples based on annotation filters"""
     drop_cols, info_cols, info_multicols = get_info_cols(sample_level)
@@ -107,18 +130,9 @@ def get_annotation_by_metas(db, context, sample_level=True):
                 annotation_by_metas, annotation_by_one_meta,
             )
         if annotation_by_metas is not None:
-            # drop all-NA columns, rows:
-            false2nan = lambda x: x or nan
-            if context.view == "/assays/":
-                annotation_by_metas = annotation_by_metas.applymap(false2nan)
-            annotation_by_metas.dropna(how="all", axis=1, inplace=True)
-            rows_to_drop = (
-                annotation_by_metas.drop(columns=info_multicols)
-                .isnull().all(axis=1)
+            dropna_2d(
+                annotation_by_metas, context, info_multicols, inplace=True,
             )
-            annotation_by_metas = annotation_by_metas.loc[~rows_to_drop,:]
-            if context.view == "/assays/":
-                annotation_by_metas.fillna(False, inplace=True)
     # reduce and sort presentation:
     if (annotation_by_metas is None) or (len(annotation_by_metas) == 0):
         return empty_df(columns=info_multicols)
