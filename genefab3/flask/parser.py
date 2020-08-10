@@ -61,22 +61,22 @@ def parse_meta_queries(key, expressions):
                 raise GeneLabException(undefined_err)
             elif field: # e.g. "factors:age"
                 if expression and negation: # e.g. "factors:age!=5"
-                    yield QUERY, meta, {field: {"$ne": values[0]}}
+                    yield QUERY, meta, {field}, {field: {"$ne": values[0]}}
                 elif expression: # e.g. "factors:age=7"
-                    yield QUERY, meta, {field: {"$in": values}}
+                    yield QUERY, meta, {field}, {field: {"$in": values}}
                 else: # e.g. "factors:age!=" without value
                     raise GeneLabException(malformed_err)
             else:
                 if negation and expression: # e.g. "factors!=age"
-                    yield REMOVER, meta, values[0]
+                    yield REMOVER, meta, {values[0]}, None
                 elif expression: # e.g. "factors=age"
-                    yield QUERY, meta, {"$or": [
+                    yield QUERY, meta, set(values), {"$or": [
                         {value: {"$exists": True}} for value in values
                     ]}
                 elif negation: # e.g. "factors!=" without value
                     raise GeneLabException(malformed_err)
                 else: # e.g. "factors", i.e. all factors
-                    yield WILDCARD, meta, None
+                    yield WILDCARD, meta, None, None
 
 
 def parse_request(request):
@@ -89,16 +89,24 @@ def parse_request(request):
         args=request.args,
         queries=defaultdict(list),
         wildcards=set(),
+        fields=defaultdict(set),
         removers=defaultdict(set),
     )
     context.queries["select"] = assay_selection_to_query(context.select)
+    meta_has_removed_fields = defaultdict(bool)
     for key in request.args:
         parser = parse_meta_queries(key, set(request.args.getlist(key)))
-        for kind, meta, query in parser:
+        for kind, meta, fields, query in parser:
             if kind == QUERY:
                 context.queries[meta].append(query)
+                context.fields[meta] |= fields
             elif kind == REMOVER:
-                context.removers[meta].add(query)
+                context.fields[meta] -= fields
+                context.removers[meta] |= fields
+                meta_has_removed_fields[meta] = True
             elif kind == WILDCARD:
                 context.wildcards.add(meta)
+    for meta in ASSAY_METADATALIKES:
+        if meta_has_removed_fields[meta] and (not context.fields[meta]):
+            context.wildcards.add(meta)
     return context

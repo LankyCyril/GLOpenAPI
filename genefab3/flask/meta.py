@@ -5,6 +5,7 @@ from pandas import DataFrame
 from natsort import natsorted
 from genefab3.utils import natsorted_dataframe, empty_df
 from pandas import concat, merge
+from functools import partial
 
 
 def get_meta_names(db, meta, context):
@@ -25,33 +26,49 @@ def get_meta_names(db, meta, context):
 
 def get_info_cols(sample_level=True):
     if sample_level:
-        drop_cols = ["_id"]
+        drop_cols = {"_id"}
         info_cols = ["accession", "assay name", "sample name"]
     else:
-        drop_cols = ["_id", "sample name"]
+        drop_cols = {"_id", "sample name"}
         info_cols = ["accession", "assay name"]
     info_multicols = [("info", col) for col in info_cols]
     return drop_cols, info_cols, info_multicols
 
 
-def get_annotation_by_one_meta(db, meta, context, drop_cols, info_cols, sample_level=True):
-    """Generate dataframe of assays matching (AND) multiple `meta` queries"""
-    collection, by_one_meta = getattr(db, meta), None
-    query2df = lambda meta_queries: (
-        DataFrame(collection.find({
-            "$and": meta_queries + [context.queries["select"]]
-        }))
-        .drop(columns=drop_cols, errors="ignore")
+def get_displayable_dataframe_from_query(collection, meta, is_wildcard, context, drop_cols, info_cols):
+    dataframe = DataFrame(
+        collection.find({
+            "$and": context.queries[meta] + [context.queries["select"]]
+        })
+    )
+    if is_wildcard:
+        to_drop = drop_cols
+    else:
+        to_drop = drop_cols | (
+            set(dataframe.columns) - set(info_cols) - context.fields[meta]
+        )
+    return (
+        dataframe
+        .drop(columns=to_drop, errors="ignore")
         .dropna(how="all", axis=1)
         .applymap(
             lambda vv: "|".join(sorted(map(str, vv))) if isinstance(vv, list)
             else vv
         )
     )
+
+
+def get_annotation_by_one_meta(db, meta, context, drop_cols, info_cols, sample_level=True):
+    """Generate dataframe of assays matching (AND) multiple `meta` queries"""
+    collection, by_one_meta = getattr(db, meta), None
     if context.queries[meta]:
-        by_one_meta = query2df(context.queries[meta])
+        by_one_meta = get_displayable_dataframe_from_query(
+            collection, meta, False, context, drop_cols, info_cols,
+        )
     if meta in context.wildcards:
-        by_one_wildcard = query2df([])
+        by_one_wildcard = get_displayable_dataframe_from_query(
+            collection, meta, True, context, drop_cols, info_cols,
+        )
         if by_one_meta is None:
             by_one_meta = by_one_wildcard
         elif len(by_one_meta) == 0:
@@ -59,10 +76,11 @@ def get_annotation_by_one_meta(db, meta, context, drop_cols, info_cols, sample_l
         else:
             by_one_meta = merge(by_one_meta, by_one_wildcard)
     if by_one_meta is not None:
-        by_one_meta = ( # drop empty columns and simplify representation:
-            by_one_meta # FIXME: what if a meta name is "accession"?
-            .drop(columns=context.removers[meta])
+        # drop empty columns and simplify representation:
+        by_one_meta = (
+            by_one_meta
             .dropna(how="all", axis=1)
+            .drop(columns=context.removers[meta], errors="ignore")
         )
         return concat({ # make two-level:
             "info": by_one_meta[info_cols],
