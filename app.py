@@ -32,13 +32,47 @@ else:
     exception_catcher = app.errorhandler(Exception)(exception_catcher)
 
 
+def get_and_display(db, getter, kwargs, request):
+    """Wrapper for data retrieval and display"""
+    context = parse_request(request)
+    refresh_database_metadata(db, context.select)
+    return display(getter(db, **kwargs, context=context), context)
+
+
 @app.route("/", methods=["GET"])
 def documentation():
-    """Hello, Space!"""
     from genefab3.docs import interactive_doc
     return interactive_doc(url_root=request.url_root.rstrip("/"))
 
-@app.route("/<meta>/", methods=["GET"])
+@app.route("/assays/", methods=["GET"])
+def assays(**kwargs):
+    from genefab3.flask.meta import get_assays_by_metas as getter
+    return get_and_display(db, getter, kwargs, request)
+
+@app.route("/samples/", methods=["GET"])
+def samples(**kwargs):
+    from genefab3.flask.meta import get_samples_by_metas as getter
+    return get_and_display(db, getter, kwargs, request)
+
+@app.route("/data/", methods=["GET"])
+def data(**kwargs):
+    from genefab3.flask.data import get_data_by_metas as getter
+    return get_and_display(db, getter, kwargs, request)
+
+@app.route("/favicon.<imgtype>")
+def favicon(**kwargs):
+    return ""
+
+
+# Debug zone:
+
+@app.route("/debug/")
+def debug():
+    """Debug"""
+    from genefab3.flask.debug import debug
+    return debug(db)
+
+@app.route("/debug/<meta>/", methods=["GET"])
 def meta(**kwargs):
     """List names of particular meta"""
     context = parse_request(request)
@@ -46,44 +80,9 @@ def meta(**kwargs):
     from genefab3.flask.meta import get_meta_names as getter
     return display(getter(db, **kwargs, context=context), context)
 
-@app.route("/assays/", methods=["GET"])
-def assays(**kwargs):
-    """Select assays based on annotation filters"""
-    context = parse_request(request)
-    refresh_database_metadata(db, context.select)
-    from genefab3.flask.meta import get_assays_by_metas as getter
-    return display(getter(db, context), context)
-
-@app.route("/samples/", methods=["GET"])
-def samples(**kwargs):
-    """Select samples based on annotation filters"""
-    context = parse_request(request)
-    refresh_database_metadata(db, context.select)
-    from genefab3.flask.meta import get_samples_by_metas as getter
-    return display(getter(db, context), context)
-
-@app.route("/data/", methods=["GET"])
-def data(**kwargs):
-    """Select data based on annotation filters"""
-    context = parse_request(request)
-    refresh_database_metadata(db, context.select)
-    from genefab3.flask.data import get_data_by_metas as getter
-    return display(getter(db, context), context)
-
-@app.route("/<accession>/<assay_name>/<meta>/", methods=["GET"])
+@app.route("/debug/<accession>/<assay_name>/<meta>/", methods=["GET"])
 def assay_metadata(**kwargs):
     """Display assay metadata"""
     context = parse_request(request)
     from genefab3.flask.debug import get_assay_metadata as getter
     return display(getter(db, **kwargs, rargs=request.args), context)
-
-@app.route("/favicon.<imgtype>")
-def favicon(**kwargs):
-    """Catch request for favicons"""
-    return ""
-
-@app.route("/debug/")
-def debug():
-    """Debug"""
-    from genefab3.flask.debug import debug
-    return debug(db)
