@@ -158,8 +158,8 @@ def get_dynamic_twolevel_dataframe_removers():
         var meta = columns[ci].columnGroup, name = columns[ci].name;
         if (meta !== "info") {
             $(this).append(
-                "&nbsp;<a class='remover' href='"+
-                window.location.href+"&"+meta+"!="+escape(name)+"'>&times;</a>"
+                "&nbsp;<a class='remover' href='"+window.location.href+
+                "&hide="+meta+":"+escape(name)+"'>&times;</a>"
             );
         };
         ci += 1;

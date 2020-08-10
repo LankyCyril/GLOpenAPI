@@ -42,13 +42,24 @@ def assay_selection_to_query(selection):
         return {}
 
 
+def parse_meta_removers(key, expressions):
+    """Process queries like 'hide=factors:age'"""
+    for expression in expressions:
+        malformed_err = "Malformed argument: {}={}".format(key, expression)
+        if ("|" in expression) or (":" not in expression):
+            raise GeneLabException(malformed_err)
+        else:
+            meta, field = expression.split(":") # TODO: catch more than one ':'
+            yield REMOVER, meta, {field}, None
+
+
 def parse_meta_queries(key, expressions):
-    """Process queries like e.g. 'factors=age' and 'factors:age=1|2'"""
+    """Process queries like e.g. 'factors=age', 'factors:age=1|2', 'factors:age!=5'"""
     if key[-1] == "!":
         real_key, negation = key[:-1], True
     else:
         real_key, negation = key, False
-    if ":" in real_key:
+    if ":" in real_key: # TODO: catch more than one ':'
         meta, field = real_key.split(":") # e.g. "factors" and "age"
     else:
         meta, field = real_key, None # e.g. "factors"
@@ -68,7 +79,7 @@ def parse_meta_queries(key, expressions):
                     raise GeneLabException(malformed_err)
             else:
                 if negation and expression: # e.g. "factors!=age"
-                    yield REMOVER, meta, {values[0]}, None
+                    raise GeneLabException(undefined_err)
                 elif expression: # e.g. "factors=age"
                     yield QUERY, meta, set(values), {"$or": [
                         {value: {"$exists": True}} for value in values
@@ -77,6 +88,14 @@ def parse_meta_queries(key, expressions):
                     raise GeneLabException(malformed_err)
                 else: # e.g. "factors", i.e. all factors
                     yield WILDCARD, meta, None, None
+
+
+def parse_meta_arguments(key, expressions):
+    """Process queries like e.g. 'factors=age', 'factors:age=1|2', 'factors:age!=5', 'hide=factors:age'"""
+    if key == "hide":
+        yield from parse_meta_removers(key, expressions)
+    else:
+        yield from parse_meta_queries(key, expressions)
 
 
 def parse_request(request):
@@ -94,7 +113,7 @@ def parse_request(request):
     )
     context.queries["select"] = assay_selection_to_query(context.select)
     for key in request.args:
-        parser = parse_meta_queries(key, set(request.args.getlist(key)))
+        parser = parse_meta_arguments(key, set(request.args.getlist(key)))
         for kind, meta, fields, query in parser:
             if kind == QUERY:
                 context.queries[meta].append(query)
