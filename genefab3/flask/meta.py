@@ -5,6 +5,7 @@ from pandas import DataFrame
 from natsort import natsorted
 from genefab3.utils import natsorted_dataframe, empty_df
 from pandas import concat, merge
+from numpy import nan
 
 
 def get_meta_names(db, meta, context):
@@ -24,6 +25,7 @@ def get_meta_names(db, meta, context):
 
 
 def get_info_cols(sample_level=True):
+    """Get info columns for metadata dataframes"""
     if sample_level:
         drop_cols = {"_id"}
         info_cols = ["accession", "assay name", "sample name"]
@@ -35,6 +37,7 @@ def get_info_cols(sample_level=True):
 
 
 def get_displayable_dataframe_from_query(collection, meta, is_wildcard, context, drop_cols, info_cols):
+    """Query MongoDB and convert output to DataFrame, observing context"""
     dataframe = DataFrame(
         collection.find({
             "$and": context.queries[meta] + [context.queries["select"]]
@@ -76,11 +79,10 @@ def get_annotation_by_one_meta(db, meta, context, drop_cols, info_cols, sample_l
             by_one_meta = merge(by_one_meta, by_one_wildcard)
     if by_one_meta is not None:
         # drop empty columns and simplify representation:
-        by_one_meta = (
-            by_one_meta
-            .dropna(how="all", axis=1)
-            .drop(columns=context.removers[meta], errors="ignore")
+        by_one_meta.drop(
+            columns=context.removers[meta], errors="ignore", inplace=True,
         )
+        by_one_meta.dropna(how="all", axis=1, inplace=True)
         return concat({ # make two-level:
             "info": by_one_meta[info_cols],
             meta: by_one_meta.drop(columns=info_cols) if sample_level
@@ -91,7 +93,7 @@ def get_annotation_by_one_meta(db, meta, context, drop_cols, info_cols, sample_l
 
 
 def get_annotation_by_metas(db, context, sample_level=True):
-    """Select samples based on annotation filters"""
+    """Select assays/samples based on annotation filters"""
     drop_cols, info_cols, info_multicols = get_info_cols(sample_level)
     annotation_by_metas = None
     for meta in ASSAY_METADATALIKES:
@@ -104,6 +106,19 @@ def get_annotation_by_metas(db, context, sample_level=True):
             annotation_by_metas = merge(
                 annotation_by_metas, annotation_by_one_meta,
             )
+        if annotation_by_metas is not None:
+            # drop all-NA columns, rows:
+            false2nan = lambda x: x or nan
+            if context.view == "/assays/":
+                annotation_by_metas = annotation_by_metas.applymap(false2nan)
+            annotation_by_metas.dropna(how="all", axis=1, inplace=True)
+            rows_to_drop = (
+                annotation_by_metas.drop(columns=info_multicols)
+                .isnull().all(axis=1)
+            )
+            annotation_by_metas = annotation_by_metas.loc[~rows_to_drop,:]
+            if context.view == "/assays/":
+                annotation_by_metas.fillna(False, inplace=True)
     # reduce and sort presentation:
     if (annotation_by_metas is None) or (len(annotation_by_metas) == 0):
         return empty_df(columns=info_multicols)
@@ -114,8 +129,10 @@ def get_annotation_by_metas(db, context, sample_level=True):
 
 
 def get_assays_by_metas(db, context):
+    """Alias for selection of assays based on annotation filters"""
     return get_annotation_by_metas(db, context, sample_level=False)
 
 
 def get_samples_by_metas(db, context):
+    """Alias for selection of samples based on annotation filters"""
     return get_annotation_by_metas(db, context, sample_level=True)
