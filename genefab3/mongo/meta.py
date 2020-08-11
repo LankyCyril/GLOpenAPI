@@ -1,7 +1,8 @@
 from os import environ
 from sys import stderr
-from genefab3.config import MAX_AUTOUPDATED_DATASETS, COLD_SEARCH_MASK
-from genefab3.config import MAX_JSON_AGE, MAX_JSON_THREADS
+from genefab3.config import COLD_SEARCH_MASK, MAX_JSON_AGE, MAX_JSON_THREADS
+from genefab3.config import CACHER_THREAD_CHECK_INTERVAL
+from genefab3.config import CACHER_THREAD_RECHECK_INTERVAL
 from genefab3.config import ASSAY_METADATALIKES
 from genefab3.utils import download_cold_json
 from genefab3.mongo.utils import replace_doc
@@ -11,9 +12,21 @@ from datetime import datetime
 from pymongo import DESCENDING
 from pandas import Series
 from concurrent.futures import as_completed, ThreadPoolExecutor
+from threading import Thread
+from time import sleep
 
 
 DEBUG = (environ.get("FLASK_ENV", None) == "development")
+
+
+def cacher_thread_log(message, error=False):
+    """Log message about CacherThread"""
+    if DEBUG:
+        if error:
+            print_mask = "CacherThread ERROR @ {}: {}"
+        else:
+            print_mask = "CacherThread message @ {}: {}"
+        print(print_mask.format(datetime.now(), message), file=stderr)
 
 
 def get_fresh_and_stale_accessions(db, max_age=MAX_JSON_AGE):
@@ -115,10 +128,11 @@ def refresh_many_datasets(db, accessions, max_workers=MAX_JSON_THREADS):
         for future in as_completed(future_to_accession):
             _, glds_changed = future.result()
             accession = future_to_accession[future]
-            if DEBUG:
-                print("Refreshed JSON for dataset:", accession, file=stderr)
+            cacher_thread_log("Refreshed JSON for dataset {}".format(accession))
             if glds_changed:
-                print("JSON changed for dataset:", accession, file=stderr)
+                cacher_thread_log(
+                    "JSON changed for dataset {}".format(accession),
+                )
                 datasets_with_assays_to_update.append(accession)
     return datasets_with_assays_to_update
 
@@ -151,9 +165,9 @@ def refresh_many_assays(db, datasets_with_assays_to_update, max_workers=MAX_JSON
             accession for accession in datasets_with_assays_to_update
         }
         for future in as_completed(future_to_accession):
-            if DEBUG:
-                acc = future_to_accession[future]
-                print("Refreshed JSON for assays in:", acc, file=stderr)
+            cacher_thread_log("Refreshed JSON for assays in {}".format(
+                future_to_accession[future]
+            ))
 
 
 def refresh_database_metadata_for_some_datasets(db, accessions):
@@ -167,36 +181,52 @@ def refresh_database_metadata_for_some_datasets(db, accessions):
     return datasets_with_assays_to_update
 
 
-def refresh_database_metadata_for_one_dataset(db, accession):
-    """Put updated JSONs for one dataset and its assays into database"""
-    return refresh_database_metadata_for_some_datasets(db, {accession})
-
-
-def refresh_database_metadata_for_all_datasets(db):
+def refresh_database_metadata(db):
     """Iterate over datasets in cold storage, put updated JSONs into database"""
     fresh, stale = get_fresh_and_stale_accessions(db)
     try: # get number of datasets in database, and then all dataset JSONs
-        n_datasets = min(
-            get_fresh_json(db, COLD_SEARCH_MASK.format(0))["hits"]["total"],
-            MAX_AUTOUPDATED_DATASETS,
-        )
-        url = COLD_SEARCH_MASK.format(n_datasets)
-        raw_datasets_json = get_fresh_json(db, url)["hits"]["hits"]
+        url_n = COLD_SEARCH_MASK.format(0)
+        n_datasets = get_fresh_json(db, url_n)["hits"]["total"]
+        url_all = COLD_SEARCH_MASK.format(n_datasets)
+        raw_datasets_json = get_fresh_json(db, url_all)["hits"]["hits"]
         all_accessions = {raw_json["_id"] for raw_json in raw_datasets_json}
     except KeyError:
-        raise GeneLabJSONException("Malformed search JSON")
-    updated_assays = refresh_database_metadata_for_some_datasets(
-        db, all_accessions - fresh,
-    )
-    for accession in (fresh | stale) - all_accessions: # drop removed datasets
-        db.dataset_timestamps.delete_many({"accession": accession})
-        db.accession_to_id.delete_many({"accession": accession})
-    return all_accessions, fresh, stale, updated_assays
-
-
-def refresh_database_metadata(db, context_select=None):
-    if context_select is None:
-        return refresh_database_metadata_for_all_datasets(db)
+        cacher_thread_log(
+            "Cold storage returned malformed search JSON", error=True,
+        )
     else:
-        refresh_database_metadata_for_some_datasets(db, set(context_select))
-        return None
+        updated_assays = refresh_database_metadata_for_some_datasets(
+            db, all_accessions - fresh,
+        )
+        for accession in (fresh | stale) - all_accessions:
+            # drop removed datasets:
+            db.dataset_timestamps.delete_many({"accession": accession})
+            db.accession_to_id.delete_many({"accession": accession})
+        return all_accessions, fresh, stale, updated_assays
+
+
+class CacherThread(Thread):
+    """Lives in background and keeps local metadata cache up to date"""
+    def __init__(self, db, check_interval=CACHER_THREAD_CHECK_INTERVAL, recheck_interval=CACHER_THREAD_RECHECK_INTERVAL):
+        self.db, self.check_interval = db, check_interval
+        self.recheck_interval = recheck_interval
+        super().__init__()
+    def run(self):
+        while True:
+            cacher_thread_log("Checking cache")
+            try:
+                accessions, fresh, stale, _ = refresh_database_metadata(self.db)
+            except Exception as e:
+                cacher_thread_log("{}".format(e), error=True)
+                cacher_thread_log("Will try again after {} seconds".format(
+                    self.recheck_interval
+                ))
+                sleep(self.recheck_interval)
+            else:
+                cacher_thread_log("{} fresh, {} stale accessions".format(
+                    len(fresh), len(stale),
+                ))
+                cacher_thread_log("Will now sleep for {} seconds".format(
+                    self.check_interval
+                ))
+                sleep(self.check_interval)

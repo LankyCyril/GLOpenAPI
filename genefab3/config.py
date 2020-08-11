@@ -17,8 +17,9 @@ COLD_FILEDATES_MASK = COLD_API_ROOT + "/data/study/filelistings/{}"
 INDEX_BY = "Sample Name"
 TIMESTAMP_FMT = "%a %b %d %H:%M:%S %Z %Y"
 
-MAX_AUTOUPDATED_DATASETS = float("inf")
 MAX_JSON_AGE = 10800 # 3 hours (in seconds)
+CACHER_THREAD_CHECK_INTERVAL = 1800 # 30 minutes (in seconds)
+CACHER_THREAD_RECHECK_INTERVAL = 60 # 10 minutes (in seconds)
 MAX_JSON_THREADS = 24
 
 ASSAY_METADATALIKES = {
