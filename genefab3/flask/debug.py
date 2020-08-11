@@ -1,7 +1,6 @@
 from os import environ
 from genefab3.config import DEBUG_MARKERS
 from genefab3.mongo.meta import refresh_database_metadata
-from genefab3.mongo.meta import refresh_database_metadata_for_one_dataset
 from genefab3.mongo.meta import get_dataset_with_caching
 from genefab3.exceptions import GeneLabException
 
@@ -20,7 +19,6 @@ def debug(db, rargs={}):
 
 
 def get_assay_metadata(db, accession, assay_name, meta, rargs={}):
-    refresh_database_metadata_for_one_dataset(db, accession)
     glds = get_dataset_with_caching(db, accession)
     assay = glds.assays[assay_name]
     try:

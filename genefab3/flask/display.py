@@ -4,6 +4,7 @@ from pandas import DataFrame, isnull
 from re import sub
 from genefab3.utils import map_replace
 from genefab3.config import ASSAY_METADATALIKES
+from genefab3.flask.parser import parse_request
 
 
 DF_KWS = dict(index=False, header=False, na_rep="NA")
@@ -261,3 +262,9 @@ def display(obj, context):
         raise NotImplementedError(
             "Display of {}".format(str(type(obj).strip("<>")))
         )
+
+
+def displayable(db, getter, kwargs, request):
+    """Wrapper for data retrieval and display"""
+    context = parse_request(request)
+    return display(getter(db, **kwargs, context=context), context)
