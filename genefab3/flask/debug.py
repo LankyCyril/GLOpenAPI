@@ -18,7 +18,7 @@ def debug(db, rargs={}):
         ])
 
 
-def get_assay_metadata(db, accession, assay_name, meta, rargs={}):
+def get_assay_metadata(db, accession, assay_name, meta, context):
     glds = get_dataset_with_caching(db, accession)
     assay = glds.assays[assay_name]
     try:
