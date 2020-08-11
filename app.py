@@ -25,8 +25,9 @@ except ServerSelectionTimeoutError:
 else:
     db = getattr(mongo, MONGO_DB_NAME)
 
-cacher_thread = CacherThread(db)
-cacher_thread.start()
+if environ.get("WERKZEUG_RUN_MAIN", None) != "true":
+    # https://stackoverflow.com/a/9476701/590676
+    CacherThread(db).start()
 
 if environ.get("FLASK_ENV", None) in DEBUG_MARKERS:
     traceback_printer = app.errorhandler(Exception)(traceback_printer)
