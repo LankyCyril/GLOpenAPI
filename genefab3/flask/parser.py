@@ -46,10 +46,10 @@ def parse_meta_removers(key, expressions):
     """Process queries like 'hide=factors:age'"""
     for expression in expressions:
         malformed_err = "Malformed argument: {}={}".format(key, expression)
-        if ("|" in expression) or (":" not in expression):
+        if ("|" in expression) or (expression.count(":") != 1):
             raise GeneLabException(malformed_err)
         else:
-            meta, field = expression.split(":") # TODO: catch more than one ':'
+            meta, field = expression.split(":")
             yield REMOVER, meta, {field}, None
 
 
@@ -59,8 +59,10 @@ def parse_meta_queries(key, expressions):
         real_key, negation = key[:-1], True
     else:
         real_key, negation = key, False
-    if ":" in real_key: # TODO: catch more than one ':'
+    if real_key.count(":") == 1:
         meta, field = real_key.split(":") # e.g. "factors" and "age"
+    elif real_key.count(":") > 1:
+        raise GeneLabException("Malformed argument: {}".format(key))
     else:
         meta, field = real_key, None # e.g. "factors"
     if meta in ASSAY_METADATALIKES:
