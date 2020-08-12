@@ -4,7 +4,8 @@ from pandas import DataFrame, isnull
 from re import sub
 from genefab3.utils import map_replace
 from genefab3.config import ASSAY_METADATALIKES
-from genefab3.flask.parser import parse_request
+from genefab3.flask.parser import parse_request, parse_meta_arguments
+from genefab3.flask.parser import REMOVER
 
 
 DF_KWS = dict(index=False, header=False, na_rep="NA")
@@ -167,6 +168,74 @@ def get_dynamic_twolevel_dataframe_removers():
     });"""
 
 
+def get_select_query_explanation(cqs):
+    """Generate human-friendly explanation of passed query '&select='"""
+    select_mask = "<li><tt>&{}</tt><br>list entries in {}</li>"
+    accession, assay_name = cqs["accession"], cqs.get("assay name", None)
+    if assay_name:
+        return select_mask.format(
+            "select={}:{}".format(accession, assay_name),
+            "assay '{}' from dataset '{}'".format(assay_name, accession),
+        )
+    else:
+        return select_mask.format(
+            "select={}".format(accession), "dataset '{}'".format(accession),
+        )
+
+
+def get_remover_query_explanation(key, value, meta, fields):
+    """Generate human-friendly explanation of passed query '&hide='"""
+    return '<li><tt>&{}={}</tt><br>remove {} column of "{}"</li>'.format(
+        key, value, meta, next(iter(fields)),
+    )
+
+
+def get_meta_query_explanation(key, value, meta, query):
+    """Generate human-friendly explanation of passed meta query"""
+    if value == "":
+        kv_pair = key
+        explanation = "list all {} for all entries".format(key)
+    else:
+        kv_pair = "{}={}".format(key, value)
+        head, tail = next(iter(query.items()))
+        if head == "$or":
+            mask = "list entries that have {}: {}"
+            explanation = mask.format(
+                meta, ", ".join(
+                    '"{}"'.format(next(iter(v))) for v in tail
+                )
+            )
+        elif "$in" in tail:
+            mask = "list entries where {} of {} are one of: {}"
+            explanation = mask.format(
+                meta, head,
+                ", or".join('"{}"'.format(v) for v in tail["$in"])
+            )
+        else:
+            explanation = "<i>unexplained</i>"
+    return "<li><tt>&{}</tt><br>{}</li>".format(kv_pair, explanation)
+
+
+def get_query_explanation(context):
+    """Generate human-friendly explanation of passed query"""
+    view_mask = "<li><tt>{}?</tt><br>view {}</li>"
+    explanations = [view_mask.format(context.view, context.view.strip("/"))]
+    for cqs in context.queries["select"].get("$or", []):
+        explanations.append(get_select_query_explanation(cqs))
+    for key in sorted(context.args):
+        for value in sorted(set(context.args.getlist(key))):
+            for kind, meta, fields, query in parse_meta_arguments(key, {value}):
+                if kind == REMOVER:
+                    explanations.append(
+                        get_remover_query_explanation(key, value, meta, fields),
+                    )
+                elif query:
+                    explanations.append(
+                        get_meta_query_explanation(key, value, meta, query),
+                    )
+    return "<br>".join(explanations)
+
+
 def get_dynamic_twolevel_dataframe_html(df, context, frozen=0):
     """Display dataframe with two-level columns using SlickGrid"""
     shortnames = []
@@ -201,6 +270,7 @@ def get_dynamic_twolevel_dataframe_html(df, context, frozen=0):
             "SAMPLESVIEW": build_url(context, "/samples/"),
             "DATAVIEW": build_url(context, "/data/"),
             "// COLUMNDATA": columndata, "// ROWDATA": rowdata,
+            "<!--QUERYEXPLANATION-->": get_query_explanation(context),
         }
     )
 
