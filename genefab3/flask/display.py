@@ -169,19 +169,22 @@ def get_dynamic_twolevel_dataframe_removers():
     });"""
 
 
-def get_select_query_explanation(cqs):
+def get_select_query_explanation(cqs_list):
     """Generate human-friendly explanation of passed query '&select='"""
-    select_mask = "<li><tt>&{}</tt><br>list entries in {}</li>"
-    accession, assay_name = cqs["accession"], cqs.get("assay name", None)
-    if assay_name:
-        return select_mask.format(
-            "select={}:{}".format(accession, assay_name),
-            'assay "{}" from dataset "{}"'.format(assay_name, accession),
-        )
-    else:
-        return select_mask.format(
-            "select={}".format(accession), 'dataset "{}"'.format(accession),
-        )
+    select_mask = "<li><tt>&select={}</tt><br>list entries in {}</li>"
+    aa_pairs = []
+    explanations = []
+    for cqs in cqs_list:
+        accession, assay_name = cqs["accession"], cqs.get("assay name", None)
+        if assay_name:
+            aa_pairs.append("{}:{}".format(accession, assay_name))
+            explanations.append(
+                'assay "{}" from dataset "{}"'.format(assay_name, accession),
+            )
+        else:
+            aa_pairs.append(accession)
+            explanations.append('dataset "{}"'.format(accession))
+    return select_mask.format("|".join(aa_pairs), ", or ".join(explanations))
 
 
 def get_remover_query_explanation(key, value, meta, fields):
@@ -210,7 +213,7 @@ def get_meta_query_explanation(key, value, meta, query):
             mask = "list entries where {} of {} are one of: {}"
             explanation = mask.format(
                 meta, head,
-                ", or".join('"{}"'.format(v) for v in tail["$in"])
+                ", or ".join('"{}"'.format(v) for v in tail["$in"])
             )
         else:
             explanation = "<i>unexplained</i>"
@@ -220,9 +223,10 @@ def get_meta_query_explanation(key, value, meta, query):
 def get_query_explanation(context):
     """Generate human-friendly explanation of passed query"""
     view_mask = "<li><tt>{}?</tt><br>view {}</li>"
-    explanations = [view_mask.format(context.view, context.view.strip("/"))]
-    for cqs in context.queries["select"].get("$or", []):
-        explanations.append(get_select_query_explanation(cqs))
+    explanations = [
+        view_mask.format(context.view, context.view.strip("/")),
+        get_select_query_explanation(context.queries["select"].get("$or", [])),
+    ]
     for key in sorted(context.args):
         for value in sorted(set(context.args.getlist(key))):
             for kind, meta, fields, query in parse_meta_arguments(key, {value}):
