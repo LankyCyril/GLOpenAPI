@@ -160,7 +160,8 @@ def get_dynamic_twolevel_dataframe_removers():
         var meta = columns[ci].columnGroup, name = columns[ci].name;
         if (meta !== "info") {
             $(this).append(
-                "&nbsp;<a class='remover' href='"+window.location.href+
+                "&nbsp;<a class='remover' href='"+
+                window.location.href.replace(/#+$/g, "")+
                 "&hide="+meta+":"+escape(name)+"'>&times;</a>"
             );
         };
@@ -175,11 +176,11 @@ def get_select_query_explanation(cqs):
     if assay_name:
         return select_mask.format(
             "select={}:{}".format(accession, assay_name),
-            "assay '{}' from dataset '{}'".format(assay_name, accession),
+            'assay "{}" from dataset "{}"'.format(assay_name, accession),
         )
     else:
         return select_mask.format(
-            "select={}".format(accession), "dataset '{}'".format(accession),
+            "select={}".format(accession), 'dataset "{}"'.format(accession),
         )
 
 
@@ -225,13 +226,13 @@ def get_query_explanation(context):
     for key in sorted(context.args):
         for value in sorted(set(context.args.getlist(key))):
             for kind, meta, fields, query in parse_meta_arguments(key, {value}):
-                if kind == REMOVER:
-                    explanations.append(
-                        get_remover_query_explanation(key, value, meta, fields),
-                    )
-                elif query:
+                if kind != REMOVER:
                     explanations.append(
                         get_meta_query_explanation(key, value, meta, query),
+                    )
+                elif kind == REMOVER:
+                    explanations.append(
+                        get_remover_query_explanation(key, value, meta, fields),
                     )
     return "<br>".join(explanations)
 
