@@ -84,11 +84,13 @@ def sparse_json_to_dataframe(entries):
     return repr(entries)[:50] + "..."
 
 
-def sparse_json_to_many_dataframes(_using, ignore=(AttributeError,)):
-    try:
-        return {k: sparse_json_to_dataframe(e) for k, e in _using.items()}
-    except ignore:
-        pass
+def dictmap(function, ignore=AttributeError):
+    def mapper(_using):
+        try:
+            return {k: function(e) for k, e in _using.items()}
+        except ignore:
+            pass
+    return mapper
 
 
 class ISA(Namespace):
@@ -98,8 +100,8 @@ class ISA(Namespace):
             _raised=Parser(["foreignFields", 0, "isa2json"], [1, Any, Any],
                 _copy_atoms=False,
                 _raised=Parser("additionalInformation", Any,
-                    _raised=Parser(_each=sparse_json_to_many_dataframes),
-                    assays2=Parser("assays", 1, sparse_json_to_many_dataframes),
+                    _raised=Parser(_each=dictmap(sparse_json_to_dataframe)),
+                    assays2=Parser("assays", 1, dictmap(sparse_json_to_dataframe)),
                 ),
             ),
         )
