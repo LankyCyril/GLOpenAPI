@@ -19,8 +19,7 @@ TIMESTAMP_FMT = "%a %b %d %H:%M:%S %Z %Y"
 
 MAX_JSON_AGE = 10800 # 3 hours (in seconds)
 CACHER_THREAD_CHECK_INTERVAL = 1800 # 30 minutes (in seconds)
-CACHER_THREAD_RECHECK_INTERVAL = 60 # 10 minutes (in seconds)
-MAX_JSON_THREADS = 24
+CACHER_THREAD_RECHECK_INTERVAL = 300 # 5 minutes (in seconds)
 
 ASSAY_METADATALIKES = {
     "factors", "parameters", "characteristics", "comments", "properties",
