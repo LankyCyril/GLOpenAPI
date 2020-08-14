@@ -106,9 +106,9 @@ def get_dataset_with_caching(db, accession):
             accession, glds_json, fileurls_json, filedates_json=None,
         )
         replace_doc(
-            db.accession_to_id, {"accession": accession}, cold_id=glds._id,
+            db.accession_to_id, {"accession": accession}, cold_id=glds.isa._id,
         )
-        filedates_json = get_fresh_json(db, glds._id, "filedates")
+        filedates_json = get_fresh_json(db, glds.isa._id, "filedates")
     else:
         filedates_json = get_fresh_json(db, _id_search["cold_id"], "filedates")
         glds = ColdStorageDataset(
