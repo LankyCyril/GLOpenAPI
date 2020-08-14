@@ -2,7 +2,7 @@ from genefab3.exceptions import GeneLabJSONException
 from pandas import DataFrame, concat
 
 
-def FromSparseTable(entries):
+def ToSparseTable(entries):
     """Combines 'header' and 'raw' fields into two-level DataFrame"""
     try:
         raw_header = DataFrame(entries["header"])

@@ -1,36 +1,12 @@
+from sys import stderr
 from re import search, sub
 from genefab3.exceptions import GeneLabException, GeneLabJSONException
 from genefab3.config import GENELAB_ROOT
 from genefab3.utils import download_cold_json as dl_json
 from genefab3.utils import extract_file_timestamp, levenshtein_distance
 from genefab3.coldstorage.assay import ColdStorageAssay
-from pandas import DataFrame, concat
 from argparse import Namespace
-
-
-def parse_glds_json(glds_json):
-    """Parse GLDS JSON reported by cold storage"""
-    if len(glds_json) == 0:
-        raise GeneLabJSONException("Invalid JSON (GLDS does not exist?)")
-    elif len(glds_json) > 1:
-        raise GeneLabJSONException("Invalid JSON, too many sections")
-    else:
-        try:
-            json = glds_json[0]
-            _id, metadata_id = json["_id"], json["metadata_id"]
-        except (TypeError, KeyError):
-            raise GeneLabJSONException("Invalid JSON, missing ID fields")
-        foreign_fields = json.get("foreignFields", [])
-        if len(foreign_fields) == 0:
-            raise GeneLabJSONException("Invalid JSON, no foreignFields")
-        elif len(foreign_fields) > 1:
-            raise GeneLabJSONException("Invalid JSON, multiple foreignFields")
-        else:
-            try:
-                info = foreign_fields[0]["isa2json"]["additionalInformation"]
-            except KeyError:
-                raise GeneLabJSONException("Invalid JSON: isa2json")
-            return _id, metadata_id, info
+from genefab3.isa.parser import ISA
 
 
 def parse_fileurls_json(fileurls_json):
@@ -57,46 +33,25 @@ def parse_filedates_json(filedates_json):
 
 class ColdStorageDataset():
     """Contains GLDS metadata associated with an accession number"""
-    raw_json = Namespace()
  
     def __init__(self, accession, glds_json=None, fileurls_json=None, filedates_json=None):
-        """Request JSON representation of ISA metadata and store fields"""
-        self.accession = accession
-        self.raw_json.glds = glds_json or dl_json(accession, "glds")
-        _id, metadata_id, info = parse_glds_json(self.raw_json.glds)
-        self.raw_json.fileurls = fileurls_json or dl_json(accession, "fileurls")
-        self.raw_json.filedates = filedates_json or dl_json(_id, "filedates")
-        self.fileurls = parse_fileurls_json(self.raw_json.fileurls)
-        self.filedates = parse_filedates_json(self.raw_json.filedates)
-        self._id = _id
-        try:
-            self.json = Namespace(**{
-                field: info[field] for field in
-                ("description", "samples", "ontologies", "organisms")
-            })
-        except KeyError:
-            raise GeneLabJSONException("Invalid JSON, missing isa2json fields")
-        try:
-            self.assays = {name: None for name in info["assays"]} # placeholders
-            self.assays = ColdStorageAssayDispatcher( # actual assays
-                dataset=self, assays_json=info["assays"],
-            )
-        except KeyError:
-            raise GeneLabJSONException("Invalid JSON, missing 'assays' field")
- 
-    @property
-    def summary(self):
-        """List factors, assay names and types"""
-        assays_summary = self.assays.summary.copy()
-        assays_summary["type"] = "assay"
-        factors_dataframe = DataFrame(
-            columns=["type", "name", "factors"],
-            data=[
-                ["dataset", self.accession, fi["factor"]]
-                for fi in self.json.description["factors"]
-            ]
+        """Request ISA and store fields"""
+        self.isa = ISA(glds_json or dl_json(accession, "glds"))
+        if accession not in {self.isa.accession, self.isa.legacy_accession}:
+            raise GeneLabException("Initializing dataset with wrong JSON")
+        else:
+            self.accession = accession
+        self.fileurls = parse_fileurls_json(
+            fileurls_json or dl_json(accession, "fileurls"),
         )
-        return concat([factors_dataframe, assays_summary], axis=0, sort=False)
+        self.filedates = parse_filedates_json(
+            filedates_json or dl_json(self.isa._id, "filedates"),
+        )
+        try:
+            self.assays = {a: None for a in self.isa.assays} # placeholders
+            self.assays = ColdStorageAssayDispatcher(self) # actual assays
+        except (KeyError, TypeError):
+            raise GeneLabJSONException("Invalid JSON (field 'assays')")
  
     def resolve_filename(self, mask):
         """Given mask, find filenames, urls, and datestamps"""
@@ -148,21 +103,16 @@ def infer_sample_key(assay_name, keys):
 class ColdStorageAssayDispatcher(dict):
     """Contains a dataset's assay objects, indexable by name or by attributes"""
  
-    def __init__(self, dataset, assays_json):
+    def __init__(self, dataset):
         """Populate dictionary of assay_name -> Assay()"""
-        try:
-            for assay_name, assay_json in assays_json.items():
-                sample_key = infer_sample_key(
-                    assay_name, dataset.json.samples.keys(),
-                )
-                super().__setitem__(
-                    assay_name, ColdStorageAssay(
-                        dataset, assay_name, assay_json,
-                        sample_json=dataset.json.samples[sample_key],
-                    )
-                )
-        except KeyError:
-            raise GeneLabJSONException("Malformed assay JSON")
+        for assay_name in dataset.isa.assays:
+            sample_key = infer_sample_key(assay_name, dataset.isa.samples)
+            if levenshtein_distance(assay_name, sample_key) > 1:
+                msg = "Warning: ld('{}', '{}')".format(assay_name, sample_key)
+                print(msg, file=stderr)
+            super().__setitem__(
+                assay_name, ColdStorageAssay(dataset, assay_name, sample_key)
+            )
  
     def __getitem__(self, assay_name):
         """Get assay by name or alias"""

@@ -1,7 +1,7 @@
 from argparse import Namespace
 from genefab3.exceptions import GeneLabJSONException
 from functools import partial
-from genefab3.isa.types import FromSparseTable
+from genefab3.isa.types import ToSparseTable
 
 
 Any, Atom = "Any", "Atom"
@@ -109,8 +109,8 @@ class ISA(DefaultNamespace):
             doi=Parser(["doiFields", 0, "doi"], [1, Any, Atom]),
             _raised=Parser(["foreignFields", 0, "isa2json"], [1, Any, Any],
                 _raised=Parser("additionalInformation", Any,
-                    assays=Parser("assays", 1, valmapper(FromSparseTable)),
-                    samples=Parser("samples", 1, valmapper(FromSparseTable)),
+                    assays=Parser("assays", 1, valmapper(ToSparseTable)),
+                    samples=Parser("samples", 1, valmapper(ToSparseTable)),
                 ),
             ),
         )
