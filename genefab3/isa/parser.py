@@ -109,8 +109,8 @@ class ISA(DefaultNamespace):
             doi=Parser(["doiFields", 0, "doi"], [1, Any, Atom]),
             _raised=Parser(["foreignFields", 0, "isa2json"], [1, Any, Any],
                 _raised=Parser("additionalInformation", Any,
-                    assays=Parser("assays", 1, valmapper(ToSparseTable)),
-                    samples=Parser("samples", 1, valmapper(ToSparseTable)),
+                    assays=Parser("assays", Any, valmapper(ToSparseTable)),
+                    samples=Parser("samples", Any, valmapper(ToSparseTable)),
                 ),
             ),
         )
