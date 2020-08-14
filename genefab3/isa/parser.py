@@ -35,7 +35,12 @@ def isatomic(variable):
         return True
 
 
-def populate(_what=Namespace(), _using={}, _via=None, _lengths=Any, _toplevel_method=None, _each=None, _copy_atoms=True, _copy_atomic_lists=True, _raised=(), **kwargs):
+class DefaultNamespace(Namespace):
+    def __getattr__(self, x):
+        return getattr(super(), x, DefaultNamespace())
+
+
+def populate(_what=DefaultNamespace(), _using={}, _via=None, _lengths=Any, _toplevel_method=None, _each=None, _copy_atoms=False, _copy_atomic_lists=False, _raised=(), **kwargs):
     if not isinstance(_via, (list, tuple)):
         _via = [_via]
     if not isinstance(_lengths, (list, tuple)):
@@ -80,7 +85,7 @@ def Parser(_via=None, _lengths=Any, _toplevel_method=None, _each=None, **kwargs)
     )
 
 
-def sparse_json_to_dataframe(entries):
+def MetadataLike(entries):
     return repr(entries)[:50] + "..."
 
 
@@ -93,15 +98,14 @@ def dictmap(function, ignore=AttributeError):
     return mapper
 
 
-class ISA(Namespace):
+class ISA(DefaultNamespace):
     def __init__(self, json):
         parser = Parser([None, 0], [1, Any],
+            _copy_atoms=True, _copy_atomic_lists=True,
             doi=Parser(["doiFields", 0, "doi"], [1, Any, Atom]),
             _raised=Parser(["foreignFields", 0, "isa2json"], [1, Any, Any],
-                _copy_atoms=False,
                 _raised=Parser("additionalInformation", Any,
-                    _raised=Parser(_each=dictmap(sparse_json_to_dataframe)),
-                    assays2=Parser("assays", 1, dictmap(sparse_json_to_dataframe)),
+                    assays=Parser("assays", 1, dictmap(MetadataLike)),
                 ),
             ),
         )
