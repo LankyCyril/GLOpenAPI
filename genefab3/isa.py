@@ -28,37 +28,39 @@ def descend(_using, _via, _lengths):
     return source
 
 
-def atomic(value):
-    for v in value:
-        if isinstance(v, (dict, list)):
+def atomic(variable):
+    for x in variable:
+        if isinstance(x, (dict, list)):
             return False
     else:
         return True
 
 
-def populate(_what=Namespace(), _using={}, _via=(None,), _lengths=(ANY,), _method=None, _copy_atoms=True, _copy_atomic_lists=True, _raised=(), **kwargs):
+def populate(_what=Namespace(), _using={}, _via=(None,), _lengths=(ANY,), _toplevel_method=None, _per_item_method=None, _copy_atoms=True, _copy_atomic_lists=True, _raised=(), **kwargs):
     if (not _using) or (len(_via) == 0):
         raise GeneLabJSONException("Reached a dead end in JSON")
     source = descend(_using, _via, _lengths)
-    if _method is not None:
-        return _method(source)
+    if _toplevel_method is not None:
+        return _toplevel_method(source)
     elif isinstance(source, list):
         error_mask = "Could not get key-value pairs at level {}"
         raise GeneLabJSONException(error_mask.format(_via))
     elif isinstance(source, dict):
         for method in _raised:
-            for key, value in method(_using=source)._get_kwargs():
-                setattr(_what, key, value)
-        for key, value in source.items():
-            if isinstance(value, list) and _copy_atomic_lists and atomic(value):
-                setattr(_what, key, value)
-            elif (not isinstance(value, (dict, list))) and _copy_atoms:
-                setattr(_what, key, value)
-        for key, method in kwargs.items():
+            for k, v in method(_using=source)._get_kwargs():
+                setattr(_what, k, v)
+        for k, v in source.items():
+            if _per_item_method is not None:
+                setattr(_what, k, _per_item_method(v))
+            elif isinstance(v, list) and _copy_atomic_lists and atomic(v):
+                setattr(_what, k, v)
+            elif (not isinstance(v, (dict, list))) and _copy_atoms:
+                setattr(_what, k, v)
+        for k, method in kwargs.items():
             if isinstance(method, Callable):
-                setattr(_what, key, method(_using=source))
+                setattr(_what, k, method(_using=source))
             else:
-                setattr(_what, key, method)
+                setattr(_what, k, method)
         return _what
     elif kwargs:
         raise GeneLabJSONException("Cannot descend into keys of atomic field")
@@ -66,9 +68,11 @@ def populate(_what=Namespace(), _using={}, _via=(None,), _lengths=(ANY,), _metho
         return source
 
 
-def staged_populate(_via=(None,), _lengths=(ANY,), _method=None, **kwargs):
+def staged_populate(_via=(None,), _lengths=(ANY,), _toplevel_method=None, _per_item_method=None, **kwargs):
     return partial(
-        populate, _via=_via, _lengths=_lengths, _method=_method, **kwargs,
+        populate, _via=_via, _lengths=_lengths,
+        _toplevel_method=_toplevel_method, _per_item_method=_per_item_method,
+        **kwargs,
     )
 
 
@@ -76,11 +80,15 @@ def sparse_json_to_dataframe(entries):
     return repr(entries)[:50] + "..."
 
 
-def sparse_json_to_many_dataframes(dict_of_entries):
-    return {
-        key: sparse_json_to_dataframe(entries)
-        for key, entries in dict_of_entries.items()
-    }
+def sparse_json_to_many_dataframes(_using, ignore={AttributeError}):
+    try:
+        return {
+            key: sparse_json_to_dataframe(entries)
+            for key, entries in _using.items()
+        }
+    except Exception as e:
+        if type(e) in ignore:
+            pass
 
 
 class ISA(Namespace):
@@ -95,11 +103,11 @@ class ISA(Namespace):
                 staged_populate(
                     ("foreignFields", 0, "isa2json", "additionalInformation"),
                     (1, ANY, ANY, ANY),
-                    assays=staged_populate(
-                        ("assays",), (ANY,), sparse_json_to_many_dataframes,
-                    ),
-                    samples=staged_populate(
-                        ("samples",), (ANY,), sparse_json_to_many_dataframes,
+                    _raised=[staged_populate(
+                        _per_item_method=sparse_json_to_many_dataframes,
+                    )],
+                    assays_directly=staged_populate(
+                        ("assays",), (1,), sparse_json_to_many_dataframes,
                     ),
                 ),
             ],
