@@ -1,10 +1,9 @@
 from argparse import Namespace
 from genefab3.exceptions import GeneLabJSONException
-from collections import Callable
 from functools import partial
 
 
-ANY, ATOM = "any", "atom"
+Any, Atom = "Any", "Atom"
 
 
 def descend(_using, _via, _lengths):
@@ -18,17 +17,17 @@ def descend(_using, _via, _lengths):
             except (IndexError, KeyError):
                 error_mask = "Could not descend into key {}"
                 raise GeneLabJSONException(error_mask.format(key))
-        if _len != ANY:
+        if _len != Any:
             error_mask = "Unexpected number of fields under key {}"
             if isinstance(source, (list, dict)):
                 if (len(source) != _len):
                     raise GeneLabJSONException(error_mask.format(key))
-            elif _len != ATOM:
+            elif _len != Atom:
                 raise GeneLabJSONException(error_mask.format(key))
     return source
 
 
-def atomic(variable):
+def isatomic(variable):
     for x in variable:
         if isinstance(x, (dict, list)):
             return False
@@ -36,7 +35,7 @@ def atomic(variable):
         return True
 
 
-def populate(_what=Namespace(), _using={}, _via=(None,), _lengths=(ANY,), _toplevel_method=None, _per_item_method=None, _copy_atoms=True, _copy_atomic_lists=True, _raised=(), **kwargs):
+def populate(_what=Namespace(), _using={}, _via=(None,), _lengths=(Any,), _toplevel_method=None, _each=None, _copy_atoms=True, _copy_atomic_lists=True, _raised=(), **kwargs):
     if not isinstance(_via, (list, tuple)):
         _via = [_via]
     if not isinstance(_lengths, (list, tuple)):
@@ -54,14 +53,14 @@ def populate(_what=Namespace(), _using={}, _via=(None,), _lengths=(ANY,), _tople
             for k, v in method(_using=source)._get_kwargs():
                 setattr(_what, k, v)
         for k, v in source.items():
-            if _per_item_method is not None:
-                setattr(_what, k, _per_item_method(v))
-            elif isinstance(v, list) and _copy_atomic_lists and atomic(v):
+            if _each is not None:
+                setattr(_what, k, _each(v))
+            elif isinstance(v, list) and _copy_atomic_lists and isatomic(v):
                 setattr(_what, k, v)
             elif (not isinstance(v, (dict, list))) and _copy_atoms:
                 setattr(_what, k, v)
         for k, method in kwargs.items():
-            if isinstance(method, Callable):
+            if callable(method):
                 setattr(_what, k, method(_using=source))
             else:
                 setattr(_what, k, method)
@@ -72,10 +71,10 @@ def populate(_what=Namespace(), _using={}, _via=(None,), _lengths=(ANY,), _tople
         return source
 
 
-def StagedParser(_via=(None,), _lengths=(ANY,), _toplevel_method=None, _per_item_method=None, **kwargs):
+def Parser(_via=(None,), _lengths=(Any,), _toplevel_method=None, _each=None, **kwargs):
     return partial(
         populate, _via=_via, _lengths=_lengths,
-        _toplevel_method=_toplevel_method, _per_item_method=_per_item_method,
+        _toplevel_method=_toplevel_method, _each=_each,
         **kwargs,
     )
 
@@ -97,24 +96,14 @@ def sparse_json_to_many_dataframes(_using, ignore={AttributeError}):
 
 class ISA(Namespace):
     def __init__(self, json):
-        parser = StagedParser([None, 0], [1, ANY],
-            doi=StagedParser(
-                ["doiFields", 0, "doi"], [1, ANY, ATOM],
-            ),
-            _raised=[
-                StagedParser(["foreignFields", 0, "isa2json"], [1, ANY, ANY],
-                    _copy_atoms=False,
-                    _raised=[
-                        StagedParser("additionalInformation", ANY,
-                            _raised=[StagedParser(
-                                _per_item_method=sparse_json_to_many_dataframes,
-                            )],
-                            assays_directly=StagedParser("assays", 1,
-                                sparse_json_to_many_dataframes,
-                            ),
-                        ),
-                    ],
-                ),
-            ],
+        parser = Parser([None, 0], [1, Any],
+            doi=Parser(["doiFields", 0, "doi"], [1, Any, Atom]),
+            _raised=[Parser(["foreignFields", 0, "isa2json"], [1, Any, Any],
+                _copy_atoms=False,
+                _raised=[Parser("additionalInformation", Any,
+                    _raised=[Parser(_each=sparse_json_to_many_dataframes)],
+                    assays2=Parser("assays", 1, sparse_json_to_many_dataframes),
+                )],
+            )],
         )
         parser(_what=self, _using=json)
