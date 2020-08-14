@@ -72,7 +72,7 @@ def populate(_what=Namespace(), _using={}, _via=(None,), _lengths=(ANY,), _tople
         return source
 
 
-def staged_populate(_via=(None,), _lengths=(ANY,), _toplevel_method=None, _per_item_method=None, **kwargs):
+def StagedParser(_via=(None,), _lengths=(ANY,), _toplevel_method=None, _per_item_method=None, **kwargs):
     return partial(
         populate, _via=_via, _lengths=_lengths,
         _toplevel_method=_toplevel_method, _per_item_method=_per_item_method,
@@ -97,23 +97,24 @@ def sparse_json_to_many_dataframes(_using, ignore={AttributeError}):
 
 class ISA(Namespace):
     def __init__(self, json):
-        populate(_what=self, _using=json, _via=[None, 0], _lengths=[1, ANY],
+        parser = StagedParser([None, 0], [1, ANY],
+            doi=StagedParser(
+                ["doiFields", 0, "doi"], [1, ANY, ATOM],
+            ),
             _raised=[
-                staged_populate(["foreignFields", 0, "isa2json"], [1, ANY, ANY],
+                StagedParser(["foreignFields", 0, "isa2json"], [1, ANY, ANY],
                     _copy_atoms=False,
                     _raised=[
-                        staged_populate("additionalInformation", ANY,
-                            _raised=[staged_populate(
+                        StagedParser("additionalInformation", ANY,
+                            _raised=[StagedParser(
                                 _per_item_method=sparse_json_to_many_dataframes,
                             )],
-                            assays_directly=staged_populate("assays", 1,
+                            assays_directly=StagedParser("assays", 1,
                                 sparse_json_to_many_dataframes,
                             ),
                         ),
                     ],
                 ),
             ],
-            doi=staged_populate(
-                ["doiFields", 0, "doi"], [1, ANY, ATOM],
-            ),
         )
+        parser(_what=self, _using=json)
