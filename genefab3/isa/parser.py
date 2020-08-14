@@ -1,12 +1,14 @@
 from argparse import Namespace
 from genefab3.exceptions import GeneLabJSONException
 from functools import partial
+from genefab3.isa.types import FromSparseTable
 
 
 Any, Atom = "Any", "Atom"
 
 
 def descend(_using, _via, _lengths):
+    """Follow given keys and indices down into JSON, check value lengths during descent"""
     if len(_via) != len(_lengths):
         raise GeneLabJSONException("Unexpected number of requested JSON fields")
     source = _using
@@ -27,7 +29,8 @@ def descend(_using, _via, _lengths):
     return source
 
 
-def isatomic(variable):
+def isatomiclist(variable):
+    """Check if `variable` is list of atomic items"""
     for x in variable:
         if isinstance(x, (dict, list)):
             return False
@@ -36,11 +39,13 @@ def isatomic(variable):
 
 
 class DefaultNamespace(Namespace):
+    """Namespace with infinite descent"""
     def __getattr__(self, x):
         return getattr(super(), x, DefaultNamespace())
 
 
 def populate(_what=DefaultNamespace(), _using={}, _via=None, _lengths=Any, _toplevel_method=None, _each=None, _copy_atoms=False, _copy_atomic_lists=False, _raised=(), **kwargs):
+    """Parse entries at given level of JSON"""
     if not isinstance(_via, (list, tuple)):
         _via = [_via]
     if not isinstance(_lengths, (list, tuple)):
@@ -62,7 +67,7 @@ def populate(_what=DefaultNamespace(), _using={}, _via=None, _lengths=Any, _topl
         for k, v in source.items():
             if _each is not None:
                 setattr(_what, k, _each(v))
-            elif isinstance(v, list) and _copy_atomic_lists and isatomic(v):
+            elif isinstance(v, list) and _copy_atomic_lists and isatomiclist(v):
                 setattr(_what, k, v)
             elif (not isinstance(v, (dict, list))) and _copy_atoms:
                 setattr(_what, k, v)
@@ -79,33 +84,33 @@ def populate(_what=DefaultNamespace(), _using={}, _via=None, _lengths=Any, _topl
 
 
 def Parser(_via=None, _lengths=Any, _toplevel_method=None, _each=None, **kwargs):
+    """Stage populate() with some arguments filled"""
     return partial(
         populate, _via=_via, _lengths=_lengths, _each=_each,
         _toplevel_method=_toplevel_method, **kwargs,
     )
 
 
-def MetadataLike(entries):
-    return repr(entries)[:50] + "..."
-
-
-def dictmap(function, ignore=AttributeError):
+def valmapper(function, ignore=AttributeError):
+    """Like toolz.valmap, but decorator-like and safe if passed object is not dict"""
     def mapper(_using):
         try:
             return {k: function(e) for k, e in _using.items()}
         except ignore:
-            pass
+            return None
     return mapper
 
 
 class ISA(DefaultNamespace):
+    """Parses GLDS JSON in ISA-Tab-like fashion"""
     def __init__(self, json):
         parser = Parser([None, 0], [1, Any],
             _copy_atoms=True, _copy_atomic_lists=True,
             doi=Parser(["doiFields", 0, "doi"], [1, Any, Atom]),
             _raised=Parser(["foreignFields", 0, "isa2json"], [1, Any, Any],
                 _raised=Parser("additionalInformation", Any,
-                    assays=Parser("assays", 1, dictmap(MetadataLike)),
+                    assays=Parser("assays", 1, valmapper(FromSparseTable)),
+                    samples=Parser("samples", 1, valmapper(FromSparseTable)),
                 ),
             ),
         )
