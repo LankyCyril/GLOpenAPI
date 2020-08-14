@@ -44,14 +44,10 @@ class DefaultNamespace(Namespace):
         return getattr(super(), x, DefaultNamespace())
 
 
-def populate(_what=DefaultNamespace(), _using={}, _via=None, _lengths=Any, _toplevel_method=None, _each=None, _copy_atoms=False, _copy_atomic_lists=False, _raised=(), **kwargs):
+def populate(_what=None, _using=None, _via=(None,), _lengths=(Any,), _toplevel_method=None, _each=None, _copy_atoms=False, _copy_atomic_lists=False, _raised=(), **kwargs):
     """Parse entries at given level of JSON"""
-    if not isinstance(_via, (list, tuple)):
-        _via = [_via]
-    if not isinstance(_lengths, (list, tuple)):
-        _lengths = [_lengths]
-    if not isinstance(_raised, (list, tuple)):
-        _raised = [_raised]
+    if _what is None:
+        _what = DefaultNamespace()
     if (not _using) or (len(_via) == 0):
         raise GeneLabJSONException("Reached a dead end in JSON")
     source = descend(_using, _via, _lengths)
@@ -83,7 +79,7 @@ def populate(_what=DefaultNamespace(), _using={}, _via=None, _lengths=Any, _topl
         return source
 
 
-def Parser(_via=None, _lengths=Any, _toplevel_method=None, _each=None, **kwargs):
+def Parser(_via=(None,), _lengths=(Any,), _toplevel_method=None, _each=None, **kwargs):
     """Stage populate() with some arguments filled"""
     return partial(
         populate, _via=_via, _lengths=_lengths, _each=_each,
@@ -104,14 +100,15 @@ def valmapper(function, ignore=AttributeError):
 class ISA(DefaultNamespace):
     """Parses GLDS JSON in ISA-Tab-like fashion"""
     def __init__(self, json):
-        parser = Parser([None, 0], [1, Any],
+        map_TST = valmapper(ToSparseTable)
+        parser = Parser((None, 0), (1, Any),
             _copy_atoms=True, _copy_atomic_lists=True,
-            doi=Parser(["doiFields", 0, "doi"], [1, Any, Atom]),
-            _raised=Parser(["foreignFields", 0, "isa2json"], [1, Any, Any],
-                _raised=Parser("additionalInformation", Any,
-                    assays=Parser("assays", Any, valmapper(ToSparseTable)),
-                    samples=Parser("samples", Any, valmapper(ToSparseTable)),
-                ),
-            ),
+            doi=Parser(("doiFields", 0, "doi"), (1, Any, Atom)),
+            _raised=(Parser(("foreignFields", 0, "isa2json"), (1, Any, Any),
+                _raised=(Parser(("additionalInformation",), (Any,),
+                    assays=Parser(("assays",), (Any,), map_TST),
+                    samples=Parser(("samples",), (Any,), map_TST),
+                ),),
+            ),),
         )
         parser(_what=self, _using=json)
