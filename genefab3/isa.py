@@ -37,6 +37,10 @@ def atomic(variable):
 
 
 def populate(_what=Namespace(), _using={}, _via=(None,), _lengths=(ANY,), _toplevel_method=None, _per_item_method=None, _copy_atoms=True, _copy_atomic_lists=True, _raised=(), **kwargs):
+    if not isinstance(_via, (list, tuple)):
+        _via = [_via]
+    if not isinstance(_lengths, (list, tuple)):
+        _lengths = [_lengths]
     if (not _using) or (len(_via) == 0):
         raise GeneLabJSONException("Reached a dead end in JSON")
     source = descend(_using, _via, _lengths)
@@ -92,26 +96,24 @@ def sparse_json_to_many_dataframes(_using, ignore={AttributeError}):
 
 
 class ISA(Namespace):
- 
     def __init__(self, json):
-        populate(
-            _what=self, _using=json, _via=(None, 0), _lengths=(1, ANY),
+        populate(_what=self, _using=json, _via=[None, 0], _lengths=[1, ANY],
             _raised=[
-                staged_populate(
-                    ("foreignFields", 0, "isa2json"), (1, ANY, ANY),
-                ),
-                staged_populate(
-                    ("foreignFields", 0, "isa2json", "additionalInformation"),
-                    (1, ANY, ANY, ANY),
-                    _raised=[staged_populate(
-                        _per_item_method=sparse_json_to_many_dataframes,
-                    )],
-                    assays_directly=staged_populate(
-                        ("assays",), (1,), sparse_json_to_many_dataframes,
-                    ),
+                staged_populate(["foreignFields", 0, "isa2json"], [1, ANY, ANY],
+                    _copy_atoms=False,
+                    _raised=[
+                        staged_populate("additionalInformation", ANY,
+                            _raised=[staged_populate(
+                                _per_item_method=sparse_json_to_many_dataframes,
+                            )],
+                            assays_directly=staged_populate("assays", 1,
+                                sparse_json_to_many_dataframes,
+                            ),
+                        ),
+                    ],
                 ),
             ],
             doi=staged_populate(
-                ("doiFields", 0, "doi"), (1, ANY, ATOM),
+                ["doiFields", 0, "doi"], [1, ANY, ATOM],
             ),
         )
