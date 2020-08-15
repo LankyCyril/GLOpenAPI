@@ -1,5 +1,12 @@
+from argparse import Namespace
 from genefab3.exceptions import GeneLabJSONException
 from pandas import DataFrame, concat
+
+
+class TurtleSpace(Namespace):
+    """Namespace with infinite descent"""
+    def __getattr__(self, x):
+        return getattr(super(), x, TurtleSpace())
 
 
 def ToSparseTable(entries):

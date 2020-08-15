@@ -1,7 +1,6 @@
-from argparse import Namespace
 from genefab3.exceptions import GeneLabJSONException
 from functools import partial
-from genefab3.isa.types import ToSparseTable
+from genefab3.isa.types import TurtleSpace, ToSparseTable
 
 
 Any, Atom = "Any", "Atom"
@@ -38,16 +37,10 @@ def isatomiclist(variable):
         return True
 
 
-class DefaultNamespace(Namespace):
-    """Namespace with infinite descent"""
-    def __getattr__(self, x):
-        return getattr(super(), x, DefaultNamespace())
-
-
 def populate(_what=None, _using=None, _via=(None,), _lengths=(Any,), _toplevel_method=None, _each=None, _copy_atoms=False, _copy_atomic_lists=False, _raised=(), **kwargs):
     """Parse entries at given level of JSON"""
     if _what is None:
-        _what = DefaultNamespace()
+        _what = TurtleSpace()
     if (not _using) or (len(_via) == 0):
         raise GeneLabJSONException("Reached a dead end in JSON")
     source = descend(_using, _via, _lengths)
@@ -97,7 +90,7 @@ def valmapper(function, ignore=AttributeError):
     return mapper
 
 
-class ISA(DefaultNamespace):
+class ISA(TurtleSpace):
     """Parses GLDS JSON in ISA-Tab-like fashion"""
     def __init__(self, json):
         map_TST = valmapper(ToSparseTable)
