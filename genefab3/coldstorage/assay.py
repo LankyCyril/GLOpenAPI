@@ -1,183 +1,108 @@
 from genefab3.exceptions import GeneLabJSONException, GeneLabException
 from genefab3.config import INDEX_BY
 from genefab3.utils import force_default_name_delimiter
-from collections import defaultdict
-from pandas import Series, DataFrame, concat, merge, read_csv
-from re import search, fullmatch, split, sub, IGNORECASE
-from copy import copy, deepcopy
+from pandas import DataFrame, read_csv, isnull, MultiIndex
+from re import compile, search, split, sub, IGNORECASE
+from copy import copy
 from urllib.request import urlopen
+from itertools import count
 
 
-def filter_json(json, use=None, discard=None):
-    """Reduce metadata-like JSON to 'header' fields matching `field_mask`"""
-    try:
-        header_content = []
-        if use:
-            marker = r'^{}:\s*'.format(use)
-            for entry in json["header"]:
-                if search(marker, entry["title"], flags=IGNORECASE):
-                    modified_entry = deepcopy(entry)
-                    raw_converted_title = sub(
-                        marker, "", entry["title"], flags=IGNORECASE,
-                    )
-                    modified_entry["title"] = sub(
-                        r'_', " ", raw_converted_title.lower(),
-                    )
-                    header_content.append(modified_entry)
-                elif (entry["title"] == INDEX_BY):
-                    header_content.append(entry)
-        elif discard:
-            marker = r'^({}):\s*'.format("|".join(discard))
-            for entry in json["header"]:
-                if not search(marker, entry["title"], flags=IGNORECASE):
-                    header_content.append(entry)
-                elif (entry["title"] == INDEX_BY):
-                    header_content.append(entry)
-        return {"raw": deepcopy(json["raw"]), "header": header_content}
-    except KeyError:
-        raise GeneLabJSONException("Malformed assay JSON: header and/or raw")
+def filter_table(sparse_table, use=None, discard=None, index_by=INDEX_BY):
+    """Reduce metadata-like to columns matching `use` XOR not matching `discard`"""
+    if use:
+        expression = r'^{}:\s*'.format(use)
+        matches = compile(expression, flags=IGNORECASE).search
+        filtered_columns = [
+            (l0, l1) for l0, l1 in sparse_table.columns
+            if (not isnull(l0)) and (matches(l0) or (l0 == index_by))
+        ]
+    elif discard:
+        expression = r'^({}):\s*'.format("|".join(discard))
+        matches = compile(expression, flags=IGNORECASE).search
+        filtered_columns = [
+            (l0, l1) for l0, l1 in sparse_table.columns
+            if (not isnull(l0)) and (matches(l0) or (l0 == index_by))
+        ]
+    filtered_table = sparse_table[filtered_columns].copy()
+    return filtered_table
 
 
-def parse_assay_json_fields(json):
-    """Parse fields and titles from assay json 'header'"""
-    try:
-        header = json["header"]
-    except KeyError:
-        raise GeneLabJSONException("Malformed assay JSON: header")
-    field2title = {entry["field"]: entry["title"] for entry in header}
-    if len(field2title) != len(header):
-        raise GeneLabJSONException("Conflicting IDs of data fields")
-    fields = defaultdict(set)
-    for field, title in field2title.items():
-        fields[title].add(field)
-    return dict(fields), field2title
-
-
-def INPLACE_merge_duplicate_fields(dataframe, fields):
-    first_field, *other_fields = fields
-    for other_field in other_fields:
-        if (dataframe[first_field] != dataframe[other_field]).any():
-            raise ValueError("Ambiguous and differing duplicate fields")
-    else:
-        dataframe.drop(columns=other_fields, inplace=True)
-        return first_field
-
-
-def parse_metadatalike_json(metadata_object, json):
-    """Convert assay JSON to metadata DataFrame"""
-    try:
-        raw = json["raw"]
-    except KeyError:
-        raise GeneLabJSONException("Malformed assay JSON: raw")
-    # convert raw JSON to raw DataFrame:
-    unindexed_dataframe = concat(map(Series, raw), axis=1).T
-    # find field title to index metadata by:
-    matching_indexer_titles = metadata_object.match_field_titles(
-        INDEX_BY, method=fullmatch,
+def strip_prefixes(dataframe, use):
+    """Remove prefixes used to filter original table"""
+    expression = r'^{}:\s*'.format(use)
+    return DataFrame(
+        data=dataframe.values,
+        index=dataframe.index,
+        columns=MultiIndex.from_tuples([
+            (sub(expression, "", l0, flags=IGNORECASE), l1)
+            for l0, l1 in dataframe.columns
+        ]),
     )
-    if len(matching_indexer_titles) == 0:
-        raise IndexError("Nonexistent '{}'".format(INDEX_BY))
-    elif len(matching_indexer_titles) > 1:
-        raise IndexError("Ambiguous '{}'".format(INDEX_BY))
-    else:
-        indexed_by = matching_indexer_titles.pop()
-        if indexed_by == metadata_object.indexed_by:
-            matching_fields = {metadata_object.internally_indexed_by}
-        else:
-            matching_fields = metadata_object.fields[indexed_by]
-    if len(matching_fields) == 0:
-        raise IndexError("Nonexistent '{}'".format(INDEX_BY))
-    elif len(matching_fields) > 1:
-        try:
-            internally_indexed_by = INPLACE_merge_duplicate_fields(
-                unindexed_dataframe, matching_fields,
-            )
-        except ValueError:
-            raise IndexError("Ambiguous '{}'".format(INDEX_BY))
-    else:
-        internally_indexed_by = list(matching_fields)[0]
-    # reindex raw DataFrame:
-    raw_dataframe = unindexed_dataframe.set_index(internally_indexed_by)
-    raw_dataframe.index = raw_dataframe.index.map(force_default_name_delimiter)
-    return raw_dataframe, indexed_by, internally_indexed_by
 
 
-def make_metadatalike_dataframe(metadata_object):
-    """Convert raw dataframe into human-accessible dataframe"""
-    multicols = ["field", "internal_field"]
-    columns_dataframe = DataFrame(
-        data=metadata_object.raw_dataframe.columns, columns=["internal_field"]
-    )
-    fields_dataframe = DataFrame(
-        data=[[k, v] for k, vv in metadata_object.fields.items() for v in vv],
-        columns=multicols
-    )
-    multiindex_dataframe = (
-        merge(columns_dataframe, fields_dataframe, sort=False, how="outer")
-        .fillna("Unknown")
-    )
-    mdv = multiindex_dataframe["internal_field"].values
-    rmv = metadata_object.raw_dataframe.columns.values
-    if (mdv != rmv).any():
-        em = "Inconsistent internal and human-readable fields in assay metadata"
-        raise GeneLabException(em)
-    else:
-        multiindex_dataframe = multiindex_dataframe.sort_values(by="field")
-        internal_field_order = multiindex_dataframe["internal_field"]
-        as_frame = metadata_object.raw_dataframe[internal_field_order].copy()
-        as_frame.columns = multiindex_dataframe.set_index(multicols).index
-        return as_frame
+def make_metadatalike_dataframe(raw_dataframe, index_by=INDEX_BY, use=None):
+    """Index dataframe by index_by"""
+    index_columns = raw_dataframe[index_by]
+    if index_columns.shape[1] == 0:
+        raise GeneLabException("Nonexistent field: " + index_by)
+    elif index_columns.shape[1] > 1:
+        if index_columns.T.drop_duplicates().shape[0] > 1:
+            msg = "Multiple fields with differing values: " + index_by
+            raise GeneLabException(msg)
+        else: # will remove duplicated index columns regardless of second level
+            c = count()
+            keep = [
+                not (col==index_by and next(c) or 0)
+                for col, _ in raw_dataframe.columns
+            ]
+    else: # make sure `keep` exists but does not remove anything
+        keep = [True] * raw_dataframe.shape[1]
+    index = (index_by, index_columns.columns[0])
+    full = raw_dataframe.loc[:,keep].set_index(index)
+    if (full.shape[1] > 0) and use:
+        full = strip_prefixes(full, use)
+    full.index.name, full.columns.names = None, index
+    return full
 
 
-def get_variable_subset_of_dataframe(df):
-    """Subset `df` to columns that have variable values"""
-    return df.loc[:, df.apply(lambda r: len(set(r.values))>1)]
-
-
-def make_named_metadatalike_dataframe(df, index_name=None):
+def make_named_metadatalike_dataframe(df, index_by=INDEX_BY):
     """Keep only named (known) variable columns, drop internal field names"""
     fields = df.columns.get_level_values(0)
-    named_df = df.loc[:, [f != "Unknown" for f in fields]].copy()
+    named_df = df.loc[:, [not isnull(f) for f in fields]].copy()
     named_df.columns = named_df.columns.droplevel(1)
     named_df.columns.name = None
-    if index_name:
-        named_df.index.name = index_name
+    if index_by:
+        named_df.index.name = index_by
     return named_df
 
 
 class MetadataLike():
     """Stores assay fields and metadata in raw and processed form"""
-    indexed_by, internally_indexed_by = None, None
  
-    def __init__(self, json, use=None, discard=None):
+    def __init__(self, sparse_table, use=None, discard=None, index_by=INDEX_BY, harmonize=lambda f: sub(r'_', " ", f).lower()):
         """Convert assay JSON to metadata object"""
         if (use is None) and (discard is None):
-            filtered_json = json
+            raw_dataframe = sparse_table
         elif use:
-            filtered_json = filter_json(json, use=use)
+            raw_dataframe = filter_table(
+                sparse_table, use=use, index_by=index_by,
+            )
         elif discard:
-            filtered_json = filter_json(json, discard=discard)
+            raw_dataframe = filter_table(
+                sparse_table, discard=discard, index_by=index_by,
+            )
         else:
             raise GeneLabException("MetadataLike can only 'use' XOR 'discard'")
-        self.fields, self.field2title = parse_assay_json_fields(filtered_json)
-        self.raw_dataframe, self.indexed_by, self.internally_indexed_by = (
-            parse_metadatalike_json(self, filtered_json)
-        )
-        del self.fields[self.indexed_by]
-        self.full = make_metadatalike_dataframe(self)
-        self.named = make_named_metadatalike_dataframe(
-            self.full, self.indexed_by,
-        )
- 
-    def match_field_titles(self, pattern, flags=IGNORECASE, method=search):
-        """Find fields matching pattern"""
-        if self.indexed_by:
-            field_pool = set(self.fields) | {self.indexed_by}
-        else:
-            field_pool = self.fields
-        return {
-            title for title in field_pool if method(pattern, title, flags=flags)
-        }
+        if harmonize:
+            raw_dataframe.columns = MultiIndex.from_tuples([
+                (l0, l1) if isnull(l0) else (harmonize(l0), l1)
+                for l0, l1 in raw_dataframe.columns
+            ])
+            index_by = harmonize(index_by)
+        self.full = make_metadatalike_dataframe(raw_dataframe, index_by, use)
+        self.named = make_named_metadatalike_dataframe(self.full, index_by)
+        self.indexed_by = index_by
 
 
 def INPLACE_force_default_name_delimiter_in_file_data(filedata, metadata_indexed_by, metadata_name_set):
@@ -197,8 +122,8 @@ def INPLACE_force_default_name_delimiter_in_file_data(filedata, metadata_indexed
 class ColdStorageAssay():
     """Stores individual assay information and metadata"""
  
-    def __init__(self, dataset, name, assay_json, sample_json):
-        """Parse assay JSON reported by cold storage"""
+    def __init__(self, dataset, name, sample_key):
+        """Parse assay-related entries from ISA"""
         try:
             _ = dataset.assays[name]
         except (AttributeError, KeyError):
@@ -207,13 +132,15 @@ class ColdStorageAssay():
         self.name = name
         self.dataset = dataset
         try:
+            assays_isa = dataset.isa.assays[name]
+            samples_isa = dataset.isa.samples[sample_key]
             ML = MetadataLike
-            self.metadata = ML(assay_json)
-            self.factors = ML(sample_json, use="factor value")
-            self.parameters = ML(sample_json, use="parameter value")
-            self.characteristics = ML(sample_json, use="characteristics")
-            self.comments = ML(sample_json, use="comment")
-            self.properties = ML(sample_json, discard={
+            self.metadata = ML(assays_isa)
+            self.factors = ML(samples_isa, use="factor value")
+            self.parameters = ML(samples_isa, use="parameter value")
+            self.characteristics = ML(samples_isa, use="characteristics")
+            self.comments = ML(samples_isa, use="comment")
+            self.properties = ML(samples_isa, discard={
                 "factor value", "parameter value", "characteristics", "comment",
             })
         except IndexError as e:

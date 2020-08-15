@@ -1,10 +1,25 @@
 from bson import Code
+from bson.errors import InvalidDocument as InvalidDocumentError
+
+
+def insert_one_safe(collection, query):
+    """Insert key-value pairs, modifying dangerous keys ('_id', keys containing '$' and '.')"""
+    safe_query = {}
+    for k, v in query.items():
+        safe_key = k.replace("$", "_").replace(".", "_")
+        if safe_key == "_id":
+            safe_key = "__id"
+        if safe_key not in safe_query:
+            safe_query[safe_key] = v
+        else:
+            raise InvalidDocumentError("Safe keys conflict")
+    collection.insert_one(safe_query)
 
 
 def replace_doc(collection, query, **kwargs):
     """Shortcut to drop all instances and replace with updated instance"""
     collection.delete_many(query)
-    collection.insert_one({**query, **kwargs})
+    insert_one_safe(collection, {**query, **kwargs})
 
 
 def get_collection_fields(collection, skip=set()):
