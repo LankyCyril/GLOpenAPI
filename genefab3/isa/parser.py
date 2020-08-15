@@ -1,9 +1,6 @@
 from genefab3.exceptions import GeneLabJSONException
 from functools import partial
-from genefab3.isa.types import TurtleSpace, ToSparseTable
-
-
-Any, Atom = "Any", "Atom"
+from genefab3.isa.types import TurtleDict, TurtleSpace, SparseTable, Any, Atom
 
 
 def descend(_using, _via, _lengths):
@@ -16,8 +13,7 @@ def descend(_using, _via, _lengths):
             try:
                 source = source[key]
             except (IndexError, KeyError):
-                error_mask = "Could not descend into key {}"
-                raise GeneLabJSONException(error_mask.format(key))
+                source = TurtleDict()
         if _len != Any:
             error_mask = "Unexpected number of fields under key {}"
             if isinstance(source, (list, dict)):
@@ -93,14 +89,14 @@ def valmapper(function, ignore=AttributeError):
 class ISA(TurtleSpace):
     """Parses GLDS JSON in ISA-Tab-like fashion"""
     def __init__(self, json):
-        map_TST = valmapper(ToSparseTable)
+        SparseTableDict = valmapper(SparseTable)
         parser = Parser((None, 0), (1, Any),
             _copy_atoms=True, _copy_atomic_lists=True,
             doi=Parser(("doiFields", 0, "doi"), (1, Any, Atom)),
             _raised=(Parser(("foreignFields", 0, "isa2json"), (1, Any, Any),
                 _raised=(Parser(("additionalInformation",), (Any,),
-                    assays=Parser(("assays",), (Any,), map_TST),
-                    samples=Parser(("samples",), (Any,), map_TST),
+                    assays=Parser(("assays",), (Any,), SparseTableDict),
+                    samples=Parser(("samples",), (Any,), SparseTableDict),
                 ),),
             ),),
         )

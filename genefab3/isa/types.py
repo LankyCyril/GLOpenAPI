@@ -1,6 +1,20 @@
+from numpy import nan
 from argparse import Namespace
 from genefab3.exceptions import GeneLabJSONException
 from pandas import DataFrame, concat
+
+
+Any, Atom = "Any", "Atom"
+
+
+class TurtleDict(float):
+    """Empty dictionary with infinite descent that masquerades as numpy.nan"""
+    def __new__(self):
+        return float.__new__(self, nan)
+    def __getitem__(self, x):
+        return TurtleDict()
+    def __len__(self):
+        return 0
 
 
 class TurtleSpace(Namespace):
@@ -9,7 +23,7 @@ class TurtleSpace(Namespace):
         return getattr(super(), x, TurtleSpace())
 
 
-def ToSparseTable(entries):
+def SparseTable(entries):
     """Combines 'header' and 'raw' fields into two-level DataFrame"""
     try:
         raw_header = DataFrame(entries["header"])
