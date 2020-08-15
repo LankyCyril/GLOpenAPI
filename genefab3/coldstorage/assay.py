@@ -8,16 +8,6 @@ from urllib.request import urlopen
 from itertools import count
 
 
-def infer_assay_types(name):
-    """Infer known assay types from curated assay name"""
-    return {
-        assay_type.split("|")[0] for assay_type in ASSAY_TYPES if search(
-            r'(-|_|^)' + assay_type.replace(" ", "_") + r'(-|_|$)',
-            name, flags=IGNORECASE,
-        )
-    }
-
-
 def filter_table(isa_table, use=None, discard=None, index_by=INDEX_BY):
     """Reduce metadata-like to columns matching `use` XOR not matching `discard`"""
     if use:
@@ -115,6 +105,17 @@ class MetadataLike():
         self.indexed_by = index_by
 
 
+class MetadataLikeAssayTypes:
+    """MetadataLike-like representation of assay types inferred from assay name"""
+    def __init__(self, assay_name):
+        self.named = {
+            assay_type.split("|")[0] for assay_type in ASSAY_TYPES if search(
+                r'(-|_|^)' + assay_type.replace(" ", "_") + r'(-|_|$)',
+                assay_name, flags=IGNORECASE,
+            )
+        }
+
+
 def INPLACE_force_default_name_delimiter_in_file_data(filedata, metadata_indexed_by, metadata_name_set):
     """In data read from file, find names and force default name delimiter"""
     if metadata_indexed_by in filedata.columns:
@@ -141,7 +142,7 @@ class ColdStorageAssay():
             raise GeneLabException(msg)
         self.name = name
         self.dataset = dataset
-        self.types = infer_assay_types(name)
+        self.types = MetadataLikeAssayTypes(name)
         try:
             assays_isa = dataset.isa.assays[name]
             samples_isa = dataset.isa.samples[sample_key]
