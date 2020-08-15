@@ -42,9 +42,9 @@ def strip_prefixes(dataframe, use):
     )
 
 
-def make_metadatalike_dataframe(raw_dataframe, index_by=INDEX_BY, use=None):
+def make_metadatalike_dataframe(isa_table, index_by=INDEX_BY, use=None):
     """Index dataframe by index_by"""
-    index_columns = raw_dataframe[index_by]
+    index_columns = isa_table[index_by]
     if index_columns.shape[1] == 0:
         raise GeneLabException("Nonexistent field: " + index_by)
     elif index_columns.shape[1] > 1:
@@ -55,12 +55,12 @@ def make_metadatalike_dataframe(raw_dataframe, index_by=INDEX_BY, use=None):
             c = count()
             keep = [
                 not (col==index_by and next(c) or 0)
-                for col, _ in raw_dataframe.columns
+                for col, _ in isa_table.columns
             ]
     else: # make sure `keep` exists but does not remove anything
-        keep = [True] * raw_dataframe.shape[1]
+        keep = [True] * isa_table.shape[1]
     index = (index_by, index_columns.columns[0])
-    full = raw_dataframe.loc[:,keep].set_index(index)
+    full = isa_table.loc[:,keep].set_index(index)
     if (full.shape[1] > 0) and use:
         full = strip_prefixes(full, use)
     full.index.name, full.columns.names = None, index
@@ -78,48 +78,52 @@ def make_named_metadatalike_dataframe(df, index_by=INDEX_BY):
     return named_df
 
 
+def ISATableLike(data, like):
+    """Make ISATable from arbitrary dict with shape and INDEX_BY like that of `like`"""
+    c = count(200000)
+    values = [v for vv in data.values() for v in vv]
+    titles = [k for k, v in data.items() for _ in range(len(v))]
+    fields = ["a{}{}".format(next(c), sub(" ", "", t)) for t in titles]
+    return concat([
+        DataFrame(
+            data=vstack([values]*like.full.shape[0]),
+            columns=MultiIndex.from_arrays([titles, fields]),
+        ),
+        DataFrame(
+            data=like.full.index,
+            columns=MultiIndex.from_tuples([like.full.columns.names]),
+        ),
+    ], axis=1)
+
+
 class MetadataLike():
     """Stores assay fields and metadata in raw and processed form"""
  
-    def __init__(self, values, like=None, use=None, discard=None, index_by=INDEX_BY, harmonize=lambda f: sub(r'_', " ", f).lower()):
+    def __init__(self, data, like=None, use=None, discard=None, index_by=INDEX_BY, harmonize=lambda f: sub(r'_', " ", f).lower()):
         """Convert assay ISATable to metadata object, or make metadata object similar to `like`"""
-        if isinstance(values, dict) and isinstance(like, MetadataLike):
-            c = count(200000)
-            data = [v for vv in values.values() for v in vv]
-            titles = [k for k, v in values.items() for _ in range(len(v))]
-            fields = ["a{}{}".format(next(c), sub(" ", "", t)) for t in titles]
-            raw_dataframe = concat([
-                DataFrame(
-                    data=vstack([data]*like.full.shape[0]),
-                    columns=MultiIndex.from_arrays([titles, fields]),
-                ),
-                DataFrame(
-                    data=like.full.index,
-                    columns=MultiIndex.from_tuples([like.full.columns.names]),
-                ),
-            ], axis=1)
-        elif not isinstance(values, DataFrame):
+        if isinstance(data, dict) and isinstance(like, MetadataLike):
+            isa_table = ISATableLike(data, like)
+        elif isinstance(data, DataFrame):
+            isa_table = data
+        else:
             raise GeneLabException("MetadataLike from unsupported object type")
-        if (use is None) and (discard is None):
-            if like is None:
-                raw_dataframe = values
-        elif use:
-            raw_dataframe = filter_table(
-                values, use=use, index_by=index_by,
+        if use:
+            isa_table = filter_table(
+                isa_table, use=use, index_by=index_by,
             )
         elif discard:
-            raw_dataframe = filter_table(
-                values, discard=discard, index_by=index_by,
+            isa_table = filter_table(
+                isa_table, discard=discard, index_by=index_by,
             )
-        else:
+        elif use and discard:
             raise GeneLabException("MetadataLike can only 'use' XOR 'discard'")
         if harmonize:
-            raw_dataframe.columns = MultiIndex.from_tuples([
+            isa_table.columns = MultiIndex.from_tuples([
                 (l0, l1) if isnull(l0) else (harmonize(l0), l1)
-                for l0, l1 in raw_dataframe.columns
+                for l0, l1 in isa_table.columns
             ])
             index_by = harmonize(index_by)
-        self.full = make_metadatalike_dataframe(raw_dataframe, index_by, use)
+        self.full = make_metadatalike_dataframe(isa_table, index_by, use)
         self.named = make_named_metadatalike_dataframe(self.full, index_by)
         self.indexed_by = index_by
 
@@ -138,10 +142,10 @@ def INPLACE_force_default_name_delimiter_in_file_data(filedata, metadata_indexed
     ]
 
 
-def infer_types(assay_name):
+def infer_assay_types(assay_name):
     """Infer assay types from curated assay name"""
     return {
-        "assay type": {
+        "type": {
             assay_type.split("|")[0] for assay_type in ASSAY_TYPES if search(
                 r'(-|_|^)' + assay_type.replace(" ", "_") + r'(-|_|$)',
                 assay_name, flags=IGNORECASE,
@@ -174,7 +178,7 @@ class ColdStorageAssay():
             self.properties = ML(samples_isa, discard={
                 "factor value", "parameter value", "characteristics", "comment",
             })
-            self.types = MetadataLike(infer_types(name), like=self.comments)
+            self.assay_types = ML(infer_assay_types(name), like=self.comments)
         except IndexError as e:
             msg = "{}, {}: {}".format(dataset.accession, name, e)
             raise GeneLabJSONException(msg)
