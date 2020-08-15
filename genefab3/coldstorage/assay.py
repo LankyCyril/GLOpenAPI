@@ -183,6 +183,15 @@ class ColdStorageAssay():
             msg = "{}, {}: {}".format(dataset.accession, name, e)
             raise GeneLabJSONException(msg)
  
+    def __getattr__(self, attribute):
+        """Allow asking for metas with spaces: e.g., getattr(self, "assay types")"""
+        if " " in attribute:
+            return getattr(self, sub(r'\s', "_", attribute))
+        else:
+            raise AttributeError("'{}' object has no attribute '{}'".format(
+                "ColdStorageAssay", attribute,
+            ))
+ 
     def resolve_filename(self, mask, sample_mask=".*", field_mask=".*"):
         """Given masks, find filenames, urls, and datestamps"""
         dataset_level_files = self.dataset.resolve_filename(mask)

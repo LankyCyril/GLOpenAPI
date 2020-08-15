@@ -29,7 +29,8 @@ ASSAY_TYPES = {
 }
 
 ASSAY_METADATALIKES = {
-    "factors", "parameters", "characteristics", "comments", "properties",
+    "assay types", "factors", "parameters", "characteristics",
+    "comments", "properties",
 }
 
 DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'
