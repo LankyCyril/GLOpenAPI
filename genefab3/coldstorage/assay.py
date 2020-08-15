@@ -5,6 +5,7 @@ from pandas import DataFrame, read_csv, isnull, MultiIndex
 from re import compile, search, split, sub, IGNORECASE
 from copy import copy
 from urllib.request import urlopen
+from itertools import count
 
 
 def filter_table(sparse_table, use=None, discard=None, index_by=INDEX_BY):
@@ -35,13 +36,24 @@ def filter_table(sparse_table, use=None, discard=None, index_by=INDEX_BY):
 def make_metadatalike_dataframe(raw_dataframe, index_by=INDEX_BY):
     """Index dataframe by index_by"""
     index_columns = raw_dataframe[index_by]
-    if index_columns.shape[1] != 1:
-        raise GeneLabException("Duplicate or nonexistent field: " + index_by)
-    else:
-        index = (index_by, index_columns.columns[0])
-        full = raw_dataframe.set_index(index)
-        full.index.name, full.columns.names = None, index
-        return full
+    if index_columns.shape[1] == 0:
+        raise GeneLabException("Nonexistent field: " + index_by)
+    elif index_columns.shape[1] > 1:
+        if index_columns.T.drop_duplicates().shape[0] > 1:
+            msg = "Multiple fields with differing values: " + index_by
+            raise GeneLabException(msg)
+        else: # will remove duplicated index columns regardless of second level
+            c = count()
+            keep = [
+                not (col==index_by and next(c) or 0)
+                for col, _ in raw_dataframe.columns
+            ]
+    else: # make sure `keep` exists but does not remove anything
+        keep = [True] * raw_dataframe.shape[1]
+    index = (index_by, index_columns.columns[0])
+    full = raw_dataframe.loc[:,keep].set_index(index)
+    full.index.name, full.columns.names = None, index
+    return full
 
 
 def make_named_metadatalike_dataframe(df, index_by=None):
