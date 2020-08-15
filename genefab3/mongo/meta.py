@@ -5,7 +5,7 @@ from genefab3.config import CACHER_THREAD_CHECK_INTERVAL
 from genefab3.config import CACHER_THREAD_RECHECK_INTERVAL
 from genefab3.config import ASSAY_METADATALIKES
 from genefab3.utils import download_cold_json
-from genefab3.mongo.utils import replace_doc
+from genefab3.mongo.utils import replace_doc, insert_one_safe
 from genefab3.exceptions import GeneLabJSONException
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from datetime import datetime
@@ -127,7 +127,7 @@ def refresh_assay_meta_stores(db, accession):
                 "accession": assay.dataset.accession, "assay name": assay.name,
             })
             for sample_name, row in dataframe.iterrows():
-                collection.insert_one({
+                insert_one_safe(collection, {
                     **{
                         "accession": assay.dataset.accession,
                         "assay name": assay.name, "sample name": sample_name,
