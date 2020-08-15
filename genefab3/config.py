@@ -21,6 +21,13 @@ MAX_JSON_AGE = 10800 # 3 hours (in seconds)
 CACHER_THREAD_CHECK_INTERVAL = 1800 # 30 minutes (in seconds)
 CACHER_THREAD_RECHECK_INTERVAL = 300 # 5 minutes (in seconds)
 
+ASSAY_TYPES = {
+    "dna", "rna", "protein",
+    "nucleotide", "genome", "metagenome",
+    "microarray|genechip", "sequencing", "mass spectrometry", "bisulfite",
+    "transcription profiling", "methylation profiling", "expression profiling",
+}
+
 ASSAY_METADATALIKES = {
     "factors", "parameters", "characteristics", "comments", "properties",
 }

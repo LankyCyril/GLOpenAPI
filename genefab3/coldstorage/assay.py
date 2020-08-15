@@ -1,11 +1,21 @@
 from genefab3.exceptions import GeneLabJSONException, GeneLabException
-from genefab3.config import INDEX_BY
+from genefab3.config import INDEX_BY, ASSAY_TYPES
 from genefab3.utils import force_default_name_delimiter
 from pandas import DataFrame, read_csv, isnull, MultiIndex
 from re import compile, search, split, sub, IGNORECASE
 from copy import copy
 from urllib.request import urlopen
 from itertools import count
+
+
+def infer_assay_types(name):
+    """Infer known assay types from curated assay name"""
+    return {
+        assay_type.split("|")[0] for assay_type in ASSAY_TYPES if search(
+            r'(-|_|^)' + assay_type.replace(" ", "_") + r'(-|_|$)',
+            name, flags=IGNORECASE,
+        )
+    }
 
 
 def filter_table(isa_table, use=None, discard=None, index_by=INDEX_BY):
@@ -131,6 +141,7 @@ class ColdStorageAssay():
             raise GeneLabException(msg)
         self.name = name
         self.dataset = dataset
+        self.types = infer_assay_types(name)
         try:
             assays_isa = dataset.isa.assays[name]
             samples_isa = dataset.isa.samples[sample_key]
