@@ -64,12 +64,6 @@ def favicon(**kwargs):
 
 # Debug zone:
 
-@app.route("/debug/")
-def debug():
-    """Debug"""
-    from genefab3.flask.debug import debug
-    return debug(db)
-
 @app.route("/debug/<accession>/<assay_name>/<meta>/", methods=["GET"])
 def assay_metadata(**kwargs):
     """Display assay metadata"""
