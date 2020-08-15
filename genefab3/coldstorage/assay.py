@@ -1,11 +1,12 @@
 from genefab3.exceptions import GeneLabJSONException, GeneLabException
 from genefab3.config import INDEX_BY, ASSAY_TYPES
 from genefab3.utils import force_default_name_delimiter
-from pandas import DataFrame, read_csv, isnull, MultiIndex
+from pandas import DataFrame, read_csv, isnull, MultiIndex, concat
 from re import compile, search, split, sub, IGNORECASE
 from copy import copy
 from urllib.request import urlopen
 from itertools import count
+from numpy import vstack
 
 
 def filter_table(isa_table, use=None, discard=None, index_by=INDEX_BY):
@@ -80,17 +81,35 @@ def make_named_metadatalike_dataframe(df, index_by=INDEX_BY):
 class MetadataLike():
     """Stores assay fields and metadata in raw and processed form"""
  
-    def __init__(self, isa_table, use=None, discard=None, index_by=INDEX_BY, harmonize=lambda f: sub(r'_', " ", f).lower()):
-        """Convert assay JSON to metadata object"""
+    def __init__(self, values, like=None, use=None, discard=None, index_by=INDEX_BY, harmonize=lambda f: sub(r'_', " ", f).lower()):
+        """Convert assay ISATable to metadata object, or make metadata object similar to `like`"""
+        if isinstance(values, dict) and isinstance(like, MetadataLike):
+            c = count(200000)
+            data = [v for vv in values.values() for v in vv]
+            titles = [k for k, v in values.items() for _ in range(len(v))]
+            fields = ["a{}{}".format(next(c), sub(" ", "", t)) for t in titles]
+            raw_dataframe = concat([
+                DataFrame(
+                    data=vstack([data]*like.full.shape[0]),
+                    columns=MultiIndex.from_arrays([titles, fields]),
+                ),
+                DataFrame(
+                    data=like.full.index,
+                    columns=MultiIndex.from_tuples([like.full.columns.names]),
+                ),
+            ], axis=1)
+        elif not isinstance(values, DataFrame):
+            raise GeneLabException("MetadataLike from unsupported object type")
         if (use is None) and (discard is None):
-            raw_dataframe = isa_table
+            if like is None:
+                raw_dataframe = values
         elif use:
             raw_dataframe = filter_table(
-                isa_table, use=use, index_by=index_by,
+                values, use=use, index_by=index_by,
             )
         elif discard:
             raw_dataframe = filter_table(
-                isa_table, discard=discard, index_by=index_by,
+                values, discard=discard, index_by=index_by,
             )
         else:
             raise GeneLabException("MetadataLike can only 'use' XOR 'discard'")
@@ -103,17 +122,6 @@ class MetadataLike():
         self.full = make_metadatalike_dataframe(raw_dataframe, index_by, use)
         self.named = make_named_metadatalike_dataframe(self.full, index_by)
         self.indexed_by = index_by
-
-
-class MetadataLikeAssayTypes:
-    """MetadataLike-like representation of assay types inferred from assay name"""
-    def __init__(self, assay_name):
-        self.named = {
-            assay_type.split("|")[0] for assay_type in ASSAY_TYPES if search(
-                r'(-|_|^)' + assay_type.replace(" ", "_") + r'(-|_|$)',
-                assay_name, flags=IGNORECASE,
-            )
-        }
 
 
 def INPLACE_force_default_name_delimiter_in_file_data(filedata, metadata_indexed_by, metadata_name_set):
@@ -130,6 +138,18 @@ def INPLACE_force_default_name_delimiter_in_file_data(filedata, metadata_indexed
     ]
 
 
+def infer_types(assay_name):
+    """Infer assay types from curated assay name"""
+    return {
+        "assay type": {
+            assay_type.split("|")[0] for assay_type in ASSAY_TYPES if search(
+                r'(-|_|^)' + assay_type.replace(" ", "_") + r'(-|_|$)',
+                assay_name, flags=IGNORECASE,
+            )
+        }
+    }
+
+
 class ColdStorageAssay():
     """Stores individual assay information and metadata"""
  
@@ -142,7 +162,6 @@ class ColdStorageAssay():
             raise GeneLabException(msg)
         self.name = name
         self.dataset = dataset
-        self.types = MetadataLikeAssayTypes(name)
         try:
             assays_isa = dataset.isa.assays[name]
             samples_isa = dataset.isa.samples[sample_key]
@@ -155,6 +174,7 @@ class ColdStorageAssay():
             self.properties = ML(samples_isa, discard={
                 "factor value", "parameter value", "characteristics", "comment",
             })
+            self.types = MetadataLike(infer_types(name), like=self.comments)
         except IndexError as e:
             msg = "{}, {}: {}".format(dataset.accession, name, e)
             raise GeneLabJSONException(msg)
