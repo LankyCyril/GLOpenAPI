@@ -60,7 +60,7 @@ def make_metadatalike_dataframe(raw_dataframe, index_by=INDEX_BY, use=None):
         keep = [True] * raw_dataframe.shape[1]
     index = (index_by, index_columns.columns[0])
     full = raw_dataframe.loc[:,keep].set_index(index)
-    if use:
+    if (full.shape[1] > 0) and use:
         full = strip_prefixes(full, use)
     full.index.name, full.columns.names = None, index
     return full
