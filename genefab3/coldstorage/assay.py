@@ -25,15 +25,23 @@ def filter_table(sparse_table, use=None, discard=None, index_by=INDEX_BY):
             if (not isnull(l0)) and (matches(l0) or (l0 == index_by))
         ]
     filtered_table = sparse_table[filtered_columns].copy()
-    if use:
-        filtered_table.columns = MultiIndex.from_tuples([
-            (sub(expression, "", l0, flags=IGNORECASE), l1)
-            for l0, l1 in filtered_table.columns
-        ])
     return filtered_table
 
 
-def make_metadatalike_dataframe(raw_dataframe, index_by=INDEX_BY):
+def strip_prefixes(dataframe, use):
+    """Remove prefixes used to filter original table"""
+    expression = r'^{}:\s*'.format(use)
+    return DataFrame(
+        data=dataframe.values,
+        index=dataframe.index,
+        columns=MultiIndex.from_tuples([
+            (sub(expression, "", l0, flags=IGNORECASE), l1)
+            for l0, l1 in dataframe.columns
+        ]),
+    )
+
+
+def make_metadatalike_dataframe(raw_dataframe, index_by=INDEX_BY, use=None):
     """Index dataframe by index_by"""
     index_columns = raw_dataframe[index_by]
     if index_columns.shape[1] == 0:
@@ -52,11 +60,13 @@ def make_metadatalike_dataframe(raw_dataframe, index_by=INDEX_BY):
         keep = [True] * raw_dataframe.shape[1]
     index = (index_by, index_columns.columns[0])
     full = raw_dataframe.loc[:,keep].set_index(index)
+    if use:
+        full = strip_prefixes(full, use)
     full.index.name, full.columns.names = None, index
     return full
 
 
-def make_named_metadatalike_dataframe(df, index_by=None):
+def make_named_metadatalike_dataframe(df, index_by=INDEX_BY):
     """Keep only named (known) variable columns, drop internal field names"""
     fields = df.columns.get_level_values(0)
     named_df = df.loc[:, [not isnull(f) for f in fields]].copy()
@@ -90,7 +100,7 @@ class MetadataLike():
                 for l0, l1 in raw_dataframe.columns
             ])
             index_by = harmonize(index_by)
-        self.full = make_metadatalike_dataframe(raw_dataframe, index_by)
+        self.full = make_metadatalike_dataframe(raw_dataframe, index_by, use)
         self.named = make_named_metadatalike_dataframe(self.full, index_by)
         self.indexed_by = index_by
 
