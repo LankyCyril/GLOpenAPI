@@ -1,6 +1,6 @@
 from genefab3.exceptions import GeneLabJSONException
 from functools import partial
-from genefab3.isa.types import TurtleDict, TurtleSpace, SparseTable, Any, Atom
+from genefab3.isa.types import TurtleDict, TurtleSpace, ISATable, Any, Atom
 
 
 def descend(_using, _via, _lengths):
@@ -89,14 +89,14 @@ def valmapper(function, ignore=AttributeError):
 class ISA(TurtleSpace):
     """Parses GLDS JSON in ISA-Tab-like fashion"""
     def __init__(self, json):
-        SparseTableDict = valmapper(SparseTable)
+        ISATableDict = valmapper(ISATable)
         parser = Parser((None, 0), (1, Any),
             _copy_atoms=True, _copy_atomic_lists=True,
             doi=Parser(("doiFields", 0, "doi"), (1, Any, Atom)),
             _raised=(Parser(("foreignFields", 0, "isa2json"), (1, Any, Any),
                 _raised=(Parser(("additionalInformation",), (Any,),
-                    assays=Parser(("assays",), (Any,), SparseTableDict),
-                    samples=Parser(("samples",), (Any,), SparseTableDict),
+                    assays=Parser(("assays",), (Any,), ISATableDict),
+                    samples=Parser(("samples",), (Any,), ISATableDict),
                 ),),
             ),),
         )

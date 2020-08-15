@@ -8,23 +8,23 @@ from urllib.request import urlopen
 from itertools import count
 
 
-def filter_table(sparse_table, use=None, discard=None, index_by=INDEX_BY):
+def filter_table(isa_table, use=None, discard=None, index_by=INDEX_BY):
     """Reduce metadata-like to columns matching `use` XOR not matching `discard`"""
     if use:
         expression = r'^{}:\s*'.format(use)
         matches = compile(expression, flags=IGNORECASE).search
         filtered_columns = [
-            (l0, l1) for l0, l1 in sparse_table.columns
+            (l0, l1) for l0, l1 in isa_table.columns
             if (not isnull(l0)) and (matches(l0) or (l0 == index_by))
         ]
     elif discard:
         expression = r'^({}):\s*'.format("|".join(discard))
         matches = compile(expression, flags=IGNORECASE).search
         filtered_columns = [
-            (l0, l1) for l0, l1 in sparse_table.columns
+            (l0, l1) for l0, l1 in isa_table.columns
             if (not isnull(l0)) and (matches(l0) or (l0 == index_by))
         ]
-    filtered_table = sparse_table[filtered_columns].copy()
+    filtered_table = isa_table[filtered_columns].copy()
     return filtered_table
 
 
@@ -80,17 +80,17 @@ def make_named_metadatalike_dataframe(df, index_by=INDEX_BY):
 class MetadataLike():
     """Stores assay fields and metadata in raw and processed form"""
  
-    def __init__(self, sparse_table, use=None, discard=None, index_by=INDEX_BY, harmonize=lambda f: sub(r'_', " ", f).lower()):
+    def __init__(self, isa_table, use=None, discard=None, index_by=INDEX_BY, harmonize=lambda f: sub(r'_', " ", f).lower()):
         """Convert assay JSON to metadata object"""
         if (use is None) and (discard is None):
-            raw_dataframe = sparse_table
+            raw_dataframe = isa_table
         elif use:
             raw_dataframe = filter_table(
-                sparse_table, use=use, index_by=index_by,
+                isa_table, use=use, index_by=index_by,
             )
         elif discard:
             raw_dataframe = filter_table(
-                sparse_table, discard=discard, index_by=index_by,
+                isa_table, discard=discard, index_by=index_by,
             )
         else:
             raise GeneLabException("MetadataLike can only 'use' XOR 'discard'")

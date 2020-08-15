@@ -23,13 +23,13 @@ class TurtleSpace(Namespace):
         return getattr(super(), x, TurtleSpace())
 
 
-def SparseTable(entries):
+def ISATable(entries):
     """Combines 'header' and 'raw' fields into two-level DataFrame"""
     try:
         raw_header = DataFrame(entries["header"])
         raw_values = DataFrame(entries["raw"])
     except (KeyError, TypeError):
-        raise GeneLabJSONException("Malformed sparse table passed")
+        raise GeneLabJSONException("Malformed ISA JSON table passed")
     if raw_header["encoded"].any():
         raise GeneLabJSONException("Encoded fields are not supported")
     else:
