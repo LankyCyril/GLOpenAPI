@@ -22,7 +22,7 @@ def filter_table(isa_table, use=None, discard=None, index_by=INDEX_BY):
         matches = compile(expression, flags=IGNORECASE).search
         filtered_columns = [
             (l0, l1) for l0, l1 in isa_table.columns
-            if (not isnull(l0)) and (matches(l0) or (l0 == index_by))
+            if (not isnull(l0)) and ((not matches(l0)) or (l0 == index_by))
         ]
     filtered_table = isa_table[filtered_columns].copy()
     return filtered_table
