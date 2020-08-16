@@ -1,33 +1,211 @@
 <!DOCTYPE html>
-<html>
+<html lang='en'>
     <head>
         <meta charset='utf-8'>
-        <title>NASA GeneLab Data API v3 reference</title>
-        <style type='text/css'>
-            span.code { font-family: monospace, mono; border: 1px solid #888888; padding: 5pt; }
-            span.code a, span.code tt { font-family: monospace, mono; color: #000; text-decoration: none; }
-            a { font-family: monospace, mono; font-size: .85em; color: #000; text-decoration: none; }
-            code { font-family: monospace, mono; font-size: .85em; }
-            code a { color: #000; text-decoration: none; font-size: 1em; }
-            h3 { font-family: monospace, mono; font-size: 1.3em; }
+        <meta http-equiv='X-UA-Compatible' content='IE=edge'/>
+        <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
+        <title>NASA GeneLab Data API v3 Introduction</title>
+        <link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Oxygen+Mono&family=Roboto:wght@300;500&display=swap'/>
+        <style>
+            * {font-size: 13pt; font-family: "Roboto", sans-serif; font-weight: 300}
+            a {cursor: pointer}
+            b {font-weight: 500}
+            em {font-style: normal; color: #D10}
+            label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
+            h1 {font-size: 28pt; font-weight: 500; border-bottom: 1pt solid black; display: inline-block; margin: 5pt 0 20pt 0}
+            h2 {font-size: 20pt; font-weight: 500; display: inline-block; margin: 10pt 0 0 0}
+            /* div {border: 1px dashed red} */
+            #url-wrapper {display: inline-block}
+            #url-description {
+                display: inline-block; background: #CDF; padding: 5pt;
+                border-width: 1pt 1pt 0 1pt;
+                border-style: solid; border-color: #AAA;
+            }
+            #url {
+                font-size: 12pt; font-family: "Oxygen", monospace;
+                padding: 5pt; border: 1px solid #AAA;
+                height: 60pt; min-height: 60pt; max-height: 50vh;
+                width: 480pt; min-width: 480pt;
+                word-wrap: break-word;
+                overflow-y: auto;
+            }
+            #url-follow {
+                display: inline-block; float: right; background: #DDD; padding: 5pt;
+                border-width: 0 1pt 1pt 1pt;
+                border-style: solid; border-color: #AAA;
+            }
+            #url-follow a {color: black; text-decoration: none}
+            #selectors {padding-top: 25pt}
+            #selectors > div {padding-bottom: 16pt}
+            #selectors > div > div:first-child {width: 200pt; min-width: 200pt}
+            #selectors > div > div {display: inline-block; vertical-align: top}
+            #selectors > div > div ~ div {position: relative; top: -1pt}
+            #selectors > div > div ~ div input {position: relative; top: 1pt}
+            a.button.inactive {color: #AAA; font-style: italic; border-bottom: 1pt dashed #CCC}
         </style>
     </head>
     <body>
-        <h1>NASA GeneLab Data API reference</h1>
-            <h2><a name='request_anatomy'>The anatomy of a request</a></h2>
-                <span class='code'>
-                    <tt>%URL_ROOT%</tt><tt>/</tt><a style='background:#eedd55;' href='#dataset_accession'>dataset_accession</a>/<a style='background:#55dd55;' href='#assay_name'>assay_name</a>/<a style='background:#dd5555;' href='#data_category'>data_category</a>/<a style='background:#aaaaff;' href='#data_type'>data_type</a>/<a style='background:#ff88ff;' href='#transform'>transform</a>/?<a style='background:#cccccc;' href='#get_args'>[get_args]</a>
-                </span>
-                <p>
-                    The request can be routed to any depth. All following URLs
-                    are valid examples:
-                </p>
-                <code>
-                    <a href='%URL_ROOT%/GLDS-111/'>%URL_ROOT%/<span style='background:#eedd55'>GLDS-111</span>/</a><br>
-                    <a href='%URL_ROOT%/GLDS-4/assay/?fmt=html'>%URL_ROOT%/<span style='background:#eedd55'>GLDS-4</span>/<span style='background:#55dd55'>assay</span>/?<span style='background:#cccccc'>fmt=html</span></a><br>
-                    <a href='%URL_ROOT%/GLDS-42/assay/annotation/?fmt=json'>%URL_ROOT%/<span style='background:#eedd55'>GLDS-42</span>/<span style='background:#55dd55'>assay</span>/<span style='background:#dd5555'>annotation</span>/?<span style='background:#cccccc'>fmt=json</span></a><br>
-                    <a href='%URL_ROOT%/GLDS-30/a_GLDS-30_microarray_metadata-txt/data/pca/'>%URL_ROOT%/<span style='background:#eedd55'>GLDS-30</span>/<span style='background:#55dd55'>a_GLDS-30_microarray_metadata-txt</span>/<span style='background:#dd5555'>data</span>/<span style='background:#aaaaff'>pca</span>/</a><br>
-                    <a href='%URL_ROOT%/GLDS-63/assay/data/processed/descriptive/?sort_by=Parameter%20Value:%20Absorbed%20Radiation%20Dose&hidecol=Protocol%20REF&top=20'>%URL_ROOT%/<span style='background:#eedd55'>GLDS-63</span>/<span style='background:#55dd55'>assay</span>/<span style='background:#dd5555'>data</span>/<span style='background:#aaaaff'>processed</span>/<span style='background:#ff88ff'>descriptive</span>/?<span style='background:#cccccc'>sort_by=Parameter%20Value:%20Absorbed%20Radiation%20Dose</span>&<span style='background:#cccccc'>hidecol=Protocol%20REF</span>&<span style='background:#cccccc'>top=20</span></a>
-                </code>
+        <h1>NASA GeneLab Data API v3 Introduction</h1>
+        <div>
+            <div id='url-wrapper'>
+                <div id='url-description'>You are here:</div>
+                <div id='url'>
+                    %URL_ROOT%
+                </div>
+                <div id='url-follow'><a href=''>Follow generated URL</a></div>
+            </div>
+        </div>
+        <h2>Build a request:</h2>
+        <div id='selectors'>
+            <div>
+                <div><b>View level:</b></div>
+                <div>
+                    <select id='view'>
+                        <option value='' selected></option>
+                        <option value='assays'>/assays/</option>
+                        <option value='samples'>/samples/</option>
+                        <option value='data'>/data/</option>
+                    </select>
+                </div>
+            </div>
+            <div>
+                <div>
+                    <b>Metadata, show all fields for:</b>
+                    <!--<br><i>(useful for an overview<br>of assays and samples)</i>-->
+                </div>
+                <div>
+                    <input type='checkbox' id='assay types'> <label for='assay types'><em>&amp;</em><span>assay types</span></label><br>
+                    <input type='checkbox' id='factors'> <label for='factors'><em>&amp;</em><span>factors</span></label><br>
+                    <input type='checkbox' id='characteristics'> <label for='characteristics'><em>&amp;</em><span>characteristics</span></label><br>
+                    <input type='checkbox' id='parameters'> <label for='parameters'><em>&amp;</em><span>parameters</span></label><br>
+                    <input type='checkbox' id='properties'> <label for='properties'><em>&amp;</em><span>properties</span></label><br>
+                    <input type='checkbox' id='comments'> <label for='comments'><em>&amp;</em><span>comments</span></label><br>
+                </div>
+            </div>
+            <div>
+                <div><b>Subset by existence of metadata:</b></div>
+                <div>
+                    <div id='meta-existence-1'>
+                        <input type='checkbox' id='meta-existence-1-checkbox'>
+                        <em>&amp;</em>
+                        <select id='meta-existence-1-1-fields'>
+                            <option value='assay types'>assay types</option>
+                            <option value='factors' selected>factors</option>
+                            <option value='characteristics'>characteristics</option>
+                            <option value='parameters'>parameters</option>
+                            <option value='properties'>properties</option>
+                            <option value='comments'>comments</option>
+                        </select>
+                        =
+                        <select id='meta-existence-1-1-names'>
+                            <option value='spaceflight' selected>spaceflight</option>
+                        </select>
+                        <a id='meta-existence-1-1-or' class='button inactive'>OR</a>
+                    </div>
+                    <div id='meta-existence-2'>
+                        <input type='checkbox' id='meta-existence-2-checkbox' disabled>
+                        <em></em>
+                        <a id='meta-existence-2-and' class='button inactive'>AND</a>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div><b>Subset by metadata values:</b></div>
+                <div>
+                    <div id='meta-value-equals-1'>
+                        <input type='checkbox' id='meta-value-equals-1-checkbox'>
+                        <em>&amp;</em>
+                        <select id='meta-value-equals-1-1-fields'>
+                            <option value='assay types'>assay types</option>
+                            <option value='factors' selected>factors</option>
+                            <option value='characteristics'>characteristics</option>
+                            <option value='parameters'>parameters</option>
+                            <option value='properties'>properties</option>
+                            <option value='comments'>comments</option>
+                        </select>
+                        :
+                        <select id='meta-value-equals-1-1-names'>
+                            <option value='spaceflight' selected>spaceflight</option>
+                        </select>
+                        =
+                        <select id='meta-value-equals-1-1-values'>
+                            <option value='Ground Control' selected>Ground Control</option>
+                        </select>
+                        <a id='meta-value-equals-1-1-or' class='button inactive'>OR</a>
+                    </div>
+                    <div id='meta-value-equals-2'>
+                        <input type='checkbox' id='meta-value-equals-2-checkbox' disabled>
+                        <em></em>
+                        <a id='meta-value-equals-2-and' class='button inactive'>AND</a>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div><b>Filter out metadata values:</b></div>
+                <div>
+                    <div id='meta-value-notequals-1'>
+                        <input type='checkbox' id='meta-value-notequals-1-checkbox'>
+                        <em>&amp;</em>
+                        <select id='meta-value-notequals-1-fields'>
+                            <option value='assay types'>assay types</option>
+                            <option value='factors' selected>factors</option>
+                            <option value='characteristics'>characteristics</option>
+                            <option value='parameters'>parameters</option>
+                            <option value='properties'>properties</option>
+                            <option value='comments'>comments</option>
+                        </select>
+                        :
+                        <select id='meta-value-notequals-1-names'>
+                            <option value='spaceflight' selected>spaceflight</option>
+                        </select>
+                        !=
+                        <select id='meta-value-notequals-1-values'>
+                            <option value='Basal Control' selected>Basal Control</option>
+                        </select>
+                    </div>
+                    <div id='meta-value-notequals-2'>
+                        <input type='checkbox' id='meta-value-notequals-2-checkbox' disabled>
+                        <em></em>
+                        <a id='meta-value-notequals-2-and' class='button inactive'>AND</a>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div><b>Subset by datasets and assays:</b></div>
+                <div>
+                    <div id='select-1'>
+                        <input type='checkbox' id='select-1-checkbox'>
+                        <em>&amp;</em>
+                        <select id='select-1-accessions'>
+                            <option value='GLDS-1' selected>GLDS-1</option>
+                            <option value='GLDS-2'>GLDS-2</option>
+                            <option value='GLDS-3'>GLDS-3</option>
+                        </select>
+                        :
+                        <select id='select-1-names'>
+                            <option value='' selected></option>
+                            <option value='a_E-GEOD-53196_GeneChip_assay-txt'>a_E-GEOD-53196_GeneChip_assay-txt</option>
+                        </select>
+                    </div>
+                    <div id='select-2'>
+                        <input type='checkbox' id='select-1-checkbox' disabled>
+                        <em></em>
+                        <a id='select-2-or' class='button inactive'>OR</a>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div><b>Display in format:</b></div>
+                <div>
+                    <em>&ampfmt=</em>
+                    <select id='fmt'>
+                        <option value='browser' selected>browser</option>
+                        <option value='html'>html</option>
+                        <option value='tsv'>tsv</option>
+                        <option value='csv'>csv</option>
+                    </select>
+                </div>
+            </div>
+        </div>
     </body>
 </html>
