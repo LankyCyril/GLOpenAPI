@@ -10,7 +10,7 @@
             * {font-size: 13pt; font-family: "Roboto", sans-serif; font-weight: 300}
             a {cursor: pointer}
             b {font-weight: 500}
-            em {font-style: normal; color: #AAA; font-family: "Oxygen", monospace; font-size: 12pt}
+            em {font-style: normal; color: black; font-family: "Oxygen", monospace; font-size: 12pt}
             em.remover {color: #D10; cursor: pointer; border-bottom: 1pt dashed #D10}
             label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
             h1 {font-size: 28pt; font-weight: 500; border-bottom: 1pt solid black; display: inline-block; margin: 5pt 0 20pt 0}
@@ -60,6 +60,13 @@ function remove_query_part() {
     console.log(this.id);
 }
 
+function clone_query_part() {
+    // var section_name = this.id.replace(/-add$/g, "");
+    // var section_list_name = "#"+section_name+"-list";
+    // var last_in_list = $(section_list_name).last("."+section_name);
+    // $(section_list_name).append(last_in_list.clone());
+}
+
 function housekeeping() {
     $("#view option[value='']").remove();
     if ($("#view").val() == "data") {
@@ -103,6 +110,7 @@ $(document).ready(function() {
     $(".remover").mouseover(function () {$(this).html("&times;")});
     $(".remover").mouseout(function () {$(this).html("&amp;")});
     $(".remover").click(remove_query_part);
+    $(".button-add").click(clone_query_part);
     $("input[type=checkbox]").click(generate_url);
     $("select").change(generate_url);
 });
@@ -170,7 +178,7 @@ $(document).ready(function() {
                     </div>
                     <div id='meta-existence-N'>
                         <input type='checkbox' disabled>
-                        <a id='meta-existence-N-add' class='button inactive'>AND</a>
+                        <a id='meta-existence-add' class='button inactive button-add'>AND</a>
                     </div>
                 </div>
             </div>
@@ -197,7 +205,7 @@ $(document).ready(function() {
                     </div>
                     <div id='meta-exclude-N'>
                         <input type='checkbox' disabled>
-                        <a id='meta-exclude-N-add' class='button inactive'>AND</a>
+                        <a id='meta-exclude-add' class='button inactive'>AND</a>
                     </div>
                 </div>
             </div>
@@ -229,7 +237,7 @@ $(document).ready(function() {
                     </div>
                     <div id='meta-value-equals-N'>
                         <input type='checkbox' disabled>
-                        <a id='meta-value-equals-N-add' class='button inactive'>AND</a>
+                        <a id='meta-value-equals-add' class='button inactive'>AND</a>
                     </div>
                 </div>
             </div>
@@ -260,7 +268,7 @@ $(document).ready(function() {
                     </div>
                     <div id='meta-value-notequals-N'>
                         <input type='checkbox' disabled>
-                        <a id='meta-value-notequals-N-add' class='button inactive'>AND</a>
+                        <a id='meta-value-notequals-add' class='button inactive'>AND</a>
                     </div>
                 </div>
             </div>
@@ -285,7 +293,7 @@ $(document).ready(function() {
                     </div>
                     <div id='select-N'>
                         <input type='checkbox' disabled>
-                        <a id='select-N-add' class='button inactive'>OR</a>
+                        <a id='select-add' class='button inactive'>OR</a>
                     </div>
                 </div>
             </div>
