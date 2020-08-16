@@ -44,9 +44,34 @@
             a.button.inactive {color: #AAA; font-style: italic; border-bottom: 1pt dashed #CCC}
         </style>
     </head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+<script>
+
+var url_root = "%URL_ROOT%";
+
+function toggle_builder() {
+    $("#selectors").show();
+    $("#url-builder").show();
+    $("h2").show();
+    $("#noscript").hide();
+}
+
+function generate_url() {
+    var url = url_root;
+    $("#url").text(url);
+    $("#url-follow a").attr("href", url);
+};
+
+$(document).ready(function() {
+    toggle_builder();
+    $("input[type=checkbox]").click(generate_url);
+    $("select").change(generate_url);
+});
+
+</script>
     <body>
         <h1>NASA GeneLab Data API v3 Introduction</h1>
-        <div>
+        <div id='url-builder' style='display:none'>
             <div id='url-wrapper'>
                 <div id='url-description'>You are here:</div>
                 <div id='url'>
@@ -55,8 +80,9 @@
                 <div id='url-follow'><a href=''>Follow generated URL</a></div>
             </div>
         </div>
-        <h2>Build a request:</h2>
-        <div id='selectors'>
+        <h2 style='display:none'>Build a request:</h2>
+        <div id='noscript' style='display:block'>This interactive guide requires a browser with JavaScript support</div>
+        <div id='selectors' style='display:none'>
             <div>
                 <div><b>View level:</b></div>
                 <div>
