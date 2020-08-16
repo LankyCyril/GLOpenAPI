@@ -11,6 +11,7 @@
             a {cursor: pointer}
             b {font-weight: 500}
             em {font-style: normal; color: #D10}
+            em.remover {cursor: pointer}
             label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
             h1 {font-size: 28pt; font-weight: 500; border-bottom: 1pt solid black; display: inline-block; margin: 5pt 0 20pt 0}
             h2 {font-size: 20pt; font-weight: 500; display: inline-block; margin: 10pt 0 0 0}
@@ -55,6 +56,10 @@ function toggle_builder() {
     $("#noscript").hide();
 }
 
+function remove_query_part() {
+    console.log(this.id);
+}
+
 function housekeeping() {
     $("#view option[value='']").remove();
     if ($("#view").val() == "data") {
@@ -78,6 +83,9 @@ function generate_url() {
 
 $(document).ready(function() {
     toggle_builder();
+    $(".remover").mouseover(function () {$(this).html("&times;")});
+    $(".remover").mouseout(function () {$(this).html("&amp;")});
+    $(".remover").click(remove_query_part);
     $("input[type=checkbox]").click(generate_url);
     $("select").change(generate_url);
 });
@@ -127,7 +135,7 @@ $(document).ready(function() {
                 <div>
                     <div id='meta-existence-1'>
                         <input type='checkbox' id='meta-existence-1-checkbox'>
-                        <em>&amp;</em>
+                        <em class='remover' id='meta-existence-1-remover'>&amp;</em>
                         <select id='meta-existence-1-1-fields'>
                             <option value='assay types'>assay types</option>
                             <option value='factors' selected>factors</option>
@@ -142,10 +150,9 @@ $(document).ready(function() {
                         </select>
                         <a id='meta-existence-1-1-or' class='button inactive'>OR</a>
                     </div>
-                    <div id='meta-existence-2'>
-                        <input type='checkbox' id='meta-existence-2-checkbox' disabled>
-                        <em></em>
-                        <a id='meta-existence-2-and' class='button inactive'>AND</a>
+                    <div id='meta-existence-N'>
+                        <input type='checkbox' disabled>
+                        <a id='meta-existence-N-add' class='button inactive'>AND</a>
                     </div>
                 </div>
             </div>
@@ -154,7 +161,7 @@ $(document).ready(function() {
                 <div>
                     <div id='meta-exclude-1'>
                         <input type='checkbox' id='meta-exclude-1-checkbox'>
-                        <em>&amp;</em>
+                        <em class='remover' id='meta-exclude-1-remover'>&amp;</em>
                         <select id='meta-exclude-1-fields'>
                             <option value='assay types'>assay types</option>
                             <option value='factors' selected>factors</option>
@@ -168,10 +175,9 @@ $(document).ready(function() {
                             <option value='spaceflight' selected>ionizing radiation</option>
                         </select>
                     </div>
-                    <div id='meta-exclude-2'>
-                        <input type='checkbox' id='meta-exclude-2-checkbox' disabled>
-                        <em></em>
-                        <a id='meta-exclude-2-and' class='button inactive'>AND</a>
+                    <div id='meta-exclude-N'>
+                        <input type='checkbox' disabled>
+                        <a id='meta-exclude-N-add' class='button inactive'>AND</a>
                     </div>
                 </div>
             </div>
@@ -180,7 +186,7 @@ $(document).ready(function() {
                 <div>
                     <div id='meta-value-equals-1'>
                         <input type='checkbox' id='meta-value-equals-1-checkbox'>
-                        <em>&amp;</em>
+                        <em class='remover' id='meta-value-equals-1-remover'>&amp;</em>
                         <select id='meta-value-equals-1-1-fields'>
                             <option value='assay types'>assay types</option>
                             <option value='factors' selected>factors</option>
@@ -199,10 +205,9 @@ $(document).ready(function() {
                         </select>
                         <a id='meta-value-equals-1-1-or' class='button inactive'>OR</a>
                     </div>
-                    <div id='meta-value-equals-2'>
-                        <input type='checkbox' id='meta-value-equals-2-checkbox' disabled>
-                        <em></em>
-                        <a id='meta-value-equals-2-and' class='button inactive'>AND</a>
+                    <div id='meta-value-equals-N'>
+                        <input type='checkbox' disabled>
+                        <a id='meta-value-equals-N-add' class='button inactive'>AND</a>
                     </div>
                 </div>
             </div>
@@ -211,7 +216,7 @@ $(document).ready(function() {
                 <div>
                     <div id='meta-value-notequals-1'>
                         <input type='checkbox' id='meta-value-notequals-1-checkbox'>
-                        <em>&amp;</em>
+                        <em class='remover' id='meta-value-notequals-1-remover'>&amp;</em>
                         <select id='meta-value-notequals-1-fields'>
                             <option value='assay types'>assay types</option>
                             <option value='factors' selected>factors</option>
@@ -229,10 +234,9 @@ $(document).ready(function() {
                             <option value='Basal Control' selected>Basal Control</option>
                         </select>
                     </div>
-                    <div id='meta-value-notequals-2'>
-                        <input type='checkbox' id='meta-value-notequals-2-checkbox' disabled>
-                        <em></em>
-                        <a id='meta-value-notequals-2-and' class='button inactive'>AND</a>
+                    <div id='meta-value-notequals-N'>
+                        <input type='checkbox' disabled>
+                        <a id='meta-value-notequals-N-add' class='button inactive'>AND</a>
                     </div>
                 </div>
             </div>
@@ -241,7 +245,7 @@ $(document).ready(function() {
                 <div>
                     <div id='select-1'>
                         <input type='checkbox' id='select-1-checkbox'>
-                        <em>&amp;</em>
+                        <em class='remover' id='select-1-remover'>&amp;</em>
                         <select id='select-1-accessions'>
                             <option value='GLDS-1' selected>GLDS-1</option>
                             <option value='GLDS-2'>GLDS-2</option>
@@ -253,10 +257,9 @@ $(document).ready(function() {
                             <option value='a_E-GEOD-53196_GeneChip_assay-txt'>a_E-GEOD-53196_GeneChip_assay-txt</option>
                         </select>
                     </div>
-                    <div id='select-2'>
-                        <input type='checkbox' id='select-1-checkbox' disabled>
-                        <em></em>
-                        <a id='select-2-or' class='button inactive'>OR</a>
+                    <div id='select-N'>
+                        <input type='checkbox' disabled>
+                        <a id='select-N-add' class='button inactive'>OR</a>
                     </div>
                 </div>
             </div>
