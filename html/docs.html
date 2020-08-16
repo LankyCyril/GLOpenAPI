@@ -10,8 +10,8 @@
             * {font-size: 13pt; font-family: "Roboto", sans-serif; font-weight: 300}
             a {cursor: pointer}
             b {font-weight: 500}
-            em {font-style: normal; color: #D10}
-            em.remover {cursor: pointer}
+            em {font-style: normal; color: #AAA; font-family: "Oxygen", monospace; font-size: 12pt}
+            em.remover {color: #D10; cursor: pointer; border-bottom: 1pt dashed #D10}
             label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
             h1 {font-size: 28pt; font-weight: 500; border-bottom: 1pt solid black; display: inline-block; margin: 5pt 0 20pt 0}
             h2 {font-size: 20pt; font-weight: 500; display: inline-block; margin: 10pt 0 0 0}
@@ -74,7 +74,24 @@ function housekeeping() {
 
 function generate_url() {
     housekeeping();
-    var url = url_root;
+    var url = url_root + "/" + escape($("#view").val()) + "/?";
+    if ($("#view").val() !== "data") {
+        $("#show-all-fields input[type=checkbox]").each(function () {
+            if ($(this).prop("checked")) {
+                url = url + escape(this.id) + "&";
+            };
+        });
+    };
+    $(".meta-existence").each(function () {
+        if ($(this).children("input[type=checkbox]").prop("checked")) {
+            url = url + $(this).children("select.meta-existence-field").val() + "=";
+            $(this).children("select.meta-existence-name").each(function () {
+                url = url + escape($(this).val()) + "|";
+            });
+            url = url.replace(/\|$/g, "&");
+        }
+    });
+    url = url + "fmt=" + $("#fmt").val();
     $("#url-description").text("Generated URL:");
     $("#url").text(url);
     $("#url-follow a").attr("href", url)
@@ -119,9 +136,8 @@ $(document).ready(function() {
             <div class='not-for-data'>
                 <div>
                     <b>Metadata, show all fields for:</b>
-                    <!--<br><i>(useful for an overview<br>of assays and samples)</i>-->
                 </div>
-                <div>
+                <div id='show-all-fields'>
                     <input type='checkbox' id='assay types'> <label for='assay types'><em>&amp;</em><span>assay types</span></label><br>
                     <input type='checkbox' id='factors'> <label for='factors'><em>&amp;</em><span>factors</span></label><br>
                     <input type='checkbox' id='characteristics'> <label for='characteristics'><em>&amp;</em><span>characteristics</span></label><br>
@@ -133,22 +149,24 @@ $(document).ready(function() {
             <div>
                 <div><b>Subset by existence of metadata:</b></div>
                 <div>
-                    <div id='meta-existence-1'>
-                        <input type='checkbox' id='meta-existence-1-checkbox'>
-                        <em class='remover' id='meta-existence-1-remover'>&amp;</em>
-                        <select id='meta-existence-1-1-fields'>
-                            <option value='assay types'>assay types</option>
-                            <option value='factors' selected>factors</option>
-                            <option value='characteristics'>characteristics</option>
-                            <option value='parameters'>parameters</option>
-                            <option value='properties'>properties</option>
-                            <option value='comments'>comments</option>
-                        </select>
-                        =
-                        <select id='meta-existence-1-1-names'>
-                            <option value='spaceflight' selected>spaceflight</option>
-                        </select>
-                        <a id='meta-existence-1-1-or' class='button inactive'>OR</a>
+                    <div id='meta-existence-list'>
+                        <div class='meta-existence' id='meta-existence-1'>
+                            <input type='checkbox' id='meta-existence-1-checkbox'>
+                            <em class='remover' id='meta-existence-1-remover'>&amp;</em>
+                            <select class='meta-existence-field' id='meta-existence-1-1-field'>
+                                <option value='assay types'>assay types</option>
+                                <option value='factors' selected>factors</option>
+                                <option value='characteristics'>characteristics</option>
+                                <option value='parameters'>parameters</option>
+                                <option value='properties'>properties</option>
+                                <option value='comments'>comments</option>
+                            </select>
+                            =
+                            <select class='meta-existence-name' id='meta-existence-1-1-name'>
+                                <option value='spaceflight' selected>spaceflight</option>
+                            </select>
+                            <a id='meta-existence-1-1-or' class='button inactive'>OR</a>
+                        </div>
                     </div>
                     <div id='meta-existence-N'>
                         <input type='checkbox' disabled>
@@ -159,21 +177,23 @@ $(document).ready(function() {
             <div>
                 <div><b>Exclude metadata fields:</b></div>
                 <div>
-                    <div id='meta-exclude-1'>
-                        <input type='checkbox' id='meta-exclude-1-checkbox'>
-                        <em class='remover' id='meta-exclude-1-remover'>&amp;</em>
-                        <select id='meta-exclude-1-fields'>
-                            <option value='assay types'>assay types</option>
-                            <option value='factors' selected>factors</option>
-                            <option value='characteristics'>characteristics</option>
-                            <option value='parameters'>parameters</option>
-                            <option value='properties'>properties</option>
-                            <option value='comments'>comments</option>
-                        </select>
-                        !=
-                        <select id='meta-exclude-1-names'>
-                            <option value='spaceflight' selected>ionizing radiation</option>
-                        </select>
+                    <div id='meta-exclude-list'>
+                        <div id='meta-exclude-1'>
+                            <input type='checkbox' id='meta-exclude-1-checkbox'>
+                            <em class='remover' id='meta-exclude-1-remover'>&amp;</em>
+                            <select id='meta-exclude-1-fields'>
+                                <option value='assay types'>assay types</option>
+                                <option value='factors' selected>factors</option>
+                                <option value='characteristics'>characteristics</option>
+                                <option value='parameters'>parameters</option>
+                                <option value='properties'>properties</option>
+                                <option value='comments'>comments</option>
+                            </select>
+                            !=
+                            <select id='meta-exclude-1-names'>
+                                <option value='spaceflight' selected>ionizing radiation</option>
+                            </select>
+                        </div>
                     </div>
                     <div id='meta-exclude-N'>
                         <input type='checkbox' disabled>
@@ -184,26 +204,28 @@ $(document).ready(function() {
             <div>
                 <div><b>Subset by metadata values:</b></div>
                 <div>
-                    <div id='meta-value-equals-1'>
-                        <input type='checkbox' id='meta-value-equals-1-checkbox'>
-                        <em class='remover' id='meta-value-equals-1-remover'>&amp;</em>
-                        <select id='meta-value-equals-1-1-fields'>
-                            <option value='assay types'>assay types</option>
-                            <option value='factors' selected>factors</option>
-                            <option value='characteristics'>characteristics</option>
-                            <option value='parameters'>parameters</option>
-                            <option value='properties'>properties</option>
-                            <option value='comments'>comments</option>
-                        </select>
-                        :
-                        <select id='meta-value-equals-1-1-names'>
-                            <option value='spaceflight' selected>spaceflight</option>
-                        </select>
-                        =
-                        <select id='meta-value-equals-1-1-values'>
-                            <option value='Ground Control' selected>Ground Control</option>
-                        </select>
-                        <a id='meta-value-equals-1-1-or' class='button inactive'>OR</a>
+                    <div id='meta-value-equals-list'>
+                        <div id='meta-value-equals-1'>
+                            <input type='checkbox' id='meta-value-equals-1-checkbox'>
+                            <em class='remover' id='meta-value-equals-1-remover'>&amp;</em>
+                            <select id='meta-value-equals-1-1-fields'>
+                                <option value='assay types'>assay types</option>
+                                <option value='factors' selected>factors</option>
+                                <option value='characteristics'>characteristics</option>
+                                <option value='parameters'>parameters</option>
+                                <option value='properties'>properties</option>
+                                <option value='comments'>comments</option>
+                            </select>
+                            :
+                            <select id='meta-value-equals-1-1-names'>
+                                <option value='spaceflight' selected>spaceflight</option>
+                            </select>
+                            =
+                            <select id='meta-value-equals-1-1-values'>
+                                <option value='Ground Control' selected>Ground Control</option>
+                            </select>
+                            <a id='meta-value-equals-1-1-or' class='button inactive'>OR</a>
+                        </div>
                     </div>
                     <div id='meta-value-equals-N'>
                         <input type='checkbox' disabled>
@@ -214,25 +236,27 @@ $(document).ready(function() {
             <div>
                 <div><b>Filter out metadata values:</b></div>
                 <div>
-                    <div id='meta-value-notequals-1'>
-                        <input type='checkbox' id='meta-value-notequals-1-checkbox'>
-                        <em class='remover' id='meta-value-notequals-1-remover'>&amp;</em>
-                        <select id='meta-value-notequals-1-fields'>
-                            <option value='assay types'>assay types</option>
-                            <option value='factors' selected>factors</option>
-                            <option value='characteristics'>characteristics</option>
-                            <option value='parameters'>parameters</option>
-                            <option value='properties'>properties</option>
-                            <option value='comments'>comments</option>
-                        </select>
-                        :
-                        <select id='meta-value-notequals-1-names'>
-                            <option value='spaceflight' selected>spaceflight</option>
-                        </select>
-                        !=
-                        <select id='meta-value-notequals-1-values'>
-                            <option value='Basal Control' selected>Basal Control</option>
-                        </select>
+                    <div id='meta-value-notequals-list'>
+                        <div id='meta-value-notequals-1'>
+                            <input type='checkbox' id='meta-value-notequals-1-checkbox'>
+                            <em class='remover' id='meta-value-notequals-1-remover'>&amp;</em>
+                            <select id='meta-value-notequals-1-fields'>
+                                <option value='assay types'>assay types</option>
+                                <option value='factors' selected>factors</option>
+                                <option value='characteristics'>characteristics</option>
+                                <option value='parameters'>parameters</option>
+                                <option value='properties'>properties</option>
+                                <option value='comments'>comments</option>
+                            </select>
+                            :
+                            <select id='meta-value-notequals-1-names'>
+                                <option value='spaceflight' selected>spaceflight</option>
+                            </select>
+                            !=
+                            <select id='meta-value-notequals-1-values'>
+                                <option value='Basal Control' selected>Basal Control</option>
+                            </select>
+                        </div>
                     </div>
                     <div id='meta-value-notequals-N'>
                         <input type='checkbox' disabled>
@@ -243,19 +267,21 @@ $(document).ready(function() {
             <div>
                 <div><b>Subset by datasets and assays:</b></div>
                 <div>
-                    <div id='select-1'>
-                        <input type='checkbox' id='select-1-checkbox'>
-                        <em class='remover' id='select-1-remover'>&amp;</em>
-                        <select id='select-1-accessions'>
-                            <option value='GLDS-1' selected>GLDS-1</option>
-                            <option value='GLDS-2'>GLDS-2</option>
-                            <option value='GLDS-3'>GLDS-3</option>
-                        </select>
-                        :
-                        <select id='select-1-names'>
-                            <option value='' selected></option>
-                            <option value='a_E-GEOD-53196_GeneChip_assay-txt'>a_E-GEOD-53196_GeneChip_assay-txt</option>
-                        </select>
+                    <div id='select-list'>
+                        <div id='select-1'>
+                            <input type='checkbox' id='select-1-checkbox'>
+                            <em class='remover' id='select-1-remover'>&amp;</em>
+                            <select id='select-1-accessions'>
+                                <option value='GLDS-1' selected>GLDS-1</option>
+                                <option value='GLDS-2'>GLDS-2</option>
+                                <option value='GLDS-3'>GLDS-3</option>
+                            </select>
+                            :
+                            <select id='select-1-names'>
+                                <option value='' selected></option>
+                                <option value='a_E-GEOD-53196_GeneChip_assay-txt'>a_E-GEOD-53196_GeneChip_assay-txt</option>
+                            </select>
+                        </div>
                     </div>
                     <div id='select-N'>
                         <input type='checkbox' disabled>
