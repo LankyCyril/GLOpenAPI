@@ -110,6 +110,32 @@
                 </div>
             </div>
             <div>
+                <div><b>Exclude metadata fields:</b></div>
+                <div>
+                    <div id='meta-exclude-1'>
+                        <input type='checkbox' id='meta-exclude-1-checkbox'>
+                        <em>&amp;</em>
+                        <select id='meta-exclude-1-fields'>
+                            <option value='assay types'>assay types</option>
+                            <option value='factors' selected>factors</option>
+                            <option value='characteristics'>characteristics</option>
+                            <option value='parameters'>parameters</option>
+                            <option value='properties'>properties</option>
+                            <option value='comments'>comments</option>
+                        </select>
+                        !=
+                        <select id='meta-exclude-1-names'>
+                            <option value='spaceflight' selected>ionizing radiation</option>
+                        </select>
+                    </div>
+                    <div id='meta-exclude-2'>
+                        <input type='checkbox' id='meta-exclude-2-checkbox' disabled>
+                        <em></em>
+                        <a id='meta-exclude-2-and' class='button inactive'>AND</a>
+                    </div>
+                </div>
+            </div>
+            <div>
                 <div><b>Subset by metadata values:</b></div>
                 <div>
                     <div id='meta-value-equals-1'>
