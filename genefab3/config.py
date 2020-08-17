@@ -17,12 +17,20 @@ COLD_FILEDATES_MASK = COLD_API_ROOT + "/data/study/filelistings/{}"
 INDEX_BY = "Sample Name"
 TIMESTAMP_FMT = "%a %b %d %H:%M:%S %Z %Y"
 
-MAX_AUTOUPDATED_DATASETS = float("inf")
 MAX_JSON_AGE = 10800 # 3 hours (in seconds)
-MAX_JSON_THREADS = 24
+CACHER_THREAD_CHECK_INTERVAL = 1800 # 30 minutes (in seconds)
+CACHER_THREAD_RECHECK_INTERVAL = 300 # 5 minutes (in seconds)
+
+ASSAY_TYPES = {
+    "dna", "rna", "protein",
+    "nucleotide", "genome", "metagenome",
+    "microarray|genechip", "sequencing", "mass spectrometry", "bisulfite",
+    "transcription profiling", "methylation profiling", "expression profiling",
+}
 
 ASSAY_METADATALIKES = {
-    "factors", "parameters", "characteristics", "comments", "properties",
+    "assay types", "factors", "parameters", "characteristics",
+    "comments", "properties",
 }
 
 DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'

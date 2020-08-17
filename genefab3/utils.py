@@ -5,16 +5,10 @@ from json import loads
 from re import search, sub, escape
 from genefab3.exceptions import GeneLabException, GeneLabJSONException
 from datetime import datetime
-from numpy import zeros
+from numpy import zeros, nan
+from pandas import DataFrame, concat
 from natsort import natsorted
 from functools import lru_cache
-
-
-class UniversalSet(set):
-    """Naive universal set"""
-    def __and__(self, x): return x
-    def __rand__(self, x): return x
-    def __contains__(self, x): return True
 
 
 def natsorted_dataframe(dataframe, by, ascending=True, sort_trailing_columns=False):
@@ -109,3 +103,11 @@ def map_replace(string, mappings):
         lambda m: mappings[m.group()],
         string,
     )
+
+
+def empty_df(columns):
+    """Generate empty DataFrame with given columns"""
+    return concat(
+        [DataFrame(columns), DataFrame([nan]*len(columns), columns=[2])],
+        axis=1,
+    ).set_index([0, 1]).T
