@@ -15,6 +15,7 @@
             label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
             h1 {font-size: 28pt; font-weight: 500; border-bottom: 1pt solid black; display: inline-block; margin: 5pt 0 20pt 0}
             h2 {font-size: 20pt; font-weight: 500; display: inline-block; margin: 10pt 0 0 0}
+            #url-builder {position: sticky; top: 0; background: #FFFFFFEE}
             #url-wrapper {display: inline-block}
             #url-description {
                 display: inline-block; background: #CDF; padding: 5pt;
@@ -53,17 +54,14 @@ var url_root = "%URL_ROOT%";
 function generate_url() {
     housekeeping();
     var url = url_root + "/" + escape($("#view").val()) + "/?";
-    if ($("#view").val() !== "data") {
+    if ($("#view").val() !== "data")
         $("#show-all-fields input[type=checkbox]").each(function () {
-            if ($(this).prop("checked")) {
+            if ($(this).prop("checked"))
                 url = url + escape(this.id) + "&";
-            };
         });
-    };
     $(".meta-existence").each(function () {
         if ($(this).children("input[type=checkbox]").prop("checked")) {
             url = url + escape($(this).children("select.meta-existence-field").val()) + "=";
-            console.log($(this).children(".or-selects").length);
             $(this).children(".or-selects").children("select.meta-existence-name").each(function () {
                 url = url + escape($(this).val()) + "|";
             });
@@ -71,14 +69,43 @@ function generate_url() {
         }
     });
     $(".meta-exclude").each(function () {
+        if ($(this).children("input[type=checkbox]").prop("checked"))
+            url = url +
+                escape($(this).children("select.meta-exclude-field").val()) + "!=" +
+                escape($(this).children("select.meta-exclude-name").val()) + "&";
+    });
+    $(".meta-value-equals").each(function () {
         if ($(this).children("input[type=checkbox]").prop("checked")) {
             url = url +
-                escape($(this).children("select.meta-exclude-field").val()) +
-                "!=" +
-                escape($(this).children("select.meta-exclude-name").val()) +
-                "&";
+                escape($(this).children("select.meta-value-equals-field").val()) + ":" +
+                escape($(this).children("select.meta-value-equals-name").val()) + "=";
+            $(this).children(".or-selects").children("select.meta-value-equals-value").each(function () {
+                url = url + escape($(this).val()) + "|";
+            });
+            url = url.replace(/\|$/g, "&");
         }
     });
+    $(".meta-value-notequals").each(function () {
+        if ($(this).children("input[type=checkbox]").prop("checked"))
+            url = url +
+                escape($(this).children("select.meta-value-notequals-field").val()) + ":" +
+                escape($(this).children("select.meta-value-notequals-name").val()) + "!=" +
+                escape($(this).children("select.meta-value-notequals-value").val()) + "&";
+    });
+    var datasets_selected = false;
+    var selection_argument = "select=";
+    $(".select").each(function () {
+        if ($(this).children("input[type=checkbox]").prop("checked")) {
+            datasets_selected = true;
+            selection_argument = selection_argument + escape($(this).children("select.select-accessions").val());
+            var assay_name = $(this).children("select.select-name").val();
+            if (assay_name !== "")
+                selection_argument = selection_argument + ":" + assay_name;
+            selection_argument = selection_argument + "|";
+        }
+    });
+    if (datasets_selected)
+        url = url + selection_argument.replace(/\|$/g, "&");
     url = url + "fmt=" + $("#fmt").val();
     $("#url-description").text("Generated URL:");
     $("#url").text(url);
@@ -140,7 +167,7 @@ function clone_query_or() {
     var section_name = $(this).attr("class").replace(/\sor$/g, "");
     var or_selects = $(this).parent("div").children(".or-selects");
     var new_dropdown = or_selects.children().last("select").clone();
-    or_selects.append("<em>|</em>");
+    or_selects.append("<em style='margin-left:3pt;margin-right:3pt'>|</em>");
     or_selects.append(new_dropdown);
     refresh_event_handlers();
     generate_url();
@@ -217,12 +244,10 @@ $(document).ready(function() {
                                 <option value='properties'>properties</option>
                                 <option value='comments'>comments</option>
                             </select>
-                            =
-                            <div class='or-selects'>
-                                <select class='meta-existence-name'>
-                                    <option value='spaceflight' selected>spaceflight</option>
-                                </select>
-                            </div>
+                            <em>=</em>
+                            <div class='or-selects'><select class='meta-existence-name'>
+                                <option value='spaceflight' selected>spaceflight</option>
+                            </select></div>
                             <a class='meta-existence or'>OR</a>
                         </div>
                     </div>
@@ -247,7 +272,7 @@ $(document).ready(function() {
                                 <option value='properties'>properties</option>
                                 <option value='comments'>comments</option>
                             </select>
-                            !=
+                            <em>!=</em>
                             <select class='meta-exclude-name'>
                                 <option value='ionizing radiation' selected>ionizing radiation</option>
                             </select>
@@ -274,15 +299,15 @@ $(document).ready(function() {
                                 <option value='properties'>properties</option>
                                 <option value='comments'>comments</option>
                             </select>
-                            :
+                            <em>:</em>
                             <select class='meta-value-equals-name'>
                                 <option value='spaceflight' selected>spaceflight</option>
                             </select>
-                            =
-                            <select class='meta-value-equals-value'>
+                            <em>=</em>
+                            <div class='or-selects'><select class='meta-value-equals-value'>
                                 <option value='Ground Control' selected>Ground Control</option>
-                            </select>
-                            <a id='meta-value-equals-or' class='button inactive button-or'>OR</a>
+                            </select></div>
+                            <a class='meta-value-equals or'>OR</a>
                         </div>
                     </div>
                     <div id='meta-value-equals-N'>
@@ -306,11 +331,11 @@ $(document).ready(function() {
                                 <option value='properties'>properties</option>
                                 <option value='comments'>comments</option>
                             </select>
-                            :
+                            <em>:</em>
                             <select class='meta-value-notequals-name'>
                                 <option value='spaceflight' selected>spaceflight</option>
                             </select>
-                            !=
+                            <em>!=</em>
                             <select class='meta-value-notequals-value'>
                                 <option value='Basal Control' selected>Basal Control</option>
                             </select>
@@ -334,7 +359,7 @@ $(document).ready(function() {
                                 <option value='GLDS-2'>GLDS-2</option>
                                 <option value='GLDS-3'>GLDS-3</option>
                             </select>
-                            :
+                            <em>:</em>
                             <select class='select-name'>
                                 <option value='' selected></option>
                                 <option value='a_E-GEOD-53196_GeneChip_assay-txt'>a_E-GEOD-53196_GeneChip_assay-txt</option>
