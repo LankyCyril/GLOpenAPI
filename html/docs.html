@@ -25,12 +25,15 @@
             }
             #url {
                 font-size: 12pt; font-family: "Oxygen", monospace;
+                color: #999;
                 padding: 5pt; border: 1px solid #AAA;
-                height: 60pt; min-height: 60pt; max-height: 50vh;
+                height: 100pt; min-height: 100pt; max-height: 50vh;
                 width: 480pt; min-width: 480pt;
                 word-wrap: break-word;
                 overflow-y: auto;
             }
+            #url b {font-family: "Oxygen", monospace; font-weight: normal; color: blue}
+            #url i {font-family: "Oxygen", monospace; font-weight: normal; font-style: normal; color: black}
             #url-follow {
                 display: inline-block; float: right; background: #DDD; padding: 5pt;
                 border-width: 0 1pt 1pt 1pt;
@@ -55,47 +58,47 @@ var url_root = "%URL_ROOT%";
 
 function generate_url() {
     housekeeping();
-    var url = url_root + "/" + escape($("#view").val()) + "/?";
+    var url = url_root + "/<b>" + escape($("#view").val()) + "</b>/?";
     if ($("#view").val() !== "data")
         $("#show-all-fields input[type=checkbox]").each(function () {
             if ($(this).prop("checked"))
-                url = url + escape(this.id) + "&";
+                url = url + "<b>" + escape(this.id) + "</b>&";
         });
     $(".meta-existence").each(function () {
         if ($(this).children("input[type=checkbox]").prop("checked")) {
-            url = url + escape($(this).children("select.meta-existence-field").val()) + "=";
+            url = url + "<b>" + escape($(this).children("select.meta-existence-field").val()) + "=</b><i>";
             $(this).children(".or-selects").children("select.meta-existence-name").each(function () {
                 url = url + escape($(this).val()) + "|";
             });
-            url = url.replace(/\|$/g, "&");
+            url = url.replace(/\|$/g, "</i>&");
         }
     });
     $(".meta-exclude").each(function () {
         if ($(this).children("input[type=checkbox]").prop("checked"))
-            url = url +
-                escape($(this).children("select.meta-exclude-field").val()) + "!=" +
-                escape($(this).children("select.meta-exclude-name").val()) + "&";
+            url = url + "<b>" +
+                escape($(this).children("select.meta-exclude-field").val()) + "!=</b><i>" +
+                escape($(this).children("select.meta-exclude-name").val()) + "</i>&";
     });
     $(".meta-value-equals").each(function () {
         if ($(this).children("input[type=checkbox]").prop("checked")) {
-            url = url +
+            url = url + "<b>" +
                 escape($(this).children("select.meta-value-equals-field").val()) + ":" +
-                escape($(this).children("select.meta-value-equals-name").val()) + "=";
+                escape($(this).children("select.meta-value-equals-name").val()) + "=</b><i>";
             $(this).children(".or-selects").children("select.meta-value-equals-value").each(function () {
                 url = url + escape($(this).val()) + "|";
             });
-            url = url.replace(/\|$/g, "&");
+            url = url.replace(/\|$/g, "</i>&");
         }
     });
     $(".meta-value-notequals").each(function () {
         if ($(this).children("input[type=checkbox]").prop("checked"))
-            url = url +
+            url = url + "<b>" +
                 escape($(this).children("select.meta-value-notequals-field").val()) + ":" +
-                escape($(this).children("select.meta-value-notequals-name").val()) + "!=" +
-                escape($(this).children("select.meta-value-notequals-value").val()) + "&";
+                escape($(this).children("select.meta-value-notequals-name").val()) + "!=</b><i>" +
+                escape($(this).children("select.meta-value-notequals-value").val()) + "</i>&";
     });
     var datasets_selected = false;
-    var selection_argument = "select=";
+    var selection_argument = "<b>select=</b><i>";
     $(".select").each(function () {
         if ($(this).children("input[type=checkbox]").prop("checked")) {
             datasets_selected = true;
@@ -107,8 +110,8 @@ function generate_url() {
         }
     });
     if (datasets_selected)
-        url = url + selection_argument.replace(/\|$/g, "&");
-    url = url + "fmt=" + $("#fmt").val();
+        url = url + selection_argument.replace(/\|$/g, "</i>&");
+    url = url + "<b>fmt=</b><i>" + $("#fmt").val() + "</i>";
     $("#url-description").text("Generated URL:");
     $("#url").html(url);
     $("#url-follow a").attr("href", $("#url").text());
