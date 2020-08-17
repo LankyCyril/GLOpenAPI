@@ -321,7 +321,7 @@ def display_dataframe(df, context):
             .hide_index().render()
         )
         mimetype = "text/html"
-    elif fmt == "interactive":
+    elif fmt in {"interactive", "browser"}:
         content = get_dynamic_dataframe_html(df, context)
         mimetype = "text/html"
     else:

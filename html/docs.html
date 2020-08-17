@@ -13,9 +13,10 @@
             em {font-style: normal; color: black; font-family: "Oxygen", monospace; font-size: 12pt}
             em.remover, em.remover-or {color: #D10; cursor: pointer; border-bottom: 1pt dashed #D10}
             label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
+            select {margin: 1pt 0}
             h1 {font-size: 28pt; font-weight: 500; border-bottom: 1pt solid black; display: inline-block; margin: 5pt 0 20pt 0}
             h2 {font-size: 20pt; font-weight: 500; display: inline-block; margin: 10pt 0 0 0}
-            #url-builder {position: sticky; top: 0; background: #FFFFFFEE}
+            #url-builder {position: sticky; top: 0; background: #FFFFFFEE; z-index: 8}
             #url-wrapper {display: inline-block}
             #url-description {
                 display: inline-block; background: #CDF; padding: 5pt;
@@ -43,7 +44,7 @@
             #selectors > div > div ~ div {position: relative; top: -1pt}
             #selectors > div > div ~ div input {position: relative; top: 1pt}
             a.add, a.or {color: #AAA; font-style: italic; border-bottom: 1pt dashed #CCC}
-            a.del {color: #AAA; font-style: italic}
+            a.del {color: #AAA; font-style: italic; margin-left: 3pt}
             .or-selects {display: inline-block}
         </style>
     </head>
@@ -178,7 +179,7 @@ function clone_query_or() {
     var new_dropdown = or_selects.children("select").last().clone();
     or_selects.append("<em style='margin-left:3pt;margin-right:3pt'>|</em>");
     or_selects.append(new_dropdown);
-    or_selects.append(" <a class='del'>x</a>");
+    or_selects.append("<a class='del'>x</a>");
     refresh_event_handlers();
     generate_url();
 }
