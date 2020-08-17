@@ -61,11 +61,20 @@ function generate_url() {
     };
     $(".meta-existence").each(function () {
         if ($(this).children("input[type=checkbox]").prop("checked")) {
-            url = url + $(this).children("select.meta-existence-field").val() + "=";
+            url = url + escape($(this).children("select.meta-existence-field").val()) + "=";
             $(this).children("select.meta-existence-name").each(function () {
                 url = url + escape($(this).val()) + "|";
             });
             url = url.replace(/\|$/g, "&");
+        }
+    });
+    $(".meta-exclude").each(function () {
+        if ($(this).children("input[type=checkbox]").prop("checked")) {
+            url = url +
+                escape($(this).children("select.meta-exclude-field").val()) +
+                "!=" +
+                escape($(this).children("select.meta-exclude-name").val()) +
+                "&";
         }
     });
     url = url + "fmt=" + $("#fmt").val();
@@ -121,6 +130,7 @@ function clone_query_part() {
     var section_list = $("#"+section_name+"-list");
     section_list.append(section_list.children().last("."+section_name).clone());
     refresh_event_handlers();
+    generate_url();
 }
 
 function housekeeping() {
@@ -224,7 +234,7 @@ $(document).ready(function() {
                             </select>
                             !=
                             <select class='meta-exclude-name'>
-                                <option value='spaceflight' selected>ionizing radiation</option>
+                                <option value='ionizing radiation' selected>ionizing radiation</option>
                             </select>
                         </div>
                     </div>
