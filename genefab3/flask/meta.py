@@ -86,11 +86,14 @@ def get_annotation_by_one_meta(db, meta, context, drop_cols, info_cols, sample_l
             columns=context.removers[meta], errors="ignore", inplace=True,
         )
         by_one_meta.dropna(how="all", axis=1, inplace=True)
-        return concat({ # make two-level:
-            "info": by_one_meta[info_cols],
-            meta: by_one_meta.drop(columns=info_cols) if sample_level
-                else ~by_one_meta.drop(columns=info_cols).isnull()
-        }, axis=1).drop_duplicates()
+        try:
+            return concat({ # make two-level:
+                "info": by_one_meta[info_cols],
+                meta: by_one_meta.drop(columns=info_cols) if sample_level
+                    else ~by_one_meta.drop(columns=info_cols).isnull()
+            }, axis=1).drop_duplicates()
+        except KeyError:
+            return SHRUNKEN_TO_NOTHING
     else:
         return None
 
