@@ -110,8 +110,8 @@ function generate_url() {
         url = url + selection_argument.replace(/\|$/g, "&");
     url = url + "fmt=" + $("#fmt").val();
     $("#url-description").text("Generated URL:");
-    $("#url").text(url);
-    $("#url-follow a").attr("href", url)
+    $("#url").html(url);
+    $("#url-follow a").attr("href", $("#url").text());
     $("#url-follow").css("background", "lightgreen");
 }
 
