@@ -125,8 +125,9 @@ def get_dynamic_meta_formatter(context, i, meta, meta_name):
             return (v == "NA")
             ? "<i style='color:#BBB'>"+v+"</i>"
             : ((v == "False")
-            ? "<font style='color:#FAA'>"+v+"</font>"
-            : "<a href='{}{}="+escape("{}")+"' style='color:green'>"+v+"</a>");
+            ? "<a href='{0}{1}!="+escape("{2}")+"' style='color:#FAA'>"+v+"</a>"
+            : "<a href='{0}{1}="+escape("{2}")+
+                "' style='color:green'>"+v+"</a>");
         }};"""
     else:
         formatter_mask = """function(r,c,v,d,x){{
@@ -153,7 +154,7 @@ def get_dynamic_dataframe_formatters(df, context, shortnames):
     return "\n".join(formatters)
 
 
-def get_dynamic_twolevel_dataframe_removers():
+def DEPRECATED_get_dynamic_twolevel_dataframe_removers():
     """Get SlickGrid column removers"""
     return """var ci = 0;
     $(".slick-header-sortable").each(function () {
@@ -265,14 +266,9 @@ def get_dynamic_twolevel_dataframe_html(df, context, frozen=0):
         cdm.format(n, n, a, b) for (a, b), n in zip(df.columns, shortnames)
     )
     formatters = get_dynamic_dataframe_formatters(df, context, shortnames)
-    if context.view in {"/assays/", "/samples/"}:
-        removers = get_dynamic_twolevel_dataframe_removers()
-    else:
-        removers = ""
     return map_replace(
         DF_DYNAMIC_HTML, {
             "// FROZENCOLUMN": str(frozen), "// FORMATTERS": formatters,
-            "// REMOVERS": removers,
             "HTMLINK": build_url(context, drop={"fmt"}) + "fmt=html",
             "CSVLINK": build_url(context, drop={"fmt"}) + "fmt=csv",
             "TSVLINK": build_url(context, drop={"fmt"}) + "fmt=tsv",
