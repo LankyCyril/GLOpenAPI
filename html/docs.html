@@ -63,7 +63,8 @@ function generate_url() {
     $(".meta-existence").each(function () {
         if ($(this).children("input[type=checkbox]").prop("checked")) {
             url = url + escape($(this).children("select.meta-existence-field").val()) + "=";
-            $(this).children("select.meta-existence-name").each(function () {
+            console.log($(this).children(".or-selects").length);
+            $(this).children(".or-selects").children("select.meta-existence-name").each(function () {
                 url = url + escape($(this).val()) + "|";
             });
             url = url.replace(/\|$/g, "&");
