@@ -4,7 +4,7 @@ from pandas import DataFrame, isnull
 from re import sub
 from genefab3.utils import map_replace
 from genefab3.config import ASSAY_METADATALIKES
-from genefab3.flask.parser import parse_request, parse_meta_arguments
+from genefab3.flask.parser import parse_request, parse_meta_queries
 from genefab3.flask.parser import REMOVER
 
 
@@ -162,7 +162,7 @@ def get_dynamic_twolevel_dataframe_removers():
             $(this).append(
                 "&nbsp;<a class='remover' href='"+
                 window.location.href.replace(/#+$/g, "")+
-                "&hide="+meta+":"+escape(name)+"'>&times;</a>"
+                "&"+meta+"!="+escape(name)+"'>&times;</a>"
             );
         };
         ci += 1;
@@ -229,7 +229,7 @@ def get_query_explanation(context):
     ]
     for key in sorted(context.args):
         for value in sorted(set(context.args.getlist(key))):
-            for kind, meta, fields, query in parse_meta_arguments(key, {value}):
+            for kind, meta, fields, query in parse_meta_queries(key, {value}):
                 if kind != REMOVER:
                     explanations.append(
                         get_meta_query_explanation(key, value, meta, query),
