@@ -4,7 +4,7 @@ from pandas import DataFrame, isnull
 from re import sub
 from genefab3.utils import map_replace
 from genefab3.config import ASSAY_METADATALIKES
-from genefab3.flask.parser import parse_request, parse_meta_arguments
+from genefab3.flask.parser import parse_request, parse_meta_queries
 from genefab3.flask.parser import REMOVER
 
 
@@ -125,8 +125,9 @@ def get_dynamic_meta_formatter(context, i, meta, meta_name):
             return (v == "NA")
             ? "<i style='color:#BBB'>"+v+"</i>"
             : ((v == "False")
-            ? "<font style='color:#FAA'>"+v+"</font>"
-            : "<a href='{}{}="+escape("{}")+"' style='color:green'>"+v+"</a>");
+            ? "<a href='{0}{1}!="+escape("{2}")+"' style='color:#FAA'>"+v+"</a>"
+            : "<a href='{0}{1}="+escape("{2}")+
+                "' style='color:green'>"+v+"</a>");
         }};"""
     else:
         formatter_mask = """function(r,c,v,d,x){{
@@ -153,7 +154,7 @@ def get_dynamic_dataframe_formatters(df, context, shortnames):
     return "\n".join(formatters)
 
 
-def get_dynamic_twolevel_dataframe_removers():
+def DEPRECATED_get_dynamic_twolevel_dataframe_removers():
     """Get SlickGrid column removers"""
     return """var ci = 0;
     $(".slick-header-sortable").each(function () {
@@ -162,7 +163,7 @@ def get_dynamic_twolevel_dataframe_removers():
             $(this).append(
                 "&nbsp;<a class='remover' href='"+
                 window.location.href.replace(/#+$/g, "")+
-                "&hide="+meta+":"+escape(name)+"'>&times;</a>"
+                "&"+meta+"!="+escape(name)+"'>&times;</a>"
             );
         };
         ci += 1;
@@ -172,6 +173,8 @@ def get_dynamic_twolevel_dataframe_removers():
 def get_select_query_explanation(cqs_list):
     """Generate human-friendly explanation of passed query '&select='"""
     select_mask = "<li><tt>&select={}</tt><br>list entries in {}</li>"
+    if not cqs_list:
+        return None
     aa_pairs = []
     explanations = []
     for cqs in cqs_list:
@@ -215,6 +218,9 @@ def get_meta_query_explanation(key, value, meta, query):
                 meta, head,
                 ", or ".join('"{}"'.format(v) for v in tail["$in"])
             )
+        elif "$ne" in tail:
+            mask = "list entries where {} of {} are not \"{}\""
+            explanation = mask.format(meta, head, tail["$ne"])
         else:
             explanation = "<i>unexplained</i>"
     return "<li><tt>&{}</tt><br>{}</li>".format(kv_pair, explanation)
@@ -229,7 +235,7 @@ def get_query_explanation(context):
     ]
     for key in sorted(context.args):
         for value in sorted(set(context.args.getlist(key))):
-            for kind, meta, fields, query in parse_meta_arguments(key, {value}):
+            for kind, meta, fields, query in parse_meta_queries(key, {value}):
                 if kind != REMOVER:
                     explanations.append(
                         get_meta_query_explanation(key, value, meta, query),
@@ -238,7 +244,7 @@ def get_query_explanation(context):
                     explanations.append(
                         get_remover_query_explanation(key, value, meta, fields),
                     )
-    return "<br>".join(explanations)
+    return "<br>".join(e for e in explanations if e)
 
 
 def get_dynamic_twolevel_dataframe_html(df, context, frozen=0):
@@ -260,14 +266,9 @@ def get_dynamic_twolevel_dataframe_html(df, context, frozen=0):
         cdm.format(n, n, a, b) for (a, b), n in zip(df.columns, shortnames)
     )
     formatters = get_dynamic_dataframe_formatters(df, context, shortnames)
-    if context.view in {"/assays/", "/samples/"}:
-        removers = get_dynamic_twolevel_dataframe_removers()
-    else:
-        removers = ""
     return map_replace(
         DF_DYNAMIC_HTML, {
             "// FROZENCOLUMN": str(frozen), "// FORMATTERS": formatters,
-            "// REMOVERS": removers,
             "HTMLINK": build_url(context, drop={"fmt"}) + "fmt=html",
             "CSVLINK": build_url(context, drop={"fmt"}) + "fmt=csv",
             "TSVLINK": build_url(context, drop={"fmt"}) + "fmt=tsv",

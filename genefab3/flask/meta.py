@@ -8,6 +8,9 @@ from pandas import concat, merge
 from numpy import nan
 
 
+SHRUNKEN_TO_NOTHING = False
+
+
 def get_meta_names(db, meta, context):
     """List names of particular meta"""
     if meta not in ASSAY_METADATALIKES:
@@ -74,7 +77,7 @@ def get_annotation_by_one_meta(db, meta, context, drop_cols, info_cols, sample_l
         if by_one_meta is None:
             by_one_meta = by_one_wildcard
         elif len(by_one_meta) == 0:
-            return None
+            return SHRUNKEN_TO_NOTHING
         else:
             by_one_meta = merge(by_one_meta, by_one_wildcard)
     if by_one_meta is not None:
@@ -123,6 +126,8 @@ def get_annotation_by_metas(db, context, sample_level=True):
         annotation_by_one_meta = get_annotation_by_one_meta(
             db, meta, context, drop_cols, info_cols, sample_level=sample_level,
         )
+        if annotation_by_one_meta is SHRUNKEN_TO_NOTHING:
+            return empty_df(columns=info_multicols)
         if annotation_by_metas is None:
             annotation_by_metas = annotation_by_one_meta
         elif annotation_by_one_meta is not None:
