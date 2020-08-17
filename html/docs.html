@@ -43,6 +43,7 @@
             #selectors > div > div ~ div {position: relative; top: -1pt}
             #selectors > div > div ~ div input {position: relative; top: 1pt}
             a.add, a.or {color: #AAA; font-style: italic; border-bottom: 1pt dashed #CCC}
+            a.del {color: #AAA; font-style: italic}
             .or-selects {display: inline-block}
         </style>
     </head>
@@ -132,6 +133,13 @@ function set_default_repr_of_remover_ors() {
     });
 }
 
+function remove_last_query_option() {
+    $(this).prev().prev().remove();
+    $(this).prev("select").remove();
+    $(this).remove();
+    generate_url();
+}
+
 function refresh_event_handlers() {
     $(".remover, .remover-or").unbind("mouseover").unbind("mouseout").unbind("click");
     $(".remover, .remover-or").mouseover(function () {$(this).html("&times;")});
@@ -139,8 +147,9 @@ function refresh_event_handlers() {
     set_default_repr_of_remover_ors();
     $(".remover-or").mouseout(set_default_repr_of_remover_ors);
     $(".remover, .remover-or").click(remove_query_part);
-    $("a.add, a.or, input[type=checkbox], select").unbind("click");
+    $("a.add, a.or, a.del, input[type=checkbox], select").unbind("click");
     $("a.add").click(clone_query_part);
+    $("a.del").click(remove_last_query_option);
     $("a.or").click(clone_query_or);
     $("input[type=checkbox], select").click(generate_url);
 }
@@ -166,9 +175,10 @@ function clone_query_part() {
 function clone_query_or() {
     var section_name = $(this).attr("class").replace(/\sor$/g, "");
     var or_selects = $(this).parent("div").children(".or-selects");
-    var new_dropdown = or_selects.children().last("select").clone();
+    var new_dropdown = or_selects.children("select").last().clone();
     or_selects.append("<em style='margin-left:3pt;margin-right:3pt'>|</em>");
     or_selects.append(new_dropdown);
+    or_selects.append(" <a class='del'>x</a>");
     refresh_event_handlers();
     generate_url();
 }
