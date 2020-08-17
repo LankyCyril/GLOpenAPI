@@ -172,6 +172,8 @@ def get_dynamic_twolevel_dataframe_removers():
 def get_select_query_explanation(cqs_list):
     """Generate human-friendly explanation of passed query '&select='"""
     select_mask = "<li><tt>&select={}</tt><br>list entries in {}</li>"
+    if not cqs_list:
+        return None
     aa_pairs = []
     explanations = []
     for cqs in cqs_list:
@@ -215,6 +217,9 @@ def get_meta_query_explanation(key, value, meta, query):
                 meta, head,
                 ", or ".join('"{}"'.format(v) for v in tail["$in"])
             )
+        elif "$ne" in tail:
+            mask = "list entries where {} of {} are not \"{}\""
+            explanation = mask.format(meta, head, tail["$ne"])
         else:
             explanation = "<i>unexplained</i>"
     return "<li><tt>&{}</tt><br>{}</li>".format(kv_pair, explanation)
@@ -238,7 +243,7 @@ def get_query_explanation(context):
                     explanations.append(
                         get_remover_query_explanation(key, value, meta, fields),
                     )
-    return "<br>".join(explanations)
+    return "<br>".join(e for e in explanations if e)
 
 
 def get_dynamic_twolevel_dataframe_html(df, context, frozen=0):
