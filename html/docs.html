@@ -41,7 +41,8 @@
             #selectors > div > div {display: inline-block; vertical-align: top}
             #selectors > div > div ~ div {position: relative; top: -1pt}
             #selectors > div > div ~ div input {position: relative; top: 1pt}
-            a.add {color: #AAA; font-style: italic; border-bottom: 1pt dashed #CCC}
+            a.add, a.or {color: #AAA; font-style: italic; border-bottom: 1pt dashed #CCC}
+            .or-selects {display: inline-block}
         </style>
     </head>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
@@ -110,8 +111,9 @@ function refresh_event_handlers() {
     set_default_repr_of_remover_ors();
     $(".remover-or").mouseout(set_default_repr_of_remover_ors);
     $(".remover, .remover-or").click(remove_query_part);
-    $("a.add, input[type=checkbox], select").unbind("click");
+    $("a.add, a.or, input[type=checkbox], select").unbind("click");
     $("a.add").click(clone_query_part);
+    $("a.or").click(clone_query_or);
     $("input[type=checkbox], select").click(generate_url);
 }
 
@@ -129,6 +131,16 @@ function clone_query_part() {
     var section_name = $(this).attr("class").replace(/\sadd$/g, "");
     var section_list = $("#"+section_name+"-list");
     section_list.append(section_list.children().last("."+section_name).clone());
+    refresh_event_handlers();
+    generate_url();
+}
+
+function clone_query_or() {
+    var section_name = $(this).attr("class").replace(/\sor$/g, "");
+    var or_selects = $(this).parent("div").children(".or-selects");
+    var new_dropdown = or_selects.children().last("select").clone();
+    or_selects.append("<em>|</em>");
+    or_selects.append(new_dropdown);
     refresh_event_handlers();
     generate_url();
 }
@@ -205,10 +217,12 @@ $(document).ready(function() {
                                 <option value='comments'>comments</option>
                             </select>
                             =
-                            <select class='meta-existence-name'>
-                                <option value='spaceflight' selected>spaceflight</option>
-                            </select>
-                            <a class='button inactive button-or'>OR</a>
+                            <div class='or-selects'>
+                                <select class='meta-existence-name'>
+                                    <option value='spaceflight' selected>spaceflight</option>
+                                </select>
+                            </div>
+                            <a class='meta-existence or'>OR</a>
                         </div>
                     </div>
                     <div id='meta-existence-N'>
