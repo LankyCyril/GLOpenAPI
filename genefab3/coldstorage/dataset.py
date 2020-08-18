@@ -5,6 +5,7 @@ from genefab3.exceptions import GeneLabJSONException, GeneLabDatabaseException
 from memoized_property import memoized_property
 from genefab3.config import GENELAB_ROOT
 from genefab3.utils import extract_file_timestamp
+from genefab3.isa.parser import ISA
 from genefab3.coldstorage.assay import ColdStorageAssay
 
 
@@ -62,31 +63,6 @@ class ColdStorageDataset():
             error = "{}: malformed 'filelistings' JSON".format(self.accession)
             raise GeneLabJSONException(error)
  
-    @memoized_property
-    def isa_zip_url(self):
-        """Find unique ISA ZIP URL"""
-        zip_urls = {
-            fileurl for filename, fileurl in self.fileurls.items()
-            if search(r'.*_metadata_.*-ISA\.zip$', filename)
-        }
-        if len(zip_urls) == 0:
-            error = "{}: ISA ZIP not found".format(self.accession)
-            raise GeneLabDatabaseException(error)
-        elif len(zip_urls) == 1:
-            return zip_urls.pop()
-        else:
-            error = "{}: multiple ambiguous ISA ZIPs".format(self.accession)
-            raise GeneLabDatabaseException(error)
-
-    def init_assays(self):
-        """Initialize assays via ISA ZIP"""
-        self.isa = ISA(self.isa_zip_url)
-        #try:
-        #    self.assays = {a: None for a in self.isa.assays} # placeholders
-        #    self.assays = ColdStorageAssayDispatcher(self) # actual assays
-        #except (KeyError, TypeError):
-        #    raise GeneLabJSONException("Invalid JSON (field 'assays')")
- 
     def resolve_filename(self, mask):
         """Given mask, find filenames, urls, and datestamps"""
         return {
@@ -96,6 +72,23 @@ class ColdStorageDataset():
             )
             for filename, url in self.fileurls.items() if search(mask, filename)
         }
+
+    def init_assays(self):
+        """Initialize assays via ISA ZIP"""
+        isa_zip_descriptors = self.resolve_filename(r'.*_metadata_.*-ISA\.zip$')
+        if len(isa_zip_descriptors) == 0:
+            error = "{}: ISA ZIP not found".format(self.accession)
+            raise GeneLabDatabaseException(error)
+        elif len(isa_zip_descriptors) == 1:
+            self.isa = ISA(next(iter(isa_zip_descriptors.values())).url)
+        else:
+            error = "{}: multiple ambiguous ISA ZIPs".format(self.accession)
+            raise GeneLabDatabaseException(error)
+        #try:
+        #    self.assays = {a: None for a in self.isa.assays} # placeholders
+        #    self.assays = ColdStorageAssayDispatcher(self) # actual assays
+        #except (KeyError, TypeError):
+        #    raise GeneLabJSONException("Invalid JSON (field 'assays')")
 
 
 class ColdStorageAssayDispatcher(dict):
