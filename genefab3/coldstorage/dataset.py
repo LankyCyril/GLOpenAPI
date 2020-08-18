@@ -1,57 +1,91 @@
-from sys import stderr
-from re import search, sub
-from genefab3.exceptions import GeneLabException, GeneLabJSONException
-from genefab3.config import GENELAB_ROOT
-from genefab3.utils import download_cold_json as dl_json
-from genefab3.utils import extract_file_timestamp, levenshtein_distance
-from genefab3.coldstorage.assay import ColdStorageAssay
 from argparse import Namespace
-from genefab3.isa.parser import ISA
-
-
-def parse_fileurls_json(fileurls_json):
-    """Parse file urls JSON reported by cold storage"""
-    try:
-        return {
-            fd["file_name"]: GENELAB_ROOT+fd["remote_url"]
-            for fd in fileurls_json
-        }
-    except KeyError:
-        raise GeneLabJSONException("Malformed 'files' JSON")
-
-
-def parse_filedates_json(filedates_json):
-    """Parse file dates JSON reported by cold storage"""
-    try:
-        return {
-            fd["file_name"]: extract_file_timestamp(fd)
-            for fd in filedates_json
-        }
-    except KeyError:
-        raise GeneLabJSONException("Malformed 'filelistings' JSON")
+from re import search
+from genefab3.utils import download_cold_json as dl_json
+from genefab3.exceptions import GeneLabJSONException, GeneLabDatabaseException
+from memoized_property import memoized_property
+from genefab3.config import GENELAB_ROOT
+from genefab3.utils import extract_file_timestamp
+from genefab3.coldstorage.assay import ColdStorageAssay
 
 
 class ColdStorageDataset():
     """Contains GLDS metadata associated with an accession number"""
+    json = Namespace()
+    isa = None
  
-    def __init__(self, accession, glds_json=None, fileurls_json=None, filedates_json=None):
+    def __init__(self, accession, json=Namespace(), init_assays=True):
         """Request ISA and store fields"""
-        self.isa = ISA(glds_json or dl_json(accession, "glds"))
-        if accession not in {self.isa.accession, self.isa.legacy_accession}:
-            raise GeneLabException("Initializing dataset with wrong JSON")
-        else:
-            self.accession = accession
-        self.fileurls = parse_fileurls_json(
-            fileurls_json or dl_json(accession, "fileurls"),
-        )
-        self.filedates = parse_filedates_json(
-            filedates_json or dl_json(self.isa._id, "filedates"),
-        )
+        jga = lambda name: getattr(json, name, None)
+        # validate JSON and initialize identifiers"
+        self.json.glds = jga("glds") or dl_json(accession, "glds")
         try:
-            self.assays = {a: None for a in self.isa.assays} # placeholders
-            self.assays = ColdStorageAssayDispatcher(self) # actual assays
-        except (KeyError, TypeError):
-            raise GeneLabJSONException("Invalid JSON (field 'assays')")
+            assert len(self.json.glds) == 1
+            self._id = self.json.glds[0]["_id"]
+        except (AssertionError, IndexError, KeyError):
+            error = "{}: malformed GLDS JSON".format(accession)
+            raise GeneLabJSONException(error)
+        else:
+            j = self.json.glds[0]
+            if accession in {j.get("accession"), j.get("legacy_accession")}:
+                self.accession = accession
+            else:
+                error = "{}: initializing with wrong JSON".format(accession)
+                raise GeneLabJSONException(error)
+        # populate file information:
+        self.json.fileurls = jga("fileurls") or dl_json(accession, "fileurls")
+        self.json.filedates = jga("fileurls") or dl_json(self._id, "filedates")
+        # initialize assays via ISA ZIP:
+        if init_assays:
+            self.init_assays()
+ 
+    @memoized_property
+    def fileurls(self):
+        """Parse file URLs JSON reported by cold storage"""
+        try:
+            return {
+                fd["file_name"]: GENELAB_ROOT+fd["remote_url"]
+                for fd in self.json.fileurls
+            }
+        except KeyError:
+            error = "{}: malformed 'files' JSON".format(self.accession)
+            raise GeneLabJSONException(error)
+ 
+    @memoized_property
+    def filedates(self):
+        """Parse file dates JSON reported by cold storage"""
+        try:
+            return {
+                fd["file_name"]: extract_file_timestamp(fd)
+                for fd in self.json.filedates
+            }
+        except KeyError:
+            error = "{}: malformed 'filelistings' JSON".format(self.accession)
+            raise GeneLabJSONException(error)
+ 
+    @memoized_property
+    def isa_zip_url(self):
+        """Find unique ISA ZIP URL"""
+        zip_urls = {
+            fileurl for filename, fileurl in self.fileurls.items()
+            if search(r'.*_metadata_.*-ISA\.zip$', filename)
+        }
+        if len(zip_urls) == 0:
+            error = "{}: ISA ZIP not found".format(self.accession)
+            raise GeneLabDatabaseException(error)
+        elif len(zip_urls) == 1:
+            return zip_urls.pop()
+        else:
+            error = "{}: multiple ambiguous ISA ZIPs".format(self.accession)
+            raise GeneLabDatabaseException(error)
+
+    def init_assays(self):
+        """Initialize assays via ISA ZIP"""
+        self.isa = ISA(self.isa_zip_url)
+        #try:
+        #    self.assays = {a: None for a in self.isa.assays} # placeholders
+        #    self.assays = ColdStorageAssayDispatcher(self) # actual assays
+        #except (KeyError, TypeError):
+        #    raise GeneLabJSONException("Invalid JSON (field 'assays')")
  
     def resolve_filename(self, mask):
         """Given mask, find filenames, urls, and datestamps"""
@@ -64,42 +98,6 @@ class ColdStorageDataset():
         }
 
 
-def infer_sample_key(assay_name, keys):
-    """Infer sample key for assay from dataset JSON"""
-    expected_key = sub(r'^a', "s", assay_name)
-    if expected_key in keys: # first, try key as-is, expected behavior
-        return expected_key
-    else: # otherwise, match regardless of case
-        for key in keys:
-            if key.lower() == expected_key.lower():
-                return key
-        else:
-            if len(keys) == 1: # otherwise, the only one must be correct
-                return next(iter(keys))
-            else: # find longest match starting from head
-                max_key_length = max(len(key) for key in keys)
-                max_comparison_length = min(len(expected_key), max_key_length)
-                for cl in range(max_comparison_length, 0, -1):
-                    likely_keys = {
-                        key for key in keys
-                        if key[:cl].lower() == expected_key[:cl].lower()
-                    }
-                    if len(likely_keys) == 1:
-                        return likely_keys.pop()
-                    elif len(likely_keys) > 1: # resolve by edit distance
-                        best_key, best_ld = None, -1
-                        for key in likely_keys:
-                            key_ld = levenshtein_distance(
-                                key.lower(), expected_key.lower(),
-                            )
-                            if key_ld > best_ld:
-                                best_key, best_ld = key, key_ld
-                        if best_key:
-                            return best_key
-                else:
-                    raise GeneLabException("No matching samples key for assay")
-
-
 class ColdStorageAssayDispatcher(dict):
     """Contains a dataset's assay objects, indexable by name or by attributes"""
  
@@ -107,9 +105,6 @@ class ColdStorageAssayDispatcher(dict):
         """Populate dictionary of assay_name -> Assay()"""
         for assay_name in dataset.isa.assays:
             sample_key = infer_sample_key(assay_name, dataset.isa.samples)
-            if levenshtein_distance(assay_name, sample_key) > 1:
-                msg = "Warning: ld('{}', '{}')".format(assay_name, sample_key)
-                print(msg, file=stderr)
             super().__setitem__(
                 assay_name, ColdStorageAssay(dataset, assay_name, sample_key)
             )
