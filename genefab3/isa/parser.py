@@ -1,5 +1,5 @@
-from pandas import DataFrame, concat, read_csv
-from re import search, sub
+from pandas import concat, read_csv
+from re import search
 from genefab3.exceptions import GeneLabISAException
 from argparse import Namespace
 from urllib.request import urlopen
@@ -7,83 +7,45 @@ from zipfile import ZipFile
 from io import BytesIO, StringIO
 from logging import getLogger, CRITICAL
 from isatools.isatab import load_investigation
+from collections import defaultdict
 
 
 INVESTIGATION_KEYS = {
-    "ontology_sources", "s_factors", "s_contacts", "s_publications",
-    "investigation", "i_publications", "s_assays", "s_protocols",
-    "s_design_descriptors", "studies", "i_contacts",
+    "Ontology Source Reference": "ontology_sources",
+    "Investigation": "investigation",
+    "Investigation Publications": "i_publications",
+    "Investigation Contacts": "i_contacts",
+    "Study": "studies",
+    "Study Design Descriptors": "s_design_descriptors",
+    "Study Publications": "s_publications",
+    "Study Factors": "s_factors",
+    "Study Assays": "s_assays",
+    "Study Protocols": "s_protocols",
+    "Study Contacts": "s_contacts",
 }
 
 
-class InvestigationSection(DataFrame):
-    """Stores single section of GLDS ISA 'Investigation' Tab"""
- 
-    def __init__(self, dataframe):
-        """Split dataframe into DataFrames of main and comments"""
-        comment_column_mapper = {}
-        for col in dataframe.columns:
-            matcher = search(r'^Comment\s*\[(.+)\]$', col)
-            if matcher:
-                comment_column_mapper[col] = matcher.group(1)
-        super().__init__(dataframe[[
-            col for col in dataframe.columns if col not in comment_column_mapper
-        ]])
-        self.columns.name = None
-        comment_columns = [
-            col for col in dataframe.columns if col in comment_column_mapper
-        ]
-        self._metadata = ["comments"]
-        self.comments = dataframe[comment_columns].rename(
-            columns=comment_column_mapper,
-        )
-        for obj in (self, self.comments):
-            obj.columns.name = None
-            obj.reset_index(drop=True, inplace=True)
- 
-    def to_json(self):
-        """Return as JSON of all levels"""
-        return {
-            "main": DataFrame.to_json(self, orient="records"),
-            "comments": DataFrame.to_json(self, orient="records"),
-        }
- 
-    def to_frame(self, mode=None, append=None):
-        """Return as DataFrame with values from certain level"""
-        if (mode is not None) or (append is not None):
-            error_mask = "{}() cannot be modified with `mode`, `append`"
-            raise GeneLabISAException(error_mask.format("InvestigationSection"))
-        else:
-            return self
-
-
-class Investigation:
+class Investigation(dict):
     """Stores GLDS ISA Tab 'investigation' in accessible formats"""
  
     def __init__(self, raw_investigation):
-        for field, content in raw_investigation.items():
-            if isinstance(content, list):
-                dataframe = concat(content)
-            else:
-                dataframe = content
-            dataframe.drop(
-                columns=range(0, dataframe.shape[1]),
-                errors="ignore", inplace=True,
-            )
-            setattr(self, field, InvestigationSection(dataframe))
- 
-    def __getattr__(self, key):
-        putative_key = sub(r'^(.).*_', r'\1_', key.lower().replace(" ", "_"))
-        if putative_key in dir(self):
-            return getattr(self, putative_key)
-        else:
-            raise AttributeError("Investigation has no field '{}'".format(key))
- 
-    def __getitem__(self, key):
-        return getattr(self, key)
+        for key, internal_key in INVESTIGATION_KEYS.items():
+            if internal_key in raw_investigation:
+                content = raw_investigation[internal_key]
+                if isinstance(content, list):
+                    dataframe = concat(content)
+                else:
+                    dataframe = content
+                dataframe.drop(
+                    columns=range(0, dataframe.shape[1]),
+                    errors="ignore", inplace=True,
+                )
+                dataframe.columns.name = None
+                dataframe.reset_index(drop=True, inplace=True)
+                super().__setitem__(key, dataframe.to_dict(orient="records"))
 
 
-class Studies(list):
+class StudyEntries(list):
     """Stores GLDS ISA Tab 'studies' records as a multilevel JSON"""
     _self_identifier = "Study"
     _by_sample_name = {}
@@ -167,9 +129,13 @@ class Studies(list):
         )
 
 
-class Assays(Studies):
+class AssayEntries(StudyEntries):
     """Stores GLDS ISA Tab 'assays' records as a multilevel JSON"""
+    def abort_on_by_sample_name():
+        error = "Unique look up by sample name within AssayEntries not allowed"
+        raise GeneLabISAException(error)
     _self_identifier = "Assay"
+    _by_sample_name = defaultdict(abort_on_by_sample_name)
 
 
 def read_table(handle):
@@ -187,8 +153,8 @@ class ISA:
         """Unpack ZIP from URL and delegate to sub-parsers"""
         self.raw = self.ingest_raw_isa(isa_zip_url)
         self.investigation = Investigation(self.raw.investigation)
-        self.studies = Studies(self.raw.studies)
-        self.assays = Assays(self.raw.assays)
+        self.studies = StudyEntries(self.raw.studies)
+        self.assays = AssayEntries(self.raw.assays)
  
     def ingest_raw_isa(self, isa_zip_url):
         """Unpack ZIP from URL and delegate to top-level parsers"""
@@ -216,7 +182,4 @@ class ISA:
                 raise GeneLabISAException("{}: missing ISA tab '{}'".format(
                     archive_name, tab,
                 ))
-        if set(raw.investigation.keys()) != INVESTIGATION_KEYS:
-            error = "{}: malformed ISA tab 'investigation'".format(archive_name)
-            raise GeneLabISAException(error)
         return raw
