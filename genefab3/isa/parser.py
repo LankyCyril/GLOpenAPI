@@ -1,4 +1,4 @@
-from pandas import concat, read_csv
+from pandas import read_csv
 from re import search
 from genefab3.exceptions import GeneLabISAException
 from argparse import Namespace
@@ -16,6 +16,7 @@ INVESTIGATION_KEYS = {
     "Investigation Publications": "i_publications",
     "Investigation Contacts": "i_contacts",
     "Study": "studies",
+    "Studies": "studies",
     "Study Design Descriptors": "s_design_descriptors",
     "Study Publications": "s_publications",
     "Study Factors": "s_factors",
@@ -33,16 +34,17 @@ class Investigation(dict):
             if internal_key in raw_investigation:
                 content = raw_investigation[internal_key]
                 if isinstance(content, list):
-                    dataframe = concat(content)
+                    json = [self._jsonify(df) for df in content]
                 else:
-                    dataframe = content
-                dataframe.drop(
-                    columns=range(0, dataframe.shape[1]),
-                    errors="ignore", inplace=True,
-                )
-                dataframe.columns.name = None
-                dataframe.reset_index(drop=True, inplace=True)
-                super().__setitem__(key, dataframe.to_dict(orient="records"))
+                    json = self._jsonify(content)
+                if isinstance(json, list):
+                    if (len(json) == 1) and isinstance(json[0], list):
+                        json = json[0]
+                super().__setitem__(key, json)
+ 
+    def _jsonify(self, df):
+        nn = range(0, df.shape[1])
+        return df.drop(columns=nn, errors="ignore").to_dict(orient="records")
 
 
 class StudyEntries(list):
