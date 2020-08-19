@@ -57,13 +57,6 @@ class InvestigationSection(DataFrame):
             return self
 
 
-class Section:
-    """Stores single section of GLDS ISA 'Studies' or 'Assays' Tab"""
-    def __init__(self, dataframe): pass
-    def to_json(self): pass
-    def to_frame(self, mode=None, append=None): pass
-
-
 class Investigation:
     """Stores GLDS ISA Tab 'investigation' in accessible formats"""
  
@@ -90,22 +83,101 @@ class Investigation:
         return getattr(self, key)
 
 
-class Assays(dict):
-    """Stores GLDS ISA Tab 'assays' in accessible formats"""
+class Studies(list):
+    """Stores GLDS ISA Tab 'studies' records as a multilevel JSON"""
+    _self_identifier = "Study"
+    _by_sample_name = {}
  
-    def __init__(self, raw_assays):
-        for assay_name, raw_assay in raw_assays.items():
-            super().__setitem__(assay_name, Section(raw_assay))
-
-
-class Studies(Assays):
-    """Stores GLDS ISA Tab 'studies' in accessible formats"""
+    def __init__(self, raw_dataframes):
+        """Convert tables to multilevel JSONs"""
+        for name, raw_dataframe in raw_dataframes.items():
+            sample_names = set()
+            for _, row in raw_dataframe.iterrows():
+                if "Sample Name" not in row:
+                    error = "Table entry must have 'Sample Name'"
+                    raise GeneLabISAException(error)
+                else:
+                    sample_name = row["Sample Name"]
+                if sample_name in sample_names:
+                    error = "Table file contains duplicate Sample Names"
+                    raise GeneLabISAException(error)
+                else:
+                    sample_names.add(sample_name)
+                json = self._row_to_json(row, name)
+                super().append(json)
+                if self._self_identifier == "Study":
+                    if sample_name in self._by_sample_name:
+                        error = "Duplicate Sample Name in studies"
+                        raise GeneLabISAException(error)
+                    else:
+                        self._by_sample_name[sample_name] = json
  
-    def __init__(self, raw_studies):
-        if len(raw_studies) > 1:
-            raise GeneLabISAException("Multi-study datasets are not supported")
+    def _row_to_json(self, row, name):
+        """Convert single row of table to multilevel JSON"""
+        json, qualifiable = {"": {self._self_identifier: name}}, None
+        for column, value in row.items():
+            field, subfield, extra = self._parse_field(column)
+            if not self._is_known_qualifier(column): # top-level field
+                if not subfield: # e.g. "Source Name"
+                    if field in json:
+                        error = "Duplicate field '{}'".format(field)
+                        raise GeneLabISAException(error)
+                    else: # make {"Source Name": {"": "ABC"}}
+                        json[field] = {"": value}
+                        qualifiable = json[field]
+                else: # e.g. "Characteristics[Age]"
+                    if field not in json:
+                        json[field] = {}
+                    if subfield in json[field]:
+                        raise GeneLabISAException(
+                            "Duplicate field '{}[{}]'".format(field, subfield),
+                        )
+                    else: # make {"Characteristics": {"Age": {"": "36"}}}
+                        json[field][subfield] = {"": value}
+                        qualifiable = json[field][subfield]
+            else: # qualify entry at pointer with second-level field
+                if qualifiable is None:
+                    raise GeneLabISAException("Qualifier before main field")
+                if field == "Comment": # make {"Comment": {"mood": "cheerful"}}
+                    if "Comment" not in qualifiable:
+                        qualifiable["Comment"] = {"": None}
+                    qualifiable["Comment"][subfield or ""] = value
+                elif subfield:
+                    ... # TODO
+                    # log(f"Ignoring extra info past qualifier '{field}'")
+                else: # make {"Unit": "percent"}
+                    qualifiable[field] = value
+        return json
+ 
+    def _parse_field(self, column):
+        """Interpret field like 'Source Name' or 'Characteristics[sex,http://purl.obolibrary.org/obo/PATO_0000047,EFO]"""
+        matcher = search(r'(.+)\s*\[\s*(.+)\s*\]\s*$', column)
+        if matcher:
+            field = matcher.group(1)
+            subfield, *extra = matcher.group(2).split(",")
+            return field, subfield, extra
         else:
-            super().__init__(raw_studies)
+            return column, None, []
+ 
+    def _is_known_qualifier(self, field):
+        """Check if `field` is one of 'Term Accession Number', 'Unit', any 'Comment[.+]', or any '.*REF'"""
+        return (
+            (field == "Term Accession Number") or (field == "Unit") or
+            field.endswith(" REF") or search(r'^Comment\s*\[.+\]\s*$', field)
+        )
+
+
+class Assays(Studies):
+    """Stores GLDS ISA Tab 'assays' records as a multilevel JSON"""
+    _self_identifier = "Assay"
+
+
+def read_table(handle):
+    """Read TSV file, allowing for duplicate column names"""
+    raw_dataframe = read_csv(handle, sep="\t", comment="#", header=None)
+    raw_dataframe.columns = raw_dataframe.iloc[0,:]
+    raw_dataframe.columns.name = None
+    return raw_dataframe.drop(index=[0]).reset_index(drop=True)
 
 
 class ISA:
@@ -120,7 +192,6 @@ class ISA:
  
     def ingest_raw_isa(self, isa_zip_url):
         """Unpack ZIP from URL and delegate to top-level parsers"""
-        read_tsv = lambda f: read_csv(f, sep="\t", comment="#")
         raw = Namespace(
             investigation=None, studies={}, assays={},
         )
@@ -136,9 +207,9 @@ class ISA:
                                 getLogger("isatools").setLevel(CRITICAL+1)
                                 raw.investigation = load_investigation(sio)
                             elif kind == "s":
-                                raw.studies[name] = read_tsv(handle)
+                                raw.studies[name] = read_table(handle)
                             elif kind == "a":
-                                raw.assays[name] = read_tsv(handle)
+                                raw.assays[name] = read_table(handle)
         archive_name = isa_zip_url.split("/")[-1]
         for tab, value in raw._get_kwargs():
             if not value:
