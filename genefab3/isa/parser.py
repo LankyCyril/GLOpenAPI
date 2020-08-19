@@ -1,13 +1,12 @@
-from pandas import DataFrame, concat
+from pandas import DataFrame, concat, read_csv
 from re import search, sub
+from genefab3.exceptions import GeneLabISAException
 from argparse import Namespace
 from urllib.request import urlopen
 from zipfile import ZipFile
 from io import BytesIO, StringIO
 from logging import getLogger, CRITICAL
 from isatools.isatab import load_investigation
-from pandas import read_csv
-from genefab3.exceptions import GeneLabISAException
 
 
 INVESTIGATION_KEYS = {
@@ -17,18 +16,11 @@ INVESTIGATION_KEYS = {
 }
 
 
-class Section(DataFrame):
-    """Stores single section of GLDS ISA Tab"""
+class InvestigationSection(DataFrame):
+    """Stores single section of GLDS ISA 'Investigation' Tab"""
  
-    def __init__(self, dataframe, kind=None):
-        """Parse DataFrame into subsections"""
-        if kind is Investigation: # simple, just move Comments
-            self.__init__from__investigation__(dataframe)
-        else:
-            super().__init__()
- 
-    def __init__from__investigation__(self, dataframe):
-        """Split dataframe into main and comments"""
+    def __init__(self, dataframe):
+        """Split dataframe into DataFrames of main and comments"""
         comment_column_mapper = {}
         for col in dataframe.columns:
             matcher = search(r'^Comment\s*\[(.+)\]$', col)
@@ -37,16 +29,43 @@ class Section(DataFrame):
         super().__init__(dataframe[[
             col for col in dataframe.columns if col not in comment_column_mapper
         ]])
+        self.columns.name = None
         comment_columns = [
             col for col in dataframe.columns if col in comment_column_mapper
         ]
+        self._metadata = ["comments"]
         self.comments = dataframe[comment_columns].rename(
             columns=comment_column_mapper,
         )
+        for obj in (self, self.comments):
+            obj.columns.name = None
+            obj.reset_index(drop=True, inplace=True)
+ 
+    def to_json(self):
+        """Return as JSON of all levels"""
+        return {
+            "main": DataFrame.to_json(self, orient="records"),
+            "comments": DataFrame.to_json(self, orient="records"),
+        }
+ 
+    def to_frame(self, mode=None, append=None):
+        """Return as DataFrame with values from certain level"""
+        if (mode is not None) or (append is not None):
+            error_mask = "{}() cannot be modified with `mode`, `append`"
+            raise GeneLabISAException(error_mask.format("InvestigationSection"))
+        else:
+            return self
+
+
+class Section:
+    """Stores single section of GLDS ISA 'Studies' or 'Assays' Tab"""
+    def __init__(self, dataframe): pass
+    def to_json(self): pass
+    def to_frame(self, mode=None, append=None): pass
 
 
 class Investigation:
-    """Stores GLDS ISA Tab 'investigation' in an accessible format"""
+    """Stores GLDS ISA Tab 'investigation' in accessible formats"""
  
     def __init__(self, raw_investigation):
         for field, content in raw_investigation.items():
@@ -58,7 +77,7 @@ class Investigation:
                 columns=range(0, dataframe.shape[1]),
                 errors="ignore", inplace=True,
             )
-            setattr(self, field, Section(dataframe, kind=Investigation))
+            setattr(self, field, InvestigationSection(dataframe))
  
     def __getattr__(self, key):
         putative_key = sub(r'^(.).*_', r'\1_', key.lower().replace(" ", "_"))
@@ -71,6 +90,24 @@ class Investigation:
         return getattr(self, key)
 
 
+class Assays(dict):
+    """Stores GLDS ISA Tab 'assays' in accessible formats"""
+ 
+    def __init__(self, raw_assays):
+        for assay_name, raw_assay in raw_assays.items():
+            super().__setitem__(assay_name, Section(raw_assay))
+
+
+class Studies(Assays):
+    """Stores GLDS ISA Tab 'studies' in accessible formats"""
+ 
+    def __init__(self, raw_studies):
+        if len(raw_studies) > 1:
+            raise GeneLabISAException("Multi-study datasets are not supported")
+        else:
+            super().__init__(raw_studies)
+
+
 class ISA:
     """Stores GLDS ISA information retrieved from ISA ZIP file URL"""
  
@@ -78,14 +115,14 @@ class ISA:
         """Unpack ZIP from URL and delegate to sub-parsers"""
         self.raw = self.ingest_raw_isa(isa_zip_url)
         self.investigation = Investigation(self.raw.investigation)
-        self.samples = self.process_samples(self.raw.samples)
-        self.assays = self.process_assays(self.raw.assays)
+        self.studies = Studies(self.raw.studies)
+        self.assays = Assays(self.raw.assays)
  
     def ingest_raw_isa(self, isa_zip_url):
         """Unpack ZIP from URL and delegate to top-level parsers"""
         read_tsv = lambda f: read_csv(f, sep="\t", comment="#")
         raw = Namespace(
-            investigation=None, samples={}, assays={},
+            investigation=None, studies={}, assays={},
         )
         with urlopen(isa_zip_url) as response:
             with ZipFile(BytesIO(response.read())) as archive:
@@ -99,7 +136,7 @@ class ISA:
                                 getLogger("isatools").setLevel(CRITICAL+1)
                                 raw.investigation = load_investigation(sio)
                             elif kind == "s":
-                                raw.samples[name] = read_tsv(handle)
+                                raw.studies[name] = read_tsv(handle)
                             elif kind == "a":
                                 raw.assays[name] = read_tsv(handle)
         archive_name = isa_zip_url.split("/")[-1]
@@ -112,6 +149,3 @@ class ISA:
             error = "{}: malformed ISA tab 'investigation'".format(archive_name)
             raise GeneLabISAException(error)
         return raw
- 
-    def process_samples(self, raw_samples): pass
-    def process_assays(self, raw_assays): pass
