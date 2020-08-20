@@ -1,5 +1,5 @@
 from pandas import read_csv
-from re import search
+from re import search, sub
 from genefab3.exceptions import GeneLabISAException
 from argparse import Namespace
 from urllib.request import urlopen
@@ -141,6 +141,15 @@ class AssayEntries(StudyEntries):
     _by_sample_name = defaultdict(abort_on_by_sample_name)
 
 
+def parse_investigation(handle):
+    """Load investigation tab with isatools, safeguard input for engine='python', suppress logger"""
+    safe_handle = StringIO( # make number of double quotes inside fields even:
+        sub(r'([^\n\t])\"([^\n\t])', r'\1""\2', handle.read().decode()),
+    )
+    getLogger("isatools").setLevel(CRITICAL+1)
+    return load_investigation(safe_handle)
+
+
 def read_table(handle):
     """Read TSV file, allowing for duplicate column names"""
     raw_dataframe = read_csv(handle, sep="\t", comment="#", header=None)
@@ -173,9 +182,7 @@ class ISA:
                         kind, name = matcher.groups()
                         with archive.open(relpath) as handle:
                             if kind == "i":
-                                sio = StringIO(handle.read().decode())
-                                getLogger("isatools").setLevel(CRITICAL+1)
-                                raw.investigation = load_investigation(sio)
+                                raw.investigation = parse_investigation(handle)
                             elif kind == "s":
                                 raw.studies[name] = read_table(handle)
                             elif kind == "a":
