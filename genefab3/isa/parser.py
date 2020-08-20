@@ -3,6 +3,7 @@ from re import search
 from genefab3.exceptions import GeneLabISAException
 from argparse import Namespace
 from urllib.request import urlopen
+from os import path
 from zipfile import ZipFile
 from io import BytesIO, StringIO
 from logging import getLogger, CRITICAL
@@ -165,11 +166,12 @@ class ISA:
         )
         with urlopen(isa_zip_url) as response:
             with ZipFile(BytesIO(response.read())) as archive:
-                for filename in archive.namelist():
+                for relpath in archive.namelist():
+                    _, filename = path.split(relpath)
                     matcher = search(r'^([isa])_(.+)\.txt$', filename)
                     if matcher:
                         kind, name = matcher.groups()
-                        with archive.open(filename) as handle:
+                        with archive.open(relpath) as handle:
                             if kind == "i":
                                 sio = StringIO(handle.read().decode())
                                 getLogger("isatools").setLevel(CRITICAL+1)
