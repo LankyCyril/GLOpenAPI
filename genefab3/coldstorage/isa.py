@@ -85,11 +85,10 @@ class StudyEntries(list):
             if not self._is_known_qualifier(column): # top-level field
                 if not subfield: # e.g. "Source Name"
                     if field in json:
-                        error = "Duplicate field '{}'".format(field)
-                        raise GeneLabISAException(error)
+                        json[field].append({"": value})
                     else: # make {"Source Name": {"": "ABC"}}
-                        json[field] = {"": value}
-                        qualifiable = json[field]
+                        json[field] = [{"": value}]
+                    qualifiable = json[field][-1]
                 else: # e.g. "Characteristics[Age]"
                     if field not in json:
                         json[field] = {}
