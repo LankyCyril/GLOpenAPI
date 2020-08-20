@@ -143,7 +143,10 @@ class AssayEntries(StudyEntries):
 def parse_investigation(handle):
     """Load investigation tab with isatools, safeguard input for engine='python', suppress logger"""
     safe_handle = StringIO( # make number of double quotes inside fields even:
-        sub(r'([^\n\t])\"([^\n\t])', r'\1""\2', handle.read().decode()),
+        sub(
+            r'([^\n\t])\"([^\n\t])', r'\1""\2',
+            handle.read().decode(errors="replace")
+        ),
     )
     getLogger("isatools").setLevel(CRITICAL+1)
     return load_investigation(safe_handle)
