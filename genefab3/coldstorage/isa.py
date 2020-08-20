@@ -151,7 +151,9 @@ def parse_investigation(handle):
 
 def read_table(handle):
     """Read TSV file, allowing for duplicate column names"""
-    raw_dataframe = read_csv(handle, sep="\t", comment="#", header=None)
+    raw_dataframe = read_csv(
+        handle, sep="\t", comment="#", header=None, index_col=False,
+    )
     raw_dataframe.columns = raw_dataframe.iloc[0,:]
     raw_dataframe.columns.name = None
     return raw_dataframe.drop(index=[0]).reset_index(drop=True)
