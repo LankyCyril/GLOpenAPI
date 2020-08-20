@@ -63,18 +63,12 @@ class StudyEntries(list):
         else:
             self._by_sample_name = defaultdict(self._abort_lookup)
         for name, raw_dataframe in raw_dataframes.items():
-            sample_names = set()
             for _, row in raw_dataframe.iterrows():
                 if "Sample Name" not in row:
                     error = "Table entry must have 'Sample Name'"
                     raise GeneLabISAException(error)
                 else:
                     sample_name = row["Sample Name"]
-                if sample_name in sample_names:
-                    error = "Table file contains duplicate Sample Names"
-                    raise GeneLabISAException(error)
-                else:
-                    sample_names.add(sample_name)
                 json = self._row_to_json(row, name)
                 super().append(json)
                 if self._self_identifier == "Study":
