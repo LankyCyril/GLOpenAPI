@@ -52,9 +52,16 @@ class StudyEntries(list):
     """Stores GLDS ISA Tab 'studies' records as a multilevel JSON"""
     _self_identifier = "Study"
  
+    def _abort_lookup(self):
+        error = "Unique look up by sample name within AssayEntries not allowed"
+        raise GeneLabISAException(error)
+ 
     def __init__(self, raw_dataframes):
         """Convert tables to multilevel JSONs"""
-        self._by_sample_name = {}
+        if self._self_identifier == "Study":
+            self._by_sample_name = {}
+        else:
+            self._by_sample_name = defaultdict(self._abort_lookup)
         for name, raw_dataframe in raw_dataframes.items():
             sample_names = set()
             for _, row in raw_dataframe.iterrows():
@@ -133,11 +140,7 @@ class StudyEntries(list):
 
 class AssayEntries(StudyEntries):
     """Stores GLDS ISA Tab 'assays' records as a multilevel JSON"""
-    def abort_on_by_sample_name():
-        error = "Unique look up by sample name within AssayEntries not allowed"
-        raise GeneLabISAException(error)
     _self_identifier = "Assay"
-    _by_sample_name = defaultdict(abort_on_by_sample_name)
 
 
 def parse_investigation(handle):
