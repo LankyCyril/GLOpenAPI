@@ -1,11 +1,11 @@
 from argparse import Namespace
 from re import search
-from genefab3.utils import download_cold_json as dl_json
+from genefab3.coldstorage.json import download_cold_json as dl_json
 from genefab3.exceptions import GeneLabJSONException, GeneLabDatabaseException
 from memoized_property import memoized_property
 from genefab3.config import GENELAB_ROOT
 from genefab3.utils import extract_file_timestamp
-from genefab3.isa.parser import ISA
+from genefab3.coldstorage.isa import IsaZip
 from genefab3.coldstorage.assay import ColdStorageAssay
 
 
@@ -80,7 +80,7 @@ class ColdStorageDataset():
             error = "{}: ISA ZIP not found".format(self.accession)
             raise GeneLabDatabaseException(error)
         elif len(isa_zip_descriptors) == 1:
-            self.isa = ISA(next(iter(isa_zip_descriptors.values())).url)
+            self.isa = IsaZip(next(iter(isa_zip_descriptors.values())).url)
         else:
             error = "{}: multiple ambiguous ISA ZIPs".format(self.accession)
             raise GeneLabDatabaseException(error)

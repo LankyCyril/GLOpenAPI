@@ -4,7 +4,7 @@ from genefab3.config import COLD_SEARCH_MASK, MAX_JSON_AGE
 from genefab3.config import CACHER_THREAD_CHECK_INTERVAL
 from genefab3.config import CACHER_THREAD_RECHECK_INTERVAL
 from genefab3.config import ASSAY_METADATALIKES
-from genefab3.utils import download_cold_json
+from genefab3.coldstorage.json import download_cold_json
 from genefab3.mongo.utils import replace_doc, insert_one_safe
 from genefab3.exceptions import GeneLabJSONException
 from genefab3.coldstorage.dataset import ColdStorageDataset

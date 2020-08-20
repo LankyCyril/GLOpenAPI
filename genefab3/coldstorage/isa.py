@@ -158,7 +158,7 @@ def read_table(handle):
     return raw_dataframe.drop(index=[0]).reset_index(drop=True)
 
 
-class ISA:
+class IsaZip:
     """Stores GLDS ISA information retrieved from ISA ZIP file URL"""
  
     def __init__(self, isa_zip_url):
