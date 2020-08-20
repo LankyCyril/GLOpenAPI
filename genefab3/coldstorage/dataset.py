@@ -63,25 +63,33 @@ class ColdStorageDataset():
             error = "{}: malformed 'filelistings' JSON".format(self.accession)
             raise GeneLabJSONException(error)
  
-    def resolve_filename(self, mask):
+    def resolve_filename(self, mask, strict=False):
         """Given mask, find filenames, urls, and datestamps"""
+        if strict:
+            additional_check = lambda fn: fn in self.filedates
+        else:
+            additional_check = lambda fn: True
         return {
             filename: Namespace(
                 filename=filename, url=url,
                 timestamp=self.filedates.get(filename, -1)
             )
-            for filename, url in self.fileurls.items() if search(mask, filename)
+            for filename, url in self.fileurls.items()
+            if search(mask, filename) and additional_check(filename)
         }
 
     def init_assays(self):
         """Initialize assays via ISA ZIP"""
-        isa_zip_descriptors = self.resolve_filename(r'.*_metadata_.*-ISA\.zip$')
+        isa_zip_descriptors = self.resolve_filename(
+            r'.*_metadata_.*-ISA\.zip$', strict=True,
+        )
         if len(isa_zip_descriptors) == 0:
             error = "{}: ISA ZIP not found".format(self.accession)
             raise GeneLabDatabaseException(error)
         elif len(isa_zip_descriptors) == 1:
             self.isa = IsaZip(next(iter(isa_zip_descriptors.values())).url)
         else:
+            print(isa_zip_descriptors)
             error = "{}: multiple ambiguous ISA ZIPs".format(self.accession)
             raise GeneLabDatabaseException(error)
         #try:
