@@ -1,5 +1,6 @@
 from argparse import Namespace
 from re import search
+from urllib.parse import quote
 from genefab3.coldstorage.json import download_cold_json as dl_json
 from genefab3.exceptions import GeneLabJSONException, GeneLabDatabaseException
 from memoized_property import memoized_property
@@ -44,7 +45,7 @@ class ColdStorageDataset():
         """Parse file URLs JSON reported by cold storage"""
         try:
             return {
-                fd["file_name"]: GENELAB_ROOT+fd["remote_url"]
+                fd["file_name"]: GENELAB_ROOT + quote(fd["remote_url"])
                 for fd in self.json.fileurls
             }
         except KeyError:
@@ -63,26 +64,20 @@ class ColdStorageDataset():
             error = "{}: malformed 'filelistings' JSON".format(self.accession)
             raise GeneLabJSONException(error)
  
-    def resolve_filename(self, mask, strict=False):
+    def resolve_filename(self, mask):
         """Given mask, find filenames, urls, and datestamps"""
-        if strict:
-            additional_check = lambda fn: fn in self.filedates
-        else:
-            additional_check = lambda fn: True
         return {
             filename: Namespace(
-                filename=filename, url=url,
-                timestamp=self.filedates.get(filename, -1)
+                filename=filename, url=self.fileurls.get(filename, None),
+                timestamp=int(timestamp) if str(timestamp).isdigit() else -1,
             )
-            for filename, url in self.fileurls.items()
-            if search(mask, filename) and additional_check(filename)
+            for filename, timestamp in self.filedates.items()
+            if search(mask, filename)
         }
 
     def init_assays(self):
         """Initialize assays via ISA ZIP"""
-        isa_zip_descriptors = self.resolve_filename(
-            r'.*_metadata_.*-ISA\.zip$', strict=True,
-        )
+        isa_zip_descriptors = self.resolve_filename(r'.*_metadata_.*-ISA\.zip$')
         if len(isa_zip_descriptors) == 0:
             error = "{}: ISA ZIP not found".format(self.accession)
             raise GeneLabDatabaseException(error)
