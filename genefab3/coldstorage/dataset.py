@@ -20,6 +20,8 @@ class ColdStorageDataset():
         jga = lambda name: getattr(json, name, None)
         # validate JSON and initialize identifiers"
         self.json.glds = jga("glds") or dl_json(accession, "glds")
+        if not self.json.glds:
+            raise GeneLabJSONException("{}: no dataset found".format(accession))
         try:
             assert len(self.json.glds) == 1
             self._id = self.json.glds[0]["_id"]
