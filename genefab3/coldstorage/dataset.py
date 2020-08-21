@@ -4,7 +4,7 @@ from urllib.parse import quote
 from genefab3.coldstorage.json import download_cold_json as dl_json
 from genefab3.exceptions import GeneLabJSONException, GeneLabDatabaseException
 from memoized_property import memoized_property
-from genefab3.config import GENELAB_ROOT
+from genefab3.config import GENELAB_ROOT, ISA_ZIP_REGEX
 from genefab3.utils import extract_file_timestamp
 from genefab3.coldstorage.isa import IsaZip
 from genefab3.coldstorage.assay import ColdStorageAssay
@@ -79,7 +79,7 @@ class ColdStorageDataset():
 
     def init_assays(self):
         """Initialize assays via ISA ZIP"""
-        isa_zip_descriptors = self.resolve_filename(r'.*_metadata_.*-ISA\.zip$')
+        isa_zip_descriptors = self.resolve_filename(ISA_ZIP_REGEX)
         if len(isa_zip_descriptors) == 0:
             error = "{}: ISA ZIP not found".format(self.accession)
             raise GeneLabDatabaseException(error)
