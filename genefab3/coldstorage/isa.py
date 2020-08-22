@@ -112,8 +112,9 @@ class StudyEntries(list):
                     if "Comment" not in qualifiable:
                         qualifiable["Comment"] = {"": None}
                     qualifiable["Comment"][subfield or ""] = value
-                elif subfield: # TODO
-                    ... # log(f"Ignoring extra info past qualifier '{field}'")
+                elif subfield:
+                    warning = "Extra info past qualifier '{}'".format(field)
+                    getLogger("genefab3").warning(warning, stack_info=True)
                 else: # make {"Unit": "percent"}
                     qualifiable[field] = value
         return json
