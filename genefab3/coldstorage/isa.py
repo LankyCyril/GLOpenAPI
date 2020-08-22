@@ -129,11 +129,11 @@ class StudyEntries(list):
         else:
             return column, None, []
  
-    def _is_known_qualifier(self, field):
-        """Check if `field` is one of 'Term Accession Number', 'Unit', any 'Comment[.+]', or any '.*REF'"""
+    def _is_known_qualifier(self, column):
+        """Check if `column` is one of 'Term Accession Number', 'Unit', any 'Comment[.+]', or any '.*REF'"""
         return (
-            (field == "Term Accession Number") or (field == "Unit") or
-            field.endswith(" REF") or search(r'^Comment\s*\[.+\]\s*$', field)
+            (column == "Term Accession Number") or (column == "Unit") or
+            column.endswith(" REF") or search(r'^Comment\s*\[.+\]\s*$', column)
         )
 
 
