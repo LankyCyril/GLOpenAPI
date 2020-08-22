@@ -80,26 +80,31 @@ class StudyEntries(list):
  
     def _row_to_json(self, row, name):
         """Convert single row of table to multilevel JSON"""
-        json, qualifiable = {"": {self._self_identifier: name}}, None
+        json = {"": {self._self_identifier: name}}
+        protocol, qualifiable = None, None
         for column, value in row.items():
             field, subfield, extra = self._parse_field(column)
-            if not self._is_known_qualifier(column): # top-level field
+            if field == "Protocol REF":
+                protocol = value
+            elif not self._is_known_qualifier(column): # top-level field
                 if not subfield: # e.g. "Source Name"
+                    value_with_protocol = {"": value, "Protocol REF": protocol}
                     if field in json:
-                        json[field].append({"": value})
+                        json[field].append(value_with_protocol)
                     else: # make {"Source Name": {"": "ABC"}}
-                        json[field] = [{"": value}]
+                        json[field] = [value_with_protocol]
                     qualifiable = json[field][-1]
                 else: # e.g. "Characteristics[Age]"
                     if field not in json:
                         json[field] = {}
                     if subfield in json[field]:
-                        raise GeneLabISAException(
-                            "Duplicate field '{}[{}]'".format(field, subfield),
-                        )
+                        error = "Duplicate '{}[{}]'".format(field, subfield)
+                        raise GeneLabISAException(error)
                     else: # make {"Characteristics": {"Age": {"": "36"}}}
                         json[field][subfield] = {"": value}
                         qualifiable = json[field][subfield]
+                        if field == "Parameter Value":
+                            qualifiable["Protocol REF"] = protocol
             else: # qualify entry at pointer with second-level field
                 if qualifiable is None:
                     raise GeneLabISAException("Qualifier before main field")
@@ -107,9 +112,8 @@ class StudyEntries(list):
                     if "Comment" not in qualifiable:
                         qualifiable["Comment"] = {"": None}
                     qualifiable["Comment"][subfield or ""] = value
-                elif subfield:
-                    ... # TODO
-                    # log(f"Ignoring extra info past qualifier '{field}'")
+                elif subfield: # TODO
+                    ... # log(f"Ignoring extra info past qualifier '{field}'")
                 else: # make {"Unit": "percent"}
                     qualifiable[field] = value
         return json
