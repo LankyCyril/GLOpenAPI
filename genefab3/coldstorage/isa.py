@@ -121,7 +121,7 @@ class StudyEntries(list):
  
     def _parse_field(self, column):
         """Interpret field like 'Source Name' or 'Characteristics[sex,http://purl.obolibrary.org/obo/PATO_0000047,EFO]"""
-        matcher = search(r'(.+)\s*\[\s*(.+)\s*\]\s*$', column)
+        matcher = search(r'(.+[^\s])\s*\[\s*(.+[^\s])\s*\]\s*$', column)
         if matcher:
             field = matcher.group(1)
             subfield, *extra = matcher.group(2).split(",")
