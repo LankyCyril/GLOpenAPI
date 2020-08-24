@@ -14,12 +14,11 @@ COLD_GLDS_MASK = COLD_API_ROOT + "/data/study/data/{}/"
 COLD_FILEURLS_MASK = COLD_API_ROOT + "/data/glds/files/{}"
 COLD_FILEDATES_MASK = COLD_API_ROOT + "/data/study/filelistings/{}"
 
-INDEX_BY = "Sample Name"
 TIMESTAMP_FMT = "%a %b %d %H:%M:%S %Z %Y"
 
 MAX_JSON_AGE = 10800 # 3 hours (in seconds)
 CACHER_THREAD_CHECK_INTERVAL = 1800 # 30 minutes (in seconds)
-CACHER_THREAD_RECHECK_INTERVAL = 300 # 5 minutes (in seconds)
+CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
 
 ASSAY_TYPES = {
     "dna", "rna", "protein",

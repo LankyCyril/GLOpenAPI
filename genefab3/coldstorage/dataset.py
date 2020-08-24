@@ -1,25 +1,31 @@
 from argparse import Namespace
 from re import search
 from urllib.parse import quote
-from genefab3.coldstorage.json import download_cold_json as dl_json
+from genefab3.coldstorage.json import download_cold_json
 from genefab3.exceptions import GeneLabJSONException, GeneLabDatabaseException
 from memoized_property import memoized_property
 from genefab3.config import GENELAB_ROOT, ISA_ZIP_REGEX
 from genefab3.utils import extract_file_timestamp
 from genefab3.coldstorage.isa import IsaZip
+from collections import defaultdict
 from genefab3.coldstorage.assay import ColdStorageAssay
 
 
 class ColdStorageDataset():
     """Contains GLDS metadata associated with an accession number"""
     json = Namespace()
+    changed = Namespace()
     isa = None
  
-    def __init__(self, accession, json=Namespace(), init_assays=True):
+    def __init__(self, accession, json=Namespace(), init_assays=True, get_json=download_cold_json):
         """Request ISA and store fields"""
         jga = lambda name: getattr(json, name, None)
         # validate JSON and initialize identifiers"
-        self.json.glds = jga("glds") or dl_json(accession, "glds")
+        self.json.glds, self.changed.glds = jga("glds"), True
+        if not self.json.glds:
+            self.json.glds, self.changed.glds = get_json(
+                identifier=accession, kind="glds",
+            )
         if not self.json.glds:
             raise GeneLabJSONException("{}: no dataset found".format(accession))
         try:
@@ -36,8 +42,16 @@ class ColdStorageDataset():
                 error = "{}: initializing with wrong JSON".format(accession)
                 raise GeneLabJSONException(error)
         # populate file information:
-        self.json.fileurls = jga("fileurls") or dl_json(accession, "fileurls")
-        self.json.filedates = jga("fileurls") or dl_json(self._id, "filedates")
+        self.json.fileurls, self.changed.fileurls = jga("fileurls"), True
+        self.json.filedates, self.changed.filedates = jga("filedates"), True
+        if not self.json.fileurls:
+            self.json.fileurls, self.changed.fileurls = get_json(
+                identifier=accession, kind="fileurls",
+            )
+        if not self.json.filedates:
+            self.json.filedates, self.changed.filedates = get_json(
+                identifier=self._id, kind="filedates",
+            )
         # initialize assays via ISA ZIP:
         if init_assays:
             self.init_assays()
@@ -89,11 +103,10 @@ class ColdStorageDataset():
             print(isa_zip_descriptors)
             error = "{}: multiple ambiguous ISA ZIPs".format(self.accession)
             raise GeneLabDatabaseException(error)
-        #try:
-        #    self.assays = {a: None for a in self.isa.assays} # placeholders
-        #    self.assays = ColdStorageAssayDispatcher(self) # actual assays
-        #except (KeyError, TypeError):
-        #    raise GeneLabJSONException("Invalid JSON (field 'assays')")
+        # placeholders:
+        self.assays = {e[""]["Assay"]: None for e in self.isa.assays}
+        # actual assays:
+        self.assays = ColdStorageAssayDispatcher(self)
 
 
 class ColdStorageAssayDispatcher(dict):
@@ -101,10 +114,14 @@ class ColdStorageAssayDispatcher(dict):
  
     def __init__(self, dataset):
         """Populate dictionary of assay_name -> Assay()"""
-        for assay_name in dataset.isa.assays:
-            sample_key = infer_sample_key(assay_name, dataset.isa.samples)
+        isa_entries_by_assay = defaultdict(list)
+        for isa_entry in dataset.isa.assays:
+            assay_name = isa_entry[""]["Assay"]
+            isa_entries_by_assay[assay_name].append(isa_entry)
+        for assay_name, assay_isa_entries in isa_entries_by_assay.items():
             super().__setitem__(
-                assay_name, ColdStorageAssay(dataset, assay_name, sample_key)
+                assay_name,
+                ColdStorageAssay(dataset, assay_name, assay_isa_entries),
             )
  
     def __getitem__(self, assay_name):
