@@ -2,18 +2,26 @@ from bson import Code
 from bson.errors import InvalidDocument as InvalidDocumentError
 
 
-def insert_one_safe(collection, query):
-    """Insert key-value pairs, modifying dangerous keys ('_id', keys containing '$' and '.')"""
+def make_query_safe(query):
+    """Modify dangerous keys in nested dictionaries ('_id', keys containing '$' and '.')"""
     safe_query = {}
     for k, v in query.items():
         safe_key = k.replace("$", "_").replace(".", "_")
         if safe_key == "_id":
             safe_key = "__id"
         if safe_key not in safe_query:
-            safe_query[safe_key] = v
+            if isinstance(v, dict):
+                safe_query[safe_key] = make_query_safe(v)
+            else:
+                safe_query[safe_key] = v
         else:
             raise InvalidDocumentError("Safe keys conflict")
-    collection.insert_one(safe_query)
+    return safe_query
+
+
+def insert_one_safe(collection, query):
+    """Insert nested key-value pairs, modifying dangerous keys ('_id', keys containing '$' and '.')"""
+    collection.insert_one(make_query_safe(query))
 
 
 def replace_doc(collection, query, **kwargs):
