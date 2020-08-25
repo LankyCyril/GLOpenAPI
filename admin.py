@@ -16,17 +16,19 @@ if len(argv) == 3:
     db = getattr(mongo, MONGO_DB_NAME)
     if argv[1] == "drop":
         confirm("Yes, drop " + argv[2])
-        if argv[2] != "ALL":
-            CachedDataset.drop_cache(db=db, accession=argv[2])
-        else:
-            confirm("Yes, I am really sure I want to drop ALL")
+        if argv[2] == "ALLMETA":
+            confirm("Yes, I am really sure I want to drop ALLMETA")
             collection_names = {
                 "dataset_timestamps", "json_cache", "annotations", "metadata",
             }
             for cn in collection_names:
                 getattr(db, cn).delete_many({})
+        elif argv[2] == "log":
+            getattr(db, "log").delete_many({})
+        else:
+            CachedDataset.drop_cache(db=db, accession=argv[2])
     elif argv[1] == "recache":
-        if argv[2] == "ALL":
+        if argv[2].startswith("ALL"):
             raise NotImplementedError
         else:
             confirm("Yes, recache " + argv[2])
