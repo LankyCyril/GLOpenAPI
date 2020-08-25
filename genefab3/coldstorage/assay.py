@@ -2,7 +2,7 @@ from genefab3.exceptions import GeneLabException, GeneLabISAException
 from genefab3.utils import force_default_name_delimiter
 from pandas import DataFrame, read_csv
 from re import search, split
-from copy import copy
+from copy import deepcopy
 from urllib.request import urlopen
 
 
@@ -30,8 +30,13 @@ class ColdStorageAssay():
         except (KeyError, IndexError, TypeError):
             msg = "Attempt to associate an assay with the wrong dataset"
             raise GeneLabException(msg)
-        self.metadata = assay_isa_entries
-        try:
+        # populate metadata from Study entries, appending accession information:
+        self.metadata = []
+        for isa_entry in assay_isa_entries:
+            metadata_entry = deepcopy(isa_entry)
+            metadata_entry[""]["Accession"] = dataset.accession
+            self.metadata.append(metadata_entry)
+        try: # collect and check validity / uniqueness of Sample Name entries
             self.sample_names = {
                 entry["Sample Name"][0][""]
                 if len(entry["Sample Name"]) == 1 else None
@@ -43,13 +48,14 @@ class ColdStorageAssay():
         if None in self.sample_names:
             msg = "Malformed 'Sample Name' field in ISA entry"
             raise GeneLabISAException(msg)
-        try:
+        try: # populate annotation from combined Study and Assay entries
             self.annotation = []
             for sample_name in self.sample_names:
-                annotation_entry = copy(
+                annotation_entry = deepcopy(
                     dataset.isa.studies._by_sample_name[sample_name],
                 )
                 annotation_entry[""]["Assay"] = assay_name
+                annotation_entry[""]["Accession"] = dataset.accession
                 self.annotation.append(annotation_entry)
         except KeyError:
             msg = "Sample Name from Assay tab absent in Study tab"
@@ -90,7 +96,7 @@ class ColdStorageAssay():
         elif len(fileinfos) > 1:
             raise GeneLabException("Ambiguous file lookup")
         else:
-            fileinfo = copy(next(iter(fileinfos.values())))
+            fileinfo = deepcopy(next(iter(fileinfos.values())))
         if astype is None:
             with urlopen(fileinfo.url) as response:
                 fileinfo.filedata = response.read()

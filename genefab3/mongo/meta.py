@@ -91,13 +91,15 @@ class CachedDataset(ColdStorageDataset):
         if init_assays:
             self.init_assays()
             if self.changed.glds:
-                for assay in self.assays.values():
+                for assay_name, assay in self.assays.items():
+                    for collection in db.metadata, db.annotations:
+                        collection.delete_many({
+                            ".Accession": accession, ".Assay": assay_name,
+                        })
                     for entry in assay.metadata:
-                        #insert_one_safe(db.metadata, entry)
-                        print(entry)
+                        insert_one_safe(db.metadata, entry)
                     for entry in assay.annotation:
-                        #insert_one_safe(db.annotations, entry)
-                        print(entry)
+                        insert_one_safe(db.annotations, entry)
 
 
 class CacherThread(Thread):
