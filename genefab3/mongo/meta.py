@@ -69,7 +69,7 @@ def list_available_accessions(db):
 def list_fresh_and_stale_accessions(db, max_age=MAX_JSON_AGE):
     """Find accessions in no need / need of update in database"""
     refresh_dates = Series({
-        entry["accession"]: entry["last_refreshed"]
+        entry["Accession"]: entry["last_refreshed"]
         for entry in db.dataset_timestamps.find()
     })
     current_timestamp = int(datetime.now().timestamp())
