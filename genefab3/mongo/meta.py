@@ -3,7 +3,7 @@ from genefab3.config import COLD_SEARCH_MASK, MAX_JSON_AGE
 from genefab3.config import CACHER_THREAD_CHECK_INTERVAL
 from genefab3.config import CACHER_THREAD_RECHECK_DELAY
 from genefab3.coldstorage.json import download_cold_json
-from genefab3.mongo.utils import replace_doc, insert_one_safe
+from genefab3.mongo.utils import replace_doc, make_query_safe
 from genefab3.exceptions import GeneLabJSONException
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from datetime import datetime
@@ -45,6 +45,7 @@ def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, report_ch
             replace_doc(
                 db.json_cache, {"identifier": identifier, "kind": kind},
                 last_refreshed=int(datetime.now().timestamp()), raw=fresh_json,
+                _make_safe=False,
             )
             if report_changes and json_cache_info:
                 json_changed = (fresh_json != json_cache_info.get("raw", {}))
@@ -80,26 +81,47 @@ class CachedDataset(ColdStorageDataset):
     """ColdStorageDataset via auto-updated metadata in database"""
  
     def __init__(self, accession, db, init_assays=True):
+        self.db = db
         super().__init__(
             accession, init_assays=init_assays,
             get_json=partial(get_fresh_json, db=db),
         )
-        replace_doc(
-            db.dataset_timestamps, {"accession": accession},
-            last_refreshed=int(datetime.now().timestamp()),
-        )
-        if init_assays:
-            self.init_assays()
-            if self.changed.glds:
-                for assay_name, assay in self.assays.items():
-                    for collection in db.metadata, db.annotations:
-                        collection.delete_many({
-                            ".Accession": accession, ".Assay": assay_name,
-                        })
-                    for entry in assay.metadata:
-                        insert_one_safe(db.metadata, entry)
-                    for entry in assay.annotation:
-                        insert_one_safe(db.annotations, entry)
+        try:
+            if init_assays:
+                self.init_assays()
+                if self.changed.glds:
+                    for assay_name, assay in self.assays.items():
+                        for collection in db.metadata, db.annotations:
+                            collection.delete_many({
+                                ".Accession": accession, ".Assay": assay_name,
+                            })
+                        db.metadata.insert_many(
+                            make_query_safe(assay.metadata),
+                        )
+                        db.annotations.insert_many(
+                            make_query_safe(assay.annotation),
+                        )
+            replace_doc(
+                db.dataset_timestamps, {"Accession": accession},
+                last_refreshed=int(datetime.now().timestamp()),
+            )
+        except:
+            self.drop_cache()
+            raise
+ 
+    def drop_cache(self=None, db=None, accession=None):
+        (db or self.db).dataset_timestamps.delete_many({
+            "Accession": accession or self.accession,
+        })
+        (db or self.db).metadata.delete_many({
+            ".Accession": accession or self.accession,
+        })
+        (db or self.db).annotations.delete_many({
+            ".Accession": accession or self.accession,
+        })
+        (db or self.db).json_cache.delete_many({
+            "identifier": accession or self.accession,
+        })
 
 
 class CacherThread(Thread):
@@ -136,9 +158,7 @@ class CacherThread(Thread):
                                 "CacherThread: %s changed", accession,
                             )
                 for accession in (fresh | stale) - accessions:
-                    self.db.dataset_timestamps.delete_many({
-                        "accession": accession,
-                    })
+                    CachedDataset.drop_cache(db=self.db, accession=accession)
                 self.logger.info(
                     "CacherThread: %d fresh, %d stale", len(fresh), len(stale),
                 )

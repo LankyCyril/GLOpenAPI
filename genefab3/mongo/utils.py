@@ -4,30 +4,32 @@ from bson.errors import InvalidDocument as InvalidDocumentError
 
 def make_query_safe(query):
     """Modify dangerous keys in nested dictionaries ('_id', keys containing '$' and '.')"""
-    safe_query = {}
-    for k, v in query.items():
-        safe_key = k.replace("$", "_").replace(".", "_")
-        if safe_key == "_id":
-            safe_key = "__id"
-        if safe_key not in safe_query:
-            if isinstance(v, dict):
-                safe_query[safe_key] = make_query_safe(v)
+    if isinstance(query, list):
+        return [make_query_safe(q) for q in query]
+    else:
+        safe_query = {}
+        for k, v in query.items():
+            safe_key = k.replace("$", "_").replace(".", "_")
+            if safe_key == "_id":
+                safe_key = "__id"
+            if safe_key not in safe_query:
+                if isinstance(v, dict):
+                    safe_query[safe_key] = make_query_safe(v)
+                else:
+                    safe_query[safe_key] = v
             else:
-                safe_query[safe_key] = v
-        else:
-            raise InvalidDocumentError("Safe keys conflict")
-    return safe_query
+                raise InvalidDocumentError("Safe keys conflict")
+        return safe_query
 
 
-def insert_one_safe(collection, query):
-    """Insert nested key-value pairs, modifying dangerous keys ('_id', keys containing '$' and '.')"""
-    collection.insert_one(make_query_safe(query))
-
-
-def replace_doc(collection, query, **kwargs):
+def replace_doc(collection, query, _make_safe=True, **kwargs):
     """Shortcut to drop all instances and replace with updated instance"""
     collection.delete_many(query)
-    insert_one_safe(collection, {**query, **kwargs})
+    if _make_safe:
+        insert_query = make_query_safe({**query, **kwargs})
+    else:
+        insert_query = {**query, **kwargs}
+    collection.insert_one(insert_query)
 
 
 def get_collection_fields(collection, skip=set()):
