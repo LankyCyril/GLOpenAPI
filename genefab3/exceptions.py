@@ -24,15 +24,13 @@ def interpret_exc_info(ei):
 
 def insert_log_entry(log_collection, et=None, ev=None, stack=None, is_exception=False, **kwargs):
     try:
-        remote_addr = request.remote_addr
+        remote_addr, full_path = request.remote_addr, request.full_path
     except RuntimeError:
-        remote_addr = None
+        remote_addr, full_path = None, None
     log_collection.insert_one({
-        "timestamp": int(datetime.now().timestamp()),
-        "is_exception": is_exception,
-        "type": et, "value": ev, "stack": stack,
-        "remote_addr": remote_addr,
-        **kwargs,
+        "is_exception": is_exception, "type": et, "value": ev, "stack": stack,
+        "remote_addr": remote_addr, "full_path": full_path,
+        "timestamp": int(datetime.now().timestamp()), **kwargs,
     })
 
 
