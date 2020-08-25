@@ -24,7 +24,7 @@ class ColdStorageDataset():
         self.json.glds, self.changed.glds = jga("glds"), True
         if not self.json.glds:
             self.json.glds, self.changed.glds = get_json(
-                identifier=accession, kind="glds",
+                identifier=accession, kind="glds", report_changes=True,
             )
         if not self.json.glds:
             raise GeneLabJSONException("{}: no dataset found".format(accession))
@@ -46,11 +46,11 @@ class ColdStorageDataset():
         self.json.filedates, self.changed.filedates = jga("filedates"), True
         if not self.json.fileurls:
             self.json.fileurls, self.changed.fileurls = get_json(
-                identifier=accession, kind="fileurls",
+                identifier=accession, kind="fileurls", report_changes=True,
             )
         if not self.json.filedates:
             self.json.filedates, self.changed.filedates = get_json(
-                identifier=self._id, kind="filedates",
+                identifier=self._id, kind="filedates", report_changes=True,
             )
         # initialize assays via ISA ZIP:
         if init_assays:

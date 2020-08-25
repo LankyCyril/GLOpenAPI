@@ -44,10 +44,13 @@ class ColdStorageAssay():
             msg = "Malformed 'Sample Name' field in ISA entry"
             raise GeneLabISAException(msg)
         try:
-            self.annotation = [
-                dataset.isa.studies._by_sample_name[sample_name]
-                for sample_name in self.sample_names
-            ]
+            self.annotation = []
+            for sample_name in self.sample_names:
+                annotation_entry = copy(
+                    dataset.isa.studies._by_sample_name[sample_name],
+                )
+                annotation_entry[""]["Assay"] = assay_name
+                self.annotation.append(annotation_entry)
         except KeyError:
             msg = "Sample Name from Assay tab absent in Study tab"
             raise GeneLabISAException(msg)
