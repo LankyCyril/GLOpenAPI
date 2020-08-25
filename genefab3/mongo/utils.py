@@ -4,22 +4,24 @@ from bson.errors import InvalidDocument as InvalidDocumentError
 
 def make_query_safe(query):
     """Modify dangerous keys in nested dictionaries ('_id', keys containing '$' and '.')"""
-    if isinstance(query, list):
-        return [make_query_safe(q) for q in query]
-    else:
+    if isinstance(query, dict):
         safe_query = {}
         for k, v in query.items():
             safe_key = k.replace("$", "_").replace(".", "_")
             if safe_key == "_id":
                 safe_key = "__id"
             if safe_key not in safe_query:
-                if isinstance(v, dict):
+                if isinstance(v, (list, dict)):
                     safe_query[safe_key] = make_query_safe(v)
                 else:
                     safe_query[safe_key] = v
             else:
                 raise InvalidDocumentError("Safe keys conflict")
         return safe_query
+    elif isinstance(query, list):
+        return [make_query_safe(q) for q in query]
+    else:
+        return query
 
 
 def replace_doc(collection, query, _make_safe=True, **kwargs):
