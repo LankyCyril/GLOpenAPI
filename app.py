@@ -6,7 +6,9 @@ from genefab3.config import MONGO_DB_NAME, DEBUG_MARKERS, COMPRESSIBLE_MIMETYPES
 from flask import Flask, request
 from flask_compress import Compress
 from os import environ
-from genefab3.exceptions import traceback_printer, exception_catcher
+from genefab3.exceptions import traceback_printer, exception_catcher, DBLogger
+from logging import getLogger
+from functools import partial
 from genefab3.mongo.meta import CacherThread
 from genefab3.flask.display import displayable
 
@@ -30,9 +32,14 @@ if environ.get("WERKZEUG_RUN_MAIN", None) != "true":
     CacherThread(db).start()
 
 if environ.get("FLASK_ENV", None) in DEBUG_MARKERS:
-    traceback_printer = app.errorhandler(Exception)(traceback_printer)
+    traceback_printer = app.errorhandler(Exception)(
+        partial(traceback_printer, db=db),
+    )
 else:
-    exception_catcher = app.errorhandler(Exception)(exception_catcher)
+    exception_catcher = app.errorhandler(Exception)(
+        partial(exception_catcher, db=db),
+    )
+getLogger("genefab3").addHandler(DBLogger(db))
 
 
 # App routes:
