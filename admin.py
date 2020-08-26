@@ -76,12 +76,13 @@ def showlog(db, how):
     elif how.startswith("_id="):
         entry = db.log.find_one({"_id": ObjectId(how.lstrip("_id="))})
         fields = [
-            "_id  =\t{}".format(entry["_id"]),
-            "time =\t{}".format(format_timestamp(entry["timestamp"])),
-            "what =\t{}".format(TYPE_OPTS[entry.get("is_exception")]),
-            "type =\t{}".format(entry.get("type")),
-            "from =\t{}".format(entry.get("remote_addr")),
-            "mess = \t{}".format(entry.get("value")),
+            "_id  = {}".format(entry["_id"]),
+            "time = {}".format(format_timestamp(entry["timestamp"])),
+            "what = {}".format(TYPE_OPTS[entry.get("is_exception")]),
+            "type = {}".format(entry.get("type")),
+            "from = {}".format(entry.get("remote_addr")),
+            "path = {}".format(entry.get("full_path")),
+            "mess = {}".format(entry.get("value")),
             "---",
             entry.get("stack", ""),
         ]
