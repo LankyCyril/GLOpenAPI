@@ -28,7 +28,7 @@ INVESTIGATION_KEYS = { # "Real Name In Mixed Case" -> "as_reported_by_isatools"
 
 
 class Investigation(dict):
-    """Stores GLDS ISA Tab 'investigation' in accessible formats"""
+    """Stores GLDS ISA Tab 'investigation' in accessible formats""" # NOTE: work in progress
  
     def __init__(self, raw_investigation):
         for key, internal_key in INVESTIGATION_KEYS.items():
@@ -87,7 +87,7 @@ class StudyEntries(list):
             field, subfield, extra = self._parse_field(column)
             if field == "Protocol REF":
                 protocol = value
-            elif not self._is_known_qualifier(column): # top-level field
+            elif self._is_not_qualifier(field): # top-level field
                 if not subfield: # e.g. "Source Name"
                     qualifiable = self._INPLACE_add_toplevel_field(
                         json, field, value, protocol,
@@ -100,9 +100,7 @@ class StudyEntries(list):
                 if qualifiable is None:
                     raise GeneLabISAException("Qualifier before main field")
                 else:
-                    self._INPLACE_qualify(
-                        qualifiable, field, subfield, value,
-                    )
+                    self._INPLACE_qualify(qualifiable, field, subfield, value)
         return json
  
     def _parse_field(self, column):
@@ -115,11 +113,11 @@ class StudyEntries(list):
         else:
             return column, None, []
  
-    def _is_known_qualifier(self, column):
-        """Check if `column` is one of 'Term Accession Number', 'Unit', any 'Comment[.+]', or any '.*REF'"""
+    def _is_not_qualifier(self, field):
+        """Check if `column` is none of 'Term Accession Number', 'Unit', 'Comment', any '.* REF'"""
         return (
-            (column == "Term Accession Number") or (column == "Unit") or
-            column.endswith(" REF") or search(r'^Comment\s*\[.+\]\s*$', column)
+            (field not in {"Term Accession Number", "Unit", "Comment"}) and
+            (not field.endswith(" REF"))
         )
  
     def _INPLACE_add_toplevel_field(self, json, field, value, protocol):
@@ -152,10 +150,10 @@ class StudyEntries(list):
             if "Comment" not in qualifiable:
                 qualifiable["Comment"] = {"": None}
             qualifiable["Comment"][subfield or ""] = value
-        elif subfield:
-            warning = "Extra info past qualifier '{}'".format(field)
-            getLogger("genefab3").warning(warning, stack_info=True)
         else: # make {"Unit": "percent"}
+            if subfield:
+                warning = "Extra info past qualifier '{}'".format(field)
+                getLogger("genefab3").warning(warning, stack_info=True)
             qualifiable[field] = value
 
 
