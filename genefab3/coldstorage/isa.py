@@ -89,35 +89,20 @@ class StudyEntries(list):
                 protocol = value
             elif not self._is_known_qualifier(column): # top-level field
                 if not subfield: # e.g. "Source Name"
-                    value_with_protocol = {"": value, "Protocol REF": protocol}
-                    if field in json:
-                        json[field].append(value_with_protocol)
-                    else: # make {"Source Name": {"": "ABC"}}
-                        json[field] = [value_with_protocol]
-                    qualifiable = json[field][-1]
+                    qualifiable = self._INPLACE_add_toplevel_field(
+                        json, field, value, protocol,
+                    )
                 else: # e.g. "Characteristics[Age]"
-                    if field not in json:
-                        json[field] = {}
-                    if subfield in json[field]:
-                        error = "Duplicate '{}[{}]'".format(field, subfield)
-                        raise GeneLabISAException(error)
-                    else: # make {"Characteristics": {"Age": {"": "36"}}}
-                        json[field][subfield] = {"": value}
-                        qualifiable = json[field][subfield]
-                        if field == "Parameter Value":
-                            qualifiable["Protocol REF"] = protocol
+                    qualifiable = self._INPLACE_add_metadatalike(
+                        json, field, subfield, value, protocol,
+                    )
             else: # qualify entry at pointer with second-level field
                 if qualifiable is None:
                     raise GeneLabISAException("Qualifier before main field")
-                if field == "Comment": # make {"Comment": {"mood": "cheerful"}}
-                    if "Comment" not in qualifiable:
-                        qualifiable["Comment"] = {"": None}
-                    qualifiable["Comment"][subfield or ""] = value
-                elif subfield:
-                    warning = "Extra info past qualifier '{}'".format(field)
-                    getLogger("genefab3").warning(warning, stack_info=True)
-                else: # make {"Unit": "percent"}
-                    qualifiable[field] = value
+                else:
+                    self._INPLACE_qualify(
+                        qualifiable, field, subfield, value,
+                    )
         return json
  
     def _parse_field(self, column):
@@ -136,6 +121,42 @@ class StudyEntries(list):
             (column == "Term Accession Number") or (column == "Unit") or
             column.endswith(" REF") or search(r'^Comment\s*\[.+\]\s*$', column)
         )
+ 
+    def _INPLACE_add_toplevel_field(self, json, field, value, protocol):
+        """Add top-level key-value to json ('Source Name', 'Material Type',...), qualify with 'Protocol REF', point to resulting field"""
+        value_with_protocol = {"": value, "Protocol REF": protocol}
+        if field in json:
+            json[field].append(value_with_protocol)
+        else: # make {"Source Name": [{"": "ABC"}]}
+            json[field] = [value_with_protocol]
+        qualifiable = json[field][-1]
+        return qualifiable
+ 
+    def _INPLACE_add_metadatalike(self, json, field, subfield, value, protocol):
+        """Add metadatalike to json (e.g. 'Characteristics' -> 'Age'), qualify with 'Protocol REF', point to resulting field"""
+        if field not in json:
+            json[field] = {}
+        if subfield in json[field]:
+            error = "Duplicate '{}[{}]'".format(field, subfield)
+            raise GeneLabISAException(error)
+        else: # make {"Characteristics": {"Age": {"": "36"}}}
+            json[field][subfield] = {"": value}
+            qualifiable = json[field][subfield]
+            if field == "Parameter Value":
+                qualifiable["Protocol REF"] = protocol
+            return qualifiable
+ 
+    def _INPLACE_qualify(self, qualifiable, field, subfield, value):
+        """Add qualifier to field at pointer (qualifiable)"""
+        if field == "Comment": # make {"Comment": {"mood": "cheerful"}}
+            if "Comment" not in qualifiable:
+                qualifiable["Comment"] = {"": None}
+            qualifiable["Comment"][subfield or ""] = value
+        elif subfield:
+            warning = "Extra info past qualifier '{}'".format(field)
+            getLogger("genefab3").warning(warning, stack_info=True)
+        else: # make {"Unit": "percent"}
+            qualifiable[field] = value
 
 
 class AssayEntries(StudyEntries):
