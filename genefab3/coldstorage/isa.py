@@ -11,7 +11,7 @@ from isatools.isatab import load_investigation
 from collections import defaultdict
 
 
-INVESTIGATION_KEYS = {
+INVESTIGATION_KEYS = { # "Real Name In Mixed Case" -> "as_reported_by_isatools"
     "Ontology Source Reference": "ontology_sources",
     "Investigation": "investigation",
     "Investigation Publications": "i_publications",
@@ -53,14 +53,15 @@ class StudyEntries(list):
     _self_identifier = "Study"
  
     def _abort_lookup(self):
-        error = "Unique look up by sample name within AssayEntries not allowed"
-        raise GeneLabISAException(error)
+        """Prevents ambiguous lookup through `self._by_sample_name` in inherited classes"""
+        error_mask = "Unique look up by sample name within not allowed"
+        raise GeneLabISAException(error_mask.format(type(self).__name__))
  
     def __init__(self, raw_dataframes):
         """Convert tables to nested JSONs"""
         if self._self_identifier == "Study":
             self._by_sample_name = {}
-        else:
+        else: # lookup in classes like AssayEntries would be ambiguous
             self._by_sample_name = defaultdict(self._abort_lookup)
         for name, raw_dataframe in raw_dataframes.items():
             for _, row in raw_dataframe.iterrows():
@@ -143,9 +144,9 @@ class AssayEntries(StudyEntries):
 
 
 def parse_investigation(handle):
-    """Load investigation tab with isatools, safeguard input for engine='python', suppress logger"""
-    safe_handle = StringIO( # make number of double quotes inside fields even:
-        sub(
+    """Load investigation tab with isatools, safeguard input for engine='python', suppress isatools' logger"""
+    safe_handle = StringIO(
+        sub( # make number of double quotes inside fields even:
             r'([^\n\t])\"([^\n\t])', r'\1""\2',
             handle.read().decode(errors="replace")
         ),
@@ -196,7 +197,6 @@ class IsaZip:
         archive_name = isa_zip_url.split("/")[-1]
         for tab, value in raw._get_kwargs():
             if not value:
-                raise GeneLabISAException("{}: missing ISA tab '{}'".format(
-                    archive_name, tab,
-                ))
+                error = "{}: missing ISA tab '{}'".format(archive_name, tab)
+                raise GeneLabISAException(error)
         return raw
