@@ -1,4 +1,5 @@
 from pandas import read_csv
+from numpy import nan
 from re import search, sub
 from genefab3.exceptions import GeneLabISAException
 from argparse import Namespace
@@ -82,19 +83,19 @@ class StudyEntries(list):
     def _row_to_json(self, row, name):
         """Convert single row of table to nested JSON"""
         json = {"": {self._self_identifier: name}}
-        protocol, qualifiable = None, None
+        protocol_ref, qualifiable = nan, None
         for column, value in row.items():
             field, subfield, extra = self._parse_field(column)
             if field == "Protocol REF":
-                protocol = value
+                protocol_ref = value
             elif self._is_not_qualifier(field): # top-level field
                 if not subfield: # e.g. "Source Name"
                     qualifiable = self._INPLACE_add_toplevel_field(
-                        json, field, value, protocol,
+                        json, field, value, protocol_ref,
                     )
                 else: # e.g. "Characteristics[Age]"
                     qualifiable = self._INPLACE_add_metadatalike(
-                        json, field, subfield, value, protocol,
+                        json, field, subfield, value, protocol_ref,
                     )
             else: # qualify entry at pointer with second-level field
                 if qualifiable is None:
@@ -120,17 +121,17 @@ class StudyEntries(list):
             (not field.endswith(" REF"))
         )
  
-    def _INPLACE_add_toplevel_field(self, json, field, value, protocol):
+    def _INPLACE_add_toplevel_field(self, json, field, value, protocol_ref):
         """Add top-level key-value to json ('Source Name', 'Material Type',...), qualify with 'Protocol REF', point to resulting field"""
-        value_with_protocol = {"": value, "Protocol REF": protocol}
+        value_with_protocol_ref = {"": value, "Protocol REF": protocol_ref}
         if field in json:
-            json[field].append(value_with_protocol)
+            json[field].append(value_with_protocol_ref)
         else: # make {"Source Name": [{"": "ABC"}]}
-            json[field] = [value_with_protocol]
+            json[field] = [value_with_protocol_ref]
         qualifiable = json[field][-1]
         return qualifiable
  
-    def _INPLACE_add_metadatalike(self, json, field, subfield, value, protocol):
+    def _INPLACE_add_metadatalike(self, json, field, subfield, value, protocol_ref):
         """Add metadatalike to json (e.g. 'Characteristics' -> 'Age'), qualify with 'Protocol REF', point to resulting field"""
         if field not in json:
             json[field] = {}
@@ -141,14 +142,14 @@ class StudyEntries(list):
             json[field][subfield] = {"": value}
             qualifiable = json[field][subfield]
             if field == "Parameter Value":
-                qualifiable["Protocol REF"] = protocol
+                qualifiable["Protocol REF"] = protocol_ref
             return qualifiable
  
     def _INPLACE_qualify(self, qualifiable, field, subfield, value):
         """Add qualifier to field at pointer (qualifiable)"""
         if field == "Comment": # make {"Comment": {"mood": "cheerful"}}
             if "Comment" not in qualifiable:
-                qualifiable["Comment"] = {"": None}
+                qualifiable["Comment"] = {"": nan}
             qualifiable["Comment"][subfield or ""] = value
         else: # make {"Unit": "percent"}
             if subfield:
