@@ -58,14 +58,14 @@ class StudyEntries(list):
         error_mask = "Unique look up by sample name within not allowed"
         raise GeneLabISAException(error_mask.format(type(self).__name__))
  
-    def __init__(self, raw_dataframes):
+    def __init__(self, raw_tabs):
         """Convert tables to nested JSONs"""
         if self._self_identifier == "Study":
             self._by_sample_name = {}
         else: # lookup in classes like AssayEntries would be ambiguous
             self._by_sample_name = defaultdict(self._abort_lookup)
-        for name, raw_dataframe in raw_dataframes.items():
-            for _, row in raw_dataframe.iterrows():
+        for name, raw_tab in raw_tabs.items():
+            for _, row in raw_tab.iterrows():
                 if "Sample Name" not in row:
                     error = "Table entry must have 'Sample Name'"
                     raise GeneLabISAException(error)
@@ -177,12 +177,12 @@ def parse_investigation(handle):
 
 def read_tab(handle):
     """Read TSV file, allowing for duplicate column names"""
-    raw_dataframe = read_csv(
+    raw_tab = read_csv(
         handle, sep="\t", comment="#", header=None, index_col=False,
     )
-    raw_dataframe.columns = raw_dataframe.iloc[0,:]
-    raw_dataframe.columns.name = None
-    return raw_dataframe.drop(index=[0]).reset_index(drop=True)
+    raw_tab.columns = raw_tab.iloc[0,:]
+    raw_tab.columns.name = None
+    return raw_tab.drop(index=[0]).drop_duplicates().reset_index(drop=True)
 
 
 class IsaZip:
