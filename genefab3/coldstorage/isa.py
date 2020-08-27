@@ -49,7 +49,7 @@ class Investigation(dict):
 
 
 class StudyEntries(list):
-    """Stores GLDS ISA Tab 'studies' records as a multilevel JSON"""
+    """Stores GLDS ISA Tab 'studies' records as a nested JSON"""
     _self_identifier = "Study"
  
     def _abort_lookup(self):
@@ -57,7 +57,7 @@ class StudyEntries(list):
         raise GeneLabISAException(error)
  
     def __init__(self, raw_dataframes):
-        """Convert tables to multilevel JSONs"""
+        """Convert tables to nested JSONs"""
         if self._self_identifier == "Study":
             self._by_sample_name = {}
         else:
@@ -79,7 +79,7 @@ class StudyEntries(list):
                         self._by_sample_name[sample_name] = json
  
     def _row_to_json(self, row, name):
-        """Convert single row of table to multilevel JSON"""
+        """Convert single row of table to nested JSON"""
         json = {"": {self._self_identifier: name}}
         protocol, qualifiable = None, None
         for column, value in row.items():
@@ -138,7 +138,7 @@ class StudyEntries(list):
 
 
 class AssayEntries(StudyEntries):
-    """Stores GLDS ISA Tab 'assays' records as a multilevel JSON"""
+    """Stores GLDS ISA Tab 'assays' records as a nested JSON"""
     _self_identifier = "Assay"
 
 
@@ -181,12 +181,12 @@ class IsaZip:
         )
         with urlopen(isa_zip_url) as response:
             with ZipFile(BytesIO(response.read())) as archive:
-                for relpath in archive.namelist():
-                    _, filename = path.split(relpath)
+                for filepath in archive.namelist():
+                    _, filename = path.split(filepath)
                     matcher = search(r'^([isa])_(.+)\.txt$', filename)
                     if matcher:
                         kind, name = matcher.groups()
-                        with archive.open(relpath) as handle:
+                        with archive.open(filepath) as handle:
                             if kind == "i":
                                 raw.investigation = parse_investigation(handle)
                             elif kind == "s":
