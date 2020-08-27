@@ -174,7 +174,7 @@ def parse_investigation(handle):
     return load_investigation(safe_handle)
 
 
-def read_table(handle):
+def read_tab(handle):
     """Read TSV file, allowing for duplicate column names"""
     raw_dataframe = read_csv(
         handle, sep="\t", comment="#", header=None, index_col=False,
@@ -210,9 +210,9 @@ class IsaZip:
                             if kind == "i":
                                 raw.investigation = parse_investigation(handle)
                             elif kind == "s":
-                                raw.studies[name] = read_table(handle)
+                                raw.studies[name] = read_tab(handle)
                             elif kind == "a":
-                                raw.assays[name] = read_table(handle)
+                                raw.assays[name] = read_tab(handle)
         archive_name = isa_zip_url.split("/")[-1]
         for tab, value in raw._get_kwargs():
             if not value:
