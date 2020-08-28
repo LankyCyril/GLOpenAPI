@@ -189,7 +189,7 @@ def read_tab(handle, filename):
         raw_tab = read_csv(string_tee, **reader_kwargs)
         warning_mask = "Absorbing {}: Potentially badly formatted tab file {}"
         warning = warning_mask.format(repr(e), filename)
-        getLogger("genefab3").warning(warning, stack_info=True)
+        getLogger("genefab3").warning(warning)
     raw_tab.columns = raw_tab.iloc[0,:]
     raw_tab.columns.name = None
     return raw_tab.drop(index=[0]).drop_duplicates().reset_index(drop=True)
