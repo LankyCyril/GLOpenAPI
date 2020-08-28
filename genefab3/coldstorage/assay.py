@@ -25,31 +25,30 @@ class ColdStorageAssay():
  
     def __init__(self, dataset, assay_name, assay_isa_entries):
         """Combine and re-parse Assay and Study entries from dataset ISA"""
+        self.metadata, self.annotation, self.sample_names = [], [], set()
         try:
             _ = dataset.assays[assay_name]
         except (KeyError, IndexError, TypeError):
-            msg = "Attempt to associate an assay with the wrong dataset"
-            raise GeneLabException(msg)
+            error = "Attempt to associate an assay with the wrong dataset"
+            raise GeneLabException(error)
         # populate metadata from Study entries, appending accession information:
-        self.metadata = []
         for isa_entry in assay_isa_entries:
             metadata_entry = deepcopy(isa_entry)
             metadata_entry[""]["Accession"] = dataset.accession
             self.metadata.append(metadata_entry)
-        try: # collect and check validity / uniqueness of Sample Name entries
-            self.sample_names = {
-                entry["Sample Name"][0][""]
-                if len(entry["Sample Name"]) == 1 else None
-                for entry in assay_isa_entries
-            }
-        except (KeyError, IndexError):
-            msg = "Could not retrieve Sample Name from ISA entry"
-            raise GeneLabISAException(msg)
-        if None in self.sample_names:
-            msg = "Malformed 'Sample Name' field in ISA entry"
-            raise GeneLabISAException(msg)
+        # collect and check validity / uniqueness of Sample Name entries:
+        for entry in assay_isa_entries:
+            try:
+                entry_sample_names = {ee[""] for ee in entry["Sample Name"]}
+            except (KeyError, IndexError, TypeError):
+                error = "Could not retrieve Sample Name from Assay entry"
+                raise GeneLabISAException(error)
+            if len(entry_sample_names) == 1:
+                self.sample_names.add(entry_sample_names.pop())
+            else:
+                error = "Assay tab has multiple Sample Names for one entry"
+                raise GeneLabISAException(error)
         # populate annotation from combined Study and Assay entries:
-        self.annotation = []
         for sample_name in self.sample_names:
             if sample_name in dataset.isa.studies._by_sample_name:
                 annotation_entry = deepcopy(
