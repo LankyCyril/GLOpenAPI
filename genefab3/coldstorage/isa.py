@@ -156,7 +156,7 @@ class StudyEntries(list):
         else: # make {"Unit": "percent"}
             if subfield:
                 warning = "Extra info past qualifier '{}'".format(field)
-                getLogger("genefab3").warning(warning, stack_info=True)
+                getLogger("genefab3").warning(warning)
             qualifiable[field] = value
 
 
