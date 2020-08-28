@@ -48,18 +48,16 @@ class ColdStorageAssay():
         if None in self.sample_names:
             msg = "Malformed 'Sample Name' field in ISA entry"
             raise GeneLabISAException(msg)
-        try: # populate annotation from combined Study and Assay entries
-            self.annotation = []
-            for sample_name in self.sample_names:
+        # populate annotation from combined Study and Assay entries:
+        self.annotation = []
+        for sample_name in self.sample_names:
+            if sample_name in dataset.isa.studies._by_sample_name:
                 annotation_entry = deepcopy(
                     dataset.isa.studies._by_sample_name[sample_name],
                 )
                 annotation_entry[""]["Assay"] = assay_name
                 annotation_entry[""]["Accession"] = dataset.accession
                 self.annotation.append(annotation_entry)
-        except KeyError:
-            msg = "Sample Name from Assay tab absent in Study tab"
-            raise GeneLabISAException(msg)
  
     def resolve_filename(self, mask, sample_mask=".*", field_mask=".*"):
         """Given masks, find filenames, urls, and datestamps"""
