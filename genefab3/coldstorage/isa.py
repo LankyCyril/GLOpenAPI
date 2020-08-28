@@ -75,7 +75,8 @@ class StudyEntries(list):
                 super().append(json)
                 if self._self_identifier == "Study":
                     if sample_name in self._by_sample_name:
-                        error = "Duplicate Sample Name in studies"
+                        error_mask = "Duplicate Sample Name '{}' in studies"
+                        error = error_mask.format(sample_name)
                         raise GeneLabISAException(error)
                     else:
                         self._by_sample_name[sample_name] = json
