@@ -1,4 +1,5 @@
 from pandas import read_csv
+from pandas.errors import ParserError
 from numpy import nan
 from re import search, sub
 from genefab3.exceptions import GeneLabISAException
@@ -176,11 +177,19 @@ def parse_investigation(handle):
     return load_investigation(safe_handle)
 
 
-def read_tab(handle):
-    """Read TSV file, allowing for duplicate column names"""
-    raw_tab = read_csv(
-        handle, sep="\t", comment="#", header=None, index_col=False,
-    )
+def read_tab(handle, filename):
+    """Read TSV file, absorbing encoding errors, and allowing for duplicate column names"""
+    byte_tee = BytesIO(handle.read())
+    reader_kwargs = dict(sep="\t", comment="#", header=None, index_col=False)
+    try:
+        raw_tab = read_csv(byte_tee, **reader_kwargs)
+    except (UnicodeDecodeError, ParserError) as e:
+        byte_tee.seek(0)
+        string_tee = StringIO(byte_tee.read().decode(errors="replace"))
+        raw_tab = read_csv(string_tee, **reader_kwargs)
+        warning_mask = "Absorbing {}: Potentially badly formatted tab file {}"
+        warning = warning_mask.format(repr(e), filename)
+        getLogger("genefab3").warning(warning, stack_info=True)
     raw_tab.columns = raw_tab.iloc[0,:]
     raw_tab.columns.name = None
     return raw_tab.drop(index=[0]).drop_duplicates().reset_index(drop=True)
@@ -212,9 +221,9 @@ class IsaZip:
                             if kind == "i":
                                 raw.investigation = parse_investigation(handle)
                             elif kind == "s":
-                                raw.studies[name] = read_tab(handle)
+                                raw.studies[name] = read_tab(handle, filename)
                             elif kind == "a":
-                                raw.assays[name] = read_tab(handle)
+                                raw.assays[name] = read_tab(handle, filename)
         archive_name = isa_zip_url.split("/")[-1]
         for tab, value in raw._get_kwargs():
             if not value:
