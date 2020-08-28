@@ -55,7 +55,7 @@ class StudyEntries(list):
  
     def _abort_lookup(self):
         """Prevents ambiguous lookup through `self._by_sample_name` in inherited classes"""
-        error_mask = "Unique look up by sample name within not allowed"
+        error_mask = "Unique look up by sample name within {} not allowed"
         raise GeneLabISAException(error_mask.format(type(self).__name__))
  
     def __init__(self, raw_tabs):
