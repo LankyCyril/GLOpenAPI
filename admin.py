@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from logging import getLogger, INFO
 from sys import argv
 from pymongo import MongoClient, DESCENDING
 from bson.objectid import ObjectId
@@ -9,6 +10,10 @@ from datetime import datetime
 
 TIME_FMT = "%Y-%m-%d %H:%M:%S"
 TYPE_OPTS = {True: "Exception", False: "Warning", None: "Unknown"}
+
+
+logger = getLogger("genefab3")
+logger.setLevel(INFO)
 
 
 def format_timestamp(timestamp):
@@ -42,7 +47,7 @@ def recache(db, what):
     else:
         confirm("Yes, recache " + what)
         CachedDataset.drop_cache(db=db, accession=what)
-        CachedDataset(what, db)
+        CachedDataset(db, what, logger=logger)
 
 
 def showlog(db, how):

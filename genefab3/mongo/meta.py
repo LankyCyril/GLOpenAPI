@@ -3,7 +3,7 @@ from genefab3.config import COLD_SEARCH_MASK, MAX_JSON_AGE
 from genefab3.config import CACHER_THREAD_CHECK_INTERVAL
 from genefab3.config import CACHER_THREAD_RECHECK_DELAY
 from genefab3.coldstorage.json import download_cold_json
-from genefab3.mongo.utils import replace_doc, make_query_safe
+from genefab3.mongo.utils import replace_doc, make_query_safe as safe
 from genefab3.exceptions import GeneLabJSONException
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from datetime import datetime
@@ -80,8 +80,8 @@ def list_fresh_and_stale_accessions(db, max_age=MAX_JSON_AGE):
 class CachedDataset(ColdStorageDataset):
     """ColdStorageDataset via auto-updated metadata in database"""
  
-    def __init__(self, accession, db, init_assays=True):
-        self.db = db
+    def __init__(self, db, accession, logger, init_assays=True):
+        self.db, self.logger = db, logger
         super().__init__(
             accession, init_assays=init_assays,
             get_json=partial(get_fresh_json, db=db),
@@ -95,12 +95,16 @@ class CachedDataset(ColdStorageDataset):
                             collection.delete_many({
                                 ".Accession": accession, ".Assay": assay_name,
                             })
-                        db.metadata.insert_many(
-                            make_query_safe(assay.metadata),
-                        )
-                        db.annotations.insert_many(
-                            make_query_safe(assay.annotation),
-                        )
+                        if assay.metadata:
+                            db.metadata.insert_many(safe(assay.metadata))
+                        else:
+                            msg_mask = "%s, %s: no metadata entries"
+                            logger.warning(msg_mask, accession, assay_name)
+                        if assay.annotation:
+                            db.annotations.insert_many(safe(assay.annotation))
+                        else:
+                            msg_mask = "%s, %s: no annotation entries"
+                            logger.warning(msg_mask, accession, assay_name)
             replace_doc(
                 db.dataset_timestamps, {"Accession": accession},
                 last_refreshed=int(datetime.now().timestamp()),
@@ -146,7 +150,7 @@ class CacherThread(Thread):
             else:
                 for accession in accessions - fresh:
                     try:
-                        glds = CachedDataset(accession, self.db)
+                        glds = CachedDataset(self.db, accession, self.logger)
                     except Exception as e:
                         self.logger.error(
                             "CacherThread: %s at accession %s",
