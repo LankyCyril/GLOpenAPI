@@ -9,7 +9,7 @@ from datetime import datetime
 
 
 TIME_FMT = "%Y-%m-%d %H:%M:%S"
-TYPE_OPTS = {True: "Exception", False: "Warning", None: "Unknown"}
+TYPE_OPTS = {True: "Exception", False: "LogMessage", None: "Unknown"}
 
 
 logger = getLogger("genefab3")
