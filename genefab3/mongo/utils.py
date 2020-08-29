@@ -2,33 +2,35 @@ from bson import Code
 from bson.errors import InvalidDocument as InvalidDocumentError
 
 
-def make_query_safe(query):
+def harmonize_query(query, lowercase=True):
     """Modify dangerous keys in nested dictionaries ('_id', keys containing '$' and '.')"""
     if isinstance(query, dict):
-        safe_query = {}
+        harmonized = {}
         for k, v in query.items():
-            safe_key = k.replace("$", "_").replace(".", "_")
-            if safe_key == "_id":
-                safe_key = "__id"
-            if safe_key not in safe_query:
+            harmonized_key = k.replace("$", "_").replace(".", "_")
+            if lowercase:
+                harmonized_key = harmonized_key.lower()
+            if harmonized_key == "_id":
+                harmonized_key = "__id"
+            if harmonized_key not in harmonized:
                 if isinstance(v, (list, dict)):
-                    safe_query[safe_key] = make_query_safe(v)
+                    harmonized[harmonized_key] = harmonize_query(v)
                 else:
-                    safe_query[safe_key] = v
+                    harmonized[harmonized_key] = v
             else:
-                raise InvalidDocumentError("Safe keys conflict")
-        return safe_query
+                raise InvalidDocumentError("Harmonized keys conflict")
+        return harmonized
     elif isinstance(query, list):
-        return [make_query_safe(q) for q in query]
+        return [harmonize_query(q) for q in query]
     else:
         return query
 
 
-def replace_doc(collection, query, _make_safe=True, **kwargs):
+def replace_doc(collection, query, _harmonize=True, **kwargs):
     """Shortcut to drop all instances and replace with updated instance"""
     collection.delete_many(query)
-    if _make_safe:
-        insert_query = make_query_safe({**query, **kwargs})
+    if _harmonize:
+        insert_query = harmonize_query({**query, **kwargs})
     else:
         insert_query = {**query, **kwargs}
     collection.insert_one(insert_query)

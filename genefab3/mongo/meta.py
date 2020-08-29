@@ -3,7 +3,7 @@ from genefab3.config import COLD_SEARCH_MASK, MAX_JSON_AGE
 from genefab3.config import CACHER_THREAD_CHECK_INTERVAL
 from genefab3.config import CACHER_THREAD_RECHECK_DELAY
 from genefab3.coldstorage.json import download_cold_json
-from genefab3.mongo.utils import replace_doc, make_query_safe as safe
+from genefab3.mongo.utils import replace_doc, harmonize_query as nize
 from genefab3.exceptions import GeneLabJSONException
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from datetime import datetime
@@ -45,7 +45,7 @@ def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, report_ch
             replace_doc(
                 db.json_cache, {"identifier": identifier, "kind": kind},
                 last_refreshed=int(datetime.now().timestamp()), raw=fresh_json,
-                _make_safe=False,
+                _harmonize=False,
             )
             if report_changes and json_cache_info:
                 json_changed = (fresh_json != json_cache_info.get("raw", {}))
@@ -96,12 +96,12 @@ class CachedDataset(ColdStorageDataset):
                                 ".Accession": accession, ".Assay": assay_name,
                             })
                         if assay.metadata:
-                            db.metadata.insert_many(safe(assay.metadata))
+                            db.metadata.insert_many(nize(assay.metadata))
                         else:
                             msg_mask = "%s, %s: no metadata entries"
                             logger.warning(msg_mask, accession, assay_name)
                         if assay.annotation:
-                            db.annotations.insert_many(safe(assay.annotation))
+                            db.annotations.insert_many(nize(assay.annotation))
                         else:
                             msg_mask = "%s, %s: no annotation entries"
                             logger.warning(msg_mask, accession, assay_name)
