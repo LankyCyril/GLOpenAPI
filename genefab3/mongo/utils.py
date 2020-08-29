@@ -26,13 +26,13 @@ def harmonize_query(query, lowercase=True):
         return query
 
 
-def replace_doc(collection, query, _harmonize=True, **kwargs):
+def replace_doc(collection, query, doc, harmonize=False):
     """Shortcut to drop all instances and replace with updated instance"""
     collection.delete_many(query)
-    if _harmonize:
-        insert_query = harmonize_query({**query, **kwargs})
+    if harmonize:
+        insert_query = harmonize_query({**query, **doc})
     else:
-        insert_query = {**query, **kwargs}
+        insert_query = {**query, **doc}
     collection.insert_one(insert_query)
 
 

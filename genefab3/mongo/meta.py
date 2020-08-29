@@ -43,9 +43,11 @@ def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, report_ch
                 raise GeneLabJSONException(msg_mask.format(identifier))
         else:
             replace_doc(
-                db.json_cache, {"identifier": identifier, "kind": kind},
-                last_refreshed=int(datetime.now().timestamp()), raw=fresh_json,
-                _harmonize=False,
+                db.json_cache, {"identifier": identifier, "kind": kind}, {
+                    "last_refreshed": int(datetime.now().timestamp()),
+                    "raw": fresh_json,
+                },
+                harmonize=False,
             )
             if report_changes and json_cache_info:
                 json_changed = (fresh_json != json_cache_info.get("raw", {}))
@@ -107,7 +109,8 @@ class CachedDataset(ColdStorageDataset):
                             logger.warning(msg_mask, accession, assay_name)
             replace_doc(
                 db.dataset_timestamps, {"Accession": accession},
-                last_refreshed=int(datetime.now().timestamp()),
+                {"last_refreshed": int(datetime.now().timestamp())},
+                harmonize=True,
             )
         except:
             self.drop_cache()
