@@ -177,7 +177,7 @@ def parse_investigation(handle):
     return load_investigation(safe_handle)
 
 
-def read_tab(handle, filename):
+def read_tab(handle, isa_zip_url, filename):
     """Read TSV file, absorbing encoding errors, and allowing for duplicate column names"""
     byte_tee = BytesIO(handle.read())
     reader_kwargs = dict(sep="\t", comment="#", header=None, index_col=False)
@@ -187,8 +187,8 @@ def read_tab(handle, filename):
         byte_tee.seek(0)
         string_tee = StringIO(byte_tee.read().decode(errors="replace"))
         raw_tab = read_csv(string_tee, **reader_kwargs)
-        warning_mask = "Absorbing {}: Potentially badly formatted tab file {}"
-        warning = warning_mask.format(repr(e), filename)
+        warning_mask = "{}: absorbing {} when reading from {}"
+        warning = warning_mask.format(isa_zip_url, repr(e), filename)
         getLogger("genefab3").warning(warning)
     raw_tab.columns = raw_tab.iloc[0,:]
     raw_tab.columns.name = None
@@ -221,12 +221,15 @@ class IsaZip:
                             if kind == "i":
                                 raw.investigation = parse_investigation(handle)
                             elif kind == "s":
-                                raw.studies[name] = read_tab(handle, filename)
+                                raw.studies[name] = read_tab(
+                                    handle, isa_zip_url, filename,
+                                )
                             elif kind == "a":
-                                raw.assays[name] = read_tab(handle, filename)
-        archive_name = isa_zip_url.split("/")[-1]
+                                raw.assays[name] = read_tab(
+                                    handle, isa_zip_url, filename,
+                                )
         for tab, value in raw._get_kwargs():
             if not value:
-                error = "{}: missing ISA tab '{}'".format(archive_name, tab)
+                error = "{}: missing ISA tab '{}'".format(isa_zip_url, tab)
                 raise GeneLabISAException(error)
         return raw
