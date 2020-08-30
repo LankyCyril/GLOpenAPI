@@ -71,7 +71,7 @@ def list_available_accessions(db):
 def list_fresh_and_stale_accessions(db, max_age=MAX_JSON_AGE):
     """Find accessions in no need / need of update in database"""
     refresh_dates = Series({
-        entry["Accession"]: entry["last_refreshed"]
+        entry["accession"]: entry["last_refreshed"]
         for entry in db.dataset_timestamps.find()
     })
     current_timestamp = int(datetime.now().timestamp())
@@ -95,7 +95,7 @@ class CachedDataset(ColdStorageDataset):
                     for assay_name, assay in self.assays.items():
                         for collection in db.metadata, db.annotations:
                             collection.delete_many({
-                                ".Accession": accession, ".Assay": assay_name,
+                                ".accession": accession, ".assay": assay_name,
                             })
                         if assay.metadata:
                             db.metadata.insert_many(nize(assay.metadata))
@@ -108,7 +108,7 @@ class CachedDataset(ColdStorageDataset):
                             msg_mask = "%s, %s: no annotation entries"
                             logger.warning(msg_mask, accession, assay_name)
             replace_doc(
-                db.dataset_timestamps, {"Accession": accession},
+                db.dataset_timestamps, {"accession": accession},
                 {"last_refreshed": int(datetime.now().timestamp())},
                 harmonize=True,
             )
@@ -118,13 +118,13 @@ class CachedDataset(ColdStorageDataset):
  
     def drop_cache(self=None, db=None, accession=None):
         (db or self.db).dataset_timestamps.delete_many({
-            "Accession": accession or self.accession,
+            "accession": accession or self.accession,
         })
         (db or self.db).metadata.delete_many({
-            ".Accession": accession or self.accession,
+            ".accession": accession or self.accession,
         })
         (db or self.db).annotations.delete_many({
-            ".Accession": accession or self.accession,
+            ".accession": accession or self.accession,
         })
         (db or self.db).json_cache.delete_many({
             "identifier": accession or self.accession,
