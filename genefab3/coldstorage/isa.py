@@ -59,7 +59,7 @@ class StudyEntries(list):
         error_mask = "Unique look up by sample name within {} not allowed"
         raise GeneLabISAException(error_mask.format(type(self).__name__))
  
-    def __init__(self, raw_tabs):
+    def __init__(self, raw_tabs, **logger_info):
         """Convert tables to nested JSONs"""
         if self._self_identifier == "Study":
             self._by_sample_name = {}
@@ -72,7 +72,7 @@ class StudyEntries(list):
                     raise GeneLabISAException(error)
                 else:
                     sample_name = row["Sample Name"]
-                json = self._row_to_json(row, name)
+                json = self._row_to_json(row, name, **logger_info)
                 super().append(json)
                 if self._self_identifier == "Study":
                     if sample_name in self._by_sample_name:
@@ -82,7 +82,7 @@ class StudyEntries(list):
                     else:
                         self._by_sample_name[sample_name] = json
  
-    def _row_to_json(self, row, name):
+    def _row_to_json(self, row, name, **logger_info):
         """Convert single row of table to nested JSON"""
         json = {"": {self._self_identifier: name}}
         protocol_ref, qualifiable = nan, None
@@ -103,7 +103,10 @@ class StudyEntries(list):
                 if qualifiable is None:
                     raise GeneLabISAException("Qualifier before main field")
                 else:
-                    self._INPLACE_qualify(qualifiable, field, subfield, value)
+                    info = {**logger_info, "name": name}
+                    self._INPLACE_qualify(
+                        qualifiable, field, subfield, value, **info,
+                    )
         return json
  
     def _parse_field(self, column):
@@ -147,7 +150,7 @@ class StudyEntries(list):
                 qualifiable["Protocol REF"] = protocol_ref
             return qualifiable
  
-    def _INPLACE_qualify(self, qualifiable, field, subfield, value):
+    def _INPLACE_qualify(self, qualifiable, field, subfield, value, **logger_info):
         """Add qualifier to field at pointer (qualifiable)"""
         if field == "Comment": # make {"Comment": {"mood": "cheerful"}}
             if "Comment" not in qualifiable:
@@ -155,7 +158,11 @@ class StudyEntries(list):
             qualifiable["Comment"][subfield or ""] = value
         else: # make {"Unit": "percent"}
             if subfield:
-                warning = "Extra info past qualifier '{}'".format(field)
+                warning_mask = "{}: Extra info past qualifier '{}' in {} tab {}"
+                warning = warning_mask.format(
+                    logger_info.get("isa_zip_url", "[URL]"), field,
+                    self._self_identifier, logger_info["name"],
+                )
                 getLogger("genefab3").warning(warning)
             qualifiable[field] = value
 
@@ -177,7 +184,7 @@ def parse_investigation(handle):
     return load_investigation(safe_handle)
 
 
-def read_tab(handle, isa_zip_url, filename):
+def read_tab(handle, **logger_info):
     """Read TSV file, absorbing encoding errors, and allowing for duplicate column names"""
     byte_tee = BytesIO(handle.read())
     reader_kwargs = dict(sep="\t", comment="#", header=None, index_col=False)
@@ -188,7 +195,10 @@ def read_tab(handle, isa_zip_url, filename):
         string_tee = StringIO(byte_tee.read().decode(errors="replace"))
         raw_tab = read_csv(string_tee, **reader_kwargs)
         warning_mask = "{}: absorbing {} when reading from {}"
-        warning = warning_mask.format(isa_zip_url, repr(e), filename)
+        warning = warning_mask.format(
+            logger_info.get("isa_zip_url", "[URL]"), repr(e),
+            logger_info.get("filename", "file"),
+        )
         getLogger("genefab3").warning(warning)
     raw_tab.columns = raw_tab.iloc[0,:]
     raw_tab.columns.name = None
@@ -200,10 +210,11 @@ class IsaZip:
  
     def __init__(self, isa_zip_url):
         """Unpack ZIP from URL and delegate to sub-parsers"""
+        info = dict(isa_zip_url=isa_zip_url)
         self.raw = self.ingest_raw_isa(isa_zip_url)
         self.investigation = Investigation(self.raw.investigation)
-        self.studies = StudyEntries(self.raw.studies)
-        self.assays = AssayEntries(self.raw.assays)
+        self.studies = StudyEntries(self.raw.studies, **info)
+        self.assays = AssayEntries(self.raw.assays, **info)
  
     def ingest_raw_isa(self, isa_zip_url):
         """Unpack ZIP from URL and delegate to top-level parsers"""
@@ -214,6 +225,7 @@ class IsaZip:
             with ZipFile(BytesIO(response.read())) as archive:
                 for filepath in archive.namelist():
                     _, filename = path.split(filepath)
+                    info = dict(isa_zip_url=isa_zip_url, filename=filename)
                     matcher = search(r'^([isa])_(.+)\.txt$', filename)
                     if matcher:
                         kind, name = matcher.groups()
@@ -221,13 +233,9 @@ class IsaZip:
                             if kind == "i":
                                 raw.investigation = parse_investigation(handle)
                             elif kind == "s":
-                                raw.studies[name] = read_tab(
-                                    handle, isa_zip_url, filename,
-                                )
+                                raw.studies[name] = read_tab(handle, **info)
                             elif kind == "a":
-                                raw.assays[name] = read_tab(
-                                    handle, isa_zip_url, filename,
-                                )
+                                raw.assays[name] = read_tab(handle, **info)
         for tab, value in raw._get_kwargs():
             if not value:
                 error = "{}: missing ISA tab '{}'".format(isa_zip_url, tab)
