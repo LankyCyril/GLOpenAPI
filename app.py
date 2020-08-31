@@ -10,7 +10,7 @@ from genefab3.exceptions import traceback_printer, exception_catcher, DBLogger
 from logging import getLogger
 from functools import partial
 from genefab3.mongo.meta import CacherThread
-from genefab3.flask.display import displayable
+from genefab3.flask.display import display
 
 
 # Backend initialization:
@@ -52,17 +52,17 @@ def documentation():
 @app.route("/assays/", methods=["GET"])
 def assays(**kwargs):
     from genefab3.flask.meta import get_assays_by_metas as getter
-    return displayable(db, getter, kwargs, request)
+    return display(db, getter, kwargs, request)
 
 @app.route("/samples/", methods=["GET"])
 def samples(**kwargs):
     from genefab3.flask.meta import get_samples_by_metas as getter
-    return displayable(db, getter, kwargs, request)
+    return display(db, getter, kwargs, request)
 
 @app.route("/data/", methods=["GET"])
 def data(**kwargs):
     from genefab3.flask.data import get_data_by_metas as getter
-    return displayable(db, getter, kwargs, request)
+    return display(db, getter, kwargs, request)
 
 @app.route("/favicon.<imgtype>")
 def favicon(**kwargs):
@@ -75,4 +75,4 @@ def favicon(**kwargs):
 def meta(**kwargs):
     """List names of particular meta"""
     from genefab3.flask.meta import get_meta_names as getter
-    return displayable(db, getter, kwargs, request)
+    return display(db, getter, kwargs, request)
