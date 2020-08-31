@@ -1,4 +1,4 @@
-from logging import getLogger, INFO
+from logging import getLogger, DEBUG
 from genefab3.config import COLD_SEARCH_MASK, MAX_JSON_AGE
 from genefab3.config import CACHER_THREAD_CHECK_INTERVAL
 from genefab3.config import CACHER_THREAD_RECHECK_DELAY
@@ -91,7 +91,7 @@ class CachedDataset(ColdStorageDataset):
         try:
             if init_assays:
                 self.init_assays()
-                if self.changed.glds:
+                if any(self.changed.__dict__.values()):
                     for assay_name, assay in self.assays.items():
                         for collection in db.metadata, db.annotations:
                             collection.delete_many({
@@ -138,7 +138,7 @@ class CacherThread(Thread):
         self.db, self.check_interval = db, check_interval
         self.recheck_delay = recheck_delay
         self.logger = getLogger("genefab3")
-        self.logger.setLevel(INFO)
+        self.logger.setLevel(DEBUG)
         super().__init__()
  
     def run(self):
@@ -163,6 +163,10 @@ class CacherThread(Thread):
                         if any(glds.changed.__dict__.values()):
                             self.logger.info(
                                 "CacherThread: %s changed", accession,
+                            )
+                        else:
+                            self.logger.debug(
+                                "CacherThread: %s up to date", accession,
                             )
                 for accession in (fresh | stale) - accessions:
                     CachedDataset.drop_cache(db=self.db, accession=accession)
