@@ -28,7 +28,7 @@ def walk_up(from_path, n_steps):
 
 def get_browser_html():
     filename = path.join(
-        walk_up(path.abspath(__file__), 5), "html/slick-df.html",
+        walk_up(path.abspath(__file__), 4), "html/slick-df.html",
     )
     with open(filename) as html:
         return html.read()
