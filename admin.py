@@ -11,7 +11,6 @@ from datetime import datetime
 TIME_FMT = "%Y-%m-%d %H:%M:%S"
 TYPE_OPTS = {True: "Exception", False: "LogMessage", None: "Unknown"}
 
-
 logger = getLogger("genefab3")
 logger.setLevel(INFO)
 
@@ -50,53 +49,61 @@ def recache(db, what):
         CachedDataset(db, what, logger=logger)
 
 
+def showlog_brief_lines(db, query, max_i):
+    sort = [("timestamp", DESCENDING), ("_id", DESCENDING)]
+    for i, entry in enumerate(db.log.find(query, sort=sort)):
+        fields = [
+            entry["_id"],
+            format_timestamp(entry["timestamp"]),
+            TYPE_OPTS[entry.get("is_exception")][0],
+            "type={}".format(entry.get("type")),
+            entry.get("value", "(no message)"),
+            "from={}".format(entry.get("remote_addr")),
+            "has_stack_info" if entry.get("stack") else "no_stack_info",
+        ]
+        print(*fields[:3], sep="; ", end=" ")
+        print(*fields[3:], sep="\t")
+        if i > max_i:
+            break
+
+
+def showlog_single_entry(db, _id):
+    entry = db.log.find_one({"_id": _id})
+    fields = [
+        "_id  = {}".format(entry["_id"]),
+        "time = {}".format(format_timestamp(entry["timestamp"])),
+        "what = {}".format(TYPE_OPTS[entry.get("is_exception")]),
+        "type = {}".format(entry.get("type")),
+        "from = {}".format(entry.get("remote_addr")),
+        "path = {}".format(entry.get("full_path")),
+        "mess = {}".format(entry.get("value")),
+        "---",
+        entry.get("stack", ""),
+    ]
+    print(*fields, sep="\n")
+
+
 def showlog(db, how):
     if how.isdigit() or ((not how.startswith("_id")) and ("=" in how)):
         if how.isdigit():
-            max_i = int(how) - 1
             query = {}
+            max_i = int(how) - 1
         else:
-            max_i = float("inf")
             k, v = how.split("=", 1)
             if v == "True":
                 v = True
             elif v == "False":
                 v = False
             query = {k: v}
-        sort = [("timestamp", DESCENDING), ("_id", DESCENDING)]
-        for i, entry in enumerate(db.log.find(query, sort=sort)):
-            fields = [
-                entry["_id"],
-                format_timestamp(entry["timestamp"]),
-                TYPE_OPTS[entry.get("is_exception")][0],
-                "type={}".format(entry.get("type")),
-                entry.get("value", "(no message)"),
-                "from={}".format(entry.get("remote_addr")),
-                "has_stack_info" if entry.get("stack") else "no_stack_info",
-            ]
-            print(*fields[:3], sep="; ", end=" ")
-            print(*fields[3:], sep="\t")
-            if i > max_i:
-                break
+            max_i = float("inf")
+        showlog_brief_lines(db, query, max_i)
     elif how.startswith("_id="):
-        entry = db.log.find_one({"_id": ObjectId(how.lstrip("_id="))})
-        fields = [
-            "_id  = {}".format(entry["_id"]),
-            "time = {}".format(format_timestamp(entry["timestamp"])),
-            "what = {}".format(TYPE_OPTS[entry.get("is_exception")]),
-            "type = {}".format(entry.get("type")),
-            "from = {}".format(entry.get("remote_addr")),
-            "path = {}".format(entry.get("full_path")),
-            "mess = {}".format(entry.get("value")),
-            "---",
-            entry.get("stack", ""),
-        ]
-        print(*fields, sep="\n")
+        showlog_single_entry(db, _id=ObjectId(how.lstrip("_id=")))
     else:
         raise NotImplementedError
 
 
-if len(argv) == 3:
+if len(argv) > 1:
     mongo = MongoClient()
     db = getattr(mongo, MONGO_DB_NAME)
     if argv[1] == "drop":
@@ -104,7 +111,10 @@ if len(argv) == 3:
     elif argv[1] == "recache":
         recache(db, argv[2])
     elif argv[1] == "log":
-        showlog(db, argv[2])
+        if len(argv) > 2:
+            showlog(db, argv[2])
+        else:
+            showlog_brief_lines(db, {}, float("inf"))
     else:
         raise NotImplementedError
 else:
