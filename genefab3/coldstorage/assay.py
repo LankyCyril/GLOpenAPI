@@ -54,8 +54,10 @@ class ColdStorageAssay():
                 annotation_entry = deepcopy(
                     dataset.isa.studies._by_sample_name[sample_name],
                 )
-                annotation_entry[""]["Assay"] = assay_name
-                annotation_entry[""]["Accession"] = dataset.accession
+                annotation_entry[""].update({
+                    "Accession": dataset.accession, "Assay": assay_name,
+                    "Sample Name": sample_name,
+                })
                 self.annotation.append(annotation_entry)
  
     def resolve_filename(self, mask, sample_mask=".*", field_mask=".*"):
