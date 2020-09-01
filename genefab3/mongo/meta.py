@@ -161,13 +161,10 @@ class CacherThread(Thread):
                         )
                     else:
                         if any(glds.changed.__dict__.values()):
-                            self.logger.info(
-                                "CacherThread: %s changed", accession,
-                            )
+                            chg = "changed"
                         else:
-                            self.logger.debug(
-                                "CacherThread: %s up to date", accession,
-                            )
+                            chg = "up to date"
+                        self.logger.info("CacherThread: %s %s", accession, chg)
                 for accession in (fresh | stale) - accessions:
                     CachedDataset.drop_cache(db=self.db, accession=accession)
                 self.logger.info(
