@@ -3,9 +3,11 @@ from logging import getLogger, INFO
 from sys import argv
 from pymongo import MongoClient, DESCENDING
 from bson.objectid import ObjectId
+from datetime import datetime
 from genefab3.config import MONGO_DB_NAME
 from genefab3.mongo.meta import CachedDataset
-from datetime import datetime
+from genefab3.coldstorage.dataset import ColdStorageDataset
+from json import dumps
 
 
 TIME_FMT = "%Y-%m-%d %H:%M:%S"
@@ -103,6 +105,16 @@ def showlog(db, how):
         raise NotImplementedError
 
 
+def test_isa(db, accession, assay_name, attribute):
+    if db.dataset_timestamps.find_one({"accession": accession}):
+        glds = CachedDataset(db, accession, logger=logger)
+    else:
+        glds = ColdStorageDataset(accession)
+    assay = glds.assays[assay_name]
+    data = getattr(assay, attribute)
+    print(dumps(data, indent=4, sort_keys=True))
+
+
 if len(argv) > 1:
     mongo = MongoClient()
     db = getattr(mongo, MONGO_DB_NAME)
@@ -115,6 +127,8 @@ if len(argv) > 1:
             showlog(db, argv[2])
         else:
             showlog_brief_lines(db, {}, float("inf"))
+    elif argv[1] == "test-isa":
+        test_isa(db, argv[2], argv[3], argv[4])
     else:
         raise NotImplementedError
 else:
