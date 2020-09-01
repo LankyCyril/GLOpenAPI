@@ -20,6 +20,11 @@ def INPLACE_force_default_name_delimiter_in_file_data(filedata, metadata_indexed
     ]
 
 
+WRONG_DATASET_ERROR = "Attempt to associate an assay with the wrong dataset"
+NO_SAMPLE_NAME_ERROR = "Could not retrieve Sample Name from Assay entry"
+AMBIGUOUS_SAMPLE_NAME_ERROR = "Multiple Sample Names for one entry in Assay tab"
+
+
 class ColdStorageAssay():
     """Stores individual assay information and metadata"""
  
@@ -29,25 +34,25 @@ class ColdStorageAssay():
         try:
             _ = dataset.assays[assay_name]
         except (KeyError, IndexError, TypeError):
-            error = "Attempt to associate an assay with the wrong dataset"
-            raise GeneLabException(error)
-        # populate metadata from Study entries, appending accession information:
-        for isa_entry in assay_isa_entries:
-            metadata_entry = deepcopy(isa_entry)
-            metadata_entry[""]["Accession"] = dataset.accession
-            self.metadata.append(metadata_entry)
+            raise GeneLabException(WRONG_DATASET_ERROR)
         # collect and check validity / uniqueness of Sample Name entries:
         for entry in assay_isa_entries:
             try:
                 entry_sample_names = {ee[""] for ee in entry["Sample Name"]}
             except (KeyError, IndexError, TypeError):
-                error = "Could not retrieve Sample Name from Assay entry"
-                raise GeneLabISAException(error)
+                raise GeneLabISAException(NO_SAMPLE_NAME_ERROR)
             if len(entry_sample_names) == 1:
                 self.sample_names.add(entry_sample_names.pop())
             else:
-                error = "Assay tab has multiple Sample Names for one entry"
-                raise GeneLabISAException(error)
+                raise GeneLabISAException(AMBIGUOUS_SAMPLE_NAME_ERROR)
+        # populate metadata from Assay entries, append accession, sample name:
+        for isa_entry in assay_isa_entries:
+            metadata_entry = deepcopy(isa_entry)
+            metadata_entry[""].update({
+                "Accession": dataset.accession,
+                "Sample Name": metadata_entry["Sample Name"][0][""],
+            })
+            self.metadata.append(metadata_entry)
         # populate annotation from combined Study and Assay entries:
         for sample_name in self.sample_names:
             if sample_name in dataset.isa.studies._by_sample_name:
