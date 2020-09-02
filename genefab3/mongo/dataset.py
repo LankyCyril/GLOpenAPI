@@ -11,7 +11,7 @@ class CachedDataset(ColdStorageDataset):
     def __init__(self, db, accession, logger, init_assays=True):
         self.db, self.logger = db, logger
         super().__init__(
-            accession, init_assays=init_assays,
+            accession, init_assays=False,
             get_json=partial(get_fresh_json, db=db),
         )
         try:
