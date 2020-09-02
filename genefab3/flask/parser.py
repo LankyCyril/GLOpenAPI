@@ -1,85 +1,76 @@
 from genefab3.exceptions import GeneLabException
-from re import sub, escape
+from re import sub, escape, search, split
 from argparse import Namespace
-from genefab3.config import ASSAY_METADATALIKES
+from genefab3.config import ANNOTATION_CATEGORIES
+from genefab3.utils import UniversalSet
+from functools import partial
 from collections import defaultdict
 
 
-QUERY, WILDCARD, REMOVER = 0, 1, 2
+QUERY_ERROR = "Could not parse query component"
 
 
-def parse_assay_selection(rargs_select_list):
-    """Parse 'select' request argument"""
-    if len(rargs_select_list) == 0:
-        return None
-    elif len(rargs_select_list) == 1:
-        context_select = defaultdict(set)
-        for query in rargs_select_list[0].split("|"):
-            query_components = query.split(":", 1)
-            if len(query_components) == 1:
-                context_select[query_components[0]].add(None)
-            else:
-                context_select[query_components[0]].add(query_components[1])
-        return context_select
+def is_convertible_to_query(key):
+    """Determine if `key` is something that gives rise to database query"""
+    return (
+        (split(r'[.!]', key)[0] in ANNOTATION_CATEGORIES) or
+        (split(r'\.', key)[0] == "assay") or
+        (key == "select")
+    )
+
+
+def parse_request_wildcard_component(key, value):
+    """Parse query wildcard, such as 'factor values', 'characteristics'"""
+    query_component = {} # match everything, do not filter
+    category = key # retrieve subkeys under `key`
+    fields = UniversalSet() # use all subkeys
+    return query_component, category, fields
+
+
+def parse_request_select_component(key, value):
+    """Parse query for accession / assay name selection, such as 'select=GLDS-242.RR9_LVR|GLDS-4'"""
+    qchunks = []
+    for chunk in value.split("|"):
+        if search(r'^GLDS-[0-9]+\.', chunk):
+            accession, assay_name = chunk.split(".", 1)
+            qchunks.append({".accession": accession, ".assay": assay_name})
+        else:
+            qchunks.append({".accession": chunk})
+    query_component = {"$or": qchunks} # match by any accession/assay combo
+    category = None # accession / assay selection does not affect columns
+    fields = None
+    return query_component, category, fields
+
+
+def parse_request_equality_component(key, value):
+    """Parse query for existence / exact value, such as 'factor values=spaceflight', or 'characteristics.age=5|7"""
+    if key.count(".") > 1:
+        raise GeneLabException(QUERY_ERROR, key + "!=" + value)
+    elif "." in key: # e.g. "characteristics.age", i.e. matching values of "age"
+        category, field = key.lower().split(".")
+        fields = {field}
+        query_component = {f"{category}.{field}.": {"$in": value.split("|")}}
+    else: # e.g. "characteristics=age", i.e. matching existence of "age"
+        category = key
+        fields = set(value.split("|"))
+        query_component = {"$or": [
+            {f"{category}.{field}": {"$exists": True}} for field in fields
+        ]}
+    return query_component, category, fields
+
+
+def parse_request_negation_component(key, value):
+    """Parse query for inequality, such as 'factor values.spaceflight!=Ground Control'"""
+    if (key.count(".") == 1) and ("|" not in value):
+        category, field = key.lower().rstrip("!").split(".")
+        fields = {field}
+        query_component = {"$and": [
+            {f"{category}.{field}": {"$exists": True}},
+            {f"{category}.{field}.": {"$ne": value}},
+        ]}
+        return query_component, category, fields
     else:
-        raise GeneLabException("'select' can be used no more than once")
-
-
-def assay_selection_to_query(selection):
-    """Convert 'select' dictionary into MongoDB query"""
-    if selection:
-        query = {"$or": []}
-        for accession, assay_names in selection.items():
-            for assay_name in assay_names:
-                if assay_name:
-                    query["$or"].append({
-                        "accession": accession, "assay name": assay_name,
-                    })
-                else:
-                    query["$or"].append({"accession": accession})
-        return query
-    else:
-        return {}
-
-
-def parse_meta_queries(key, expressions):
-    """Process queries like e.g. 'factors=age', 'factors!=age', 'factors:age=1|2', 'factors:age!=5'"""
-    if key[-1] == "!":
-        real_key, negation = key[:-1], True
-    else:
-        real_key, negation = key, False
-    if real_key.count(":") == 1:
-        meta, field = real_key.split(":") # e.g. "factors" and "age"
-    elif real_key.count(":") > 1:
-        raise GeneLabException("Malformed argument: {}".format(key))
-    else:
-        meta, field = real_key, None # e.g. "factors"
-    if meta in ASSAY_METADATALIKES:
-        for expression in expressions:
-            malformed_err = "Malformed argument: {}={}".format(key, expression)
-            undefined_err = "Undefined behavior: {}={}".format(key, expression)
-            values = expression.split("|")
-            if negation and (len(values) > 1): # e.g. "f:a!=5|7" or "f!=a|b"
-                raise GeneLabException(undefined_err)
-            elif field: # e.g. "factors:age"
-                if expression and negation: # e.g. "factors:age!=5"
-                    yield QUERY, meta, {field}, {field: {"$ne": values[0]}}
-                elif expression: # e.g. "factors:age=7"
-                    yield QUERY, meta, {field}, {field: {"$in": values}}
-                else: # e.g. "factors:age!=" without value
-                    raise GeneLabException(malformed_err)
-            else:
-                if negation and expression: # e.g. "factors!=age"
-                    val = values[0]
-                    yield REMOVER, meta, {val}, {val: {"$exists": False}}
-                elif expression: # e.g. "factors=age"
-                    yield QUERY, meta, set(values), {"$or": [
-                        {value: {"$exists": True}} for value in values
-                    ]}
-                elif negation: # e.g. "factors!=" without value
-                    raise GeneLabException(malformed_err)
-                else: # e.g. "factors", i.e. all factors
-                    yield WILDCARD, meta, None, None
+        raise GeneLabException(QUERY_ERROR, key + "!=" + value)
 
 
 def parse_request(request):
@@ -87,25 +78,28 @@ def parse_request(request):
     url_root = escape(request.url_root.strip("/"))
     base_url = request.base_url.strip("/")
     context = Namespace(
-        view="/"+sub(url_root, "", base_url).strip("/")+"/",
-        select=parse_assay_selection(request.args.getlist("select")),
-        args=request.args,
-        queries=defaultdict(list),
-        fields=defaultdict(set),
-        wildcards=set(),
-        removers=defaultdict(set),
+        view="/"+sub(url_root, "", base_url).strip("/")+"/", request=request,
+        request_components=[], targets=defaultdict(set), query={"$and": []},
     )
-    context.queries["select"] = assay_selection_to_query(context.select)
     for key in request.args:
-        parser = parse_meta_queries(key, set(request.args.getlist(key)))
-        for kind, meta, fields, query in parser:
-            if kind == QUERY:
-                context.queries[meta].append(query)
-                context.fields[meta] |= fields
-            elif kind == REMOVER:
-                context.queries[meta].append(query)
-                context.removers[meta] |= fields
-                context.fields[meta] -= fields
-            elif kind == WILDCARD:
-                context.wildcards.add(meta)
+        if is_convertible_to_query(key):
+            for value in request.args.getlist(key):
+                request_component = key + "=" + value
+                matches = partial(search, string=request_component)
+                if matches(r'^[^!=$]+=$'):
+                    parse_request_component = parse_request_wildcard_component
+                elif matches(r'^select=[^!=$]+$'):
+                    parse_request_component = parse_request_select_component
+                elif matches(r'^[^!=$]+=[^!=$]+$'):
+                    parse_request_component = parse_request_equality_component
+                elif matches(r'^[^!=$]+!=[^!=$|]+$'):
+                    parse_request_component = parse_request_negation_component
+                else:
+                    raise GeneLabException(QUERY_ERROR, request_component)
+                query_component, t1k, t2ks = parse_request_component(key, value)
+                if query_component:
+                    context.query["$and"].append(query_component)
+                if t1k:
+                    context.targets[t1k] = context.targets[t1k] | t2ks
+                context.request_components.append(request_component)
     return context

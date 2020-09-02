@@ -1,11 +1,9 @@
-from os import environ
-from sys import stderr
+from logging import getLogger, DEBUG
 from genefab3.config import COLD_SEARCH_MASK, MAX_JSON_AGE
 from genefab3.config import CACHER_THREAD_CHECK_INTERVAL
-from genefab3.config import CACHER_THREAD_RECHECK_INTERVAL
-from genefab3.config import ASSAY_METADATALIKES
+from genefab3.config import CACHER_THREAD_RECHECK_DELAY
 from genefab3.coldstorage.json import download_cold_json
-from genefab3.mongo.utils import replace_doc, insert_one_safe
+from genefab3.mongo.utils import replace_doc, harmonize_query as nize
 from genefab3.exceptions import GeneLabJSONException
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from datetime import datetime
@@ -13,30 +11,7 @@ from pymongo import DESCENDING
 from pandas import Series
 from threading import Thread
 from time import sleep
-
-
-DEBUG = (environ.get("FLASK_ENV", None) == "development")
-
-
-def cacher_thread_log(message, error=False):
-    """Log message about CacherThread"""
-    if DEBUG:
-        if error:
-            print_mask = "CacherThread ERROR @ {}: {}"
-        else:
-            print_mask = "CacherThread message @ {}: {}"
-        print(print_mask.format(datetime.now(), message), file=stderr)
-
-
-def get_fresh_and_stale_accessions(db, max_age=MAX_JSON_AGE):
-    """Find accessions in no need / need of update in database"""
-    refresh_dates = Series({
-        entry["accession"]: entry["last_refreshed"]
-        for entry in db.dataset_timestamps.find()
-    })
-    current_timestamp = int(datetime.now().timestamp())
-    indexer = ((current_timestamp - refresh_dates) <= max_age)
-    return set(refresh_dates[indexer].index), set(refresh_dates[~indexer].index)
+from functools import partial
 
 
 def is_json_cache_fresh(json_cache_info, max_age=MAX_JSON_AGE):
@@ -49,7 +24,7 @@ def is_json_cache_fresh(json_cache_info, max_age=MAX_JSON_AGE):
         return (current_timestamp - cache_timestamp <= max_age)
 
 
-def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, compare=False):
+def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, report_changes=False):
     """Get JSON from local database if fresh, otherwise update local database and get"""
     json_cache_info = db.json_cache.find_one(
         {"identifier": identifier, "kind": kind},
@@ -59,7 +34,7 @@ def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, compare=F
         fresh_json, json_changed = json_cache_info["raw"], False
     else:
         try:
-            fresh_json = download_cold_json(identifier, kind=kind)
+            fresh_json, _ = download_cold_json(identifier, kind=kind)
         except Exception:
             try:
                 fresh_json, json_changed = json_cache_info["raw"], False
@@ -68,136 +43,134 @@ def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, compare=F
                 raise GeneLabJSONException(msg_mask.format(identifier))
         else:
             replace_doc(
-                db.json_cache, {"identifier": identifier, "kind": kind},
-                last_refreshed=int(datetime.now().timestamp()), raw=fresh_json,
+                db.json_cache, {"identifier": identifier, "kind": kind}, {
+                    "last_refreshed": int(datetime.now().timestamp()),
+                    "raw": fresh_json,
+                },
+                harmonize=False,
             )
-            if compare and json_cache_info:
+            if report_changes and json_cache_info:
                 json_changed = (fresh_json != json_cache_info.get("raw", {}))
-            elif compare:
+            elif report_changes:
                 json_changed = True
-    if compare:
+    if report_changes:
         return fresh_json, json_changed
     else:
         return fresh_json
 
 
-def refresh_dataset_json_store(db, accession):
-    """Refresh top-level JSON of dataset in database"""
-    glds_json, glds_changed = get_fresh_json(
-        db, accession, "glds", compare=True,
-    )
-    replace_doc(
-        db.dataset_timestamps, {"accession": accession},
-        last_refreshed=int(datetime.now().timestamp()),
-    )
-    return glds_json, glds_changed
+def list_available_accessions(db):
+    """List datasets in cold storage"""
+    url_n = COLD_SEARCH_MASK.format(0)
+    n_datasets = get_fresh_json(db, url_n)["hits"]["total"]
+    url_all = COLD_SEARCH_MASK.format(n_datasets)
+    raw_datasets_json = get_fresh_json(db, url_all)["hits"]["hits"]
+    return {raw_json["_id"] for raw_json in raw_datasets_json}
 
 
-def get_dataset_with_caching(db, accession):
-    """Refresh dataset JSONs in database"""
-    glds_json, _ = refresh_dataset_json_store(db, accession)
-    fileurls_json = get_fresh_json(db, accession, "fileurls")
-    # internal _id is only found through dataset JSON, but may be cached:
-    _id_search = db.accession_to_id.find_one({"accession": accession})
-    if (_id_search is None) or ("cold_id" not in _id_search):
-        # internal _id not cached, initialize dataset to find it:
-        glds = ColdStorageDataset(
-            accession, glds_json, fileurls_json, filedates_json=None,
+def list_fresh_and_stale_accessions(db, max_age=MAX_JSON_AGE):
+    """Find accessions in no need / need of update in database"""
+    refresh_dates = Series({
+        entry["accession"]: entry["last_refreshed"]
+        for entry in db.dataset_timestamps.find()
+    })
+    current_timestamp = int(datetime.now().timestamp())
+    indexer = ((current_timestamp - refresh_dates) <= max_age)
+    return set(refresh_dates[indexer].index), set(refresh_dates[~indexer].index)
+
+
+class CachedDataset(ColdStorageDataset):
+    """ColdStorageDataset via auto-updated metadata in database"""
+ 
+    def __init__(self, db, accession, logger, init_assays=True):
+        self.db, self.logger = db, logger
+        super().__init__(
+            accession, init_assays=init_assays,
+            get_json=partial(get_fresh_json, db=db),
         )
-        replace_doc(
-            db.accession_to_id, {"accession": accession}, cold_id=glds.isa._id,
-        )
-        filedates_json = get_fresh_json(db, glds.isa._id, "filedates")
-    else:
-        filedates_json = get_fresh_json(db, _id_search["cold_id"], "filedates")
-        glds = ColdStorageDataset(
-            accession, glds_json, fileurls_json, filedates_json,
-        )
-    return glds
-
-
-def refresh_assay_meta_stores(db, accession):
-    """Put per-sample, per-assay factors, annotation, and metadata into database"""
-    glds = get_dataset_with_caching(db, accession)
-    for assay in glds.assays.values():
-        for meta in ASSAY_METADATALIKES:
-            collection = getattr(db, meta)
-            dataframe = getattr(assay, meta).named
-            collection.delete_many({
-                "accession": assay.dataset.accession, "assay name": assay.name,
-            })
-            for sample_name, row in dataframe.iterrows():
-                insert_one_safe(collection, {
-                    **{
-                        "accession": assay.dataset.accession,
-                        "assay name": assay.name, "sample name": sample_name,
-                    },
-                    **row.groupby(row.index).aggregate(list).to_dict(),
-                })
-
-
-def refresh_database_metadata_for_some_datasets(db, accessions):
-    """Put updated JSONs for datasets with {accessions} and their assays into database"""
-    datasets_with_updated_assays = []
-    for accession in accessions:
-        _, glds_changed = refresh_dataset_json_store(db, accession)
-        cacher_thread_log("Refreshed JSON for dataset {}".format(accession))
-        if glds_changed:
-            cacher_thread_log("JSON changed for dataset {}".format(accession))
-            datasets_with_updated_assays.append(accession)
-            refresh_assay_meta_stores(db, accession)
-            cacher_thread_log(
-                "Refreshed JSON for assays in {}".format(accession),
+        try:
+            if init_assays:
+                self.init_assays()
+                if any(self.changed.__dict__.values()):
+                    for assay_name, assay in self.assays.items():
+                        for collection in db.metadata, db.annotations:
+                            collection.delete_many({
+                                ".accession": accession, ".assay": assay_name,
+                            })
+                        if assay.metadata:
+                            db.metadata.insert_many(nize(assay.metadata))
+                        else:
+                            msg_mask = "%s, %s: no metadata entries"
+                            logger.warning(msg_mask, accession, assay_name)
+                        if assay.annotation:
+                            db.annotations.insert_many(nize(assay.annotation))
+                        else:
+                            msg_mask = "%s, %s: no annotation entries"
+                            logger.warning(msg_mask, accession, assay_name)
+            replace_doc(
+                db.dataset_timestamps, {"accession": accession},
+                {"last_refreshed": int(datetime.now().timestamp())},
+                harmonize=True,
             )
-    return datasets_with_updated_assays
-
-
-def refresh_database_metadata(db):
-    """Iterate over datasets in cold storage, put updated JSONs into database"""
-    fresh, stale = get_fresh_and_stale_accessions(db)
-    try: # get number of datasets in database, and then all dataset JSONs
-        url_n = COLD_SEARCH_MASK.format(0)
-        n_datasets = get_fresh_json(db, url_n)["hits"]["total"]
-        url_all = COLD_SEARCH_MASK.format(n_datasets)
-        raw_datasets_json = get_fresh_json(db, url_all)["hits"]["hits"]
-        all_accessions = {raw_json["_id"] for raw_json in raw_datasets_json}
-    except KeyError:
-        cacher_thread_log(
-            "Cold storage returned malformed search JSON", error=True,
-        )
-    else:
-        updated_assays = refresh_database_metadata_for_some_datasets(
-            db, all_accessions - fresh,
-        )
-        for accession in (fresh | stale) - all_accessions:
-            # drop removed datasets:
-            db.dataset_timestamps.delete_many({"accession": accession})
-            db.accession_to_id.delete_many({"accession": accession})
-        return all_accessions, fresh, stale, updated_assays
+        except:
+            self.drop_cache()
+            raise
+ 
+    def drop_cache(self=None, db=None, accession=None):
+        (db or self.db).dataset_timestamps.delete_many({
+            "accession": accession or self.accession,
+        })
+        (db or self.db).metadata.delete_many({
+            ".accession": accession or self.accession,
+        })
+        (db or self.db).annotations.delete_many({
+            ".accession": accession or self.accession,
+        })
+        (db or self.db).json_cache.delete_many({
+            "identifier": accession or self.accession,
+        })
 
 
 class CacherThread(Thread):
     """Lives in background and keeps local metadata cache up to date"""
-    def __init__(self, db, check_interval=CACHER_THREAD_CHECK_INTERVAL, recheck_interval=CACHER_THREAD_RECHECK_INTERVAL):
+ 
+    def __init__(self, db, check_interval=CACHER_THREAD_CHECK_INTERVAL, recheck_delay=CACHER_THREAD_RECHECK_DELAY):
         self.db, self.check_interval = db, check_interval
-        self.recheck_interval = recheck_interval
+        self.recheck_delay = recheck_delay
+        self.logger = getLogger("genefab3")
+        self.logger.setLevel(DEBUG)
         super().__init__()
+ 
     def run(self):
         while True:
-            cacher_thread_log("Checking cache")
+            self.logger.info("CacherThread: Checking cache")
             try:
-                accessions, fresh, stale, _ = refresh_database_metadata(self.db)
+                accessions = list_available_accessions(self.db)
+                fresh, stale = list_fresh_and_stale_accessions(self.db)
             except Exception as e:
-                cacher_thread_log("{}".format(e), error=True)
-                cacher_thread_log("Will try again after {} seconds".format(
-                    self.recheck_interval
-                ))
-                sleep(self.recheck_interval)
+                self.logger.error("CacherThread: %s", repr(e), stack_info=True)
+                delay = self.recheck_delay
             else:
-                cacher_thread_log("{} fresh, {} stale accessions".format(
-                    len(fresh), len(stale),
-                ))
-                cacher_thread_log("Will now sleep for {} seconds".format(
-                    self.check_interval
-                ))
-                sleep(self.check_interval)
+                for accession in accessions - fresh:
+                    try:
+                        glds = CachedDataset(self.db, accession, self.logger)
+                    except Exception as e:
+                        self.logger.error(
+                            "CacherThread: %s at accession %s",
+                            repr(e), accession, stack_info=True,
+                        )
+                    else:
+                        if any(glds.changed.__dict__.values()):
+                            chg = "changed"
+                        else:
+                            chg = "up to date"
+                        self.logger.info("CacherThread: %s %s", accession, chg)
+                for accession in (fresh | stale) - accessions:
+                    CachedDataset.drop_cache(db=self.db, accession=accession)
+                self.logger.info(
+                    "CacherThread: %d fresh, %d stale", len(fresh), len(stale),
+                )
+                delay = self.check_interval
+            finally:
+                self.logger.info("CacherThread: sleeping for %d seconds", delay)
+                sleep(delay)
