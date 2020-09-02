@@ -1,7 +1,6 @@
 from genefab3.exceptions import GeneLabException, GeneLabISAException
 from genefab3.utils import force_default_name_delimiter
 from pandas import DataFrame, read_csv
-from numpy import nan
 from re import search, split
 from copy import deepcopy
 from urllib.request import urlopen

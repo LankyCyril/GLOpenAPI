@@ -5,7 +5,7 @@ from pymongo import MongoClient, DESCENDING
 from bson.objectid import ObjectId
 from datetime import datetime
 from genefab3.config import MONGO_DB_NAME
-from genefab3.mongo.meta import CachedDataset
+from genefab3.mongo.dataset import CachedDataset
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from json import dumps
 
