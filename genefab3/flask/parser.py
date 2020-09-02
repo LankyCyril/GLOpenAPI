@@ -14,7 +14,7 @@ def is_convertible_to_query(key):
     """Determine if `key` is something that gives rise to database query"""
     return (
         (split(r'[.!]', key)[0] in ANNOTATION_CATEGORIES) or
-        ((key.count(".") == 1) and (split(r'.', key)[0] == "assay")) or
+        (split(r'\.', key)[0] == "assay") or
         (key == "select")
     )
 
