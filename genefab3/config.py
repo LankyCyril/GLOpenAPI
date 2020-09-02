@@ -20,11 +20,7 @@ MAX_JSON_AGE = 10800 # 3 hours (in seconds)
 CACHER_THREAD_CHECK_INTERVAL = 1800 # 30 minutes (in seconds)
 CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
 
-ANNOTATION_CATEGORIES = { # "as in query" -> "as in ISA and database"
-    "factor values": "factor value",
-    "parameter values": "parameter value",
-    "characteristics": "characteristics",
-}
+ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
 
 ASSAY_METADATALIKES = None # temporary
 
