@@ -1,7 +1,7 @@
 from pandas import read_csv
 from pandas.errors import ParserError
 from numpy import nan
-from re import search, sub
+from re import search, sub, escape
 from genefab3.exceptions import GeneLabISAException
 from argparse import Namespace
 from urllib.request import urlopen
@@ -11,6 +11,7 @@ from io import BytesIO, StringIO
 from logging import getLogger, CRITICAL
 from isatools.isatab import load_investigation
 from collections import defaultdict
+from copy import deepcopy
 
 
 INVESTIGATION_KEYS = { # "Real Name In Mixed Case" -> "as_reported_by_isatools"
@@ -30,9 +31,10 @@ INVESTIGATION_KEYS = { # "Real Name In Mixed Case" -> "as_reported_by_isatools"
 
 
 class Investigation(dict):
-    """Stores GLDS ISA Tab 'investigation' in accessible formats""" # NOTE: work in progress
+    """Stores GLDS ISA Tab 'investigation' in accessible formats"""
  
     def __init__(self, raw_investigation):
+        """Convert dataframes to JSONs"""
         for key, internal_key in INVESTIGATION_KEYS.items():
             if internal_key in raw_investigation:
                 content = raw_investigation[internal_key]
@@ -46,8 +48,28 @@ class Investigation(dict):
                 super().__setitem__(key, json)
  
     def _jsonify(self, df):
+        """Convert individual dataframe to JSON"""
         nn = range(0, df.shape[1])
         return df.drop(columns=nn, errors="ignore").to_dict(orient="records")
+ 
+    def extract(self, key, by, pattern, target, lstrip=None):
+        """Extract entry corresponding to `target` filed under `key`"""
+        try:
+            for block in self[key]:
+                match = search(pattern, block[by])
+                if match and (match.group(1) == target):
+                    if lstrip:
+                        return {
+                            sub(r'^'+escape(lstrip)+r'\s*', "", k): v
+                            for k, v in block.items()
+                        }
+                    else:
+                        return deepcopy(block)
+            else:
+                raise ValueError
+        except (KeyError, TypeError, IndexError, ValueError):
+            error_mask = "Could not extract '{}' from Investigation for '{}'"
+            raise GeneLabISAException(error_mask.format(by, target))
 
 
 class StudyEntries(list):

@@ -5,6 +5,7 @@ from numpy import nan
 from pandas import DataFrame, concat
 from natsort import natsorted
 from functools import lru_cache
+from copy import deepcopy
 
 
 def natsorted_dataframe(dataframe, by, ascending=True, sort_trailing_columns=False):
@@ -69,3 +70,10 @@ class UniversalSet(set):
     def __ior__(self, x): return self
     def __ror__(self, x): return self
     def __contains__(self, x): return True
+
+
+def copy_and_update(d, key, E):
+    """Deepcopy dictionary `d`, update `d[key]` with data from `E`"""
+    d_copy = deepcopy(d)
+    d_copy[key].update(E)
+    return d_copy
