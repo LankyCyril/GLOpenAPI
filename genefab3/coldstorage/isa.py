@@ -15,17 +15,17 @@ from collections import defaultdict
 
 INVESTIGATION_KEYS = [
   # ("Real Name In Mixed Case", "as_in_isatools", target_for_keys, pattern)
-    ("Ontology Source Reference", "ontology_sources", 0, 0),
-    ("Investigation", "investigation", 0, 0),
-    ("Investigation Publications", "i_publications", 0, 0),
-    ("Investigation Contacts", "i_contacts", 0, 0),
+    ("Ontology Source Reference", "ontology_sources", None, None),
+    ("Investigation", "investigation", 0, 1),
+    ("Investigation Publications", "i_publications", None, None),
+    ("Investigation Contacts", "i_contacts", None, None),
     ("Study", "studies", "Study File Name", r'^s_(.+)\.txt$'),
-    ("Study Design Descriptors", "s_design_descriptors", 0, 0),
-    ("Study Publications", "s_publications", 0, 0),
-    ("Study Factors", "s_factors", 0, 0),
+    ("Study Design Descriptors", "s_design_descriptors", None, None),
+    ("Study Publications", "s_publications", None, None),
+    ("Study Factors", "s_factors", None, None),
     ("Study Assays", "s_assays", "Study Assay File Name", r'^a_(.+)\.txt$'),
-    ("Study Protocols", "s_protocols", 0, 0),
-    ("Study Contacts", "s_contacts", 0, 0),
+    ("Study Protocols", "s_protocols", None, None),
+    ("Study Contacts", "s_contacts", None, None),
 ]
 
 
@@ -47,7 +47,16 @@ class Investigation(dict):
                 if isinstance(json, list):
                     if (len(json) == 1) and isinstance(json[0], list):
                         json = json[0]
-                if target and pattern:
+                if isinstance(target, int) and isinstance(pattern, int):
+                    try:
+                        if len(json) != pattern:
+                            raise IndexError
+                        else:
+                            super().__setitem__(real_name, json[target])
+                    except (TypeError, IndexError, KeyError):
+                        error = f"Unexpected structure of {real_name}"
+                        raise GeneLabISAException(error)
+                elif target and pattern:
                     try:
                         super().__setitem__(real_name, {
                             search(pattern, entry[target]).group(1): entry

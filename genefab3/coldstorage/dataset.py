@@ -118,10 +118,10 @@ class ColdStorageAssayDispatcher(dict):
         for isa_entry in dataset.isa.assays:
             assay_name = isa_entry[""]["Assay"]
             isa_entries_by_assay[assay_name].append(isa_entry)
-        for assay_name, assay_isa_entries in isa_entries_by_assay.items():
+        for assay_name, isa_assay_entries in isa_entries_by_assay.items():
             super().__setitem__(
                 assay_name,
-                ColdStorageAssay(dataset, assay_name, assay_isa_entries),
+                ColdStorageAssay(dataset, assay_name, isa_assay_entries),
             )
  
     def __getitem__(self, assay_name):
