@@ -1,8 +1,12 @@
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.mongo.json import get_fresh_json
-from genefab3.mongo.utils import replace_doc, harmonize_query as nize
+from genefab3.mongo.utils import replace_doc, harmonize_query
 from datetime import datetime
 from functools import partial
+
+
+WARN_NO_META = "%s, %s: no metadata entries"
+WARN_NO_STUDY = "%s, %s, %s: no Study entries"
 
 
 class CachedDataset(ColdStorageDataset):
@@ -19,20 +23,21 @@ class CachedDataset(ColdStorageDataset):
                 self.init_assays()
                 if any(self.changed.__dict__.values()):
                     for assay_name, assay in self.assays.items():
-                        for collection in db.metadata, db.annotations:
-                            collection.delete_many({
-                                ".accession": accession, ".assay": assay_name,
-                            })
-                        if assay.metadata:
-                            db.metadata.insert_many(nize(assay.metadata))
+                        db.metadata.delete_many({
+                            ".accession": accession, ".assay": assay_name,
+                        })
+                        if assay.meta:
+                            db.metadata.insert_many(
+                                harmonize_query(assay.meta.values()),
+                            )
+                            for sample_name in assay.meta:
+                                if "Study" not in assay.meta[sample_name]:
+                                    logger.warning(
+                                        WARN_NO_STUDY, accession,
+                                        assay_name, sample_name,
+                                    )
                         else:
-                            msg_mask = "%s, %s: no metadata entries"
-                            logger.warning(msg_mask, accession, assay_name)
-                        if assay.annotation:
-                            db.annotations.insert_many(nize(assay.annotation))
-                        else:
-                            msg_mask = "%s, %s: no annotation entries"
-                            logger.warning(msg_mask, accession, assay_name)
+                            logger.warning(WARN_NO_META, accession, assay_name)
             replace_doc(
                 db.dataset_timestamps, {"accession": accession},
                 {"last_refreshed": int(datetime.now().timestamp())},
@@ -47,9 +52,6 @@ class CachedDataset(ColdStorageDataset):
             "accession": accession or self.accession,
         })
         (db or self.db).metadata.delete_many({
-            ".accession": accession or self.accession,
-        })
-        (db or self.db).annotations.delete_many({
             ".accession": accession or self.accession,
         })
         (db or self.db).json_cache.delete_many({

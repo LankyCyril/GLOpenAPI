@@ -105,10 +105,10 @@ class ColdStorageDataset():
         # placeholders:
         self.assays = {e[""]["Assay"]: None for e in self.isa.assays}
         # actual assays:
-        self.assays = ColdStorageAssayDispatcher(self)
+        self.assays = AssayDispatcher(self)
 
 
-class ColdStorageAssayDispatcher(dict):
+class AssayDispatcher(dict):
     """Contains a dataset's assay objects, indexable by name or by attributes"""
  
     def __init__(self, dataset):
