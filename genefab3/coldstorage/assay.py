@@ -28,9 +28,9 @@ class ColdStorageAssay():
     """Stores individual assay information and metadata"""
  
     def __init__(self, dataset, assay_name, isa_assay_entries):
-        """Combine and re-parse Assay and Study entries from dataset ISA"""
-        self.meta = {}
+        """Combine and re-parse entries from dataset ISA"""
         self._assert_correct_dataset(dataset, assay_name)
+        self.meta = {}
         for isa_assay_entry in isa_assay_entries:
             try: # check validity / uniqueness of Sample Name entries
                 entry_sample_names = {
