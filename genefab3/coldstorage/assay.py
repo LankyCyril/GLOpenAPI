@@ -29,7 +29,7 @@ class ColdStorageAssay():
  
     def __init__(self, dataset, assay_name, isa_assay_entries):
         """Combine and re-parse Assay and Study entries from dataset ISA"""
-        self.samples = {}
+        self.meta = {}
         self._assert_correct_dataset(dataset, assay_name)
         for isa_assay_entry in isa_assay_entries:
             try: # check validity / uniqueness of Sample Name entries
@@ -42,15 +42,15 @@ class ColdStorageAssay():
                 raise GeneLabISAException(AMBIGUOUS_SAMPLE_NAME_ERROR)
             else: # populate metadata from Assay, general Investigation entries
                 sample_name = entry_sample_names.pop()
-                self.samples[sample_name] = self._init_sample_entry_with_assay(
+                self.meta[sample_name] = self._init_sample_entry_with_assay(
                     dataset, isa_assay_entry, assay_name, sample_name,
                 )
         # populate annotation from Study and Investigation entries:
-        for sample_name in self.samples:
+        for sample_name in self.meta:
             if sample_name in dataset.isa.studies._by_sample_name:
                 # populate annotation from Study entries matching Sample Names:
                 self._extend_sample_entry_with_study(
-                    self.samples[sample_name], dataset, sample_name,
+                    self.meta[sample_name], dataset, sample_name,
                 )
  
     def _assert_correct_dataset(self, dataset, assay_name):
