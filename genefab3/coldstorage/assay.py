@@ -54,31 +54,11 @@ class ColdStorageAssay():
         # populate annotation from combined Study and Assay entries:
         for sample_name in self.sample_names:
             if sample_name in dataset.isa.studies._by_sample_name:
-                isa_entry = dataset.isa.studies._by_sample_name[sample_name]
-                study_name = isa_entry[""]["Study"]
                 self.annotation.append(copy_and_update(
-                    isa_entry, "", {
+                    dataset.isa.studies._by_sample_name[sample_name], "", {
                     "Accession": dataset.accession,
                     "Assay": assay_name, "Sample Name": sample_name,
-                    "Investigation": self._extract_investigation_fields(
-                        dataset.isa, assay_name, study_name,
-                    ),
                 }))
- 
-    def _extract_investigation_fields(self, isa, assay_name, study_name):
-        """Extract Investigation fields attributable to assay and study"""
-        return {
-            "Study Assays": isa.investigation.extract(
-                "Study Assays", by="Study Assay File Name",
-                pattern=r'^a_(.+)\.txt$', target=assay_name,
-                lstrip="Study Assay",
-            ),
-            "Study": isa.investigation.extract(
-                "Study", by="Study File Name",
-                pattern=r'^s_(.+)\.txt$', target=study_name,
-                lstrip="Study",
-            ),
-        }
  
     def resolve_filename(self, mask, sample_mask=".*", field_mask=".*"):
         """Given masks, find filenames, urls, and datestamps"""
