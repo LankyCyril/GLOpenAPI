@@ -27,39 +27,6 @@ AMBIGUOUS_SAMPLE_NAME_ERROR = "Ambiguous Sample Names for one Assay entry"
 class ColdStorageAssay():
     """Stores individual assay information and metadata"""
  
-    def _assert_correct_dataset(self, dataset, assay_name):
-        """Check if being associated with correct dataset"""
-        try:
-            _ = dataset.assays[assay_name]
-        except (KeyError, IndexError, TypeError):
-            raise GeneLabException(WRONG_DATASET_ERROR)
- 
-    def _init_sample_entry_with_assay(self, dataset, isa_assay_entry, assay_name, sample_name):
-        sample_entry = {
-            "": {
-                "Accession": dataset.accession, "Assay": assay_name,
-                "Sample Name": sample_name,
-            },
-            "Assay": copy_and_drop(isa_assay_entry, {""}),
-            "Investigation": {
-                k: v for k, v in dataset.isa.investigation.items()
-                if (isinstance(v, list) or k == "Investigation")
-            },
-        }
-        sample_entry["Investigation"]["Study Assays"] = (
-            dataset.isa.investigation["Study Assays"].get(assay_name, {})
-        )
-        return sample_entry
- 
-    def _extend_sample_entry_with_study(self, sample_entry, dataset, sample_name):
-        isa_study_entry = dataset.isa.studies._by_sample_name[sample_name]
-        study_name = isa_study_entry[""]["Study"]
-        sample_entry[""]["Study"] = study_name
-        sample_entry["Study"] = copy_and_drop(isa_study_entry, {""})
-        sample_entry["Investigation"]["Study"] = (
-            dataset.isa.investigation["Study"].get(study_name, {})
-        )
- 
     def __init__(self, dataset, assay_name, isa_assay_entries):
         """Combine and re-parse Assay and Study entries from dataset ISA"""
         self.samples = {}
@@ -85,6 +52,41 @@ class ColdStorageAssay():
                 self._extend_sample_entry_with_study(
                     self.samples[sample_name], dataset, sample_name,
                 )
+ 
+    def _assert_correct_dataset(self, dataset, assay_name):
+        """Check if being associated with correct dataset"""
+        try:
+            _ = dataset.assays[assay_name]
+        except (KeyError, IndexError, TypeError):
+            raise GeneLabException(WRONG_DATASET_ERROR)
+ 
+    def _init_sample_entry_with_assay(self, dataset, isa_assay_entry, assay_name, sample_name):
+        """Create sample entry for `sample_name`, associate with accession, Assay tab annotation, Investigation Study Assays entry"""
+        sample_entry = {
+            "": {
+                "Accession": dataset.accession, "Assay": assay_name,
+                "Sample Name": sample_name,
+            },
+            "Assay": copy_and_drop(isa_assay_entry, {""}),
+            "Investigation": {
+                k: v for k, v in dataset.isa.investigation.items()
+                if (isinstance(v, list) or k == "Investigation")
+            },
+        }
+        sample_entry["Investigation"]["Study Assays"] = (
+            dataset.isa.investigation["Study Assays"].get(assay_name, {})
+        )
+        return sample_entry
+ 
+    def _extend_sample_entry_with_study(self, sample_entry, dataset, sample_name):
+        """Add Study tab annotation, Investigation Study entry"""
+        isa_study_entry = dataset.isa.studies._by_sample_name[sample_name]
+        study_name = isa_study_entry[""]["Study"]
+        sample_entry[""]["Study"] = study_name
+        sample_entry["Study"] = copy_and_drop(isa_study_entry, {""})
+        sample_entry["Investigation"]["Study"] = (
+            dataset.isa.investigation["Study"].get(study_name, {})
+        )
  
     def resolve_filename(self, mask, sample_mask=".*", field_mask=".*"):
         """Given masks, find filenames, urls, and datestamps"""
