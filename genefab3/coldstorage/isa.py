@@ -38,9 +38,12 @@ class Investigation(dict):
             if isatools_name in raw_investigation:
                 content = raw_investigation[isatools_name]
                 if isinstance(content, list):
-                    json = [self._jsonify(df) for df in content]
+                    json = [
+                        self._jsonify(df, coerce_comments=True)
+                        for df in content
+                    ]
                 else:
-                    json = self._jsonify(content)
+                    json = self._jsonify(content, coerce_comments=True)
                 if isinstance(json, list):
                     if (len(json) == 1) and isinstance(json[0], list):
                         json = json[0]
@@ -56,10 +59,31 @@ class Investigation(dict):
                 else:
                     super().__setitem__(real_name, json)
  
-    def _jsonify(self, df):
+    def _jsonify(self, df, coerce_comments=True):
         """Convert individual dataframe to JSON"""
         nn = range(0, df.shape[1])
-        return df.drop(columns=nn, errors="ignore").to_dict(orient="records")
+        json = df.drop(columns=nn, errors="ignore").to_dict(orient="records")
+        for entry in json:
+            for key in set(entry.keys()):
+                match = search(r'^Comment\s*\[\s*(.+[^\s]\s*)\]\s*$', key)
+                if match:
+                    field, value = match.group(1), entry[key]
+                    del entry[key]
+                    if "Comment" not in entry:
+                        entry["Comment"] = {}
+                    if coerce_comments:
+                        field = field.capitalize()
+                        if field not in entry["Comment"]:
+                            entry["Comment"][field] = []
+                        entry["Comment"][field].append(value)
+                    else:
+                        entry["Comment"][field] = value
+            if coerce_comments and ("Comment" in entry):
+                for field in set(entry["Comment"].keys()):
+                    value_set = set(entry["Comment"][field])
+                    if len(value_set) == 1:
+                        entry["Comment"][field] = value_set.pop()
+        return json
 
 
 class StudyEntries(list):
