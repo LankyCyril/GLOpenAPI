@@ -13,13 +13,15 @@ def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_
         else:
             if (len(fields) == 2) and (dot_postfix == "auto"):
                 lookup_key = ".".join([isa_category] + fields) + "."
+                projection = {lookup_key + ".": True}
             else:
                 lookup_key = ".".join([isa_category] + fields)
+                projection = {lookup_key: True}
             if value:
                 query = {lookup_key: {"$in": value.split("|")}}
             else:
                 query = {lookup_key: {"$exists": True}}
-            yield query, {lookup_key: True}
+            yield query, projection
 
 
 def request_pairs_to_queries(rargs, key):
@@ -45,7 +47,8 @@ def parse_request(request):
     base_url = request.base_url.strip("/")
     context = Namespace(
         view="/"+sub(url_root, "", base_url).strip("/")+"/",
-        request=request, query={"$and": []}, projection={},
+        args=request.args, query={"$and": []}, projection={},
+        hide=set(),
     )
     for key in request.args:
         for query, projection in request_pairs_to_queries(request.args, key):
@@ -53,6 +56,6 @@ def parse_request(request):
                 context.query["$and"].append(query)
             if projection:
                 context.projection.update(projection)
-    for projection in request.args.getlist("hide"):
-        context.projection[projection] = False
+    for field in request.args.getlist("hide"):
+        context.projection.hide.add(field)
     return context
