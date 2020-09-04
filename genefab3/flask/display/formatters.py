@@ -1,4 +1,4 @@
-from genefab3.config import ASSAY_METADATALIKES
+from genefab3.config import ANNOTATION_CATEGORIES
 
 
 def build_url(context, target_view=None, drop=set()):
@@ -69,9 +69,14 @@ def get_browser_formatters(df, context, shortnames):
         formatters.append(get_browser_glds_formatter(context))
     if df.columns[1] == ("info", "assay name"):
         formatters.append(get_browser_assay_formatter(context, shortnames))
-    for i, (meta, meta_name) in enumerate(df.columns):
-        if meta in ASSAY_METADATALIKES:
-            formatters.append(
-                get_browser_meta_formatter(context, i, meta, meta_name)
-            )
+    for i, (key, target) in enumerate(df.columns): # TODO
+        category, *subkeys = key.split(".")
+        if len(subkeys) == 1:
+            if category in {"study", "assay"}:
+                if subkeys[0] in ANNOTATION_CATEGORIES:
+                    formatters.append(
+                        get_browser_meta_formatter(
+                            context, i, subkeys[0], target,
+                        ),
+                    )
     return "\n".join(formatters)
