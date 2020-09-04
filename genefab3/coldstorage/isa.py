@@ -1,16 +1,16 @@
-from pandas import read_csv
-from pandas.errors import ParserError
-from numpy import nan
-from re import search, sub
+from logging import getLogger, CRITICAL
 from genefab3.exceptions import GeneLabISAException
+from re import search, sub
+from collections import defaultdict
+from numpy import nan
 from argparse import Namespace
 from urllib.request import urlopen
-from os import path
 from zipfile import ZipFile
 from io import BytesIO, StringIO
-from logging import getLogger, CRITICAL
+from os import path
 from isatools.isatab import load_investigation
-from collections import defaultdict
+from pandas import read_csv
+from pandas.errors import ParserError
 
 
 class Investigation(dict):
