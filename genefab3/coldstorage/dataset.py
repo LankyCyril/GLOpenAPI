@@ -27,19 +27,18 @@ class ColdStorageDataset():
                 identifier=accession, kind="glds", report_changes=True,
             )
         if not self.json.glds:
-            raise GeneLabJSONException("{}: no dataset found".format(accession))
+            raise GeneLabJSONException(f"{accession}: no dataset found")
         try:
             assert len(self.json.glds) == 1
             self._id = self.json.glds[0]["_id"]
         except (AssertionError, IndexError, KeyError):
-            error = "{}: malformed GLDS JSON".format(accession)
-            raise GeneLabJSONException(error)
+            raise GeneLabJSONException(f"{accession}: malformed GLDS JSON")
         else:
             j = self.json.glds[0]
             if accession in {j.get("accession"), j.get("legacy_accession")}:
                 self.accession = accession
             else:
-                error = "{}: initializing with wrong JSON".format(accession)
+                error = f"{accession}: initializing with wrong JSON"
                 raise GeneLabJSONException(error)
         # populate file information:
         self.json.fileurls, self.changed.fileurls = jga("fileurls"), True
@@ -106,10 +105,10 @@ class ColdStorageDataset():
         # placeholders:
         self.assays = {e[""]["Assay"]: None for e in self.isa.assays}
         # actual assays:
-        self.assays = ColdStorageAssayDispatcher(self)
+        self.assays = AssayDispatcher(self)
 
 
-class ColdStorageAssayDispatcher(dict):
+class AssayDispatcher(dict):
     """Contains a dataset's assay objects, indexable by name or by attributes"""
  
     def __init__(self, dataset):
@@ -118,10 +117,10 @@ class ColdStorageAssayDispatcher(dict):
         for isa_entry in dataset.isa.assays:
             assay_name = isa_entry[""]["Assay"]
             isa_entries_by_assay[assay_name].append(isa_entry)
-        for assay_name, assay_isa_entries in isa_entries_by_assay.items():
+        for assay_name, isa_assay_entries in isa_entries_by_assay.items():
             super().__setitem__(
                 assay_name,
-                ColdStorageAssay(dataset, assay_name, assay_isa_entries),
+                ColdStorageAssay(dataset, assay_name, isa_assay_entries),
             )
  
     def __getitem__(self, assay_name):

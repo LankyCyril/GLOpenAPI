@@ -1,9 +1,7 @@
 from genefab3.exceptions import GeneLabException, GeneLabISAException
-from genefab3.utils import force_default_name_delimiter
+from genefab3.utils import force_default_name_delimiter, copy_and_drop
 from pandas import DataFrame, read_csv
-from numpy import nan
 from re import search, split
-from copy import deepcopy
 from urllib.request import urlopen
 
 
@@ -29,59 +27,66 @@ AMBIGUOUS_SAMPLE_NAME_ERROR = "Ambiguous Sample Names for one Assay entry"
 class ColdStorageAssay():
     """Stores individual assay information and metadata"""
  
-    def __init__(self, dataset, assay_name, assay_isa_entries):
-        """Combine and re-parse Assay and Study entries from dataset ISA"""
-        self.metadata, self.annotation, self.sample_names = [], [], set()
+    def __init__(self, dataset, assay_name, isa_assay_entries):
+        """Combine and re-parse entries from dataset ISA"""
+        self._assert_correct_dataset(dataset, assay_name)
+        self.meta = {}
+        for isa_assay_entry in isa_assay_entries:
+            try: # check validity / uniqueness of Sample Name entries
+                entry_sample_names = {
+                    ee[""] for ee in isa_assay_entry["Sample Name"]
+                }
+            except (KeyError, IndexError, TypeError):
+                raise GeneLabISAException(NO_SAMPLE_NAME_ERROR)
+            if len(entry_sample_names) != 1:
+                raise GeneLabISAException(AMBIGUOUS_SAMPLE_NAME_ERROR)
+            else: # populate metadata from Assay, general Investigation entries
+                sample_name = entry_sample_names.pop()
+                self.meta[sample_name] = self._init_sample_entry_with_assay(
+                    dataset, isa_assay_entry, assay_name, sample_name,
+                )
+        # populate annotation from Study and Investigation entries:
+        for sample_name in self.meta:
+            if sample_name in dataset.isa.studies._by_sample_name:
+                # populate annotation from Study entries matching Sample Names:
+                self._extend_sample_entry_with_study(
+                    self.meta[sample_name], dataset, sample_name,
+                )
+ 
+    def _assert_correct_dataset(self, dataset, assay_name):
+        """Check if being associated with correct dataset"""
         try:
             _ = dataset.assays[assay_name]
         except (KeyError, IndexError, TypeError):
             raise GeneLabException(WRONG_DATASET_ERROR)
-        # collect and check validity / uniqueness of Sample Name entries:
-        for entry in assay_isa_entries:
-            try:
-                entry_sample_names = {ee[""] for ee in entry["Sample Name"]}
-            except (KeyError, IndexError, TypeError):
-                raise GeneLabISAException(NO_SAMPLE_NAME_ERROR)
-            if len(entry_sample_names) == 1:
-                self.sample_names.add(entry_sample_names.pop())
-            else:
-                raise GeneLabISAException(AMBIGUOUS_SAMPLE_NAME_ERROR)
-        # populate metadata from Assay entries, append accession, sample name:
-        for isa_entry in assay_isa_entries:
-            entry = deepcopy(isa_entry)
-            sample_name = entry["Sample Name"][0][""]
-            entry[""].update(self._get_assay_meta(assay_name, dataset))
-            entry[""].update({
-                "Accession": dataset.accession, "Sample Name": sample_name,
-            })
-            self.metadata.append(entry)
-        # populate annotation from combined Study and Assay entries:
-        for sample_name in self.sample_names:
-            if sample_name in dataset.isa.studies._by_sample_name:
-                entry = deepcopy(
-                    dataset.isa.studies._by_sample_name[sample_name],
-                )
-                entry[""].update(self._get_assay_meta(assay_name, dataset))
-                entry[""].update({
-                    "Accession": dataset.accession,
-                    "Assay": assay_name, "Sample Name": sample_name,
-                })
-                self.annotation.append(entry)
  
-    def _get_assay_meta(self, assay_name, dataset, target_field="Study Assay File Name"):
-        """Retrieve information from Investigation tab for Assay field of entry"""
-        try:
-            for entry in dataset.isa.investigation["Study Assays"]:
-                matcher = search(r'^a_(.+)\.txt$', entry[target_field])
-                if matcher and (matcher.group(1) == assay_name):
-                    return {
-                        k.lstrip("Study Assay "): v for k, v in entry.items()
-                        if k != target_field
-                    }
-            else:
-                raise KeyError
-        except (KeyError, IndexError, TypeError):
-            return {}
+    def _init_sample_entry_with_assay(self, dataset, isa_assay_entry, assay_name, sample_name):
+        """Create sample entry for `sample_name`, associate with accession, Assay tab annotation, Investigation Study Assays entry"""
+        sample_entry = {
+            "": {
+                "Accession": dataset.accession, "Assay": assay_name,
+                "Sample Name": sample_name,
+            },
+            "Assay": copy_and_drop(isa_assay_entry, {""}),
+            "Investigation": {
+                k: v for k, v in dataset.isa.investigation.items()
+                if (isinstance(v, list) or k == "Investigation")
+            },
+        }
+        sample_entry["Investigation"]["Study Assays"] = (
+            dataset.isa.investigation["Study Assays"].get(assay_name, {})
+        )
+        return sample_entry
+ 
+    def _extend_sample_entry_with_study(self, sample_entry, dataset, sample_name):
+        """Add Study tab annotation, Investigation Study entry"""
+        isa_study_entry = dataset.isa.studies._by_sample_name[sample_name]
+        study_name = isa_study_entry[""]["Study"]
+        sample_entry[""]["Study"] = study_name
+        sample_entry["Study"] = copy_and_drop(isa_study_entry, {""})
+        sample_entry["Investigation"]["Study"] = (
+            dataset.isa.investigation["Study"].get(study_name, {})
+        )
  
     def resolve_filename(self, mask, sample_mask=".*", field_mask=".*"):
         """Given masks, find filenames, urls, and datestamps"""

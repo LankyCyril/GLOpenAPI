@@ -1,5 +1,6 @@
 from bson import Code
 from bson.errors import InvalidDocument as InvalidDocumentError
+from collections.abc import ValuesView
 
 
 def harmonize_query(query, lowercase=True):
@@ -20,7 +21,7 @@ def harmonize_query(query, lowercase=True):
             else:
                 raise InvalidDocumentError("Harmonized keys conflict")
         return harmonized
-    elif isinstance(query, list):
+    elif isinstance(query, (list, ValuesView)):
         return [harmonize_query(q) for q in query]
     else:
         return query

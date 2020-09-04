@@ -9,7 +9,7 @@ from os import environ
 from genefab3.exceptions import traceback_printer, exception_catcher, DBLogger
 from logging import getLogger
 from functools import partial
-from genefab3.mongo.meta import CacherThread
+from genefab3.mongo.cacher import CacherThread
 from genefab3.flask.display import display
 
 
