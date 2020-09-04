@@ -57,5 +57,8 @@ def parse_request(request):
             if projection:
                 context.projection.update(projection)
     for field in request.args.getlist("hide"):
-        context.projection.hide.add(field)
+        if (field in context.projection) and (field != "_id"):
+            del context.projection[field]
+        else:
+            context.projection.hide.add(field)
     return context
