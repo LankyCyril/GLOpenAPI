@@ -91,7 +91,10 @@ class Investigation(dict):
                     value_set = set(entry["Comment"][field])
                     if len(value_set) == 1:
                         entry["Comment"][field] = value_set.pop()
-        return json
+        if json:
+            return json
+        else:
+            return [{}]
 
 
 class StudyEntries(list):
