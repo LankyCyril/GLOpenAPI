@@ -27,4 +27,4 @@ def get_assays_by_metas(db, context):
 
 def get_samples_by_metas(db, context):
     """Select samples based on annotation filters"""
-    return get_annotation_by_metas(db, context, include=".sample name")
+    return get_annotation_by_metas(db, context, include={".sample name"})
