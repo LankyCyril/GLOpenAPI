@@ -1,15 +1,22 @@
 from pandas import json_normalize, MultiIndex
+from re import findall
 
 
 def get_annotation_by_metas(db, context, include=()):
     """Select assays/samples based on annotation filters"""
+    full_projection = {
+        ".accession": True, ".assay": True, **context.projection,
+        **{field: True for field in include},
+    }
     dataframe = json_normalize(db.metadata.find(
-        context.query, {
-            ".accession": True, ".assay": True,
-            **{field: True for field in include},
-            **context.projection, "_id": False,
-        }
+        context.query, {"_id": False, **full_projection},
     ))
+    subkeys_to_drop = {
+        column for column in dataframe.columns
+        if (len(findall(r'\..', column)) == 3)
+        and (column not in full_projection)
+    }
+    dataframe.drop(columns=subkeys_to_drop, inplace=True)
     dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
     dataframe.drop(columns=context.hide, inplace=True)
     dataframe.columns = MultiIndex.from_tuples(
