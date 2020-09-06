@@ -8,21 +8,26 @@ def get_annotation_by_metas(db, context, include=(), aggregate=False):
         ".accession": True, ".assay": True, **context.projection,
         **{field: True for field in include},
     }
+    # get target metadata as single-level dataframe:
     dataframe = json_normalize(db.metadata.find(
         context.query, {"_id": False, **full_projection},
     ))
+    # drop qualifier fields unless explicitly requested:
     subkeys_to_drop = {
         c for c in dataframe.columns
         if (len(findall(r'\..', c)) == 3) and (c not in full_projection)
     }
     dataframe.drop(columns=subkeys_to_drop, inplace=True)
+    # remove trailing dots and hide columns that are explicitly hidden:
     dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
     dataframe.drop(columns=context.hide, inplace=True)
+    # convert to two-level dataframe:
     dataframe.columns = MultiIndex.from_tuples(
         ("info", ".".join(fields[1:])) if fields[0] == ""
         else (".".join(fields[:2]), ".".join(fields[2:]))
         for fields in map(lambda s: s.split("."), dataframe.columns)
     )
+    # coerce to boolean "existence" if requested:
     if aggregate:
         grouper = dataframe.groupby(
             list(dataframe[["info"]].columns), as_index=False,

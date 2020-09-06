@@ -2,6 +2,7 @@ from re import sub, escape
 from argparse import Namespace
 from genefab3.config import ANNOTATION_CATEGORIES
 from genefab3.utils import UniversalSet
+from collections import OrderedDict
 
 
 def select_pair_to_query(key, value):
@@ -18,19 +19,16 @@ def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_
     if fields[0] in constrain_to:
         if (len(fields) == 2) and (dot_postfix == "auto"):
             lookup_key = ".".join([isa_category] + fields) + "."
-            projection = {lookup_key + ".": True}
         else:
             lookup_key = ".".join([isa_category] + fields)
-            projection = {lookup_key: True}
         if value:
-            query = {lookup_key: {"$in": value.split("|")}}
+            yield {lookup_key: {"$in": value.split("|")}}, lookup_key
         else:
-            query = {lookup_key: {"$exists": True}}
-        yield query, projection
+            yield {lookup_key: {"$exists": True}}, lookup_key
 
 
 def request_pairs_to_queries(rargs, key):
-    """Interpret key-value pairs if they give rise to database queries"""
+    """Interpret key-value pairs under same key if they give rise to database queries"""
     if key == "select":
         for value in rargs.getlist(key):
             if "$" not in value:
@@ -53,6 +51,38 @@ def request_pairs_to_queries(rargs, key):
                         )
 
 
+def INPLACE_update_context_queries(context, rargs):
+    """Interpret all key-value pairs that give rise to database queries"""
+    for key in rargs:
+        for query, lookup_key in request_pairs_to_queries(rargs, key):
+            context.query["$and"].append(query)
+            if lookup_key:
+                context.show.add(lookup_key)
+
+
+def INPLACE_update_context_hiders(context, rargs):
+    """Interpret values under 'hide='"""
+    for field in rargs.getlist("hide"):
+        if (field in context.show) and (field != "_id"):
+            context.show.remove(field)
+        else:
+            context.hide.add(field)
+
+
+def INPLACE_update_context_projection(context):
+    """Infer query projection using values in `show`"""
+    ordered_show = OrderedDict((e, True) for e in sorted(context.show))
+    for target, usable in ordered_show.items():
+        if usable:
+            if target[-1] == ".":
+                context.projection[target + "."] = True
+            else:
+                context.projection[target] = True
+            for potential_child in ordered_show:
+                if potential_child.startswith(target):
+                    ordered_show[potential_child] = False
+
+
 def parse_request(request):
     """Parse request components"""
     url_root = escape(request.url_root.strip("/"))
@@ -60,17 +90,9 @@ def parse_request(request):
     context = Namespace(
         view="/"+sub(url_root, "", base_url).strip("/")+"/",
         args=request.args, query={"$and": []}, projection={},
-        hide=set(),
+        show=set(), hide=set(),
     )
-    for key in request.args:
-        for query, projection in request_pairs_to_queries(request.args, key):
-            if query:
-                context.query["$and"].append(query)
-            if projection:
-                context.projection.update(projection)
-    for field in request.args.getlist("hide"):
-        if (field in context.projection) and (field != "_id"):
-            del context.projection[field]
-        else:
-            context.projection.hide.add(field)
+    INPLACE_update_context_queries(context, request.args)
+    INPLACE_update_context_hiders(context, request.args)
+    INPLACE_update_context_projection(context)
     return context
