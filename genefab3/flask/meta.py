@@ -1,5 +1,29 @@
+from argparse import Namespace
 from pandas import json_normalize, MultiIndex, isnull
 from re import findall
+
+
+def isa_sort_dataframe(dataframe):
+    """Sort single-level dataframe in order info-investigation-study-assay"""
+    column_order = Namespace(
+        info=set(), investigation=set(), study=set(), assay=set(), other=set(),
+    )
+    for column in dataframe.columns:
+        if column.startswith("."):
+            column_order.info.add(column)
+        elif column.startswith("investigation"):
+            column_order.investigation.add(column)
+        elif column.startswith("study"):
+            column_order.study.add(column)
+        elif column.startswith("assay"):
+            column_order.assay.add(column)
+        else:
+            column_order.other.add(column)
+    return dataframe[(
+        sorted(column_order.info) + sorted(column_order.investigation) +
+        sorted(column_order.study) + sorted(column_order.assay) +
+        sorted(column_order.other)
+    )]
 
 
 def get_annotation_by_metas(db, context, include=(), aggregate=False):
@@ -15,13 +39,14 @@ def get_annotation_by_metas(db, context, include=(), aggregate=False):
     # drop qualifier fields unless explicitly requested:
     subkeys_to_drop = {
         c for c in dataframe.columns
-        if (len(findall(r'\..', c)) == 3) and (c not in full_projection)
+        if (len(findall(r'\..', c)) >= 3) and (c not in full_projection)
     }
     dataframe.drop(columns=subkeys_to_drop, inplace=True)
     # remove trailing dots and hide columns that are explicitly hidden:
     dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
     dataframe.drop(columns=context.hide, inplace=True)
-    # convert to two-level dataframe:
+    # sort (ISA-aware) and convert to two-level dataframe:
+    dataframe = isa_sort_dataframe(dataframe)
     dataframe.columns = MultiIndex.from_tuples(
         ("info", ".".join(fields[1:])) if fields[0] == ""
         else (".".join(fields[:2]), ".".join(fields[2:]))
