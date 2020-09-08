@@ -48,7 +48,7 @@
             #selectors > div > div ~ div input {position: relative; top: 1pt}
             a.add, a.or {color: #AAA; font-style: italic; border-bottom: 1pt dashed #CCC}
             a.del {color: #AAA; font-style: italic; margin-left: 3pt}
-            .select-group, .or-selects {display: inline-block}
+            .or-selects {display: inline-block}
         </style>
     </head>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
@@ -56,8 +56,60 @@
 
 var url_root = "%URL_ROOT%";
 
+var metadata = {
+    "wildcard": {
+        "investigation": {
+            "investigation": true,
+            "study": true,
+            "study assays": true,
+        },
+        "study": {
+            "characteristics": true,
+            "factor value": true,
+            "parameter value": true,
+        },
+        "assay": {
+            "characteristics": true,
+            "factor value": true,
+            "parameter value": true,
+        },
+    },
+};
+
+function refresh_dropdowns() {
+    for (key in metadata) {
+        var section_lists = $("#selectors").find(".meta-" + key + ".list-item");
+        section_lists.each(function () {
+            var section_key = key;
+            var section_data = metadata[section_key];
+            for (var i = 0;; i++) {
+                var section = $(this).find("select.key-level.level-"+i);
+                if (section.length > 0) {
+                    var current_value = section.val();
+                    if (current_value in section_data) {
+                        section_key = current_value;
+                        section_data = section_data[section_key];
+                    }
+                    else {
+                        section.find("option").remove();
+                        for (section_key in section_data) {
+                            var option = new Option(section_key, section_key);
+                            $(option).html(section_key);
+                            section.append(option);
+                        }
+                    }
+                }
+                else {
+                    break;
+                }
+            }
+        });
+    }
+}
+
 function housekeeping() {
     $("#view option[value='']").remove();
+    refresh_dropdowns();
     if ($("#view").val() == "data") {
         $(".not-for-data").css("opacity", ".3");
         $(".not-for-data input").prop("disabled", true);
@@ -96,12 +148,6 @@ function toggle_builder() {
     $("#url-builder").show();
     $("h2").show();
     $("#noscript").hide();
-}
-
-function toggle_children() {
-    var select_group = $(this).nextAll(".select-group").first()
-    select_group.children(".key-level").hide();
-    select_group.children(".for-" + $(this).val()).show();
 }
 
 function set_default_repr_of_remover_ors() {
@@ -163,14 +209,12 @@ function refresh_event_handlers() {
     $("a.add").click(clone_query_part);
     $("a.del").click(remove_last_query_option);
     $("a.or").click(clone_query_or);
-    $(".toggles-children").unbind("click");
-    $(".toggles-children").click(toggle_children);
-    $(".toggles-children").each(toggle_children);
     $("input[type=checkbox], select").click(generate_url);
 }
 
 $(document).ready(function() {
     toggle_builder();
+    refresh_dropdowns();
     refresh_event_handlers();
 });
 
@@ -205,30 +249,11 @@ $(document).ready(function() {
                         <div class='meta-wildcard list-item'>
                             <input type='checkbox'>
                             <em class='remover'>&amp;</em>
-                            <select class='key-level toggles-children'>
-                                <option value='investigation'>investigation</option>
-                                <option value='study' selected>study</option>
-                                <option value='assay'>assay</option>
+                            <select class='key-level level-0'>
                             </select>
                             <em>.</em>
-                            <!-- NOTE: these are curated manually, for now -->
-                            <div class='select-group'>
-                                <select class='key-level for-investigation' style='display: none'>
-                                    <option value='investigation' selected>investigation</option>
-                                    <option value='study'>study</option>
-                                    <option value='study assays'>study assays</option>
-                                </select>
-                                <select class='key-level for-study' style='display: inline-block'>
-                                    <option value='characteristics'>characteristics</option>
-                                    <option value='factor value' selected>factor value</option>
-                                    <option value='parameter value'>parameter value</option>
-                                </select>
-                                <select class='key-level for-assay' style='display: none'>
-                                    <option value='characteristics'>characteristics</option>
-                                    <option value='factor value' selected>factor value</option>
-                                    <option value='parameter value'>parameter value</option>
-                                </select>
-                            </div>
+                            <select class='key-level level-1'>
+                            </select>
                         </div>
                     </div>
                     <div>
