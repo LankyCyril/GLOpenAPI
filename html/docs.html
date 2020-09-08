@@ -59,9 +59,9 @@ var url_root = "%URL_ROOT%";
 var metadata = {
     "wildcard": {
         "investigation": {
-            "investigation": true,
             "study": true,
             "study assays": true,
+            "investigation": true,
         },
         "study": {
             "characteristics": true,
@@ -72,6 +72,21 @@ var metadata = {
             "characteristics": true,
             "factor value": true,
             "parameter value": true,
+        },
+    },
+    "hogwarts": {
+        "slytherin": {
+            "malfoy": {"lucius": true, "draco": true},
+            "black": {"sirius": true},
+        },
+        "gryffindor": {
+            "potter": {"harry": true, "albus severus": true, "ginevra": true},
+            "weasley": {"ronald": true, "arthur": true, "fred": true, "george": true},
+            "granger": {"hermione": true},
+        },
+        "hufflepuff": {
+            "diggory": {"cedric": true},
+            "lonbottom": {"neville": true},
         },
     },
 };
@@ -96,7 +111,9 @@ function refresh_dropdowns() {
                             var option = new Option(section_key, section_key);
                             $(option).html(section_key);
                             section.append(option);
+                            section.val(section_key);
                         }
+                        section_data = section_data[section_key];
                     }
                 }
                 else {
@@ -113,12 +130,12 @@ function housekeeping() {
     if ($("#view").val() == "data") {
         $(".not-for-data").css("opacity", ".3");
         $(".not-for-data input").prop("disabled", true);
-        return [];
+        return ["hogwarts"];
     }
     else {
         $(".not-for-data").css("opacity", "1");
         $(".not-for-data input").prop("disabled", false);
-        return ["wildcard"];
+        return ["wildcard", "hogwarts"];
     }
 }
 
@@ -249,16 +266,34 @@ $(document).ready(function() {
                         <div class='meta-wildcard list-item'>
                             <input type='checkbox'>
                             <em class='remover'>&amp;</em>
-                            <select class='key-level level-0'>
-                            </select>
+                            <select class='key-level level-0'></select>
                             <em>.</em>
-                            <select class='key-level level-1'>
-                            </select>
+                            <select class='key-level level-1'></select>
                         </div>
                     </div>
                     <div>
                         <input type='checkbox' disabled>
                         <a class='meta-wildcard add'>AND</a>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div><b>Harry Potter characters:</b></div>
+                <div>
+                    <div id='meta-hogwarts-list' class='list'>
+                        <div class='meta-hogwarts list-item'>
+                            <input type='checkbox'>
+                            <em class='remover'>&amp;</em>
+                            <select class='key-level level-0'></select>
+                            <em>.</em>
+                            <select class='key-level level-1'></select>
+                            <em>.</em>
+                            <select class='key-level level-2'></select>
+                        </div>
+                    </div>
+                    <div>
+                        <input type='checkbox' disabled>
+                        <a class='meta-hogwarts add'>AND</a>
                     </div>
                 </div>
             </div>
