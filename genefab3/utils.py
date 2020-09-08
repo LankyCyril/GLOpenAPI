@@ -1,14 +1,11 @@
-from urllib.request import urlopen
-from genefab3.config import COLD_GLDS_MASK, COLD_FILEURLS_MASK
-from genefab3.config import COLD_FILEDATES_MASK, TIMESTAMP_FMT
-from json import loads
-from re import search, sub, escape
-from genefab3.exceptions import GeneLabException, GeneLabJSONException
+from genefab3.config import TIMESTAMP_FMT
+from re import sub, escape
 from datetime import datetime
-from numpy import zeros, nan
+from numpy import nan
 from pandas import DataFrame, concat
 from natsort import natsorted
 from functools import lru_cache
+from copy import deepcopy
 
 
 def natsorted_dataframe(dataframe, by, ascending=True, sort_trailing_columns=False):
@@ -23,37 +20,6 @@ def natsorted_dataframe(dataframe, by, ascending=True, sort_trailing_columns=Fal
             natsorted(set(ns_df[column])), inplace=True, ordered=True,
         )
     return ns_df.sort_values(by=by, ascending=ascending)
-
-
-def download_cold_json(identifier, kind="other"):
-    """Request and pre-parse cold storage JSONs for datasets, file listings, file dates"""
-    if kind == "glds":
-        url = COLD_GLDS_MASK.format(identifier)
-        with urlopen(url) as response:
-            return loads(response.read().decode())
-    elif kind == "fileurls":
-        accession_number_match = search(r'\d+$', identifier)
-        if accession_number_match:
-            accession_number = accession_number_match.group()
-        else:
-            raise GeneLabException("Malformed accession number")
-        url = COLD_FILEURLS_MASK.format(accession_number)
-        with urlopen(url) as response:
-            raw_json = loads(response.read().decode())
-            try:
-                return raw_json["studies"][identifier]["study_files"]
-            except KeyError:
-                raise GeneLabJSONException("Malformed 'files' JSON")
-    elif kind == "filedates":
-        url = COLD_FILEDATES_MASK.format(identifier)
-        with urlopen(url) as response:
-            return loads(response.read().decode())
-    elif kind == "other":
-        url = identifier
-        with urlopen(url) as response:
-            return loads(response.read().decode())
-    else:
-        raise GeneLabException("Unknown JSON request: kind='{}'".format(kind))
 
 
 def extract_file_timestamp(fd, key="date_modified", fallback_key="date_created", fallback_value=-1, fmt=TIMESTAMP_FMT):
@@ -78,24 +44,6 @@ def force_default_name_delimiter(string):
     return sub(r'[._-]', "-", string)
 
 
-@lru_cache(maxsize=None)
-def levenshtein_distance(v, w):
-    """Calculate levenshtein distance between two sequences"""
-    m, n = len(v), len(w)
-    dp = zeros((m+1, n+1), dtype=int)
-    for i in range(m+1):
-        for j in range(n+1):
-            if i == 0:
-                dp[i, j] = j
-            elif j == 0:
-                dp[i, j] = i
-            elif v[i-1] == w[j-1]:
-                dp[i, j] = dp[i-1, j-1]
-            else:
-                dp[i, j] = 1 + min(dp[i, j-1], dp[i-1, j], dp[i-1, j-1])
-    return dp[m, n]
-
-
 def map_replace(string, mappings):
     """Perform multiple replacements in one go"""
     return sub(
@@ -111,3 +59,29 @@ def empty_df(columns):
         [DataFrame(columns), DataFrame([nan]*len(columns), columns=[2])],
         axis=1,
     ).set_index([0, 1]).T
+
+
+class UniversalSet(set):
+    """Naive universal set"""
+    def __and__(self, x): return x
+    def __iand__(self, x): return x
+    def __rand__(self, x): return x
+    def __or__(self, x): return self
+    def __ior__(self, x): return self
+    def __ror__(self, x): return self
+    def __contains__(self, x): return True
+
+
+def copy_and_update(d, key, E):
+    """Deepcopy dictionary `d`, update `d[key]` with data from `E`"""
+    d_copy = deepcopy(d)
+    d_copy[key].update(E)
+    return d_copy
+
+
+def copy_and_drop(d, keys):
+    """Deepcopy dictionary `d`, delete `d[key] for key in keys`"""
+    d_copy = deepcopy(d)
+    for key in keys:
+        del d_copy[key]
+    return d_copy

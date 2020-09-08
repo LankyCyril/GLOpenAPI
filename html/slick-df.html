@@ -18,7 +18,6 @@
         }
         .fullpage{position: absolute; top: 25pt; left: 0; right: 0; bottom: 0}
         #grid {border: .25pt solid black}
-        #shade {z-index: 2; background: #00000099; display: none}
         #info {
             margin: 10pt auto; min-width: 3in; max-width: 50%;
             max-height: 90%; overflow: auto;
@@ -64,7 +63,6 @@
         <a style="color:#D10" href="ASSAYSVIEW">assays</a>,
         <a style="color:#D10" href="SAMPLESVIEW">samples</a>,
         <a style="color:#D10" href="DATAVIEW">data</a>.
-        <b>Query:</b> <a style="color:#D10" id="info-toggle">show explanation</a>.
     </div>
     <div id="grid" class="fullpage">
         <div id="noscript">
@@ -73,14 +71,6 @@
             instead, or use the csv and tsv links above.
             Note: the static HTML view may be slow or disabled altogether
             for large tables.
-        </div>
-    </div>
-    <div id="shade" class="fullpage">
-        <div id="info">
-            <b>Explanation of query:</b>
-            <ul>
-            <!--QUERYEXPLANATION-->
-            </ul>
         </div>
     </div>
     <div id="crosshair-h" class="crosshair"></div>
@@ -231,22 +221,6 @@ $(document).ready(function() {
     });
     $("#crosshair-toggle").click(function () {
         $(".crosshair").toggle();
-    });
-    $("#info-toggle").click(function() {
-        if ($("#shade").css("display") == "none") {
-            $("#shade").show();
-            $(this).text("hide explanation");
-        }
-        else {
-            $("#shade").hide();
-            $(this).text("show explanation");
-        }
-    });
-    $(document).keyup(function(e) {
-        if (e.key === "Escape") {
-            $("#shade").hide();
-            $("#info-toggle").text("show explanation");
-        }
     });
 });
 
