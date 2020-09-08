@@ -1,6 +1,3 @@
-from genefab3.config import ANNOTATION_CATEGORIES
-
-
 def build_url(context, target_view=None, drop=set()):
     """Rebuild URL from request, alter based on `replace` and `drop`"""
     if target_view is None:
@@ -31,7 +28,7 @@ def get_browser_assay_formatter(context, shortnames):
     """Get SlickGrid formatter for column 'assay name'"""
     mask = "columns[1].formatter={}; columns[1].defaultFormatter={};"
     formatter_mask = """function(r,c,v,d,x){{
-        return "<a href='{}select="+data[r]["{}"]+":"+escape(v)+"'>"+v+"</a>";
+        return "<a href='{}select="+data[r]["{}"]+"."+escape(v)+"'>"+v+"</a>";
     }};"""
     formatter = formatter_mask.format(
         build_url(context, "/samples/", drop={"select"}),
@@ -40,7 +37,7 @@ def get_browser_assay_formatter(context, shortnames):
     return mask.format(formatter, formatter)
 
 
-def get_browser_meta_formatter(context, i, meta, meta_name):
+def get_browser_meta_formatter(context, i, category, subkey, target):
     """Get SlickGrid formatter for meta column"""
     mask = "columns[{}].formatter={}; columns[{}].defaultFormatter={};"
     if context.view == "/assays/":
@@ -48,17 +45,19 @@ def get_browser_meta_formatter(context, i, meta, meta_name):
             return (v == "NA")
             ? "<i style='color:#BBB'>"+v+"</i>"
             : ((v == "False")
-            ? "<a href='{0}{1}!="+escape("{2}")+"' style='color:#FAA'>"+v+"</a>"
-            : "<a href='{0}{1}="+escape("{2}")+
+            ? "<font style='color:#FAA'>"+v+"</font>"
+            : "<a href='{}"+escape("{}.{}.{}")+
                 "' style='color:green'>"+v+"</a>");
         }};"""
     else:
         formatter_mask = """function(r,c,v,d,x){{
             return (v == "NA")
             ? "<i style='color:#BBB'>"+v+"</i>"
-            : "<a href='{}{}:"+escape("{}")+"="+escape(v)+"'>"+v+"</a>";
+            : "<a href='{}"+escape("{}.{}.{}")+"="+escape(v)+"'>"+v+"</a>";
         }};"""
-    formatter = formatter_mask.format(build_url(context), meta, meta_name)
+    formatter = formatter_mask.format(
+        build_url(context), category, subkey, target,
+    )
     return mask.format(i, formatter, i, formatter)
 
 
@@ -67,16 +66,15 @@ def get_browser_formatters(df, context, shortnames):
     formatters = []
     if df.columns[0] == ("info", "accession"):
         formatters.append(get_browser_glds_formatter(context))
-    if df.columns[1] == ("info", "assay name"):
+    if df.columns[1] == ("info", "assay"):
         formatters.append(get_browser_assay_formatter(context, shortnames))
-    for i, (key, target) in enumerate(df.columns): # TODO
+    for i, (key, target) in enumerate(df.columns):
         category, *subkeys = key.split(".")
         if len(subkeys) == 1:
-            if category in {"study", "assay"}:
-                if subkeys[0] in ANNOTATION_CATEGORIES:
-                    formatters.append(
-                        get_browser_meta_formatter(
-                            context, i, subkeys[0], target,
-                        ),
-                    )
+            if category != "info":
+                formatters.append(
+                    get_browser_meta_formatter(
+                        context, i, category, subkeys[0], target,
+                    ),
+                )
     return "\n".join(formatters)
