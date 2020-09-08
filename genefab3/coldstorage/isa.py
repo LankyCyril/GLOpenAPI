@@ -1,63 +1,105 @@
-from pandas import read_csv
-from pandas.errors import ParserError
-from numpy import nan
-from re import search, sub
+from logging import getLogger, CRITICAL
 from genefab3.exceptions import GeneLabISAException
+from re import search, sub
+from collections import defaultdict
+from numpy import nan
 from argparse import Namespace
 from urllib.request import urlopen
-from os import path
 from zipfile import ZipFile
 from io import BytesIO, StringIO
-from logging import getLogger, CRITICAL
+from os import path
 from isatools.isatab import load_investigation
-from collections import defaultdict
-
-
-INVESTIGATION_KEYS = { # "Real Name In Mixed Case" -> "as_reported_by_isatools"
-    "Ontology Source Reference": "ontology_sources",
-    "Investigation": "investigation",
-    "Investigation Publications": "i_publications",
-    "Investigation Contacts": "i_contacts",
-    "Study": "studies",
-    "Studies": "studies",
-    "Study Design Descriptors": "s_design_descriptors",
-    "Study Publications": "s_publications",
-    "Study Factors": "s_factors",
-    "Study Assays": "s_assays",
-    "Study Protocols": "s_protocols",
-    "Study Contacts": "s_contacts",
-}
+from pandas import read_csv
+from pandas.errors import ParserError
 
 
 class Investigation(dict):
-    """Stores GLDS ISA Tab 'investigation' in accessible formats""" # NOTE: work in progress
+    """Stores GLDS ISA Tab 'investigation' in accessible formats"""
  
     def __init__(self, raw_investigation):
-        for key, internal_key in INVESTIGATION_KEYS.items():
-            if internal_key in raw_investigation:
-                content = raw_investigation[internal_key]
+        """Convert dataframes to JSONs"""
+        for real_name, isatools_name, target, pattern in self._key_dispatcher:
+            if isatools_name in raw_investigation:
+                content = raw_investigation[isatools_name]
                 if isinstance(content, list):
-                    json = [self._jsonify(df) for df in content]
+                    json = [
+                        self._jsonify(df, coerce_comments=True)
+                        for df in content
+                    ]
                 else:
-                    json = self._jsonify(content)
+                    json = self._jsonify(content, coerce_comments=True)
                 if isinstance(json, list):
                     if (len(json) == 1) and isinstance(json[0], list):
                         json = json[0]
-                super().__setitem__(key, json)
+                if isinstance(target, int) and isinstance(pattern, int):
+                    try:
+                        if len(json) != pattern:
+                            raise IndexError
+                        else:
+                            super().__setitem__(real_name, json[target])
+                    except (TypeError, IndexError, KeyError):
+                        error = f"Unexpected structure of {real_name}"
+                        raise GeneLabISAException(error)
+                elif target and pattern:
+                    try:
+                        super().__setitem__(real_name, {
+                            search(pattern, entry[target]).group(1): entry
+                            for entry in json
+                        })
+                    except (TypeError, AttributeError, IndexError, KeyError):
+                        error = f"Could not break up '{real_name}' by name"
+                        raise GeneLabISAException(error)
+                else:
+                    super().__setitem__(real_name, json)
+
+    _key_dispatcher = [
+      # ("Real Name In Mixed Case", "as_in_isatools", target_for_keys, pattern)
+        ("Ontology Source Reference", "ontology_sources", None, None),
+        ("Investigation", "investigation", 0, 1),
+        ("Investigation Publications", "i_publications", None, None),
+        ("Investigation Contacts", "i_contacts", None, None),
+        ("Study", "studies", "Study File Name", r'^s_(.+)\.txt$'),
+        ("Study Design Descriptors", "s_design_descriptors", None, None),
+        ("Study Publications", "s_publications", None, None),
+        ("Study Factors", "s_factors", None, None),
+        ("Study Assays", "s_assays", "Study Assay File Name", r'^a_(.+)\.txt$'),
+        ("Study Protocols", "s_protocols", None, None),
+        ("Study Contacts", "s_contacts", None, None),
+    ]
  
-    def _jsonify(self, df):
+    def _jsonify(self, df, coerce_comments=True):
+        """Convert individual dataframe to JSON"""
         nn = range(0, df.shape[1])
-        return df.drop(columns=nn, errors="ignore").to_dict(orient="records")
+        json = df.drop(columns=nn, errors="ignore").to_dict(orient="records")
+        for entry in json:
+            for key in set(entry.keys()):
+                match = search(r'^Comment\s*\[\s*(.+[^\s]\s*)\]\s*$', key)
+                if match:
+                    field, value = match.group(1), entry[key]
+                    del entry[key]
+                    if "Comment" not in entry:
+                        entry["Comment"] = {}
+                    if coerce_comments:
+                        field = field.capitalize()
+                        if field not in entry["Comment"]:
+                            entry["Comment"][field] = []
+                        entry["Comment"][field].append(value)
+                    else:
+                        entry["Comment"][field] = value
+            if coerce_comments and ("Comment" in entry):
+                for field in set(entry["Comment"].keys()):
+                    value_set = set(entry["Comment"][field])
+                    if len(value_set) == 1:
+                        entry["Comment"][field] = value_set.pop()
+        if json:
+            return json
+        else:
+            return [{}]
 
 
 class StudyEntries(list):
     """Stores GLDS ISA Tab 'studies' records as a nested JSON"""
     _self_identifier = "Study"
- 
-    def _abort_lookup(self):
-        """Prevents ambiguous lookup through `self._by_sample_name` in inherited classes"""
-        error_mask = "Unique look up by sample name within {} not allowed"
-        raise GeneLabISAException(error_mask.format(type(self).__name__))
  
     def __init__(self, raw_tabs, **logger_info):
         """Convert tables to nested JSONs"""
@@ -81,6 +123,11 @@ class StudyEntries(list):
                         raise GeneLabISAException(error)
                     else:
                         self._by_sample_name[sample_name] = json
+ 
+    def _abort_lookup(self):
+        """Prevents ambiguous lookup through `self._by_sample_name` in inherited classes"""
+        error_mask = "Unique look up by sample name within {} not allowed"
+        raise GeneLabISAException(error_mask.format(type(self).__name__))
  
     def _row_to_json(self, row, name, **logger_info):
         """Convert single row of table to nested JSON"""
@@ -172,55 +219,20 @@ class AssayEntries(StudyEntries):
     _self_identifier = "Assay"
 
 
-def parse_investigation(handle):
-    """Load investigation tab with isatools, safeguard input for engine='python', suppress isatools' logger"""
-    safe_handle = StringIO(
-        sub( # make number of double quotes inside fields even:
-            r'([^\n\t])\"([^\n\t])', r'\1""\2',
-            handle.read().decode(errors="replace")
-        ),
-    )
-    getLogger("isatools").setLevel(CRITICAL+1)
-    return load_investigation(safe_handle)
-
-
-def read_tab(handle, **logger_info):
-    """Read TSV file, absorbing encoding errors, and allowing for duplicate column names"""
-    byte_tee = BytesIO(handle.read())
-    reader_kwargs = dict(sep="\t", comment="#", header=None, index_col=False)
-    try:
-        raw_tab = read_csv(byte_tee, **reader_kwargs)
-    except (UnicodeDecodeError, ParserError) as e:
-        byte_tee.seek(0)
-        string_tee = StringIO(byte_tee.read().decode(errors="replace"))
-        raw_tab = read_csv(string_tee, **reader_kwargs)
-        warning_mask = "{}: absorbing {} when reading from {}"
-        warning = warning_mask.format(
-            logger_info.get("isa_zip_url", "[URL]"), repr(e),
-            logger_info.get("filename", "file"),
-        )
-        getLogger("genefab3").warning(warning)
-    raw_tab.columns = raw_tab.iloc[0,:]
-    raw_tab.columns.name = None
-    return raw_tab.drop(index=[0]).drop_duplicates().reset_index(drop=True)
-
-
 class IsaZip:
     """Stores GLDS ISA information retrieved from ISA ZIP file URL"""
  
     def __init__(self, isa_zip_url):
         """Unpack ZIP from URL and delegate to sub-parsers"""
         info = dict(isa_zip_url=isa_zip_url)
-        self.raw = self.ingest_raw_isa(isa_zip_url)
+        self.raw = self._ingest_raw_isa(isa_zip_url)
         self.investigation = Investigation(self.raw.investigation)
         self.studies = StudyEntries(self.raw.studies, **info)
         self.assays = AssayEntries(self.raw.assays, **info)
  
-    def ingest_raw_isa(self, isa_zip_url):
+    def _ingest_raw_isa(self, isa_zip_url):
         """Unpack ZIP from URL and delegate to top-level parsers"""
-        raw = Namespace(
-            investigation=None, studies={}, assays={},
-        )
+        raw = Namespace(investigation=None, studies={}, assays={})
         with urlopen(isa_zip_url) as response:
             with ZipFile(BytesIO(response.read())) as archive:
                 for filepath in archive.namelist():
@@ -231,13 +243,49 @@ class IsaZip:
                         kind, name = matcher.groups()
                         with archive.open(filepath) as handle:
                             if kind == "i":
-                                raw.investigation = parse_investigation(handle)
+                                reader = self._read_investigation
+                                raw.investigation = reader(handle)
                             elif kind == "s":
-                                raw.studies[name] = read_tab(handle, **info)
+                                reader = self._read_tab
+                                raw.studies[name] = reader(handle, **info)
                             elif kind == "a":
-                                raw.assays[name] = read_tab(handle, **info)
+                                reader = self._read_tab
+                                raw.assays[name] = reader(handle, **info)
         for tab, value in raw._get_kwargs():
             if not value:
                 error = "{}: missing ISA tab '{}'".format(isa_zip_url, tab)
                 raise GeneLabISAException(error)
         return raw
+ 
+    def _read_investigation(self, handle):
+        """Load investigation tab with isatools, safeguard input for engine='python', suppress isatools' logger"""
+        safe_handle = StringIO(
+            sub( # make number of double quotes inside fields even:
+                r'([^\n\t])\"([^\n\t])', r'\1""\2',
+                handle.read().decode(errors="replace")
+            ),
+        )
+        getLogger("isatools").setLevel(CRITICAL+1)
+        return load_investigation(safe_handle)
+ 
+    def _read_tab(self, handle, **logger_info):
+        """Read TSV file, absorbing encoding errors, and allowing for duplicate column names"""
+        byte_tee = BytesIO(handle.read())
+        reader_kwargs = dict(
+            sep="\t", comment="#", header=None, index_col=False,
+        )
+        try:
+            raw_tab = read_csv(byte_tee, **reader_kwargs)
+        except (UnicodeDecodeError, ParserError) as e:
+            byte_tee.seek(0)
+            string_tee = StringIO(byte_tee.read().decode(errors="replace"))
+            raw_tab = read_csv(string_tee, **reader_kwargs)
+            warning_mask = "{}: absorbing {} when reading from {}"
+            warning = warning_mask.format(
+                logger_info.get("isa_zip_url", "[URL]"), repr(e),
+                logger_info.get("filename", "file"),
+            )
+            getLogger("genefab3").warning(warning)
+        raw_tab.columns = raw_tab.iloc[0,:]
+        raw_tab.columns.name = None
+        return raw_tab.drop(index=[0]).drop_duplicates().reset_index(drop=True)

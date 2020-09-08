@@ -1,85 +1,86 @@
-from genefab3.exceptions import GeneLabException
 from re import sub, escape
 from argparse import Namespace
-from genefab3.config import ASSAY_METADATALIKES
-from collections import defaultdict
+from genefab3.config import ANNOTATION_CATEGORIES
+from genefab3.utils import UniversalSet
+from collections import OrderedDict
 
 
-QUERY, WILDCARD, REMOVER = 0, 1, 2
+def select_pair_to_query(key, value):
+    """Interpret single key-value pair for dataset / assay constraint"""
+    if value.count(".") == 0:
+        yield {".accession": value}, None
+    elif value.count(".") == 1:
+        accession, assay_name = value.split(".")
+        yield {".accession": accession, ".assay": assay_name}, None
 
 
-def parse_assay_selection(rargs_select_list):
-    """Parse 'select' request argument"""
-    if len(rargs_select_list) == 0:
-        return None
-    elif len(rargs_select_list) == 1:
-        context_select = defaultdict(set)
-        for query in rargs_select_list[0].split("|"):
-            query_components = query.split(":", 1)
-            if len(query_components) == 1:
-                context_select[query_components[0]].add(None)
+def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_postfix=False):
+    """Interpret single key-value pair if it gives rise to database query"""
+    if fields[0] in constrain_to:
+        if (len(fields) == 2) and (dot_postfix == "auto"):
+            lookup_key = ".".join([isa_category] + fields) + "."
+        else:
+            lookup_key = ".".join([isa_category] + fields)
+        if value:
+            yield {lookup_key: {"$in": value.split("|")}}, lookup_key
+        else:
+            yield {lookup_key: {"$exists": True}}, lookup_key
+
+
+def request_pairs_to_queries(rargs, key):
+    """Interpret key-value pairs under same key if they give rise to database queries"""
+    if key == "select":
+        for value in rargs.getlist(key):
+            if "$" not in value:
+                yield from select_pair_to_query(key, value)
+    elif "$" not in key:
+        isa_category, *fields = key.split(".")
+        if fields:
+            for value in rargs.getlist(key):
+                if "$" not in value:
+                    if isa_category == "investigation":
+                        yield from pair_to_query(
+                            isa_category, fields, value,
+                            constrain_to=UniversalSet(), dot_postfix=False,
+                        )
+                    elif isa_category in {"study", "assay"}:
+                        yield from pair_to_query(
+                            isa_category, fields, value,
+                            constrain_to=ANNOTATION_CATEGORIES,
+                            dot_postfix="auto",
+                        )
+
+
+def INPLACE_update_context_queries(context, rargs):
+    """Interpret all key-value pairs that give rise to database queries"""
+    for key in rargs:
+        for query, lookup_key in request_pairs_to_queries(rargs, key):
+            context.query["$and"].append(query)
+            if lookup_key:
+                context.show.add(lookup_key)
+
+
+def INPLACE_update_context_hiders(context, rargs):
+    """Interpret values under 'hide='"""
+    for field in rargs.getlist("hide"):
+        if (field in context.show) and (field != "_id"):
+            context.show.remove(field)
+        else:
+            context.hide.add(field)
+
+
+def INPLACE_update_context_projection(context):
+    """Infer query projection using values in `show`"""
+    ordered_show = OrderedDict((e, True) for e in sorted(context.show))
+    for target, usable in ordered_show.items():
+        if usable:
+            if target[-1] == ".":
+                context.projection[target + "."] = True
             else:
-                context_select[query_components[0]].add(query_components[1])
-        return context_select
-    else:
-        raise GeneLabException("'select' can be used no more than once")
-
-
-def assay_selection_to_query(selection):
-    """Convert 'select' dictionary into MongoDB query"""
-    if selection:
-        query = {"$or": []}
-        for accession, assay_names in selection.items():
-            for assay_name in assay_names:
-                if assay_name:
-                    query["$or"].append({
-                        "accession": accession, "assay name": assay_name,
-                    })
-                else:
-                    query["$or"].append({"accession": accession})
-        return query
-    else:
-        return {}
-
-
-def parse_meta_queries(key, expressions):
-    """Process queries like e.g. 'factors=age', 'factors!=age', 'factors:age=1|2', 'factors:age!=5'"""
-    if key[-1] == "!":
-        real_key, negation = key[:-1], True
-    else:
-        real_key, negation = key, False
-    if real_key.count(":") == 1:
-        meta, field = real_key.split(":") # e.g. "factors" and "age"
-    elif real_key.count(":") > 1:
-        raise GeneLabException("Malformed argument: {}".format(key))
-    else:
-        meta, field = real_key, None # e.g. "factors"
-    if meta in ASSAY_METADATALIKES:
-        for expression in expressions:
-            malformed_err = "Malformed argument: {}={}".format(key, expression)
-            undefined_err = "Undefined behavior: {}={}".format(key, expression)
-            values = expression.split("|")
-            if negation and (len(values) > 1): # e.g. "f:a!=5|7" or "f!=a|b"
-                raise GeneLabException(undefined_err)
-            elif field: # e.g. "factors:age"
-                if expression and negation: # e.g. "factors:age!=5"
-                    yield QUERY, meta, {field}, {field: {"$ne": values[0]}}
-                elif expression: # e.g. "factors:age=7"
-                    yield QUERY, meta, {field}, {field: {"$in": values}}
-                else: # e.g. "factors:age!=" without value
-                    raise GeneLabException(malformed_err)
-            else:
-                if negation and expression: # e.g. "factors!=age"
-                    val = values[0]
-                    yield REMOVER, meta, {val}, {val: {"$exists": False}}
-                elif expression: # e.g. "factors=age"
-                    yield QUERY, meta, set(values), {"$or": [
-                        {value: {"$exists": True}} for value in values
-                    ]}
-                elif negation: # e.g. "factors!=" without value
-                    raise GeneLabException(malformed_err)
-                else: # e.g. "factors", i.e. all factors
-                    yield WILDCARD, meta, None, None
+                context.projection[target] = True
+            for potential_child in ordered_show:
+                if potential_child.startswith(target):
+                    ordered_show[potential_child] = False
 
 
 def parse_request(request):
@@ -88,24 +89,10 @@ def parse_request(request):
     base_url = request.base_url.strip("/")
     context = Namespace(
         view="/"+sub(url_root, "", base_url).strip("/")+"/",
-        select=parse_assay_selection(request.args.getlist("select")),
-        args=request.args,
-        queries=defaultdict(list),
-        fields=defaultdict(set),
-        wildcards=set(),
-        removers=defaultdict(set),
+        args=request.args, query={"$and": []}, projection={},
+        show=set(), hide=set(),
     )
-    context.queries["select"] = assay_selection_to_query(context.select)
-    for key in request.args:
-        parser = parse_meta_queries(key, set(request.args.getlist(key)))
-        for kind, meta, fields, query in parser:
-            if kind == QUERY:
-                context.queries[meta].append(query)
-                context.fields[meta] |= fields
-            elif kind == REMOVER:
-                context.queries[meta].append(query)
-                context.removers[meta] |= fields
-                context.fields[meta] -= fields
-            elif kind == WILDCARD:
-                context.wildcards.add(meta)
+    INPLACE_update_context_queries(context, request.args)
+    INPLACE_update_context_hiders(context, request.args)
+    INPLACE_update_context_projection(context)
     return context

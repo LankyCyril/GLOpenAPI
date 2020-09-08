@@ -13,7 +13,7 @@
             em {font-style: normal; color: black; font-family: "Oxygen", monospace; font-size: 12pt}
             em.remover, em.remover-or {color: #D10; cursor: pointer; border-bottom: 1pt dashed #D10}
             label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
-            select {margin: 1pt 0}
+            select {margin: 1pt 0; max-width: 120pt; overflow: hidden; text-overflow: ellipsis; white-space: nowrap}
             h1 {font-size: 28pt; font-weight: 500; border-bottom: 1pt solid black; display: inline-block; margin: 5pt 0 20pt 0}
             h2 {font-size: 20pt; font-weight: 500; display: inline-block; margin: 10pt 0 0 0}
             #url-builder {position: sticky; top: 0; background: #FFFFFFEE; z-index: 8}
@@ -56,61 +56,82 @@
 
 var url_root = "%URL_ROOT%";
 
-function generate_url() {
-    housekeeping();
-    var url = url_root + "/<b>" + escape($("#view").val()) + "</b>/?";
-    if ($("#view").val() !== "data")
-        $("#show-all-fields input[type=checkbox]").each(function () {
-            if ($(this).prop("checked"))
-                url = url + "<b>" + escape(this.id) + "</b>&";
+var metadata = {
+    "wildcard": /* METADATA_WILDCARDS */,
+    "existence": /* METADATA_EXISTENCE */,
+    "equals": /* METADATA_EQUALS */,
+};
+
+function refresh_dropdowns() {
+    for (key in metadata) {
+        var section_lists = $("#selectors").find(".meta-" + key + ".list-item");
+        section_lists.each(function () {
+            var section_key = key;
+            var section_data = metadata[section_key];
+            for (var i = 0;; i++) {
+                var section = $(this).find("select.level-"+i);
+                if (section.length > 0) {
+                    var current_value = section.val();
+                    if (current_value in section_data) {
+                        section_key = current_value;
+                        section_data = section_data[section_key];
+                    }
+                    else {
+                        section.find("option").remove();
+                        for (section_key in section_data) {
+                            var option = new Option(section_key, section_key);
+                            $(option).html(section_key);
+                            section.append(option);
+                            section.val(section_key);
+                        }
+                        section_data = section_data[section_key];
+                    }
+                }
+                else {
+                    break;
+                }
+            }
         });
-    $(".meta-existence").each(function () {
-        if ($(this).children("input[type=checkbox]").prop("checked")) {
-            url = url + "<b>" + escape($(this).children("select.meta-existence-field").val()) + "=</b><i>";
-            $(this).children(".or-selects").children("select.meta-existence-name").each(function () {
-                url = url + escape($(this).val()) + "|";
-            });
-            url = url.replace(/\|$/g, "</i>&");
-        }
-    });
-    $(".meta-exclude").each(function () {
-        if ($(this).children("input[type=checkbox]").prop("checked"))
-            url = url + "<b>" +
-                escape($(this).children("select.meta-exclude-field").val()) + "!=</b><i>" +
-                escape($(this).children("select.meta-exclude-name").val()) + "</i>&";
-    });
-    $(".meta-value-equals").each(function () {
-        if ($(this).children("input[type=checkbox]").prop("checked")) {
-            url = url + "<b>" +
-                escape($(this).children("select.meta-value-equals-field").val()) + ":" +
-                escape($(this).children("select.meta-value-equals-name").val()) + "=</b><i>";
-            $(this).children(".or-selects").children("select.meta-value-equals-value").each(function () {
-                url = url + escape($(this).val()) + "|";
-            });
-            url = url.replace(/\|$/g, "</i>&");
-        }
-    });
-    $(".meta-value-notequals").each(function () {
-        if ($(this).children("input[type=checkbox]").prop("checked"))
-            url = url + "<b>" +
-                escape($(this).children("select.meta-value-notequals-field").val()) + ":" +
-                escape($(this).children("select.meta-value-notequals-name").val()) + "!=</b><i>" +
-                escape($(this).children("select.meta-value-notequals-value").val()) + "</i>&";
-    });
-    var datasets_selected = false;
-    var selection_argument = "<b>select=</b><i>";
-    $(".select").each(function () {
-        if ($(this).children("input[type=checkbox]").prop("checked")) {
-            datasets_selected = true;
-            selection_argument = selection_argument + escape($(this).children("select.select-accessions").val());
-            var assay_name = $(this).children("select.select-name").val();
-            if (assay_name !== "")
-                selection_argument = selection_argument + ":" + assay_name;
-            selection_argument = selection_argument + "|";
-        }
-    });
-    if (datasets_selected)
-        url = url + selection_argument.replace(/\|$/g, "</i>&");
+    }
+}
+
+function housekeeping() {
+    $("#view option[value='']").remove();
+    refresh_dropdowns();
+    if ($("#view").val() == "data") {
+        $(".not-for-data").css("opacity", ".3");
+        $(".not-for-data input").prop("disabled", true);
+        return ["existence", "equals"];
+    }
+    else {
+        $(".not-for-data").css("opacity", "1");
+        $(".not-for-data input").prop("disabled", false);
+        return ["wildcard", "existence", "equals"];
+    }
+}
+
+function generate_url() {
+    var targets = housekeeping();
+    var url = url_root + "/<b>" + escape($("#view").val()) + "</b>/?";
+    for (var i = 0, l = targets.length; i < l; i++) {
+        $(".meta-" + targets[i]).each(function () {
+            if ($(this).children("input[type=checkbox]").prop("checked")) {
+                url = url + "<b>";
+                $(this).find(".key-level").each(function () {
+                    url = url + escape($(this).val()) + ".";
+                });
+                url = url.replace(/\.$/g, "</b>&");
+                var value_level_dropdowns = $(this).find(".value-level")
+                if (value_level_dropdowns.length > 0) {
+                    url = url.replace(/&$/g, "=<i>");
+                    value_level_dropdowns.each(function () {
+                        url = url + escape($(this).val()) + "|";
+                    });
+                    url = url.replace(/\|$/g, "</i>&");
+                }
+            }
+        });
+    }
     url = url + "<b>fmt=</b><i>" + $("#fmt").val() + "</i>";
     $("#url-description").text("Generated URL:");
     $("#url").html(url);
@@ -144,20 +165,6 @@ function remove_last_query_option() {
     generate_url();
 }
 
-function refresh_event_handlers() {
-    $(".remover, .remover-or").unbind("mouseover").unbind("mouseout").unbind("click");
-    $(".remover, .remover-or").mouseover(function () {$(this).html("&times;")});
-    $(".remover").mouseout(function () {$(this).html("&amp;")});
-    set_default_repr_of_remover_ors();
-    $(".remover-or").mouseout(set_default_repr_of_remover_ors);
-    $(".remover, .remover-or").click(remove_query_part);
-    $("a.add, a.or, a.del, input[type=checkbox], select").unbind("click");
-    $("a.add").click(clone_query_part);
-    $("a.del").click(remove_last_query_option);
-    $("a.or").click(clone_query_or);
-    $("input[type=checkbox], select").click(generate_url);
-}
-
 function remove_query_part() {
     if ($(this).parents(".list").children(".list-item").length > 1) {
         $(this).parents(".list-item").remove();
@@ -187,20 +194,23 @@ function clone_query_or() {
     generate_url();
 }
 
-function housekeeping() {
-    $("#view option[value='']").remove();
-    if ($("#view").val() == "data") {
-        $(".not-for-data").css("opacity", ".3");
-        $(".not-for-data input").prop("disabled", true);
-    }
-    else {
-        $(".not-for-data").css("opacity", "1");
-        $(".not-for-data input").prop("disabled", false);
-    }
+function refresh_event_handlers() {
+    $(".remover, .remover-or").unbind("mouseover").unbind("mouseout").unbind("click");
+    $(".remover, .remover-or").mouseover(function () {$(this).html("&times;")});
+    $(".remover").mouseout(function () {$(this).html("&amp;")});
+    set_default_repr_of_remover_ors();
+    $(".remover-or").mouseout(set_default_repr_of_remover_ors);
+    $(".remover, .remover-or").click(remove_query_part);
+    $("a.add, a.or, a.del, input[type=checkbox], select").unbind("click");
+    $("a.add").click(clone_query_part);
+    $("a.del").click(remove_last_query_option);
+    $("a.or").click(clone_query_or);
+    $("input[type=checkbox], select").click(generate_url);
 }
 
 $(document).ready(function() {
     toggle_builder();
+    refresh_dropdowns();
     refresh_event_handlers();
 });
 
@@ -210,9 +220,7 @@ $(document).ready(function() {
         <div id='url-builder' style='display:none'>
             <div id='url-wrapper'>
                 <div id='url-description'>You are here:</div>
-                <div id='url'>
-                    %URL_ROOT%
-                </div>
+                <div id='url'>%URL_ROOT%</div>
                 <div id='url-follow'><a href=''>Follow generated URL</a></div>
             </div>
         </div>
@@ -231,16 +239,21 @@ $(document).ready(function() {
                 </div>
             </div>
             <div class='not-for-data'>
+                <div><b>Metadata, show all fields for:</b></div>
                 <div>
-                    <b>Metadata, show all fields for:</b>
-                </div>
-                <div id='show-all-fields'>
-                    <input type='checkbox' id='assay types'> <label for='assay types'><em>&amp;</em><span>assay types</span></label><br>
-                    <input type='checkbox' id='factors'> <label for='factors'><em>&amp;</em><span>factors</span></label><br>
-                    <input type='checkbox' id='characteristics'> <label for='characteristics'><em>&amp;</em><span>characteristics</span></label><br>
-                    <input type='checkbox' id='parameters'> <label for='parameters'><em>&amp;</em><span>parameters</span></label><br>
-                    <input type='checkbox' id='properties'> <label for='properties'><em>&amp;</em><span>properties</span></label><br>
-                    <input type='checkbox' id='comments'> <label for='comments'><em>&amp;</em><span>comments</span></label><br>
+                    <div id='meta-wildcard-list' class='list'>
+                        <div class='meta-wildcard list-item'>
+                            <input type='checkbox'>
+                            <em class='remover'>&amp;</em>
+                            <select class='key-level level-0'></select>
+                            <em>.</em>
+                            <select class='key-level level-1'></select>
+                        </div>
+                    </div>
+                    <div>
+                        <input type='checkbox' disabled>
+                        <a class='meta-wildcard add'>AND</a>
+                    </div>
                 </div>
             </div>
             <div>
@@ -250,139 +263,38 @@ $(document).ready(function() {
                         <div class='meta-existence list-item'>
                             <input type='checkbox'>
                             <em class='remover'>&amp;</em>
-                            <select class='meta-existence-field'>
-                                <option value='assay types'>assay types</option>
-                                <option value='factors' selected>factors</option>
-                                <option value='characteristics'>characteristics</option>
-                                <option value='parameters'>parameters</option>
-                                <option value='properties'>properties</option>
-                                <option value='comments'>comments</option>
-                            </select>
-                            <em>=</em>
-                            <div class='or-selects'><select class='meta-existence-name'>
-                                <option value='spaceflight' selected>spaceflight</option>
-                            </select></div>
-                            <a class='meta-existence or'>OR</a>
+                            <select class='key-level level-0'></select>
+                            <em>.</em>
+                            <select class='key-level level-1'></select>
+                            <em>.</em>
+                            <select class='key-level level-2'></select>
                         </div>
                     </div>
-                    <div id='meta-existence-N'>
+                    <div>
                         <input type='checkbox' disabled>
                         <a class='meta-existence add'>AND</a>
                     </div>
                 </div>
             </div>
             <div>
-                <div><b>Exclude entries with metadata:</b></div>
+                <div><b>Subset by values of metadata:</b></div>
                 <div>
-                    <div id='meta-exclude-list' class='list'>
-                        <div class='meta-exclude list-item'>
+                    <div id='meta-equals-list' class='list'>
+                        <div class='meta-equals list-item'>
                             <input type='checkbox'>
                             <em class='remover'>&amp;</em>
-                            <select class='meta-exclude-field'>
-                                <option value='assay types'>assay types</option>
-                                <option value='factors' selected>factors</option>
-                                <option value='characteristics'>characteristics</option>
-                                <option value='parameters'>parameters</option>
-                                <option value='properties'>properties</option>
-                                <option value='comments'>comments</option>
-                            </select>
-                            <em>!=</em>
-                            <select class='meta-exclude-name'>
-                                <option value='ionizing radiation' selected>ionizing radiation</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div id='meta-exclude-N'>
-                        <input type='checkbox' disabled>
-                        <a class='meta-exclude add'>AND</a>
-                    </div>
-                </div>
-            </div>
-            <div>
-                <div><b>Subset by metadata values:</b></div>
-                <div>
-                    <div id='meta-value-equals-list' class='list'>
-                        <div class='meta-value-equals list-item'>
-                            <input type='checkbox'>
-                            <em class='remover'>&amp;</em>
-                            <select class='meta-value-equals-field'>
-                                <option value='assay types'>assay types</option>
-                                <option value='factors' selected>factors</option>
-                                <option value='characteristics'>characteristics</option>
-                                <option value='parameters'>parameters</option>
-                                <option value='properties'>properties</option>
-                                <option value='comments'>comments</option>
-                            </select>
-                            <em>:</em>
-                            <select class='meta-value-equals-name'>
-                                <option value='spaceflight' selected>spaceflight</option>
-                            </select>
+                            <select class='key-level level-0'></select>
+                            <em>.</em>
+                            <select class='key-level level-1'></select>
+                            <em>.</em>
+                            <select class='key-level level-2'></select>
                             <em>=</em>
-                            <div class='or-selects'><select class='meta-value-equals-value'>
-                                <option value='Ground Control' selected>Ground Control</option>
-                            </select></div>
-                            <a class='meta-value-equals or'>OR</a>
+                            <select class='value-level level-3'></select>
                         </div>
                     </div>
-                    <div id='meta-value-equals-N'>
+                    <div>
                         <input type='checkbox' disabled>
-                        <a class='meta-value-equals add'>AND</a>
-                    </div>
-                </div>
-            </div>
-            <div>
-                <div><b>Exclude entries with values:</b></div>
-                <div>
-                    <div id='meta-value-notequals-list' class='list'>
-                        <div class='meta-value-notequals list-item'>
-                            <input type='checkbox'>
-                            <em class='remover'>&amp;</em>
-                            <select class='meta-value-notequals-field'>
-                                <option value='assay types'>assay types</option>
-                                <option value='factors' selected>factors</option>
-                                <option value='characteristics'>characteristics</option>
-                                <option value='parameters'>parameters</option>
-                                <option value='properties'>properties</option>
-                                <option value='comments'>comments</option>
-                            </select>
-                            <em>:</em>
-                            <select class='meta-value-notequals-name'>
-                                <option value='spaceflight' selected>spaceflight</option>
-                            </select>
-                            <em>!=</em>
-                            <select class='meta-value-notequals-value'>
-                                <option value='Basal Control' selected>Basal Control</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div id='meta-value-notequals-N'>
-                        <input type='checkbox' disabled>
-                        <a class='meta-value-notequals add'>AND</a>
-                    </div>
-                </div>
-            </div>
-            <div>
-                <div><b>Subset by datasets and assays:</b></div>
-                <div>
-                    <div id='select-list' class='list'>
-                        <div class='select list-item'>
-                            <input type='checkbox'>
-                            <em class='remover-or'>&amp;</em>
-                            <select class='select-accessions'>
-                                <option value='GLDS-1' selected>GLDS-1</option>
-                                <option value='GLDS-2'>GLDS-2</option>
-                                <option value='GLDS-3'>GLDS-3</option>
-                            </select>
-                            <em>:</em>
-                            <select class='select-name'>
-                                <option value='' selected></option>
-                                <option value='a_E-GEOD-53196_GeneChip_assay-txt'>a_E-GEOD-53196_GeneChip_assay-txt</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div id='select-N'>
-                        <input type='checkbox' disabled>
-                        <a class='select add'>OR</a>
+                        <a class='meta-equals add'>AND</a>
                     </div>
                 </div>
             </div>
@@ -392,7 +304,6 @@ $(document).ready(function() {
                     <em>&ampfmt=</em>
                     <select id='fmt'>
                         <option value='browser' selected>browser</option>
-                        <option value='html'>html</option>
                         <option value='tsv'>tsv</option>
                         <option value='csv'>csv</option>
                     </select>

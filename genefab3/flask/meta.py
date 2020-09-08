@@ -1,160 +1,72 @@
-from genefab3.config import ASSAY_METADATALIKES
-from genefab3.exceptions import GeneLabException
-from genefab3.mongo.utils import get_collection_fields
-from pandas import DataFrame
-from natsort import natsorted
-from genefab3.utils import natsorted_dataframe, empty_df
-from pandas import concat, merge
-from numpy import nan
+from argparse import Namespace
+from pandas import json_normalize, MultiIndex, isnull
+from re import findall
 
 
-SHRUNKEN_TO_NOTHING = False
-
-
-def get_meta_names(db, meta, context):
-    """List names of particular meta"""
-    if meta not in ASSAY_METADATALIKES:
-        raise GeneLabException("Unknown request: '{}'".format(meta))
-    else:
-        return DataFrame(
-            data=natsorted(
-                get_collection_fields(
-                    collection=getattr(db, meta),
-                    skip={"accession", "assay name", "sample name"},
-                )
-            ),
-            columns=[meta],
-        )
-
-
-def get_info_cols(sample_level=True):
-    """Get info columns for metadata dataframes"""
-    if sample_level:
-        drop_cols = {"_id"}
-        info_cols = ["accession", "assay name", "sample name"]
-    else:
-        drop_cols = {"_id", "sample name"}
-        info_cols = ["accession", "assay name"]
-    info_multicols = [("info", col) for col in info_cols]
-    return drop_cols, info_cols, info_multicols
-
-
-def get_displayable_dataframe_from_query(collection, meta, is_wildcard, context, drop_cols, info_cols):
-    """Query MongoDB and convert output to DataFrame, observing context"""
-    dataframe = DataFrame(
-        collection.find({
-            "$and": context.queries[meta] + [context.queries["select"]]
-        })
+def isa_sort_dataframe(dataframe):
+    """Sort single-level dataframe in order info-investigation-study-assay"""
+    column_order = Namespace(
+        info=set(), investigation=set(), study=set(), assay=set(), other=set(),
     )
-    if is_wildcard:
-        to_drop = drop_cols
-    else:
-        to_drop = drop_cols | context.removers[meta] | (
-            set(dataframe.columns) - set(info_cols) - context.fields[meta]
-        )
-    return (
-        dataframe
-        .drop(columns=to_drop, errors="ignore")
-        .dropna(how="all", axis=1)
-        .applymap(
-            lambda vv: "|".join(sorted(map(str, vv))) if isinstance(vv, list)
-            else vv
-        )
-    )
-
-
-def get_annotation_by_one_meta(db, meta, context, drop_cols, info_cols, sample_level=True):
-    """Generate dataframe of assays matching (AND) multiple `meta` queries"""
-    collection, by_one_meta = getattr(db, meta), None
-    if context.queries[meta]:
-        by_one_meta = get_displayable_dataframe_from_query(
-            collection, meta, False, context, drop_cols, info_cols,
-        )
-    if meta in context.wildcards:
-        by_one_wildcard = get_displayable_dataframe_from_query(
-            collection, meta, True, context, drop_cols, info_cols,
-        )
-        if by_one_meta is None:
-            by_one_meta = by_one_wildcard
-        elif len(by_one_meta) == 0:
-            return SHRUNKEN_TO_NOTHING
+    for column in dataframe.columns:
+        if column.startswith("."):
+            column_order.info.add(column)
+        elif column.startswith("investigation"):
+            column_order.investigation.add(column)
+        elif column.startswith("study"):
+            column_order.study.add(column)
+        elif column.startswith("assay"):
+            column_order.assay.add(column)
         else:
-            by_one_meta = merge(by_one_meta, by_one_wildcard)
-    if by_one_meta is not None:
-        # drop empty columns and simplify representation:
-        by_one_meta.drop(
-            columns=context.removers[meta], errors="ignore", inplace=True,
-        )
-        by_one_meta.dropna(how="all", axis=1, inplace=True)
-        try:
-            return concat({ # make two-level:
-                "info": by_one_meta[info_cols],
-                meta: by_one_meta.drop(columns=info_cols) if sample_level
-                    else ~by_one_meta.drop(columns=info_cols).isnull()
-            }, axis=1).drop_duplicates()
-        except KeyError:
-            return SHRUNKEN_TO_NOTHING
-    else:
-        return None
+            column_order.other.add(column)
+    return dataframe[(
+        sorted(column_order.info) + sorted(column_order.investigation) +
+        sorted(column_order.study) + sorted(column_order.assay) +
+        sorted(column_order.other)
+    )]
 
 
-def dropna_2d(annotation_by_metas, context, info_multicols, inplace=True):
-    """Drop all-NA columns, rows, observing context and fixed 'info' columns"""
-    if inplace:
-        if context.view == "/assays/":
-            annotation_by_metas = annotation_by_metas.applymap(
-                lambda x: x or nan
-            )
-        annotation_by_metas.dropna(how="all", axis=1, inplace=True)
-        try:
-            rows_to_drop = (
-                annotation_by_metas.drop(columns=info_multicols)
-                .isnull().all(axis=1)
-            )
-        except KeyError:
-            pass
-        else:
-            annotation_by_metas = annotation_by_metas.loc[~rows_to_drop,:]
-        if context.view == "/assays/":
-            annotation_by_metas.fillna(False, inplace=True)
-    else:
-        raise NotImplementedError("dropna_2d(..., inplace=False)")
-
-
-def get_annotation_by_metas(db, context, sample_level=True):
+def get_annotation_by_metas(db, context, include=(), aggregate=False):
     """Select assays/samples based on annotation filters"""
-    drop_cols, info_cols, info_multicols = get_info_cols(sample_level)
-    annotation_by_metas = None
-    for meta in ASSAY_METADATALIKES:
-        annotation_by_one_meta = get_annotation_by_one_meta(
-            db, meta, context, drop_cols, info_cols, sample_level=sample_level,
+    full_projection = {
+        ".accession": True, ".assay": True, **context.projection,
+        **{field: True for field in include},
+    }
+    # get target metadata as single-level dataframe:
+    dataframe = json_normalize(db.metadata.find(
+        context.query, {"_id": False, **full_projection},
+    ))
+    # drop qualifier fields unless explicitly requested:
+    subkeys_to_drop = {
+        c for c in dataframe.columns
+        if (len(findall(r'\..', c)) >= 3) and (c not in full_projection)
+    }
+    dataframe.drop(columns=subkeys_to_drop, inplace=True)
+    # remove trailing dots and hide columns that are explicitly hidden:
+    dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
+    dataframe.drop(columns=context.hide, inplace=True)
+    # sort (ISA-aware) and convert to two-level dataframe:
+    dataframe = isa_sort_dataframe(dataframe)
+    dataframe.columns = MultiIndex.from_tuples(
+        ("info", ".".join(fields[1:])) if fields[0] == ""
+        else (".".join(fields[:2]), ".".join(fields[2:]))
+        for fields in map(lambda s: s.split("."), dataframe.columns)
+    )
+    # coerce to boolean "existence" if requested:
+    if aggregate:
+        grouper = dataframe.groupby(
+            list(dataframe[["info"]].columns), as_index=False,
         )
-        if annotation_by_one_meta is SHRUNKEN_TO_NOTHING:
-            return empty_df(columns=info_multicols)
-        if annotation_by_metas is None:
-            annotation_by_metas = annotation_by_one_meta
-        elif annotation_by_one_meta is not None:
-            annotation_by_metas = merge(
-                annotation_by_metas, annotation_by_one_meta,
-            )
-        if annotation_by_metas is not None:
-            dropna_2d(
-                annotation_by_metas, context, info_multicols, inplace=True,
-            )
-    # reduce and sort presentation:
-    if (annotation_by_metas is None) or (len(annotation_by_metas) == 0):
-        return empty_df(columns=info_multicols)
+        return grouper.agg(lambda a: ~isnull(a).all())
     else:
-        return natsorted_dataframe(
-            annotation_by_metas, by=info_multicols, sort_trailing_columns=True,
-        )
+        return dataframe
 
 
 def get_assays_by_metas(db, context):
-    """Alias for selection of assays based on annotation filters"""
-    return get_annotation_by_metas(db, context, sample_level=False)
+    """Select assays based on annotation filters"""
+    return get_annotation_by_metas(db, context, aggregate=True)
 
 
 def get_samples_by_metas(db, context):
-    """Alias for selection of samples based on annotation filters"""
-    return get_annotation_by_metas(db, context, sample_level=True)
+    """Select samples based on annotation filters"""
+    return get_annotation_by_metas(db, context, include={".sample name"})
