@@ -59,6 +59,7 @@ var url_root = "%URL_ROOT%";
 var metadata = {
     "wildcard": /* METADATA_WILDCARDS */,
     "existence": /* METADATA_EXISTENCE */,
+    "equals": /* METADATA_EQUALS */,
 };
 
 function refresh_dropdowns() {
@@ -100,12 +101,12 @@ function housekeeping() {
     if ($("#view").val() == "data") {
         $(".not-for-data").css("opacity", ".3");
         $(".not-for-data input").prop("disabled", true);
-        return ["existence"];
+        return ["existence", "equals"];
     }
     else {
         $(".not-for-data").css("opacity", "1");
         $(".not-for-data input").prop("disabled", false);
-        return ["wildcard", "existence"];
+        return ["wildcard", "existence", "equals"];
     }
 }
 
@@ -272,6 +273,28 @@ $(document).ready(function() {
                     <div>
                         <input type='checkbox' disabled>
                         <a class='meta-existence add'>AND</a>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div><b>Subset by values of metadata:</b></div>
+                <div>
+                    <div id='meta-equals-list' class='list'>
+                        <div class='meta-equals list-item'>
+                            <input type='checkbox'>
+                            <em class='remover'>&amp;</em>
+                            <select class='key-level level-0'></select>
+                            <em>.</em>
+                            <select class='key-level level-1'></select>
+                            <em>.</em>
+                            <select class='key-level level-2'></select>
+                            <em>=</em>
+                            <select class='value-level level-3'></select>
+                        </div>
+                    </div>
+                    <div>
+                        <input type='checkbox' disabled>
+                        <a class='meta-equals add'>AND</a>
                     </div>
                 </div>
             </div>
