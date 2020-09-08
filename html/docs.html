@@ -150,6 +150,14 @@ function generate_url() {
                     url = url + escape($(this).val()) + ".";
                 });
                 url = url.replace(/\.$/g, "</b>&");
+                var value_level_dropdowns = $(this).find(".value-level")
+                if (value_level_dropdowns.length > 0) {
+                    url = url.replace(/&$/g, "=<i>");
+                    value_level_dropdowns.each(function () {
+                        url = url + escape($(this).val()) + "|";
+                    });
+                    url = url.replace(/\|$/g, "</i>&");
+                }
             }
         });
     }
@@ -287,8 +295,8 @@ $(document).ready(function() {
                             <select class='key-level level-0'></select>
                             <em>.</em>
                             <select class='key-level level-1'></select>
-                            <em>.</em>
-                            <select class='key-level level-2'></select>
+                            <em>=</em>
+                            <select class='value-level level-2'></select>
                         </div>
                     </div>
                     <div>
