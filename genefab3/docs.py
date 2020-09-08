@@ -39,7 +39,7 @@ def get_metadata_existence_json(db):
             ))
             json[isa_category][subkey] = {
                 next_level_key: True for next_level_key in
-                raw_next_level_keyset - FINAL_KEY_BLACKLIST
+                sorted(raw_next_level_keyset - FINAL_KEY_BLACKLIST)
             }
     return json
 
@@ -51,9 +51,11 @@ def get_metadata_equals_json(db, metadata_existence_json):
         for subkey in metadata_existence_json[isa_category]:
             for next_level_key in metadata_existence_json[isa_category][subkey]:
                 json[isa_category][subkey][next_level_key] = {
-                    value: True for value in db.metadata.distinct(
-                        f"{isa_category}.{subkey}.{next_level_key}.",
-                    )
+                    value: True for value in sorted(map(str,
+                        db.metadata.distinct(
+                            f"{isa_category}.{subkey}.{next_level_key}.",
+                        )
+                    ))
                 }
     return json
 
