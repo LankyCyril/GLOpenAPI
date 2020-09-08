@@ -47,7 +47,7 @@ getLogger("genefab3").addHandler(DBLogger(db))
 @app.route("/", methods=["GET"])
 def documentation():
     from genefab3.docs import interactive_doc
-    return interactive_doc(url_root=request.url_root.rstrip("/"))
+    return interactive_doc(db, url_root=request.url_root.rstrip("/"))
 
 @app.route("/assays/", methods=["GET"])
 def assays(**kwargs):

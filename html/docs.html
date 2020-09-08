@@ -13,7 +13,7 @@
             em {font-style: normal; color: black; font-family: "Oxygen", monospace; font-size: 12pt}
             em.remover, em.remover-or {color: #D10; cursor: pointer; border-bottom: 1pt dashed #D10}
             label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
-            select {margin: 1pt 0}
+            select {margin: 1pt 0; max-width: 120pt; overflow: hidden; text-overflow: ellipsis; white-space: nowrap}
             h1 {font-size: 28pt; font-weight: 500; border-bottom: 1pt solid black; display: inline-block; margin: 5pt 0 20pt 0}
             h2 {font-size: 20pt; font-weight: 500; display: inline-block; margin: 10pt 0 0 0}
             #url-builder {position: sticky; top: 0; background: #FFFFFFEE; z-index: 8}
@@ -57,38 +57,8 @@
 var url_root = "%URL_ROOT%";
 
 var metadata = {
-    "wildcard": {
-        "investigation": {
-            "study": true,
-            "study assays": true,
-            "investigation": true,
-        },
-        "study": {
-            "characteristics": true,
-            "factor value": true,
-            "parameter value": true,
-        },
-        "assay": {
-            "characteristics": true,
-            "factor value": true,
-            "parameter value": true,
-        },
-    },
-    "hogwarts": {
-        "slytherin": {
-            "malfoy": {"lucius": true, "draco": true},
-            "black": {"sirius": true},
-        },
-        "gryffindor": {
-            "potter": {"harry": true, "albus severus": true, "ginevra": true},
-            "weasley": {"ronald": true, "arthur": true, "fred": true, "george": true},
-            "granger": {"hermione": true},
-        },
-        "hufflepuff": {
-            "diggory": {"cedric": true},
-            "lonbottom": {"neville": true},
-        },
-    },
+    "wildcard": /* METADATA_WILDCARDS */,
+    "existence": /* METADATA_EXISTENCE */,
 };
 
 function refresh_dropdowns() {
@@ -130,12 +100,12 @@ function housekeeping() {
     if ($("#view").val() == "data") {
         $(".not-for-data").css("opacity", ".3");
         $(".not-for-data input").prop("disabled", true);
-        return ["hogwarts"];
+        return ["existence"];
     }
     else {
         $(".not-for-data").css("opacity", "1");
         $(".not-for-data input").prop("disabled", false);
-        return ["wildcard", "hogwarts"];
+        return ["wildcard", "existence"];
     }
 }
 
@@ -286,22 +256,22 @@ $(document).ready(function() {
                 </div>
             </div>
             <div>
-                <div><b>Harry Potter characters:</b></div>
+                <div><b>Subset by existence of metadata:</b></div>
                 <div>
-                    <div id='meta-hogwarts-list' class='list'>
-                        <div class='meta-hogwarts list-item'>
+                    <div id='meta-existence-list' class='list'>
+                        <div class='meta-existence list-item'>
                             <input type='checkbox'>
                             <em class='remover'>&amp;</em>
                             <select class='key-level level-0'></select>
                             <em>.</em>
                             <select class='key-level level-1'></select>
-                            <em>=</em>
-                            <select class='value-level level-2'></select>
+                            <em>.</em>
+                            <select class='key-level level-2'></select>
                         </div>
                     </div>
                     <div>
                         <input type='checkbox' disabled>
-                        <a class='meta-hogwarts add'>AND</a>
+                        <a class='meta-existence add'>AND</a>
                     </div>
                 </div>
             </div>
