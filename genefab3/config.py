@@ -1,4 +1,4 @@
-MONGO_DB_NAME = "genefab3_zip2isa"
+MONGO_DB_NAME = "genefab3"
 
 DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
 
