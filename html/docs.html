@@ -62,7 +62,7 @@ var metadata = {
     "equals": /* METADATA_EQUALS */,
 };
 
-function refresh_dropdowns() {
+function refresh_all_dropdowns() {
     for (key in metadata) {
         var section_lists = $("#selectors").find(".meta-" + key + ".list-item");
         section_lists.each(function () {
@@ -78,6 +78,7 @@ function refresh_dropdowns() {
                     }
                     else {
                         section.find("option").remove();
+                        // TODO: break on big Object.keys(section_data).length
                         for (section_key in section_data) {
                             var option = new Option(section_key, section_key);
                             $(option).html(section_key);
@@ -95,9 +96,47 @@ function refresh_dropdowns() {
     }
 }
 
-function housekeeping() {
+function refresh_dropdown_section(key, level) {
+    var section_lists = $("#selectors").find(".meta-" + key + ".list-item");
+    section_lists.each(function () {
+        var section_key = key;
+        var section_data = metadata[section_key];
+        for (var i = 0; i <= level; i++) {
+            section_key = $(this).find("select.level-"+i).val();
+            section_data = section_data[section_key];
+        }
+        for (var i = level+1;; i++) {
+            var section = $(this).find("select.level-"+i);
+            section.find("option").remove();
+            // TODO: break on big Object.keys(section_data).length
+            for (section_key in section_data) {
+                var option = new Option(section_key, section_key);
+                $(option).html(section_key);
+                section.append(option);
+                section.val(section_key);
+            }
+            if ((section_data !== true) && (section_key in section_data)) {
+                section_data = section_data[section_key];
+            }
+            else {
+                break;
+            }
+        }
+    });
+}
+
+function refresh_dropdowns(key=null, level=null) {
+    if (key === null) {
+        refresh_all_dropdowns();
+    }
+    else {
+        refresh_dropdown_section(key=key, level=level);
+    }
+}
+
+function housekeeping(key=null, level=null) {
     $("#view option[value='']").remove();
-    refresh_dropdowns();
+    refresh_dropdowns(key=key, level=level);
     if ($("#view").val() == "data") {
         $(".not-for-data").css("opacity", ".3");
         $(".not-for-data input").prop("disabled", true);
@@ -111,7 +150,22 @@ function housekeeping() {
 }
 
 function generate_url() {
-    var targets = housekeeping();
+    var key = null, level = null;
+    var key_class = $(this).parent().attr("class");
+    if (key_class !== undefined) {
+        var key_matcher = key_class.match(/meta-(\S+)/);
+        if (key_matcher !== null) {
+            key = key_matcher[1];
+        }
+    }
+    var level_class = $(this).attr("class");
+    if (level_class !== undefined) {
+        var level_matcher = level_class.match(/level-(\d+)/);
+        if (level_matcher !== null) {
+            level = parseInt(level_matcher[1]);
+        }
+    }
+    var targets = housekeeping(key=key, level=level);
     var url = url_root + "/<b>" + escape($("#view").val()) + "</b>/?";
     for (var i = 0, l = targets.length; i < l; i++) {
         $(".meta-" + targets[i]).each(function () {

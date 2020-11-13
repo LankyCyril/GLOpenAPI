@@ -36,7 +36,7 @@ def get_metadata_wildcards(existence_json):
 
 
 def interactive_doc(db, html_path=None, document="docs.html", url_root="/"):
-    """Serve an interactive documentation page"""
+    """Serve an interactive documentation page""" # TODO in prod: make HTML template static / preload on app start
     if html_path is None:
         html_path = join(
             split(split(abspath(__file__))[0])[0],
