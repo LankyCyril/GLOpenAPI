@@ -75,11 +75,14 @@ def INPLACE_update_metadata_index_values(index, metadata):
     for isa_category in index:
         for subkey in index[isa_category]:
             for next_level_key in index[isa_category][subkey]:
-                index[isa_category][subkey][next_level_key] = sorted(
-                    map(str, metadata.distinct(
-                        f"{isa_category}.{subkey}.{next_level_key}.",
-                    ))
-                )
+                values = sorted(map(str, metadata.distinct(
+                    f"{isa_category}.{subkey}.{next_level_key}.",
+                )))
+                if not values:
+                    values = sorted(map(str, metadata.distinct(
+                        f"{isa_category}.{subkey}.{next_level_key}",
+                    )))
+                index[isa_category][subkey][next_level_key] = values
 
 
 def update_metadata_index(db, template=INDEX_TEMPLATE):
