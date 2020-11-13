@@ -1,63 +1,38 @@
+from collections import defaultdict
 from json import dumps
-from copy import deepcopy
 from os.path import join, split, abspath
 from genefab3.utils import map_replace
 
 
-JSON_TEMPLATE = {
-    "investigation": {
-        "study": "true",
-        "study assays": "true",
-        "investigation": "true",
-    },
-    "study": {
-        "characteristics": "true",
-        "factor value": "true",
-        "parameter value": "true",
-    },
-    "assay": {
-        "characteristics": "true",
-        "factor value": "true",
-        "parameter value": "true",
-    },
-}
-
-FINAL_KEY_BLACKLIST = {"comment"}
+def get_metadata_equals_json(metadata_index_collection):
+    """Generate JSON for documentation section 'meta-equals'"""
+    equals_json = defaultdict(dict)
+    for entry in metadata_index_collection.find():
+        equals_json[entry["isa_category"]][entry["subkey"]] = {
+            key: {value: True for value in values}
+            for key, values in entry["content"].items()
+        }
+    return dict(equals_json)
 
 
-def get_metadata_existence_json(db):
-    """Generate JSON for documentation section 'meta-existence'""" # TODO: cache in database
-    json = deepcopy(JSON_TEMPLATE)
-    for isa_category in JSON_TEMPLATE:
-        for subkey in JSON_TEMPLATE[isa_category]:
-            raw_next_level_keyset = set.union(*(
-                set(entry[isa_category][subkey].keys()) for entry in
-                db.metadata.find(
-                    {isa_category+"."+subkey: {"$exists": True}},
-                    {isa_category+"."+subkey: True},
-                )
-            ))
-            json[isa_category][subkey] = {
-                next_level_key: True for next_level_key in
-                sorted(raw_next_level_keyset - FINAL_KEY_BLACKLIST)
+def get_metadata_existence_json(equals_json):
+    """Generate JSON for documentation section 'meta-existence'"""
+    existence_json = defaultdict(dict)
+    for isa_category in equals_json:
+        for subkey in equals_json[isa_category]:
+            existence_json[isa_category][subkey] = {
+                key: True for key in equals_json[isa_category][subkey]
             }
-    return json
+    return dict(existence_json)
 
 
-def get_metadata_equals_json(db, metadata_existence_json):
-    """Generate JSON for documentation section 'meta-equals'""" # TODO: cache in database
-    json = deepcopy(metadata_existence_json)
-    for isa_category in metadata_existence_json:
-        for subkey in metadata_existence_json[isa_category]:
-            for next_level_key in metadata_existence_json[isa_category][subkey]:
-                json[isa_category][subkey][next_level_key] = {
-                    value: True for value in sorted(map(str,
-                        db.metadata.distinct(
-                            f"{isa_category}.{subkey}.{next_level_key}.",
-                        )
-                    ))
-                }
-    return json
+def get_metadata_wildcards(existence_json):
+    """Generate JSON for documentation section 'meta-wildcard'"""
+    wildcards = defaultdict(dict)
+    for isa_category in existence_json:
+        for subkey in existence_json[isa_category]:
+            wildcards[isa_category][subkey] = True
+    return dict(wildcards)
 
 
 def interactive_doc(db, html_path=None, document="docs.html", url_root="/"):
@@ -75,16 +50,15 @@ def interactive_doc(db, html_path=None, document="docs.html", url_root="/"):
         template = "Hello, Space! (No documentation at %URL_ROOT%)"
         documentation_exists = False
     if documentation_exists:
-        metadata_existence_json = get_metadata_existence_json(db)
-        metadata_equals_json = get_metadata_equals_json(
-            db, metadata_existence_json,
-        )
+        equals_json = get_metadata_equals_json(db.metadata_index)
+        existence_json = get_metadata_existence_json(equals_json)
+        wildcards = get_metadata_wildcards(existence_json)
         return map_replace(
             template, {
                 "%URL_ROOT%": url_root,
-                "/* METADATA_WILDCARDS */": dumps(JSON_TEMPLATE),
-                "/* METADATA_EXISTENCE */": dumps(metadata_existence_json),
-                "/* METADATA_EQUALS */": dumps(metadata_equals_json),
+                "/* METADATA_WILDCARDS */": dumps(wildcards),
+                "/* METADATA_EXISTENCE */": dumps(existence_json),
+                "/* METADATA_EQUALS */": dumps(equals_json),
             },
         )
     else:
