@@ -62,6 +62,15 @@ var metadata = {
     "equals": /* METADATA_EQUALS */,
 };
 
+function trimmed(key) {
+    if (key.length <= 64) {
+        return key;
+    }
+    else {
+        return key.substring(0, 61) + "...";
+    }
+}
+
 function refresh_all_dropdowns() {
     for (key in metadata) {
         var section_lists = $("#selectors").find(".meta-" + key + ".list-item");
@@ -78,10 +87,10 @@ function refresh_all_dropdowns() {
                     }
                     else {
                         section.find("option").remove();
-                        // TODO: break on big Object.keys(section_data).length
                         for (section_key in section_data) {
-                            var option = new Option(section_key, section_key);
-                            $(option).html(section_key);
+                            var key_as_shown = trimmed(section_key);
+                            var option = new Option(key_as_shown, section_key);
+                            $(option).html(key_as_shown);
                             section.append(option);
                             section.val(section_key);
                         }
@@ -108,10 +117,10 @@ function refresh_dropdown_section(key, level) {
         for (var i = level+1;; i++) {
             var section = $(this).find("select.level-"+i);
             section.find("option").remove();
-            // TODO: break on big Object.keys(section_data).length
             for (section_key in section_data) {
-                var option = new Option(section_key, section_key);
-                $(option).html(section_key);
+                var key_as_shown = trimmed(section_key);
+                var option = new Option(key_as_shown, section_key);
+                $(option).html(key_as_shown);
                 section.append(option);
                 section.val(section_key);
             }
