@@ -64,6 +64,11 @@ def files(**kwargs):
     from genefab3.flask.meta import get_files_by_metas as getter
     return display(db, getter, kwargs, request)
 
+@app.route("/file/", methods=["GET"])
+def file(**kwargs):
+    from genefab3.flask.file import get_file as getter
+    return display(db, getter, kwargs, request)
+
 @app.route("/data/", methods=["GET"])
 def data(**kwargs):
     from genefab3.flask.data import get_data_by_metas as getter
