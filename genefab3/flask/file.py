@@ -5,6 +5,7 @@ from genefab3.mongo.dataset import CachedDataset
 from urllib.request import urlopen
 
 
+ARGUMENTS_ERROR = "/file/ only accepts arguments 'select=', 'filename=', 'fmt='"
 FMT_ERROR = "/file/ only accepts 'fmt=raw'"
 FILENAME_ERROR = "/file/ requires a single 'filename=' argument"
 SELECTS_ERROR = "/file/ requires a single dataset as 'select=' argument"
@@ -12,6 +13,8 @@ SELECTS_ERROR = "/file/ requires a single dataset as 'select=' argument"
 
 def get_file(db, context):
     """Patch through to cold storage file based on `select=` and `filename=`"""
+    if not (set(context.args) <= {"filename", "select", "fmt"}):
+        raise GeneLabException(ARGUMENTS_ERROR)
     if context.args.get("fmt", "raw") != "raw":
         raise GeneLabException(FMT_ERROR)
     elif len(context.args.getlist("filename")) != 1:
