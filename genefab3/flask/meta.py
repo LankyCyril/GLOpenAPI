@@ -33,9 +33,9 @@ def get_annotation_by_metas(db, context, include=(), aggregate=False):
         **{field: True for field in include},
     }
     # get target metadata as single-level dataframe:
-    dataframe = json_normalize(db.metadata.find(
+    dataframe = json_normalize(list(db.metadata.find(
         context.query, {"_id": False, **full_projection},
-    ))
+    )))
     # drop qualifier fields unless explicitly requested:
     subkeys_to_drop = {
         c for c in dataframe.columns
