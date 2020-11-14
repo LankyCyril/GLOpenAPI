@@ -23,6 +23,7 @@ CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
 ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
 
 ISA_ZIP_REGEX = r'.*_metadata_.*[_-]ISA\.zip$'
+RAW_FILE_REGEX = r'file|plot'
 DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'
 VIZ_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table.csv$'
 PCA_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$'

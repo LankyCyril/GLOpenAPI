@@ -1,6 +1,7 @@
 from argparse import Namespace
 from pandas import json_normalize, MultiIndex, isnull
-from re import findall
+from re import findall, search, IGNORECASE
+from genefab3.config import RAW_FILE_REGEX
 
 
 def isa_sort_dataframe(dataframe):
@@ -26,22 +27,55 @@ def isa_sort_dataframe(dataframe):
     )]
 
 
-def get_annotation_by_metas(db, context, include=(), aggregate=False):
+def keep_projection(dataframe, full_projection):
+    """Drop qualifier fields from single-level dataframe, unless explicitly requested"""
+    subkeys_to_drop = {
+        c for c in dataframe.columns
+        if (len(findall(r'\..', c)) >= 3) and (c not in full_projection)
+    }
+    return dataframe.drop(columns=subkeys_to_drop)
+
+
+def unwind_file_entry(cell):
+    """Unwind lists of dicts returned for some complex unfiltered fields from database"""
+    if isinstance(cell, list):
+        try:
+            return cell[0][""]
+        except (KeyError, IndexError):
+            return str(cell)
+    else:
+        return cell
+
+
+def keep_files(dataframe, full_projection):
+    """Drop qualifier fields from single-level dataframe, unless explicitly requested OR contain filenames"""
+    subkeys_to_drop = {
+        c for c in dataframe.columns if (
+            (c not in full_projection) and
+            (not search(RAW_FILE_REGEX, c, flags=IGNORECASE))
+        )
+    }
+    return dataframe.drop(columns=subkeys_to_drop).applymap(unwind_file_entry)
+
+
+def get_annotation_by_metas(db, context, include=(), search_with_projection=True, modify=keep_projection, aggregate=False):
     """Select assays/samples based on annotation filters"""
     full_projection = {
         ".accession": True, ".assay": True, **context.projection,
         **{field: True for field in include},
     }
     # get target metadata as single-level dataframe:
-    dataframe = json_normalize(list(db.metadata.find(
-        context.query, {"_id": False, **full_projection},
-    )))
-    # drop qualifier fields unless explicitly requested:
-    subkeys_to_drop = {
-        c for c in dataframe.columns
-        if (len(findall(r'\..', c)) >= 3) and (c not in full_projection)
-    }
-    dataframe.drop(columns=subkeys_to_drop, inplace=True)
+    if search_with_projection:
+        dataframe = json_normalize(list(db.metadata.find(
+            context.query, {"_id": False, **full_projection},
+        )))
+    else:
+        dataframe = json_normalize(list(db.metadata.find(
+            context.query, {"_id": False},
+        )))
+    # modify with injected function:
+    dataframe = modify(dataframe, full_projection)
+    print(*dataframe.columns, sep="\n")
     # remove trailing dots and hide columns that are explicitly hidden:
     dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
     dataframe.drop(columns=context.hide, inplace=True)
@@ -70,3 +104,11 @@ def get_assays_by_metas(db, context):
 def get_samples_by_metas(db, context):
     """Select samples based on annotation filters"""
     return get_annotation_by_metas(db, context, include={".sample name"})
+
+
+def get_files_by_metas(db, context):
+    """Select files based on annotation filters"""
+    return get_annotation_by_metas(
+        db, context, include={".sample name"},
+        search_with_projection=False, modify=keep_files,
+    )

@@ -59,6 +59,11 @@ def samples(**kwargs):
     from genefab3.flask.meta import get_samples_by_metas as getter
     return display(db, getter, kwargs, request)
 
+@app.route("/files/", methods=["GET"])
+def files(**kwargs):
+    from genefab3.flask.meta import get_files_by_metas as getter
+    return display(db, getter, kwargs, request)
+
 @app.route("/data/", methods=["GET"])
 def data(**kwargs):
     from genefab3.flask.data import get_data_by_metas as getter
