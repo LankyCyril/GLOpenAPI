@@ -26,9 +26,11 @@ AMBIGUOUS_SAMPLE_NAME_ERROR = "Ambiguous Sample Names for one Assay entry"
 
 class ColdStorageAssay():
     """Stores individual assay information and metadata"""
+    name = None
  
     def __init__(self, dataset, assay_name, isa_assay_entries):
         """Combine and re-parse entries from dataset ISA"""
+        self.name = assay_name
         self._assert_correct_dataset(dataset, assay_name)
         self.meta = {}
         for isa_assay_entry in isa_assay_entries:
