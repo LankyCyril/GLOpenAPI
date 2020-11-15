@@ -1,5 +1,5 @@
 from argparse import Namespace
-from pandas import json_normalize, MultiIndex, isnull
+from pandas import json_normalize, MultiIndex, isnull, merge
 from re import findall, search, IGNORECASE
 from genefab3.config import RAW_FILE_REGEX
 
@@ -108,7 +108,13 @@ def get_samples_by_metas(db, context):
 
 def get_files_by_metas(db, context):
     """Select files based on annotation filters"""
-    return get_annotation_by_metas(
-        db, context, include={".sample name"},
-        search_with_projection=False, modify=keep_files,
+    return merge(
+        get_annotation_by_metas(
+            db, context, include={".sample name"},
+            search_with_projection=True, modify=keep_projection,
+        ),
+        get_annotation_by_metas(
+            db, context, include={".sample name"},
+            search_with_projection=False, modify=keep_files,
+        ),
     )
