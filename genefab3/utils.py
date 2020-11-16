@@ -1,8 +1,6 @@
 from genefab3.config import TIMESTAMP_FMT
 from re import sub, escape
 from datetime import datetime
-from numpy import nan
-from pandas import DataFrame, concat
 from natsort import natsorted
 from functools import lru_cache
 from copy import deepcopy
@@ -51,14 +49,6 @@ def map_replace(string, mappings):
         lambda m: mappings[m.group()],
         string,
     )
-
-
-def empty_df(columns):
-    """Generate empty DataFrame with given columns"""
-    return concat(
-        [DataFrame(columns), DataFrame([nan]*len(columns), columns=[2])],
-        axis=1,
-    ).set_index([0, 1]).T
 
 
 class UniversalSet(set):

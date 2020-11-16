@@ -79,11 +79,14 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
     dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
     # sort (ISA-aware) and convert to two-level dataframe:
     dataframe = isa_sort_dataframe(dataframe)
-    dataframe.columns = MultiIndex.from_tuples(
-        ("info", ".".join(fields[1:])) if fields[0] == ""
-        else (".".join(fields[:2]), ".".join(fields[2:]))
-        for fields in map(lambda s: s.split("."), dataframe.columns)
-    )
+    try:
+        dataframe.columns = MultiIndex.from_tuples(
+            ("info", ".".join(fields[1:])) if fields[0] == ""
+            else (".".join(fields[:2]), ".".join(fields[2:]))
+            for fields in map(lambda s: s.split("."), dataframe.columns)
+        )
+    except TypeError:
+        return None
     # coerce to boolean "existence" if requested:
     if aggregate:
         grouper = dataframe.groupby(
