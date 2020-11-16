@@ -75,7 +75,6 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
         )))
     # modify with injected function:
     dataframe = modify(dataframe, full_projection)
-    print(*dataframe.columns, sep="\n")
     # remove trailing dots and hide columns that are explicitly hidden:
     dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
     dataframe.drop(columns=context.hide, inplace=True)
