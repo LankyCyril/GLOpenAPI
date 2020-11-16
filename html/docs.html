@@ -183,8 +183,17 @@ function generate_url() {
                 $(this).find(".key-level").each(function () {
                     url = url + escape($(this).val()) + ".";
                 });
-                url = url.replace(/\.$/g, "</b>&");
-                var value_level_dropdowns = $(this).find(".value-level")
+                var keyunion_level_dropdowns = $(this).find(".keyunion-level");
+                if (keyunion_level_dropdowns.length > 0) {
+                    keyunion_level_dropdowns.each(function () {
+                        url = url + escape($(this).val()) + "|";
+                    });
+                    url = url.replace(/\|$/g, "</b>&");
+                }
+                else {
+                    url = url.replace(/\.$/g, "</b>&");
+                }
+                var value_level_dropdowns = $(this).find(".value-level");
                 if (value_level_dropdowns.length > 0) {
                     url = url.replace(/&$/g, "=<i>");
                     value_level_dropdowns.each(function () {
@@ -331,7 +340,7 @@ $(document).ready(function() {
                             <select class='key-level level-1'></select>
                             <em>.</em>
                             <div class='or-selects'>
-                                <select class='value-level level-2'></select>
+                                <select class='keyunion-level level-2'></select>
                             </div>
                             <a class='meta-existence or'>OR</a>
                         </div>
