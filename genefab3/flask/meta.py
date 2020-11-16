@@ -77,7 +77,6 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
     dataframe = modify(dataframe, full_projection)
     # remove trailing dots and hide columns that are explicitly hidden:
     dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
-    dataframe.drop(columns=context.hide, inplace=True)
     # sort (ISA-aware) and convert to two-level dataframe:
     dataframe = isa_sort_dataframe(dataframe)
     dataframe.columns = MultiIndex.from_tuples(

@@ -60,15 +60,6 @@ def INPLACE_update_context_queries(context, rargs):
                 context.show.add(lookup_key)
 
 
-def INPLACE_update_context_hiders(context, rargs):
-    """Interpret values under 'hide='"""
-    for field in rargs.getlist("hide"):
-        if (field in context.show) and (field != "_id"):
-            context.show.remove(field)
-        else:
-            context.hide.add(field)
-
-
 def INPLACE_update_context_projection(context):
     """Infer query projection using values in `show`"""
     ordered_show = OrderedDict((e, True) for e in sorted(context.show))
@@ -90,9 +81,8 @@ def parse_request(request):
     context = Namespace(
         view="/"+sub(url_root, "", base_url).strip("/")+"/",
         args=request.args, query={"$and": []}, projection={},
-        show=set(), hide=set(),
+        show=set(),
     )
     INPLACE_update_context_queries(context, request.args)
-    INPLACE_update_context_hiders(context, request.args)
     INPLACE_update_context_projection(context)
     return context
