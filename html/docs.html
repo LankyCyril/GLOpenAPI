@@ -135,7 +135,7 @@ function refresh_dropdown_section(key, level) {
 }
 
 function refresh_dropdowns(key=null, level=null) {
-    if (key === null) {
+    if ((key === null) || (level === null)) {
         refresh_all_dropdowns();
     }
     else {
