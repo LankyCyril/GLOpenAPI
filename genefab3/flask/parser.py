@@ -53,16 +53,18 @@ def request_pairs_to_queries(rargs, key):
 
 def INPLACE_update_context_queries(context, rargs):
     """Interpret all key-value pairs that give rise to database queries"""
+    show = set()
     for key in rargs:
         for query, lookup_key in request_pairs_to_queries(rargs, key):
             context.query["$and"].append(query)
             if lookup_key:
-                context.show.add(lookup_key)
+                show.add(lookup_key)
+    return show
 
 
-def INPLACE_update_context_projection(context):
+def INPLACE_update_context_projection(context, show):
     """Infer query projection using values in `show`"""
-    ordered_show = OrderedDict((e, True) for e in sorted(context.show))
+    ordered_show = OrderedDict((e, True) for e in sorted(show))
     for target, usable in ordered_show.items():
         if usable:
             if target[-1] == ".":
@@ -81,8 +83,7 @@ def parse_request(request):
     context = Namespace(
         view="/"+sub(url_root, "", base_url).strip("/")+"/",
         args=request.args, query={"$and": []}, projection={},
-        show=set(),
     )
-    INPLACE_update_context_queries(context, request.args)
-    INPLACE_update_context_projection(context)
+    show = INPLACE_update_context_queries(context, request.args)
+    INPLACE_update_context_projection(context, show)
     return context
