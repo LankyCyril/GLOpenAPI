@@ -95,7 +95,7 @@ def get_browser_dataframe(df, context):
 
 def render_dataframe(df, context):
     """Display dataframe with specified format"""
-    fmt = context.args.get("fmt", "tsv")
+    fmt = context.kwargs["fmt"]
     if fmt == "tsv":
         content = annotate_cols(df, sep="\t") + df.to_csv(sep="\t", **DF_KWS)
         mimetype = "text/plain"

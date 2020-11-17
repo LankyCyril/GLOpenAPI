@@ -3,6 +3,7 @@ from argparse import Namespace
 from genefab3.config import ANNOTATION_CATEGORIES
 from genefab3.utils import UniversalSet
 from collections import OrderedDict
+from werkzeug.datastructures import MultiDict
 
 
 def select_pair_to_query(key, value):
@@ -53,27 +54,29 @@ def request_pairs_to_queries(rargs, key):
 
 def INPLACE_update_context_queries(context, rargs):
     """Interpret all key-value pairs that give rise to database queries"""
-    show = set()
+    shown = set()
     for key in rargs:
         for query, lookup_key in request_pairs_to_queries(rargs, key):
             context.query["$and"].append(query)
             if lookup_key:
-                show.add(lookup_key)
-    return show
+                shown.add(lookup_key)
+            if key in context.kwargs:
+                context.kwargs.pop(key)
+    return shown
 
 
-def INPLACE_update_context_projection(context, show):
-    """Infer query projection using values in `show`"""
-    ordered_show = OrderedDict((e, True) for e in sorted(show))
-    for target, usable in ordered_show.items():
+def INPLACE_update_context_projection(context, shown):
+    """Infer query projection using values in `shown`"""
+    ordered_shown = OrderedDict((e, True) for e in sorted(shown))
+    for target, usable in ordered_shown.items():
         if usable:
             if target[-1] == ".":
                 context.projection[target + "."] = True
             else:
                 context.projection[target] = True
-            for potential_child in ordered_show:
+            for potential_child in ordered_shown:
                 if potential_child.startswith(target):
-                    ordered_show[potential_child] = False
+                    ordered_shown[potential_child] = False
 
 
 def parse_request(request):
@@ -82,8 +85,10 @@ def parse_request(request):
     base_url = request.base_url.strip("/")
     context = Namespace(
         view="/"+sub(url_root, "", base_url).strip("/")+"/",
-        args=request.args, query={"$and": []}, projection={},
+        complete_args=request.args,
+        query={"$and": []}, projection={},
+        kwargs=MultiDict(request.args),
     )
-    show = INPLACE_update_context_queries(context, request.args)
-    INPLACE_update_context_projection(context, show)
+    shown = INPLACE_update_context_queries(context, request.args)
+    INPLACE_update_context_projection(context, shown)
     return context
