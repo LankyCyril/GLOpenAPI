@@ -105,8 +105,8 @@ function refresh_all_dropdowns() {
     }
 }
 
-function refresh_dropdown_section(key, level) {
-    var section_lists = $("#selectors").find(".meta-" + key + ".list-item");
+function refresh_dropdown_section(initiator, key, level) {
+    var section_lists = $(initiator).parent();
     section_lists.each(function () {
         var section_key = key;
         var section_data = metadata[section_key];
@@ -134,18 +134,33 @@ function refresh_dropdown_section(key, level) {
     });
 }
 
-function refresh_dropdowns(key=null, level=null) {
+function refresh_dropdowns(initiator) {
+    var key = null, level = null;
+    var key_class = $(initiator).parent().attr("class");
+    if (key_class !== undefined) {
+        var key_matcher = key_class.match(/meta-(\S+)/);
+        if (key_matcher !== null) {
+            key = key_matcher[1];
+        }
+    }
+    var level_class = $(initiator).attr("class");
+    if (level_class !== undefined) {
+        var level_matcher = level_class.match(/level-(\d+)/);
+        if (level_matcher !== null) {
+            level = parseInt(level_matcher[1]);
+        }
+    }
     if ((key === null) || (level === null)) {
         refresh_all_dropdowns();
     }
     else {
-        refresh_dropdown_section(key=key, level=level);
+        refresh_dropdown_section(initiator, key, level);
     }
 }
 
-function housekeeping(key=null, level=null) {
+function housekeeping(initiator) {
     $("#view option[value='']").remove();
-    refresh_dropdowns(key=key, level=level);
+    refresh_dropdowns(initiator);
     if ($("#view").val() == "data") {
         $(".not-for-data").css("opacity", ".3");
         $(".not-for-data input").prop("disabled", true);
@@ -159,22 +174,7 @@ function housekeeping(key=null, level=null) {
 }
 
 function generate_url() {
-    var key = null, level = null;
-    var key_class = $(this).parent().attr("class");
-    if (key_class !== undefined) {
-        var key_matcher = key_class.match(/meta-(\S+)/);
-        if (key_matcher !== null) {
-            key = key_matcher[1];
-        }
-    }
-    var level_class = $(this).attr("class");
-    if (level_class !== undefined) {
-        var level_matcher = level_class.match(/level-(\d+)/);
-        if (level_matcher !== null) {
-            level = parseInt(level_matcher[1]);
-        }
-    }
-    var targets = housekeeping(key=key, level=level);
+    var targets = housekeeping(initiator=this);
     var url = url_root + "/<b>" + escape($("#view").val()) + "</b>/?";
     for (var i = 0, l = targets.length; i < l; i++) {
         $(".meta-" + targets[i]).each(function () {
