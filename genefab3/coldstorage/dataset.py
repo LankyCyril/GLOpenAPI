@@ -99,7 +99,6 @@ class ColdStorageDataset():
         elif len(isa_zip_descriptors) == 1:
             self.isa = IsaZip(next(iter(isa_zip_descriptors.values())).url)
         else:
-            print(isa_zip_descriptors)
             error = "{}: multiple ambiguous ISA ZIPs".format(self.accession)
             raise GeneLabDatabaseException(error)
         # placeholders:

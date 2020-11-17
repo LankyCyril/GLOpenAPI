@@ -92,15 +92,11 @@ def update_metadata_index(db, template=INDEX_TEMPLATE):
     INPLACE_update_metadata_index_values(index, db.metadata)
     for isa_category in index:
         for subkey in index[isa_category]:
-            try:
-                replace_doc(
-                    collection=db.metadata_index,
-                    query={"isa_category": isa_category, "subkey": subkey},
-                    doc={"content": index[isa_category][subkey]},
-                )
-            except:
-                print(index[isa_category][subkey])
-                raise
+            replace_doc(
+                collection=db.metadata_index,
+                query={"isa_category": isa_category, "subkey": subkey},
+                doc={"content": index[isa_category][subkey]},
+            )
 
 
 class CacherThread(Thread):
