@@ -24,16 +24,23 @@
                 border-style: solid; border-color: #AAA;
             }
             #url {
-                font-size: 12pt; font-family: "Oxygen", monospace;
-                color: #999;
+                font-size: 13pt; font-family: "Oxygen", monospace;
+                color: #000;
                 padding: 5pt; border: 1px solid #AAA;
                 height: 100pt; min-height: 100pt; max-height: 50vh;
                 width: 480pt; min-width: 480pt;
                 word-wrap: break-word;
                 overflow-y: auto;
             }
-            #url b {font-family: "Oxygen", monospace; font-weight: normal; color: blue}
-            #url i {font-family: "Oxygen", monospace; font-weight: normal; font-style: normal; color: black}
+            #url tt {font-family: "Oxygen", monospace; font-size: 13pt;}
+            #url tt.base_url, #url tt.pale {color: #AAA;}
+            #url tt.plain, #url tt.view {color: #222;}
+            #url tt.sep {color: #D10;}
+            #url tt.part-level-0 {color: #00F;}
+            #url tt.part-level-1 {color: #03A;}
+            #url tt.part-level-2 {color: #07A;}
+            #url tt.part-level-3, #url tt.part-level-4 {color: #000;}
+            #url tt.desaturated {font-size: 8pt; opacity: .7;}
             #url-follow {
                 display: inline-block; float: right; background: #DDD; padding: 5pt;
                 border-width: 0 1pt 1pt 1pt;
@@ -173,13 +180,67 @@ function housekeeping(initiator) {
     }
 }
 
+function strip_special(s) {
+    return s.replace(/(^[\/\?]+)|([\/\?]+$)/g, "");
+}
+
+function extract_full_base_url(a) {
+    return (
+        strip_special(a.prop("protocol")) + "//" +
+        strip_special(a.prop("hostname")) +
+        (a.prop("port") === "" ? "" : ":" + a.prop("port")) + "/"
+    )
+}
+
+function desaturate_escaped_spaces(s) {
+    return s.replace(/(\%..)/g, "<tt class='desaturated'>$1</tt>");
+}
+
+function decorate_url(url) {
+    var a = $("<a>", {href: url});
+    var decorated = (
+        "<tt class='base_url'>" + extract_full_base_url(a) +
+        "</tt><tt class='view'>" + strip_special(a.prop("pathname")) +
+        "</tt><tt class='pale'>/</tt>"
+    );
+    var tail = strip_special(a.prop("search"));
+    var level = 0, sep = "?";
+    while (tail) {
+        var match = /[\.\|\&\=]/.exec(tail);
+        if (match === null) {
+            var part = tail;
+            tail = "";
+        }
+        else {
+            var part = tail.substring(0, match.index);
+            tail = tail.substring(match.index + 1);
+        }
+        if ((sep === ".") || (sep === "="))
+            decorated += "<tt class='plain'>" + sep + "</tt>";
+        else
+            decorated += "<tt class='sep'>" + sep + "</tt>";
+        decorated += (
+            "<tt class='part-level-" + level + "'>" +
+            desaturate_escaped_spaces(part) + "</tt>"
+        );
+        if (match !== null)
+            sep = match[0];
+        if (sep === "&")
+            level = 0;
+        else if (sep === "=")
+            level = 3;
+        else if (sep !== "|")
+            level += 1;
+    }
+    return decorated;
+}
+
 function generate_url() {
     var targets = housekeeping(initiator=this);
-    var url = url_root + "/<b>" + escape($("#view").val()) + "</b>/?";
+    var url = url_root + "/" + escape($("#view").val()) + "/?";
     for (var i = 0, l = targets.length; i < l; i++) {
         $(".meta-" + targets[i]).each(function () {
             if ($(this).children("input[type=checkbox]").prop("checked")) {
-                url = url + "<b>";
                 $(this).find(".key-level").each(function () {
                     url = url + escape($(this).val()) + ".";
                 });
@@ -188,25 +249,25 @@ function generate_url() {
                     keyunion_level_dropdowns.each(function () {
                         url = url + escape($(this).val()) + "|";
                     });
-                    url = url.replace(/\|$/g, "</b>&");
+                    url = url.replace(/\|$/g, "&");
                 }
                 else {
-                    url = url.replace(/\.$/g, "</b>&");
+                    url = url.replace(/\.$/g, "&");
                 }
                 var value_level_dropdowns = $(this).find(".value-level");
                 if (value_level_dropdowns.length > 0) {
-                    url = url.replace(/&$/g, "=<i>");
+                    url = url.replace(/&$/g, "=");
                     value_level_dropdowns.each(function () {
                         url = url + escape($(this).val()) + "|";
                     });
-                    url = url.replace(/\|$/g, "</i>&");
+                    url = url.replace(/\|$/g, "&");
                 }
             }
         });
     }
-    url = url + "<b>fmt=</b><i>" + $("#fmt").val() + "</i>";
+    url = url + "fmt=" + $("#fmt").val();
     $("#url-description").text("Generated URL:");
-    $("#url").html(url);
+    $("#url").html(decorate_url(url));
     $("#url-follow a").attr("href", $("#url").text());
     $("#url-follow").css("background", "lightgreen");
 }
