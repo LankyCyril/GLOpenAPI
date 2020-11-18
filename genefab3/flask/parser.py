@@ -6,7 +6,7 @@ from collections import OrderedDict
 from werkzeug.datastructures import MultiDict
 
 
-def select_pair_to_query(key, value):
+def any_pair_to_query(key, value):
     """Interpret single key-value pair for dataset / assay constraint"""
     if value.count(".") == 0:
         return {".accession": value}, None
@@ -41,10 +41,10 @@ def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_
 
 def request_pairs_to_queries(rargs, key):
     """Interpret key-value pairs under same key if they give rise to database queries"""
-    if key == "select":
+    if key == "any":
         lookup_keys = None
         query = {"$or": [
-            select_pair_to_query(key, value)[0]
+            any_pair_to_query(key, value)[0]
             for value in rargs.getlist(key)
             if "$" not in value
         ]}

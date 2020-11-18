@@ -5,30 +5,30 @@ from genefab3.mongo.dataset import CachedDataset
 from urllib.request import urlopen
 
 
-ARGUMENTS_ERROR = "/file/ only accepts arguments 'select=', 'filename=', 'fmt='"
+ARGUMENTS_ERROR = "/file/ only accepts arguments 'any=', 'filename=', 'fmt='"
 FMT_ERROR = "/file/ only accepts 'fmt=raw'"
 FILENAME_ERROR = "/file/ requires a single 'filename=' argument"
-SELECTS_ERROR = "/file/ requires a single dataset as 'select=' argument"
+ASSAYS_ERROR = "/file/ requires a single dataset as 'any=' argument"
 
 
 def get_file(db, context):
-    """Patch through to cold storage file based on `select=` and `filename=`"""
-    if not (set(context.complete_args) <= {"filename", "select", "fmt"}):
+    """Patch through to cold storage file based on `any=` and `filename=`"""
+    if not (set(context.complete_args) <= {"filename", "any", "fmt"}):
         raise GeneLabException(ARGUMENTS_ERROR)
     if context.kwargs.get("fmt", "raw") != "raw":
         # break early to avoid downloading a file and breaking during display:
         raise GeneLabException(FMT_ERROR)
     elif len(context.kwargs.getlist("filename")) != 1:
         raise GeneLabException(FILENAME_ERROR)
-    # TODO: change 'select' logic after parser is updated:
-    elif len(context.complete_args.getlist("select")) != 1:
-        raise GeneLabException(SELECTS_ERROR)
+    # TODO: change 'any' logic after parser is updated:
+    elif len(context.complete_args.getlist("any")) != 1:
+        raise GeneLabException(ASSAYS_ERROR)
     else:
         target_accessions = set(
-            findall(r'GLDS-[0-9]+', context.complete_args["select"]),
+            findall(r'GLDS-[0-9]+', context.complete_args["any"]),
         )
         if len(target_accessions) > 1:
-            raise GeneLabException(SELECTS_ERROR)
+            raise GeneLabException(ASSAYS_ERROR)
         else:
             glds = CachedDataset(
                 db=db, accession=target_accessions.pop(), init_assays=False,

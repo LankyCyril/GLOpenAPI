@@ -244,8 +244,7 @@ function generate_url() {
             if ($(this).children("input[type=checkbox]").prop("checked")) {
                 $(this).find(".key-level").each(function () {
                     url += (
-                        escape($(this).val()).replace(/^select\%3D/, "select=")
-                        + "."
+                        escape($(this).val()).replace(/^any\%3D/, "any=") + "."
                     );
                 });
                 var keyunion_level_dropdowns = $(this).find(".keyunion-level");
