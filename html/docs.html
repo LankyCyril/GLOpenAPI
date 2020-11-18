@@ -10,6 +10,7 @@
             * {font-size: 13pt; font-family: "Roboto", sans-serif; font-weight: 300}
             a {cursor: pointer}
             b {font-weight: 500}
+            strong {color: #00A; font-weight: 500}
             em {font-style: normal; color: black; font-family: "Oxygen", monospace; font-size: 12pt}
             em.remover, em.remover-or {color: #D10; cursor: pointer; border-bottom: 1pt dashed #D10}
             label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
@@ -374,7 +375,7 @@ $(document).ready(function() {
                 </div>
             </div>
             <div class='not-for-data'>
-                <div><b>Show metadata:</b></div><br>
+                <div><b>Retrieve entries with metadata <strong>categories</strong>:</b></div><br>
                 <div>
                     <div id='meta-wildcard-list' class='list'>
                         <div class='meta-wildcard list-item'>
@@ -387,12 +388,12 @@ $(document).ready(function() {
                     </div>
                     <div>
                         <input type='checkbox' disabled>
-                        <a class='meta-wildcard add'>OR</a>
+                        <a class='meta-wildcard add'>AND</a>
                     </div>
                 </div>
             </div>
             <div>
-                <div><b>Retrieve entries with metadata:</b></div><br>
+                <div><b>Retrieve entries with metadata <strong>fields</strong>:</b></div><br>
                 <div>
                     <div id='meta-existence-list' class='list'>
                         <div class='meta-existence list-item'>
@@ -415,7 +416,7 @@ $(document).ready(function() {
                 </div>
             </div>
             <div>
-                <div><b>Retrieve entries with metadata values:</b></div><br>
+                <div><b>Retrieve entries with metadata field <strong>values</strong>:</b></div><br>
                 <div>
                     <div id='meta-equals-list' class='list'>
                         <div class='meta-equals list-item'>
@@ -440,7 +441,7 @@ $(document).ready(function() {
                 </div>
             </div>
             <div>
-                <div><b>Subset entries to datasets and/or assays:</b></div><br>
+                <div><b>Subset entries to <strong>datasets and/or assays</strong>:</b></div><br>
                 <div>
                     <div id='meta-assay-list' class='list'>
                         <div class='meta-assay list-item'>
@@ -453,7 +454,7 @@ $(document).ready(function() {
                     </div>
                     <div>
                         <input type='checkbox' disabled>
-                        <a class='meta-assay add'>OR</a>
+                        <a class='meta-assay add'>AND ANY</a>
                     </div>
                 </div>
             </div>
