@@ -67,6 +67,7 @@ var metadata = {
     "wildcard": /* METADATA_WILDCARDS */,
     "existence": /* METADATA_EXISTENCE */,
     "equals": /* METADATA_EQUALS */,
+    "assay": /* METADATA_ASSAYS */,
 };
 
 function trimmed(key) {
@@ -434,6 +435,24 @@ $(document).ready(function() {
                     <div>
                         <input type='checkbox' disabled>
                         <a class='meta-equals add'>AND</a>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div><b>Subset entries to datasets and/or assays:</b></div><br>
+                <div>
+                    <div id='meta-assay-list' class='list'>
+                        <div class='meta-assay list-item'>
+                            <input type='checkbox'>
+                            <em class='remover'>&amp;</em>select=
+                            <select class='key-level level-0'></select>
+                            <em>.</em>
+                            <select class='key-level level-1'></select>
+                        </div>
+                    </div>
+                    <div>
+                        <input type='checkbox' disabled>
+                        <a class='meta-assay add'>AND</a>
                     </div>
                 </div>
             </div>
