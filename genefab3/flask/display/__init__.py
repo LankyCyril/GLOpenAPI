@@ -1,6 +1,6 @@
 from genefab3.flask.parser import parse_request
 from genefab3.exceptions import GeneLabException
-from pandas import DataFrame
+from pandas import DataFrame, MultiIndex
 from genefab3.flask.display.raw import render_raw
 from genefab3.flask.display.dataframe import render_dataframe
 
@@ -20,3 +20,22 @@ def display(db, getter, kwargs, request):
         raise NotImplementedError("Display of {} with 'fmt={}'".format(
             type(obj).__name__, context.kwargs.get("fmt", "[unspecified]"),
         ))
+
+
+class Placeholders:
+    """Defines placeholder objects for situations where empty results need to be displayed"""
+ 
+    def dataframe(*args, **kwargs):
+        """Return an empty dataframe with specificed column names"""
+        if args and kwargs:
+            raise NotImplementedError(
+                "Placeholders.dataframe() received too many arguments",
+            )
+        elif args:
+            return DataFrame(columns=args)
+        elif kwargs:
+            return DataFrame(
+                columns=MultiIndex.from_tuples(
+                    (k, v) for k, vv in kwargs.items() for v in vv
+                ),
+            )

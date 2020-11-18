@@ -2,6 +2,7 @@ from argparse import Namespace
 from pandas import json_normalize, MultiIndex, isnull, merge
 from re import findall, search, IGNORECASE
 from genefab3.config import RAW_FILE_REGEX
+from genefab3.flask.display import Placeholders
 from pymongo.errors import OperationFailure
 
 
@@ -65,38 +66,36 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
         ".accession": True, ".assay": True, **context.projection,
         **{field: True for field in include},
     }
-    try: # get target metadata as single-level dataframe
-        if search_with_projection:
-            dataframe = json_normalize(list(db.metadata.find(
-                context.query, {"_id": False, **full_projection},
-            )))
-        else:
-            dataframe = json_normalize(list(db.metadata.find(
-                context.query, {"_id": False},
-            )))
-    except OperationFailure:
-        return None
-    # modify with injected function:
-    dataframe = modify(dataframe, full_projection)
-    # remove trailing dots and hide columns that are explicitly hidden:
-    dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
-    # sort (ISA-aware) and convert to two-level dataframe:
-    dataframe = isa_sort_dataframe(dataframe)
     try:
+        if search_with_projection:
+            proj = {"_id": False, **full_projection}
+        else:
+            proj = {"_id": False}
+        # get target metadata as single-level dataframe:
+        dataframe = json_normalize(list(db.metadata.find(context.query, proj)))
+        # modify with injected function:
+        dataframe = modify(dataframe, full_projection)
+        # remove trailing dots and hide columns that are explicitly hidden:
+        dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
+        # sort (ISA-aware) and convert to two-level dataframe:
+        dataframe = isa_sort_dataframe(dataframe)
         dataframe.columns = MultiIndex.from_tuples(
             ("info", ".".join(fields[1:])) if fields[0] == ""
             else (".".join(fields[:2]), ".".join(fields[2:]))
             for fields in map(lambda s: s.split("."), dataframe.columns)
         )
-    except TypeError:
-        return None
-    if aggregate: # coerce to boolean "existence" if requested
-        grouper = dataframe.groupby(
-            list(dataframe[["info"]].columns), as_index=False,
+    except (OperationFailure, TypeError): # no data retrieved/retrievable
+        return Placeholders.dataframe(
+            info=["accession", "assay", *(c.strip(".") for c in include)],
         )
-        return grouper.agg(lambda a: ~isnull(a).all())
     else:
-        return dataframe
+        if aggregate: # coerce to boolean "existence" if requested
+            grouper = dataframe.groupby(
+                list(dataframe[["info"]].columns), as_index=False,
+            )
+            return grouper.agg(lambda a: ~isnull(a).all())
+        else:
+            return dataframe
 
 
 def get_assays_by_metas(db, context):
