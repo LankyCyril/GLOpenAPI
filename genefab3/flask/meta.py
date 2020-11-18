@@ -2,6 +2,7 @@ from argparse import Namespace
 from pandas import json_normalize, MultiIndex, isnull, merge
 from re import findall, search, IGNORECASE
 from genefab3.config import RAW_FILE_REGEX
+from pymongo.errors import OperationFailure
 
 
 def isa_sort_dataframe(dataframe):
@@ -64,15 +65,17 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
         ".accession": True, ".assay": True, **context.projection,
         **{field: True for field in include},
     }
-    # get target metadata as single-level dataframe:
-    if search_with_projection:
-        dataframe = json_normalize(list(db.metadata.find(
-            context.query, {"_id": False, **full_projection},
-        )))
-    else:
-        dataframe = json_normalize(list(db.metadata.find(
-            context.query, {"_id": False},
-        )))
+    try: # get target metadata as single-level dataframe
+        if search_with_projection:
+            dataframe = json_normalize(list(db.metadata.find(
+                context.query, {"_id": False, **full_projection},
+            )))
+        else:
+            dataframe = json_normalize(list(db.metadata.find(
+                context.query, {"_id": False},
+            )))
+    except OperationFailure:
+        return None
     # modify with injected function:
     dataframe = modify(dataframe, full_projection)
     # remove trailing dots and hide columns that are explicitly hidden:
@@ -87,8 +90,7 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
         )
     except TypeError:
         return None
-    # coerce to boolean "existence" if requested:
-    if aggregate:
+    if aggregate: # coerce to boolean "existence" if requested
         grouper = dataframe.groupby(
             list(dataframe[["info"]].columns), as_index=False,
         )
