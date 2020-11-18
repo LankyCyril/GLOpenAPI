@@ -42,7 +42,9 @@ def get_metadata_assays(metadata_collection):
     for entry in metadata_collection.distinct(""):
         metadata_assays[entry["accession"]].add(entry["assay"])
     return {
-        k: {**{v: True for v in natsorted(metadata_assays[k])}, "": True}
+        "select="+k: {
+            **{v: True for v in natsorted(metadata_assays[k])}, "": True,
+        }
         for k in natsorted(metadata_assays)
     }
 

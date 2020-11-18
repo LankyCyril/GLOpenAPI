@@ -53,7 +53,7 @@
             #selectors > div > div {display: inline-block; vertical-align: top}
             #selectors > div > div ~ div {position: relative; top: -1pt}
             #selectors > div > div ~ div input {position: relative; top: 1pt}
-            a.add, a.or {color: #AAA; font-style: italic; border-bottom: 1pt dashed #CCC}
+            a.add, a.or {color: #459; font-style: italic; border-bottom: 1pt dashed #CCC}
             a.del {color: #AAA; font-style: italic; margin-left: 3pt}
             .or-selects {display: inline-block}
         </style>
@@ -172,12 +172,12 @@ function housekeeping(initiator) {
     if ($("#view").val() == "data") {
         $(".not-for-data").css("opacity", ".3");
         $(".not-for-data input").prop("disabled", true);
-        return ["existence", "equals"];
+        return ["existence", "equals", "assay"];
     }
     else {
         $(".not-for-data").css("opacity", "1");
         $(".not-for-data input").prop("disabled", false);
-        return ["wildcard", "existence", "equals"];
+        return ["wildcard", "existence", "equals", "assay"];
     }
 }
 
@@ -243,7 +243,10 @@ function generate_url() {
         $(".meta-" + targets[i]).each(function () {
             if ($(this).children("input[type=checkbox]").prop("checked")) {
                 $(this).find(".key-level").each(function () {
-                    url = url + escape($(this).val()) + ".";
+                    url += (
+                        escape($(this).val()).replace(/^select\%3D/, "select=")
+                        + "."
+                    );
                 });
                 var keyunion_level_dropdowns = $(this).find(".keyunion-level");
                 if (keyunion_level_dropdowns.length > 0) {
@@ -252,21 +255,20 @@ function generate_url() {
                     });
                     url = url.replace(/\|$/g, "&");
                 }
-                else {
-                    url = url.replace(/\.$/g, "&");
-                }
+                else
+                    url = url.replace(/\.+$/g, "&");
                 var value_level_dropdowns = $(this).find(".value-level");
                 if (value_level_dropdowns.length > 0) {
                     url = url.replace(/&$/g, "=");
                     value_level_dropdowns.each(function () {
-                        url = url + escape($(this).val()) + "|";
+                        url += escape($(this).val()) + "|";
                     });
                     url = url.replace(/\|$/g, "&");
                 }
             }
         });
     }
-    url = url + "fmt=" + $("#fmt").val();
+    url += "fmt=" + $("#fmt").val();
     $("#url-description").text("Generated URL:");
     $("#url").html(decorate_url(url));
     $("#url-follow a").attr("href", $("#url").text());
@@ -386,7 +388,7 @@ $(document).ready(function() {
                     </div>
                     <div>
                         <input type='checkbox' disabled>
-                        <a class='meta-wildcard add'>AND</a>
+                        <a class='meta-wildcard add'>OR</a>
                     </div>
                 </div>
             </div>
@@ -444,7 +446,7 @@ $(document).ready(function() {
                     <div id='meta-assay-list' class='list'>
                         <div class='meta-assay list-item'>
                             <input type='checkbox'>
-                            <em class='remover'>&amp;</em>select=
+                            <em class='remover'>&amp;</em>
                             <select class='key-level level-0'></select>
                             <em>.</em>
                             <select class='key-level level-1'></select>
@@ -452,7 +454,7 @@ $(document).ready(function() {
                     </div>
                     <div>
                         <input type='checkbox' disabled>
-                        <a class='meta-assay add'>AND</a>
+                        <a class='meta-assay add'>OR</a>
                     </div>
                 </div>
             </div>
