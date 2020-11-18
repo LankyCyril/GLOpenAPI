@@ -13,7 +13,7 @@ SELECTS_ERROR = "/file/ requires a single dataset as 'select=' argument"
 
 def get_file(db, context):
     """Patch through to cold storage file based on `select=` and `filename=`"""
-    if not (set(context.kwargs) <= {"filename", "select", "fmt"}):
+    if not (set(context.complete_args) <= {"filename", "select", "fmt"}):
         raise GeneLabException(ARGUMENTS_ERROR)
     if context.kwargs.get("fmt", "raw") != "raw":
         # break early to avoid downloading a file and breaking during display:
