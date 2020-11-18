@@ -6,13 +6,19 @@ from collections import OrderedDict
 from werkzeug.datastructures import MultiDict
 
 
-def any_pair_to_query(key, value):
+def assay_pair_to_query(key, value):
     """Interpret single key-value pair for dataset / assay constraint"""
-    if value.count(".") == 0:
-        return {".accession": value}, None
-    else:
-        accession, assay_name = value.split(".", 1)
-        return {".accession": accession, ".assay": assay_name}, None
+    query = {"$or": []}
+    accessions = set()
+    for expr in value.split("|"):
+        if expr.count(".") == 0:
+            query["$or"].append({".accession": expr})
+            accessions.add(expr)
+        else:
+            accession, assay_name = expr.split(".", 1)
+            query["$or"].append({".accession": accession, ".assay": assay_name})
+            accessions.add(accession)
+    yield query, None, accessions
 
 
 def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_postfix=False):
@@ -23,12 +29,12 @@ def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_
         else:
             lookup_key = ".".join([isa_category] + fields)
         if value: # metadata field must equal value or one of values
-            yield {lookup_key: {"$in": value.split("|")}}, {lookup_key}
+            yield {lookup_key: {"$in": value.split("|")}}, {lookup_key}, None
         else: # metadata field or one of metadata fields must exist
             block_match = search(r'\.[^\.]+\.$', lookup_key)
             if (not block_match) or (block_match.group().count("|") == 0):
                 # single field must exist (no OR condition):
-                yield {lookup_key: {"$exists": True}}, {lookup_key}
+                yield {lookup_key: {"$exists": True}}, {lookup_key}, None
             else: # either of the fields must exist (OR condition)
                 head = lookup_key[:block_match.start()]
                 targets = block_match.group().strip(".").split("|")
@@ -36,19 +42,15 @@ def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_
                 query = {"$or": [
                     {key: {"$exists": True}} for key in lookup_keys
                 ]}
-                yield query, lookup_keys
+                yield query, lookup_keys, None
 
 
 def request_pairs_to_queries(rargs, key):
     """Interpret key-value pairs under same key if they give rise to database queries"""
-    if key == "any":
-        lookup_keys = None
-        query = {"$or": [
-            any_pair_to_query(key, value)[0]
-            for value in rargs.getlist(key)
-            if "$" not in value
-        ]}
-        yield query, lookup_keys
+    if key == "from":
+        for value in rargs.getlist(key):
+            if "$" not in value:
+                yield from assay_pair_to_query(key, value)
     elif "$" not in key:
         isa_category, *fields = key.split(".")
         if fields:
@@ -71,12 +73,16 @@ def INPLACE_update_context_queries(context, rargs):
     """Interpret all key-value pairs that give rise to database queries"""
     shown = set()
     for key in rargs:
-        for query, lookup_keys in request_pairs_to_queries(rargs, key):
+        query_iterator = request_pairs_to_queries(rargs, key)
+        for query, lookup_keys, accessions in query_iterator:
             context.query["$and"].append(query)
             if lookup_keys:
                 shown.update(lookup_keys)
+            if accessions:
+                context.accessions.update(accessions)
             if key in context.kwargs:
                 context.kwargs.pop(key)
+    context.accessions = sorted(context.accessions)
     return shown
 
 
@@ -101,6 +107,7 @@ def parse_request(request):
     context = Namespace(
         view="/"+sub(url_root, "", base_url).strip("/")+"/",
         complete_args=request.args,
+        accessions=set(),
         query={"$and": []}, projection={},
         kwargs=MultiDict(request.args),
     )
