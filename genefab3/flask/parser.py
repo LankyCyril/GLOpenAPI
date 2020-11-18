@@ -8,14 +8,11 @@ from werkzeug.datastructures import MultiDict
 
 def select_pair_to_query(key, value):
     """Interpret single key-value pair for dataset / assay constraint"""
-    query = {"$or": []}
-    for expr in value.split("|"):
-        if expr.count(".") == 0:
-            query["$or"].append({".accession": expr})
-        elif expr.count(".") == 1:
-            accession, assay_name = expr.split(".")
-            query["$or"].append({".accession": accession, ".assay": assay_name})
-    yield query, None
+    if value.count(".") == 0:
+        return {".accession": value}, None
+    else:
+        accession, assay_name = value.split(".", 1)
+        return {".accession": accession, ".assay": assay_name}, None
 
 
 def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_postfix=False):
@@ -45,9 +42,13 @@ def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_
 def request_pairs_to_queries(rargs, key):
     """Interpret key-value pairs under same key if they give rise to database queries"""
     if key == "select":
-        for value in rargs.getlist(key):
-            if "$" not in value:
-                yield from select_pair_to_query(key, value)
+        lookup_keys = None
+        query = {"$or": [
+            select_pair_to_query(key, value)[0]
+            for value in rargs.getlist(key)
+            if "$" not in value
+        ]}
+        yield query, lookup_keys
     elif "$" not in key:
         isa_category, *fields = key.split(".")
         if fields:
