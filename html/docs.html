@@ -302,19 +302,21 @@ function remove_last_query_option() {
 }
 
 function remove_query_part() {
-    if ($(this).parents(".list").children(".list-item").length > 1) {
+    if ($(this).parents(".list").children(".list-item").length > 1)
         $(this).parents(".list-item").remove();
-    }
-    else {
+    else
         $(this).parents(".list-item").children("input[type=checkbox]").prop("checked", false);
-    }
+    $(".pipe_remover").first().removeClass("pipe_remover").html("&amp;");
     generate_url();
 }
 
 function clone_query_part() {
     var section_name = $(this).attr("class").replace(/\sadd$/g, "");
     var section_list = $("#"+section_name+"-list");
-    section_list.append(section_list.children().last("."+section_name).clone());
+    var section_clone = section_list.children().last("."+section_name).clone();
+    if (section_name === "meta-assay")
+        section_clone.children(".remover").html("|").addClass("pipe_remover");
+    section_list.append(section_clone);
     refresh_event_handlers();
     generate_url();
 }
@@ -333,7 +335,12 @@ function clone_query_or() {
 function refresh_event_handlers() {
     $(".remover, .remover-or").unbind("mouseover").unbind("mouseout").unbind("click");
     $(".remover, .remover-or").mouseover(function () {$(this).html("&times;")});
-    $(".remover").mouseout(function () {$(this).html("&amp;")});
+    $(".remover").mouseout(function () {
+        if ($(this).hasClass("pipe_remover"))
+            $(this).html("|");
+        else
+            $(this).html("&amp;");
+    });
     set_default_repr_of_remover_ors();
     $(".remover-or").mouseout(set_default_repr_of_remover_ors);
     $(".remover, .remover-or").click(remove_query_part);
