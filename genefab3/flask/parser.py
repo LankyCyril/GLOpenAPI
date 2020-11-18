@@ -1,4 +1,4 @@
-from re import sub, escape
+from re import search, sub, escape
 from argparse import Namespace
 from genefab3.config import ANNOTATION_CATEGORIES
 from genefab3.utils import UniversalSet
@@ -22,10 +22,21 @@ def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_
             lookup_key = ".".join([isa_category] + fields) + "."
         else:
             lookup_key = ".".join([isa_category] + fields)
-        if value:
-            yield {lookup_key: {"$in": value.split("|")}}, lookup_key
-        else:
-            yield {lookup_key: {"$exists": True}}, lookup_key
+        if value: # metadata field must equal value or one of values
+            yield {lookup_key: {"$in": value.split("|")}}, {lookup_key}
+        else: # metadata field or one of metadata fields must exist
+            block_match = search(r'\.[^\.]+\.$', lookup_key)
+            if (not block_match) or (block_match.group().count("|") == 0):
+                # single field must exist (no OR condition):
+                yield {lookup_key: {"$exists": True}}, {lookup_key}
+            else: # either of the fields must exist (OR condition)
+                head = lookup_key[:block_match.start()]
+                targets = block_match.group().strip(".").split("|")
+                lookup_keys = {f"{head}.{target}." for target in targets}
+                yield (
+                    {"$or": [{key: {"$exists": True}} for key in lookup_keys]},
+                    lookup_keys,
+                )
 
 
 def request_pairs_to_queries(rargs, key):
@@ -56,10 +67,10 @@ def INPLACE_update_context_queries(context, rargs):
     """Interpret all key-value pairs that give rise to database queries"""
     shown = set()
     for key in rargs:
-        for query, lookup_key in request_pairs_to_queries(rargs, key):
+        for query, lookup_keys in request_pairs_to_queries(rargs, key):
             context.query["$and"].append(query)
-            if lookup_key:
-                shown.add(lookup_key)
+            if lookup_keys:
+                shown.update(lookup_keys)
             if key in context.kwargs:
                 context.kwargs.pop(key)
     return shown
