@@ -1,9 +1,15 @@
-from genefab3.config import TIMESTAMP_FMT
+from os import environ
+from genefab3.config import TIMESTAMP_FMT, DEBUG_MARKERS
 from re import sub, escape
 from datetime import datetime
 from natsort import natsorted
 from functools import lru_cache
 from copy import deepcopy
+
+
+def is_debug():
+    """Determine if app is running in debug mode"""
+    return (environ.get("FLASK_ENV", None) in DEBUG_MARKERS)
 
 
 def natsorted_dataframe(dataframe, by, ascending=True, sort_trailing_columns=False):

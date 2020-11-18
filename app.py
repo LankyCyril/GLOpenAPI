@@ -2,7 +2,8 @@
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError
 from genefab3.exceptions import GeneLabDatabaseException
-from genefab3.config import MONGO_DB_NAME, DEBUG_MARKERS, COMPRESSIBLE_MIMETYPES
+from genefab3.config import MONGO_DB_NAME, COMPRESSIBLE_MIMETYPES
+from genefab3.utils import is_debug
 from flask import Flask, request
 from flask_compress import Compress
 from os import environ
@@ -31,7 +32,7 @@ if environ.get("WERKZEUG_RUN_MAIN", None) != "true":
     # https://stackoverflow.com/a/9476701/590676
     CacherThread(db).start()
 
-if environ.get("FLASK_ENV", None) in DEBUG_MARKERS:
+if is_debug():
     traceback_printer = app.errorhandler(Exception)(
         partial(traceback_printer, db=db),
     )
