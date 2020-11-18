@@ -8,11 +8,14 @@ from werkzeug.datastructures import MultiDict
 
 def select_pair_to_query(key, value):
     """Interpret single key-value pair for dataset / assay constraint"""
-    if value.count(".") == 0:
-        yield {".accession": value}, None
-    elif value.count(".") == 1:
-        accession, assay_name = value.split(".")
-        yield {".accession": accession, ".assay": assay_name}, None
+    query = {"$or": []}
+    for expr in value.split("|"):
+        if expr.count(".") == 0:
+            query["$or"].append({".accession": expr})
+        elif expr.count(".") == 1:
+            accession, assay_name = expr.split(".")
+            query["$or"].append({".accession": accession, ".assay": assay_name})
+    yield query, None
 
 
 def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_postfix=False):
@@ -33,10 +36,10 @@ def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_
                 head = lookup_key[:block_match.start()]
                 targets = block_match.group().strip(".").split("|")
                 lookup_keys = {f"{head}.{target}." for target in targets}
-                yield (
-                    {"$or": [{key: {"$exists": True}} for key in lookup_keys]},
-                    lookup_keys,
-                )
+                query = {"$or": [
+                    {key: {"$exists": True}} for key in lookup_keys
+                ]}
+                yield query, lookup_keys
 
 
 def request_pairs_to_queries(rargs, key):
