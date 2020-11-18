@@ -56,6 +56,7 @@
             #selectors > div > div ~ div input {position: relative; top: 1pt}
             a.add, a.or {color: #459; font-style: italic; border-bottom: 1pt dashed #CCC}
             a.del {color: #AAA; font-style: italic; margin-left: 3pt}
+            .list-item:not(:first-child) em.key {visibility: hidden}
             .or-selects {display: inline-block}
         </style>
     </head>
@@ -241,12 +242,12 @@ function generate_url() {
     var targets = housekeeping(initiator=this);
     var url = url_root + "/" + escape($("#view").val()) + "/?";
     for (var i = 0, l = targets.length; i < l; i++) {
+        if (targets[i] == "assay")
+            url += "from=";
         $(".meta-" + targets[i]).each(function () {
             if ($(this).children("input[type=checkbox]").prop("checked")) {
                 $(this).find(".key-level").each(function () {
-                    url += (
-                        escape($(this).val()).replace(/^any\%3D/, "any=") + "."
-                    );
+                    url += escape($(this).val()) + ".";
                 });
                 var keyunion_level_dropdowns = $(this).find(".keyunion-level");
                 if (keyunion_level_dropdowns.length > 0) {
@@ -255,6 +256,8 @@ function generate_url() {
                     });
                     url = url.replace(/\|$/g, "&");
                 }
+                else if (targets[i] == "assay")
+                    url = url.replace(/\.+$/g, "|");
                 else
                     url = url.replace(/\.+$/g, "&");
                 var value_level_dropdowns = $(this).find(".value-level");
@@ -267,10 +270,10 @@ function generate_url() {
                 }
             }
         });
+        url = url.replace(/from\=$/, "").replace(/\|$/, "&");
     }
-    url += "fmt=" + $("#fmt").val();
     $("#url-description").text("Generated URL:");
-    $("#url").html(decorate_url(url));
+    $("#url").html(decorate_url(url + "fmt=" + $("#fmt").val()));
     $("#url-follow a").attr("href", $("#url").text());
     $("#url-follow").css("background", "lightgreen");
 }
@@ -306,7 +309,6 @@ function remove_query_part() {
         $(this).parents(".list-item").remove();
     else
         $(this).parents(".list-item").children("input[type=checkbox]").prop("checked", false);
-    $(".pipe_remover").first().removeClass("pipe_remover").html("&amp;");
     generate_url();
 }
 
@@ -314,8 +316,8 @@ function clone_query_part() {
     var section_name = $(this).attr("class").replace(/\sadd$/g, "");
     var section_list = $("#"+section_name+"-list");
     var section_clone = section_list.children().last("."+section_name).clone();
-    if (section_name === "meta-assay")
-        section_clone.children(".remover").html("|").addClass("pipe_remover");
+    // if (section_name === "meta-assay")
+    //     section_clone.children("em.key").html("&nbsp;".repeat("&from=".length));
     section_list.append(section_clone);
     refresh_event_handlers();
     generate_url();
@@ -336,7 +338,7 @@ function refresh_event_handlers() {
     $(".remover, .remover-or").unbind("mouseover").unbind("mouseout").unbind("click");
     $(".remover, .remover-or").mouseover(function () {$(this).html("&times;")});
     $(".remover").mouseout(function () {
-        if ($(this).hasClass("pipe_remover"))
+        if ($(this).hasClass("pipe-remover"))
             $(this).html("|");
         else
             $(this).html("&amp;");
@@ -452,16 +454,18 @@ $(document).ready(function() {
                 <div>
                     <div id='meta-assay-list' class='list'>
                         <div class='meta-assay list-item'>
+                            <em class='key'>&amp;from=</em>
                             <input type='checkbox'>
-                            <em class='remover'>&amp;</em>
+                            <em class='remover pipe-remover'>|</em>
                             <select class='key-level level-0'></select>
                             <em>.</em>
                             <select class='key-level level-1'></select>
                         </div>
                     </div>
                     <div>
+                        <em style='visibility: hidden'>&amp;from=</em>
                         <input type='checkbox' disabled>
-                        <a class='meta-assay add'>AND ANY</a>
+                        <a class='meta-assay add'>OR</a>
                     </div>
                 </div>
             </div>
