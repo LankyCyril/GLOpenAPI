@@ -56,6 +56,8 @@
             #selectors > div > div ~ div input {position: relative; top: 1pt}
             a.add, a.or {color: #459; font-style: italic; border-bottom: 1pt dashed #CCC}
             a.del {color: #AAA; font-style: italic; margin-left: 3pt}
+            .list-item:first-child em.pipe-remover {opacity: 0}
+            .list-item:first-child em.pipe-remover:hover {opacity: 1}
             .list-item:not(:first-child) em.key {visibility: hidden}
             .or-selects {display: inline-block}
         </style>
@@ -318,8 +320,6 @@ function clone_query_part() {
     var section_name = $(this).attr("class").replace(/\sadd$/g, "");
     var section_list = $("#"+section_name+"-list");
     var section_clone = section_list.children().last("."+section_name).clone();
-    // if (section_name === "meta-assay")
-    //     section_clone.children("em.key").html("&nbsp;".repeat("&from=".length));
     section_list.append(section_clone);
     refresh_event_handlers();
     generate_url();
