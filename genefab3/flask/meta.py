@@ -90,10 +90,12 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
         )
     else:
         if aggregate: # coerce to boolean "existence" if requested
-            grouper = dataframe.groupby(
-                list(dataframe[["info"]].columns), as_index=False,
-            )
-            return grouper.agg(lambda a: ~isnull(a).all())
+            info_cols = list(dataframe[["info"]].columns)
+            if len(info_cols) == dataframe.shape[1]: # only 'info' cols present
+                return dataframe.drop_duplicates()
+            else: # metadata cols present and can be collapsed into booleans
+                grouper = dataframe.groupby(info_cols, as_index=False)
+                return grouper.agg(lambda a: ~isnull(a).all())
         else:
             return dataframe
 
