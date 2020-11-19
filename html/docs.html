@@ -355,9 +355,37 @@ function refresh_event_handlers() {
     $("input[type=checkbox], select").click(generate_url);
 }
 
+function prefill_example() {
+    var initiator = $("#meta-wildcard-list .key-level.level-0")
+    initiator.val("study");
+    refresh_dropdown_section(initiator, "wildcard", 0);
+    $("#meta-wildcard-list .key-level.level-1").val("characteristics");
+    initiator = $("#meta-existence-list .key-level.level-0")
+    initiator.val("study");
+    refresh_dropdown_section(initiator, "existence", 0);
+    initiator = $("#meta-existence-list .key-level.level-1")
+    initiator.val("factor value");
+    refresh_dropdown_section(initiator, "existence", 1);
+    $("#meta-existence-list .keyunion-level.level-2").val("spaceflight");
+    initiator = $("#meta-equals-list .key-level.level-0");
+    initiator.val("investigation");
+    refresh_dropdown_section(initiator, "equals", 0);
+    initiator = $("#meta-equals-list .key-level.level-1");
+    initiator.val("study assays");
+    refresh_dropdown_section(initiator, "equals", 1);
+    initiator = $("#meta-equals-list .key-level.level-2");
+    initiator.val("study assay measurement type");
+    refresh_dropdown_section(initiator, "equals", 2);
+    $("#meta-equals-list .value-level.level-3").val("transcription profiling");
+    initiator = $("#meta-assay-list .key-level.level-0")
+    initiator.val("GLDS-118");
+    refresh_dropdown_section(initiator, "assay", 0);
+}
+
 $(document).ready(function() {
     toggle_builder();
     refresh_dropdowns();
+    prefill_example();
     refresh_event_handlers();
 });
 
