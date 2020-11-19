@@ -169,6 +169,8 @@ function refresh_dropdowns(initiator) {
 }
 
 function housekeeping(initiator) {
+    if ($("#view").val() === "")
+        $("#view").val("samples");
     $("#view option[value='']").remove();
     refresh_dropdowns(initiator);
     if ($("#view").val() == "data") {
