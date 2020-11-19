@@ -1,3 +1,4 @@
+from argparse import Namespace
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.mongo.json import get_fresh_json
 from genefab3.mongo.utils import replace_doc, harmonize_query
@@ -9,11 +10,17 @@ WARN_NO_META = "%s, %s: no metadata entries"
 WARN_NO_STUDY = "%s, %s, %s: no Study entries"
 
 
+def NoLogger():
+    """Placeholder that masquerades as a logger but does not do anything"""
+    return Namespace(warning=lambda *args, **kwargs: None)
+
+
 class CachedDataset(ColdStorageDataset):
     """ColdStorageDataset via auto-updated metadata in database"""
  
-    def __init__(self, db, accession, logger, init_assays=True):
-        self.db, self.logger = db, logger
+    def __init__(self, db, accession, logger=None, init_assays=True):
+        self.db = db
+        self.logger = logger if (logger is not None) else NoLogger()
         super().__init__(
             accession, init_assays=False,
             get_json=partial(get_fresh_json, db=db),
