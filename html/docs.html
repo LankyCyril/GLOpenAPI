@@ -181,6 +181,7 @@ function housekeeping(initiator) {
     else {
         $(".not-for-data").css("opacity", "1");
         $(".not-for-data input").prop("disabled", false);
+        $(".not-for-data input.always-disabled").prop("disabled", true);
         return ["wildcard", "existence", "equals", "assay"];
     }
 }
@@ -424,7 +425,7 @@ $(document).ready(function() {
                         </div>
                     </div>
                     <div>
-                        <input type='checkbox' disabled>
+                        <input type='checkbox' class='always-disabled' disabled>
                         <a class='meta-wildcard add'>AND</a>
                     </div>
                 </div>
@@ -447,7 +448,7 @@ $(document).ready(function() {
                         </div>
                     </div>
                     <div>
-                        <input type='checkbox' disabled>
+                        <input type='checkbox' class='always-disabled' disabled>
                         <a class='meta-existence add'>AND</a>
                     </div>
                 </div>
@@ -472,7 +473,7 @@ $(document).ready(function() {
                         </div>
                     </div>
                     <div>
-                        <input type='checkbox' disabled>
+                        <input type='checkbox' class='always-disabled' disabled>
                         <a class='meta-equals add'>AND</a>
                     </div>
                 </div>
@@ -492,7 +493,7 @@ $(document).ready(function() {
                     </div>
                     <div>
                         <em style='visibility: hidden'>&amp;from=</em>
-                        <input type='checkbox' disabled>
+                        <input type='checkbox' class='always-disabled' disabled>
                         <a class='meta-assay add'>OR</a>
                     </div>
                 </div>
