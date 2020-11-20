@@ -1,12 +1,8 @@
-from pandas import Series, concat
+from pandas import Series
 from numpy import nan
 
 
-def get_single_sample_data(triple):
+def get_single_sample_data(sample_info, gene_rows=None):
+    accession, assay_name, sample_name = sample_info
+    print("Getting data for", sample_name)
     return Series([nan]*16)
-
-
-def query_data(sample_columns, gene_rows=None):
-    sample_data = concat(sample_columns.map(get_single_sample_data), axis=1)
-    sample_data.columns = sample_columns
-    return sample_data
