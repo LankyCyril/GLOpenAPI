@@ -26,7 +26,7 @@ def walk_up(from_path, n_steps):
         return from_path
 
 
-def get_browser_html():
+def get_browser_html(): # TODO in prod: make HTML template static / preload on app start
     filename = path.join(
         walk_up(path.abspath(__file__), 4), "html/slick-df.html",
     )
@@ -59,6 +59,7 @@ def get_browser_dataframe_twolevel(df, context, frozen=0):
             "HTMLINK": build_url(context, drop={"fmt"}) + "fmt=html",
             "CSVLINK": build_url(context, drop={"fmt"}) + "fmt=csv",
             "TSVLINK": build_url(context, drop={"fmt"}) + "fmt=tsv",
+            "JSONLINK": build_url(context, drop={"fmt"}) + "fmt=json",
             "ASSAYSVIEW": build_url(context, "/assays/"),
             "SAMPLESVIEW": build_url(context, "/samples/"),
             "DATAVIEW": build_url(context, "/data/"),

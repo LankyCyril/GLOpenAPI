@@ -40,8 +40,6 @@
         .slick-row.odd {background: #E8E8E8}
         a {text-decoration: none; color: black; cursor: pointer}
         a:hover {text-decoration: underline; color: blue}
-        a.remover {opacity: .1}
-        a.remover:hover {opacity: 1; text-decoration: none}
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/6pac-slickgrid/2.4.27/lib/jquery.event.drag-2.3.0.min.js"></script>
@@ -58,7 +56,8 @@
         <a style="color:#D10" id="crosshair-toggle">Toggle crosshairs</a>.<br>
         <b>Download:</b> as
         <a style="color:#D10" href="CSVLINK">csv</a>,
-        <a style="color:#D10" href="TSVLINK">tsv</a>.
+        <a style="color:#D10" href="TSVLINK">tsv</a>,
+        <a style="color:#D10" href="JSONLINK">json</a>.
         <b>Switch view level:</b>
         <a style="color:#D10" href="ASSAYSVIEW">assays</a>,
         <a style="color:#D10" href="SAMPLESVIEW">samples</a>,
@@ -66,11 +65,12 @@
     </div>
     <div id="grid" class="fullpage">
         <div id="noscript">
-            Loading data... You may view it as
-            <a style="color:#D10" href="HTMLINK">static HTML</a>
-            instead, or use the csv and tsv links above.
-            Note: the static HTML view may be slow or disabled altogether
-            for large tables.
+            Loading data in an interactive viewer...<br>
+            The viewer requires JavaScript support.
+            You may access the requested data non-interactively in
+            <a style="color:#D10" href="CSVLINK">csv</a>,
+            <a style="color:#D10" href="TSVLINK">tsv</a>, or
+            <a style="color:#D10" href="JSONLINK">json</a> formats.
         </div>
     </div>
     <div id="crosshair-h" class="crosshair"></div>
@@ -224,20 +224,13 @@ $(document).ready(function() {
     });
 });
 
-function add_removers() {
-// REMOVERS
-}
-
-add_removers();
-
 $(window).resize(function() {
     grid.setOptions({frozenColumn: false});
     grid.setOptions({frozenColumn: options.defaultFrozenColumn});
-    add_removers();
 });
 
 
-$("title").text(window.location.href.split("?")[1] || "genefab3");
+$("title").text("genefab3: " + (window.location.href.split("?")[1] || ""));
 
 </script>
 
