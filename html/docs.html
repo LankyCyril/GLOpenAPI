@@ -14,7 +14,7 @@
             em {font-style: normal; color: black; font-family: "Oxygen", monospace; font-size: 12pt}
             em.remover, em.remover-or {color: #D10; cursor: pointer; border-bottom: 1pt dashed #D10}
             label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
-            select {margin: 1pt 0; max-width: 120pt; overflow: hidden; text-overflow: ellipsis; white-space: nowrap}
+            select {margin: 1pt 0; min-width: 120pt; max-width: 120pt; overflow: hidden; text-overflow: ellipsis; white-space: nowrap}
             h1 {font-size: 28pt; font-weight: 500; border-bottom: 1pt solid black; display: inline-block; margin: 5pt 0 20pt 0}
             h2 {font-size: 20pt; font-weight: 500; display: inline-block; margin: 10pt 0 0 0}
             #url-builder {position: sticky; top: 0; background: #FFFFFFEE; z-index: 8}
@@ -46,19 +46,18 @@
                 border-style: solid; border-color: #AAA;
             }
             #url-follow a {color: black; text-decoration: none}
-            #selectors {padding-top: 25pt}
-            #selectors > div {margin-bottom: 16pt; border-left: 3pt solid #DDD; padding-left: 5pt}
-            #selectors > div > div:first-child {min-width: 200pt}
+            #selectors {padding-top: 20pt}
+            #selectors > div {margin-bottom: 12pt; border-left: 3pt solid #DDD; padding-left: 5pt}
             #selectors > div > div {display: inline-block; vertical-align: top}
-            #selectors > div > div ~ div {margin-left: 12pt; position: relative; top: 3pt}
+            #selectors > div > div ~ div {margin-left: 12pt; margin-top: 3pt}
             #selectors > div > div ~ div input {position: relative; top: 1pt}
-            a.add, a.or {color: #459; font-style: italic; border-bottom: 1pt dashed #CCC}
+            a.add, a.or {color: #777; font-style: italic; border-bottom: 1pt dashed #CCC}
             a.del {color: #AAA; font-style: italic; margin-left: 3pt}
             .list-item:not(:first-child) em.key {visibility: hidden}
             .or-selects {display: inline-block}
         </style>
     </head>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js'></script>
 <script>
 
 var url_root = "%URL_ROOT%";
@@ -70,13 +69,11 @@ var metadata = {
     "assay": /* METADATA_ASSAYS */,
 };
 
-function trimmed(key) {
-    if (key.length <= 64) {
+function trimmed_option(key) {
+    if (key.length <= 64)
         return key;
-    }
-    else {
+    else
         return key.substring(0, 61) + "...";
-    }
 }
 
 function refresh_all_dropdowns() {
@@ -96,7 +93,7 @@ function refresh_all_dropdowns() {
                     else {
                         section.find("option").remove();
                         for (section_key in section_data) {
-                            var key_as_shown = trimmed(section_key);
+                            var key_as_shown = trimmed_option(section_key);
                             var option = new Option(key_as_shown, section_key);
                             $(option).html(key_as_shown);
                             section.append(option);
@@ -127,7 +124,7 @@ function refresh_dropdown_section(initiator, key, level) {
                 var section = $(this).find("select.level-"+i);
                 section.find("option").remove();
                 for (section_key in section_data) {
-                    var key_as_shown = trimmed(section_key);
+                    var key_as_shown = trimmed_option(section_key);
                     var option = new Option(key_as_shown, section_key);
                     $(option).html(key_as_shown);
                     section.append(option);
@@ -295,12 +292,10 @@ function toggle_builder() {
 function set_default_repr_of_remover_ors() {
     var i = 0;
     $(".remover-or").each(function () {
-        if (++i == 1) {
-            $(this).html("&amp;")
-        }
-        else {
-            $(this).html("|")
-        }
+        if (++i == 1)
+            $(this).html("&amp;");
+        else
+            $(this).html("|");
     });
 }
 
@@ -315,7 +310,9 @@ function remove_query_part() {
     if ($(this).parents(".list").children(".list-item").length > 1)
         $(this).parents(".list-item").remove();
     else
-        $(this).parents(".list-item").children("input[type=checkbox]").prop("checked", false);
+        $(this).parents(".list-item")
+            .children("input[type=checkbox]")
+            .prop("checked", false);
     generate_url();
 }
 
@@ -343,7 +340,10 @@ function clone_query_or() {
 }
 
 function refresh_event_handlers() {
-    $(".remover, .remover-or").unbind("mouseover").unbind("mouseout").unbind("click");
+    $(".remover, .remover-or")
+        .unbind("mouseover")
+        .unbind("mouseout")
+        .unbind("click");
     $(".remover, .remover-or").mouseover(function () {$(this).html("&times;")});
     $(".remover").mouseout(function () {
         if ($(this).hasClass("pipe-remover"))
