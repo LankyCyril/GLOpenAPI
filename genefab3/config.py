@@ -20,9 +20,18 @@ MAX_JSON_AGE = 10800 # 3 hours (in seconds)
 CACHER_THREAD_CHECK_INTERVAL = 1800 # 30 minutes (in seconds)
 CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
 
+ISA_ZIP_REGEX = r'.*_metadata_.*[_-]ISA\.zip$'
+
 ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
 
-ISA_ZIP_REGEX = r'.*_metadata_.*[_-]ISA\.zip$'
+ISA_TECHNOLOGY_TYPE_LOCATOR = (
+    "investigation.study assays", "study assay technology type",
+)
+
+TECHNOLOGY_FILE_MASKS = { # TODO: DataFrame for different data transformations
+    "rna sequencing (rna-seq)": r'rna_seq_Unnormalized_Counts.csv',
+}
+
 RAW_FILE_REGEX = r'file|plot'
 DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'
 VIZ_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table.csv$'
