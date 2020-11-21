@@ -117,26 +117,28 @@ function refresh_dropdown_section(initiator, key, level) {
     var section_lists = $(initiator).parent();
     section_lists.each(function () {
         var section_key = key;
-        var section_data = metadata[section_key];
-        for (var i = 0; i <= level; i++) {
-            section_key = $(this).find("select.level-"+i).val();
-            section_data = section_data[section_key];
-        }
-        for (var i = level+1;; i++) {
-            var section = $(this).find("select.level-"+i);
-            section.find("option").remove();
-            for (section_key in section_data) {
-                var key_as_shown = trimmed(section_key);
-                var option = new Option(key_as_shown, section_key);
-                $(option).html(key_as_shown);
-                section.append(option);
-                section.val(section_key);
-            }
-            if ((section_data !== true) && (section_key in section_data)) {
+        if (section_key in metadata) {
+            var section_data = metadata[section_key];
+            for (var i = 0; i <= level; i++) {
+                section_key = $(this).find("select.level-"+i).val();
                 section_data = section_data[section_key];
             }
-            else {
-                break;
+            for (var i = level+1;; i++) {
+                var section = $(this).find("select.level-"+i);
+                section.find("option").remove();
+                for (section_key in section_data) {
+                    var key_as_shown = trimmed(section_key);
+                    var option = new Option(key_as_shown, section_key);
+                    $(option).html(key_as_shown);
+                    section.append(option);
+                    section.val(section_key);
+                }
+                if ((section_data !== true) && (section_key in section_data)) {
+                    section_data = section_data[section_key];
+                }
+                else {
+                    break;
+                }
             }
         }
     });
@@ -178,13 +180,13 @@ function housekeeping(initiator) {
     if ($("#view").val() !== "data") {
         $(".for-data").css("opacity", ".3");
         $(".for-data input").prop("disabled", true);
-        return ["wildcard", "existence", "equals", "assay"];
+        return ["wildcard", "existence", "equals", "assay", "fmt"];
     }
     else {
         $(".for-data").css("opacity", "1");
         $(".for-data input").prop("disabled", false);
         $("input.always-disabled").prop("disabled", true);
-        return ["wildcard", "existence", "equals", "assay", "datatype"];
+        return ["wildcard", "existence", "equals", "assay", "datatype", "fmt"];
     }
 }
 
@@ -278,7 +280,7 @@ function generate_url() {
         url = url.replace(RegExp(prefix+"$"), "").replace(/\|$/, "&");
     }
     $("#url-description").text("Generated URL:");
-    $("#url").html(decorate_url(url + "fmt=" + $("#fmt").val()));
+    $("#url").html(decorate_url(url));
     $("#url-follow a").attr("href", $("#url").text());
     $("#url-follow").css("background", "lightgreen");
 }
@@ -520,13 +522,19 @@ $(document).ready(function() {
             <div>
                 <div><b>Display in format:</b></div><br>
                 <div>
-                    <em>&amp;fmt=</em>
-                    <select id='fmt'>
-                        <option value='browser' selected>browser</option>
-                        <option value='tsv'>tsv</option>
-                        <option value='csv'>csv</option>
-                        <option value='json'>json</option>
-                    </select>
+                    <div id='meta-fmt-list' class='list'>
+                        <div class='meta-fmt list-item'>
+                            <input type='checkbox' checked disabled>
+                            <em class='key'>&amp;</em>
+                            <em class='key included-key'>fmt=</em>
+                            <select class='value-level level-0'>
+                                <option value='browser' selected>browser</option>
+                                <option value='tsv'>tsv</option>
+                                <option value='csv'>csv</option>
+                                <option value='json'>json</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
