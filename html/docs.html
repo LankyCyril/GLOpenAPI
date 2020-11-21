@@ -169,12 +169,8 @@ function refresh_dropdowns(initiator) {
 }
 
 function housekeeping(initiator) {
-    if ($("#view").val() === "") {
-        if ($("#meta-datatype-list input[type=checkbox]").prop("checked"))
-            $("#view").val("data");
-        else
-            $("#view").val("samples");
-    }
+    if ($("#view").val() === "")
+        $("#view").val("samples");
     $("#view option[value='']").remove();
     var first_assay_remover = $(
         "#meta-assay-list .list-item:first-child .remover"
@@ -384,19 +380,30 @@ function prefill_example() {
     initiator.val("study assays");
     refresh_dropdown_section(initiator, "equals", 1);
     initiator = $("#meta-equals-list .key-level.level-2");
-    initiator.val("study assay measurement type");
+    initiator.val("study assay technology type");
     refresh_dropdown_section(initiator, "equals", 2);
-    $("#meta-equals-list .value-level.level-3").val("transcription profiling");
+    $("#meta-equals-list .value-level.level-3").val("RNA Sequencing (RNA-Seq)");
+    $(".meta-assay.add").click();
     initiator = $("#meta-assay-list .key-level.level-0")
-    initiator.val("GLDS-118");
+    initiator.val("GLDS-168");
     refresh_dropdown_section(initiator, "assay", 0);
+    initiator = $("#meta-assay-list .list-item:first-child .key-level.level-0")
+    initiator.val("GLDS-48");
+    refresh_dropdown_section(initiator, "assay", 0);
+    $("#url-description").text("You are here:");
+    $("#url").html("%URL_ROOT%");
+    $("#url-follow a").attr("href", "");
+    $("#url-follow").css("background", "#DDD");
+    var option = new Option("", "");
+    $(option).html("");
+    $("select#view").append(option).val("");
 }
 
 $(document).ready(function() {
     toggle_builder();
     refresh_dropdowns();
-    prefill_example();
     refresh_event_handlers();
+    prefill_example();
 });
 
 </script>
@@ -509,11 +516,11 @@ $(document).ready(function() {
                 </div>
             </div>
             <div class='for-data'>
-                <div><b>Retrieve <strong>data</strong> for selected samples:</b></div><br>
+                <div><b>Data <strong>type</strong> to retrieve:</b></div><br>
                 <div>
                     <div id='meta-datatype-list' class='list'>
                         <div class='meta-datatype list-item'>
-                            <input type='checkbox'>
+                            <input type='checkbox' class='always-disabled' checked disabled>
                             <em class='key'>&amp;</em>
                             <em class='key included-key'>datatype=</em>
                             <select class='value-level level-0'>
