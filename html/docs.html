@@ -54,8 +54,6 @@
             #selectors > div > div ~ div input {position: relative; top: 1pt}
             a.add, a.or {color: #459; font-style: italic; border-bottom: 1pt dashed #CCC}
             a.del {color: #AAA; font-style: italic; margin-left: 3pt}
-            .list-item:first-child em.pipe-remover {opacity: 0}
-            .list-item:first-child em.pipe-remover:hover {opacity: 1}
             .list-item:not(:first-child) em.key {visibility: hidden}
             .or-selects {display: inline-block}
         </style>
@@ -172,17 +170,21 @@ function housekeeping(initiator) {
     if ($("#view").val() === "")
         $("#view").val("samples");
     $("#view option[value='']").remove();
+    var first_assay_remover = $(
+        "#meta-assay-list .list-item:first-child .remover"
+    );
+    first_assay_remover.removeClass("pipe-remover").html("&amp;");
     refresh_dropdowns(initiator);
-    if ($("#view").val() == "data") {
-        $(".not-for-data").css("opacity", ".3");
-        $(".not-for-data input").prop("disabled", true);
-        return ["existence", "equals", "assay"];
+    if ($("#view").val() !== "data") {
+        $(".for-data").css("opacity", ".3");
+        $(".for-data input").prop("disabled", true);
+        return ["wildcard", "existence", "equals", "assay"];
     }
     else {
-        $(".not-for-data").css("opacity", "1");
-        $(".not-for-data input").prop("disabled", false);
-        $(".not-for-data input.always-disabled").prop("disabled", true);
-        return ["wildcard", "existence", "equals", "assay"];
+        $(".for-data").css("opacity", "1");
+        $(".for-data input").prop("disabled", false);
+        $("input.always-disabled").prop("disabled", true);
+        return ["wildcard", "existence", "equals", "assay", "datatype"];
     }
 }
 
@@ -245,8 +247,8 @@ function generate_url() {
     var targets = housekeeping(initiator=this);
     var url = url_root + "/" + escape($("#view").val()) + "/?";
     for (var i = 0, l = targets.length; i < l; i++) {
-        if (targets[i] == "assay")
-            url += "from=";
+        var prefix = $(".meta-"+targets[i]+":first-child .included-key").text();
+        url += prefix;
         $(".meta-" + targets[i]).each(function () {
             if ($(this).children("input[type=checkbox]").prop("checked")) {
                 $(this).find(".key-level").each(function () {
@@ -273,7 +275,7 @@ function generate_url() {
                 }
             }
         });
-        url = url.replace(/from\=$/, "").replace(/\|$/, "&");
+        url = url.replace(RegExp(prefix+"$"), "").replace(/\|$/, "&");
     }
     $("#url-description").text("Generated URL:");
     $("#url").html(decorate_url(url + "fmt=" + $("#fmt").val()));
@@ -319,6 +321,9 @@ function clone_query_part() {
     var section_name = $(this).attr("class").replace(/\sadd$/g, "");
     var section_list = $("#"+section_name+"-list");
     var section_clone = section_list.children().last("."+section_name).clone();
+    if (section_name === "meta-assay") {
+        section_clone.children("em.remover").addClass("pipe-remover").html("|");
+    }
     section_list.append(section_clone);
     refresh_event_handlers();
     generate_url();
@@ -412,7 +417,7 @@ $(document).ready(function() {
                     </select>
                 </div>
             </div>
-            <div class='not-for-data'>
+            <div>
                 <div><b>Retrieve entries with metadata <strong>categories</strong>:</b></div><br>
                 <div>
                     <div id='meta-wildcard-list' class='list'>
@@ -483,18 +488,32 @@ $(document).ready(function() {
                 <div>
                     <div id='meta-assay-list' class='list'>
                         <div class='meta-assay list-item'>
-                            <em class='key'>&amp;from=</em>
                             <input type='checkbox'>
-                            <em class='remover pipe-remover'>|</em>
+                            <em class='remover'>&amp;</em>
+                            <em class='key included-key'>from=</em>
                             <select class='key-level level-0'></select>
                             <em>.</em>
                             <select class='key-level level-1'></select>
                         </div>
                     </div>
                     <div>
-                        <em style='visibility: hidden'>&amp;from=</em>
                         <input type='checkbox' class='always-disabled' disabled>
                         <a class='meta-assay add'>OR</a>
+                    </div>
+                </div>
+            </div>
+            <div class='for-data'>
+                <div><b>Retrieve <strong>data</strong> for selected samples:</b></div><br>
+                <div>
+                    <div id='meta-datatype-list' class='list'>
+                        <div class='meta-datatype list-item'>
+                            <input type='checkbox'>
+                            <em class='key'>&amp;</em>
+                            <em class='key included-key'>datatype=</em>
+                            <select class='value-level level-0'>
+                                <option value='unnormalized counts' selected>unnormalized counts</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
