@@ -169,8 +169,12 @@ function refresh_dropdowns(initiator) {
 }
 
 function housekeeping(initiator) {
-    if ($("#view").val() === "")
-        $("#view").val("samples");
+    if ($("#view").val() === "") {
+        if ($("#meta-datatype-list input[type=checkbox]").prop("checked"))
+            $("#view").val("data");
+        else
+            $("#view").val("samples");
+    }
     $("#view option[value='']").remove();
     var first_assay_remover = $(
         "#meta-assay-list .list-item:first-child .remover"
