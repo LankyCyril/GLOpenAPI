@@ -9,7 +9,8 @@ from genefab3.mongo.data import get_single_sample_data
 ISA_TECHNOLOGY_NOT_SPECIFIED_ERROR = "{} requires a '{}.{}=' argument".format(
     "/data/", *ISA_TECHNOLOGY_TYPE_LOCATOR,
 )
-NO_TARGET_FILES_ERROR = "No files found for requested data"
+DATATYPE_NOT_SPECIFIED_ERROR = "/data/ requires a 'datatype=' argument"
+NO_TARGET_FILES_ERROR = "No files found for some or all of requested data"
 MULTIPLE_TECHNOLOGIES_ERROR = "Multiple incompatible technology types requested"
 
 
@@ -17,12 +18,19 @@ def get_target_file_regex(annotation_by_metas, context):
     """Infer regex to look up data file(s)"""
     if ISA_TECHNOLOGY_TYPE_LOCATOR not in annotation_by_metas:
         raise GeneLabException(ISA_TECHNOLOGY_NOT_SPECIFIED_ERROR)
-    else: # TODO include `context`
+    elif "datatype" not in context.kwargs:
+        raise GeneLabException(DATATYPE_NOT_SPECIFIED_ERROR)
+    else:
         target_file_regexes = {
-            TECHNOLOGY_FILE_MASKS[technology.lower()] for technology in
+            TECHNOLOGY_FILE_MASKS.get(technology.lower(), {}).get(
+                context.kwargs["datatype"].lower(), None,
+            )
+            for technology in
             annotation_by_metas[ISA_TECHNOLOGY_TYPE_LOCATOR].drop_duplicates()
         }
-        if len(target_file_regexes) == 0:
+        if None in target_file_regexes:
+            raise GeneLabException(NO_TARGET_FILES_ERROR)
+        elif len(target_file_regexes) == 0:
             raise GeneLabFileException(NO_TARGET_FILES_ERROR)
         elif len(target_file_regexes) > 1:
             raise GeneLabFileException(MULTIPLE_TECHNOLOGIES_ERROR)

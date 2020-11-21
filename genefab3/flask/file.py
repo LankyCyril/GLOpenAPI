@@ -11,7 +11,6 @@ ACCESSIONS_ERROR = "/file/ requires a single dataset as 'from=' argument"
 
 def get_file(db, context):
     """Patch through to cold storage file based on `from=` and `filename=`"""
-    print(context.accessions)
     if not (set(context.complete_args) <= {"filename", "from", "fmt"}):
         raise GeneLabException(ARGUMENTS_ERROR)
     if context.kwargs.get("fmt", "raw") != "raw":

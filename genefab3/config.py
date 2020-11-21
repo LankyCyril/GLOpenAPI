@@ -28,8 +28,10 @@ ISA_TECHNOLOGY_TYPE_LOCATOR = (
     "investigation.study assays", "study assay technology type",
 )
 
-TECHNOLOGY_FILE_MASKS = { # TODO: DataFrame for different data transformations
-    "rna sequencing (rna-seq)": r'rna_seq_Unnormalized_Counts.csv',
+TECHNOLOGY_FILE_MASKS = {
+    "rna sequencing (rna-seq)": {
+        "unnormalized counts": r'rna_seq_Unnormalized_Counts.csv',
+    }
 }
 
 RAW_FILE_REGEX = r'file|plot'
