@@ -1,6 +1,7 @@
-from genefab3.flask.meta import get_samples_by_metas
 from genefab3.config import ISA_TECHNOLOGY_TYPE_LOCATOR, TECHNOLOGY_FILE_MASKS
 from genefab3.exceptions import GeneLabException, GeneLabFileException
+from genefab3.flask.parser import INPLACE_update_context
+from genefab3.flask.meta import get_samples_by_metas
 from pandas import DataFrame, concat
 from functools import partial
 from genefab3.mongo.data import get_single_sample_data
@@ -10,8 +11,11 @@ ISA_TECHNOLOGY_NOT_SPECIFIED_ERROR = "{} requires a '{}.{}=' argument".format(
     "/data/", *ISA_TECHNOLOGY_TYPE_LOCATOR,
 )
 DATATYPE_NOT_SPECIFIED_ERROR = "/data/ requires a 'datatype=' argument"
-NO_TARGET_FILES_ERROR = "No files found for some or all of requested data"
 MULTIPLE_TECHNOLOGIES_ERROR = "Multiple incompatible technology types requested"
+ALL_TARGET_FILES_MISSING, SOME_TARGET_FILES_MISSING = (
+    "No data files found for any of requested technology types",
+    "No data files found for some of requested technology types",
+)
 
 
 def get_target_file_regex(annotation_by_metas, context):
@@ -28,10 +32,10 @@ def get_target_file_regex(annotation_by_metas, context):
             for technology in
             annotation_by_metas[ISA_TECHNOLOGY_TYPE_LOCATOR].drop_duplicates()
         }
-        if None in target_file_regexes:
-            raise GeneLabException(NO_TARGET_FILES_ERROR)
-        elif len(target_file_regexes) == 0:
-            raise GeneLabFileException(NO_TARGET_FILES_ERROR)
+        if (None in target_file_regexes) and (len(target_file_regexes) > 1):
+            raise GeneLabException(SOME_TARGET_FILES_MISSING)
+        elif None in target_file_regexes:
+            raise GeneLabException(ALL_TARGET_FILES_MISSING)
         elif len(target_file_regexes) > 1:
             raise GeneLabFileException(MULTIPLE_TECHNOLOGIES_ERROR)
         else:
@@ -40,11 +44,22 @@ def get_target_file_regex(annotation_by_metas, context):
 
 def get_data_by_metas(db, context):
     """Select data based on annotation filters"""
+    if "datatype" not in context.kwargs: # break early
+        raise GeneLabException(DATATYPE_NOT_SPECIFIED_ERROR)
+    if ".".join(ISA_TECHNOLOGY_TYPE_LOCATOR) not in context.complete_args:
+        # inject "investigation.study assays.study assay technology type":
+        INPLACE_update_context(
+            context, {".".join(ISA_TECHNOLOGY_TYPE_LOCATOR): ""},
+        )
+    # get samples view and parse out per-sample accession and assay names:
     annotation_by_metas = get_samples_by_metas(db, context)
-    target_file_regex = get_target_file_regex(annotation_by_metas, context)
     info_cols = list(annotation_by_metas["info"].columns)
     sample_index = annotation_by_metas["info"].set_index(info_cols).index
+    # infer target data file masks:
+    target_file_regex = get_target_file_regex(annotation_by_metas, context)
+    # constrain to gene lists (this is for the future...):
     gene_rows = None
+    # retrieve data per-sample and merge:
     return DataFrame(
         data=concat(
             sample_index.map(

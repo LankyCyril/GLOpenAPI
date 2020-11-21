@@ -100,6 +100,12 @@ def INPLACE_update_context_projection(context, shown):
                     ordered_shown[potential_child] = False
 
 
+def INPLACE_update_context(context, rargs):
+    """Update context using data in request arguments"""
+    shown = INPLACE_update_context_queries(context, MultiDict(rargs))
+    INPLACE_update_context_projection(context, shown)
+
+
 def parse_request(request):
     """Parse request components"""
     url_root = escape(request.url_root.strip("/"))
@@ -111,6 +117,5 @@ def parse_request(request):
         query={"$and": []}, projection={},
         kwargs=MultiDict(request.args),
     )
-    shown = INPLACE_update_context_queries(context, request.args)
-    INPLACE_update_context_projection(context, shown)
+    INPLACE_update_context(context, request.args)
     return context
