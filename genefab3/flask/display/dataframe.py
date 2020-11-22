@@ -96,16 +96,15 @@ def get_browser_dataframe(df, context):
 
 def render_dataframe(df, context):
     """Display dataframe with specified format"""
-    fmt = context.kwargs["fmt"]
-    if fmt == "tsv":
+    if context.kwargs["fmt"] == "tsv":
         content = annotate_cols(df, sep="\t") + df.to_csv(sep="\t", **DF_KWS)
         mimetype = "text/plain"
-    elif fmt == "csv":
+    elif context.kwargs["fmt"] == "csv":
         content = annotate_cols(df, sep=",") + df.to_csv(sep=",", **DF_KWS)
         mimetype = "text/plain"
-    elif fmt in {"interactive", "browser"}:
+    elif context.kwargs["fmt"] in {"interactive", "browser"}:
         content = get_browser_dataframe(df, context)
         mimetype = "text/html"
     else:
-        raise NotImplementedError("fmt='{}'".format(fmt))
+        raise NotImplementedError("fmt='{}'".format(context.kwargs["fmt"]))
     return Response(content, mimetype=mimetype)

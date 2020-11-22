@@ -24,6 +24,10 @@ ISA_ZIP_REGEX = r'.*_metadata_.*[_-]ISA\.zip$'
 
 ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
 
+DEFAULT_FORMATS = {
+    "/assays/": "tsv", "/samples/": "tsv", "/data/": "tsv", "/files/": "tsv",
+}
+
 ISA_TECHNOLOGY_TYPE_LOCATOR = (
     "investigation.study assays", "study assay technology type",
 )

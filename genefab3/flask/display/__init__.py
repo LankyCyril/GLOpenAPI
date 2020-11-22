@@ -10,16 +10,15 @@ from genefab3.flask.display.dataframe import render_dataframe
 def display(db, getter, kwargs, request):
     """Generate object with `getter` and `**kwargs`, dispatch object and trailing request arguments to display handler"""
     context = parse_request(request)
-    if (context.kwargs.get("debug", "0") == "1") and is_debug():
+    if (context.kwargs["debug"] == "1") and is_debug():
         return "<pre>context={}</pre>".format(dumps(context.__dict__, indent=4))
     else:
         obj = getter(db, **kwargs, context=context)
         if obj is None:
             raise GeneLabException("No data")
-        elif context.kwargs.get("fmt", "raw") == "raw":
+        elif context.kwargs["fmt"] == "raw":
             return render_raw(obj, context)
         elif isinstance(obj, DataFrame):
-            context.kwargs["fmt"] = context.kwargs.get("fmt", "tsv")
             return render_dataframe(obj, context)
         else:
             raise NotImplementedError("Display of {} with 'fmt={}'".format(
