@@ -4,7 +4,7 @@ from genefab3.config import ANNOTATION_CATEGORIES, DEFAULT_FORMATS
 from genefab3.utils import UniversalSet
 from collections import OrderedDict
 from werkzeug.datastructures import MultiDict
-from genefab3.exceptions import GeneLabException
+from genefab3.exceptions import GeneLabParserException
 
 
 def assay_pair_to_query(key, value):
@@ -118,29 +118,29 @@ def INPLACE_fill_context_defaults(context):
 def validate_context(context):
     """Check that no arguments conflict"""
     if (context.kwargs["fmt"] == "cls") and (context.view != "/samples/"):
-        raise GeneLabException("'fmt=cls' is only valid for /samples/")
+        raise GeneLabParserException("'fmt=cls' is only valid for /samples/")
     if (context.kwargs["fmt"] == "gct") and (context.view != "/data/"):
-        raise GeneLabException("'fmt=gct' is only valid for /data/")
+        raise GeneLabParserException("'fmt=gct' is only valid for /data/")
     if (context.view == "/data/") and ("datatype" not in context.kwargs):
-        raise GeneLabException("/data/ requires a 'datatype=' argument")
+        raise GeneLabParserException("/data/ requires a 'datatype=' argument")
     if context.view == "/file/":
         ONLY_ARGS = {"filename", "from", "fmt", "debug"}
         if not (set(context.complete_args) <= ONLY_ARGS):
-            raise GeneLabException(
+            raise GeneLabParserException(
                 "/file/ only accepts arguments '{}='".format(
                     "=', '".join(sorted(ONLY_ARGS)),
                 ),
             )
         if len(context.kwargs.getlist("filename")) != 1:
-            raise GeneLabException(
+            raise GeneLabParserException(
                 "/file/ requires a single 'filename=' argument",
             )
         if len(context.accessions) != 1:
-            raise GeneLabException(
+            raise GeneLabParserException(
                 "/file/ requires a single dataset as a 'from=' argument",
             )
         if context.kwargs["fmt"] != "raw":
-            raise GeneLabException("/file/ only accepts 'fmt=raw'")
+            raise GeneLabParserException("/file/ only accepts 'fmt=raw'")
 
 
 def parse_request(request):

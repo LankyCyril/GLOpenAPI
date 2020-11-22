@@ -1,5 +1,5 @@
 from genefab3.config import ISA_TECHNOLOGY_TYPE_LOCATOR, TECHNOLOGY_FILE_MASKS
-from genefab3.exceptions import GeneLabException, GeneLabFileException
+from genefab3.exceptions import GeneLabMetadataException, GeneLabFileException
 from genefab3.flask.parser import INPLACE_update_context
 from genefab3.flask.meta import get_samples_by_metas
 from pandas import DataFrame, concat
@@ -20,7 +20,7 @@ MULTIPLE_TECHNOLOGIES_ERROR = "Multiple incompatible technology types requested"
 def get_target_file_regex(annotation_by_metas, context):
     """Infer regex to look up data file(s)"""
     if ISA_TECHNOLOGY_TYPE_LOCATOR not in annotation_by_metas:
-        raise GeneLabException(ISA_TECHNOLOGY_NOT_SPECIFIED_ERROR)
+        raise GeneLabMetadataException(ISA_TECHNOLOGY_NOT_SPECIFIED_ERROR)
     else:
         target_file_regexes = {
             TECHNOLOGY_FILE_MASKS.get(technology.lower(), {}).get(
@@ -30,11 +30,11 @@ def get_target_file_regex(annotation_by_metas, context):
             annotation_by_metas[ISA_TECHNOLOGY_TYPE_LOCATOR].drop_duplicates()
         }
         if (None in target_file_regexes) and (len(target_file_regexes) > 1):
-            raise GeneLabException(SOME_TARGET_FILES_MISSING)
+            raise GeneLabFileException(SOME_TARGET_FILES_MISSING)
         elif None in target_file_regexes:
-            raise GeneLabException(ALL_TARGET_FILES_MISSING)
+            raise GeneLabFileException(ALL_TARGET_FILES_MISSING)
         elif len(target_file_regexes) > 1:
-            raise GeneLabFileException(MULTIPLE_TECHNOLOGIES_ERROR)
+            raise GeneLabMetadataException(MULTIPLE_TECHNOLOGIES_ERROR)
         else:
             return target_file_regexes.pop()
 

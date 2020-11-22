@@ -6,10 +6,12 @@ from logging import Handler
 
 
 class GeneLabException(Exception): pass
-class GeneLabDatabaseException(Exception): pass
+class GeneLabParserException(GeneLabException): pass
+class GeneLabMetadataException(GeneLabException): pass
+class GeneLabDatabaseException(GeneLabException): pass
 class GeneLabJSONException(GeneLabException): pass
 class GeneLabISAException(GeneLabException): pass
-class GeneLabFileException(Exception): pass
+class GeneLabFileException(GeneLabException): pass
 class GeneLabDataManagerException(GeneLabException): pass
 
 
@@ -49,6 +51,8 @@ def exception_catcher(e, db):
         code, explanation = 501, "Not Implemented"
     elif isinstance(e, GeneLabDataManagerException):
         code, explanation = 500, "GeneLab Data Manager Internal Server Error"
+    elif isinstance(e, GeneLabDatabaseException):
+        code, explanation = 500, "GeneLab Database Error"
     else:
         code, explanation = 400, "Bad Request"
     *_, info = interpret_exc_info(exc_info())
