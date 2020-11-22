@@ -1,6 +1,5 @@
 from genefab3.exceptions import GeneLabException, GeneLabISAException
 from genefab3.utils import copy_and_drop
-from re import search, split
 
 
 WRONG_DATASET_ERROR = "Attempt to associate an assay with the wrong dataset"
@@ -73,30 +72,3 @@ class ColdStorageAssay():
         sample_entry["Investigation"]["Study"] = (
             dataset.isa.investigation["Study"].get(study_name, {})
         )
- 
-    def resolve_filename(self, mask, sample_mask=".*", field_mask=".*"):
-        """Given masks, find filenames, urls, and datestamps"""
-        dataset_level_files = self.dataset.resolve_filename(mask)
-        metadata_filters_present = (sample_mask != ".*") or (field_mask != ".*")
-        if len(dataset_level_files) == 0:
-            return {}
-        elif (len(dataset_level_files) == 1) and (not metadata_filters_present):
-            return dataset_level_files
-        else:
-            metadata_df = self.metadata.full # TODO new logic
-            sample_names = [
-                sn for sn in metadata_df.index if search(sample_mask, sn)
-            ]
-            fields = [
-                fn for fn in metadata_df.columns.get_level_values(0)
-                if search(field_mask, fn)
-            ]
-            metadata_subset_filenames = set.union(set(), *[
-                split(r'\s*,\s*', cell_value) for cell_value
-                in metadata_df.loc[sample_names, fields].values.flatten()
-            ])
-            return {
-                filename: fileinfo
-                for filename, fileinfo in dataset_level_files.items()
-                if filename in metadata_subset_filenames
-            }
