@@ -10,9 +10,9 @@ from genefab3.mongo.data import get_single_sample_data
 ISA_TECHNOLOGY_NOT_SPECIFIED_ERROR = "{} requires a '{}.{}=' argument".format(
     "/data/", *ISA_TECHNOLOGY_TYPE_LOCATOR,
 )
-ALL_TARGET_FILES_MISSING, SOME_TARGET_FILES_MISSING = (
-    "No data files found for any of requested technology types",
-    "No data files found for some of requested technology types",
+NO_FILES_FOR_TECHNOLOGY_ERROR, NO_FILES_FOR_DATATYPE_ERROR = (
+    "No data files found for technology type '{}' and datatype '{}'",
+    "No data files found for datatype '{}'",
 )
 MULTIPLE_TECHNOLOGIES_ERROR = "Multiple incompatible technology types requested"
 
@@ -22,17 +22,24 @@ def get_target_file_regex(annotation_by_metas, context):
     if ISA_TECHNOLOGY_TYPE_LOCATOR not in annotation_by_metas:
         raise GeneLabMetadataException(ISA_TECHNOLOGY_NOT_SPECIFIED_ERROR)
     else:
-        target_file_regexes = {
-            TECHNOLOGY_FILE_MASKS.get(technology.lower(), {}).get(
+        target_file_regexes = set()
+        technologies = annotation_by_metas[ISA_TECHNOLOGY_TYPE_LOCATOR]
+        for technology in technologies.drop_duplicates():
+            file_regex = TECHNOLOGY_FILE_MASKS.get(technology.lower(), {}).get(
                 context.kwargs["datatype"].lower(), None,
             )
-            for technology in
-            annotation_by_metas[ISA_TECHNOLOGY_TYPE_LOCATOR].drop_duplicates()
-        }
-        if (None in target_file_regexes) and (len(target_file_regexes) > 1):
-            raise GeneLabFileException(SOME_TARGET_FILES_MISSING)
-        elif None in target_file_regexes:
-            raise GeneLabFileException(ALL_TARGET_FILES_MISSING)
+            if file_regex is None:
+                raise GeneLabFileException(
+                    NO_FILES_FOR_TECHNOLOGY_ERROR.format(
+                        technology, context.kwargs["datatype"],
+                    ),
+                )
+            else:
+                target_file_regexes.add(file_regex)
+        if len(target_file_regexes) == 0:
+            raise GeneLabFileException(
+                NO_FILES_FOR_DATATYPE_ERROR.format(context.kwargs["datatype"])
+            )
         elif len(target_file_regexes) > 1:
             raise GeneLabMetadataException(MULTIPLE_TECHNOLOGIES_ERROR)
         else:
