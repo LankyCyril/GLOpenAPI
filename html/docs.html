@@ -38,7 +38,7 @@
             #url tt.part-level-0 {color: #00C; border: 1px solid #00C4; background: #AAA1}
             #url tt.part-level-1 {color: #08A; border: 1px solid #08A4; background: #AAA1}
             #url tt.part-level-2 {color: #084; border: 1px solid #0844; background: #AAA1}
-            #url tt.part-level-3, #url tt.part-level-4 {color: #000; border: 1px solid #CDF4; background: #CDF4}
+            #url tt.part-level-3, #url tt.part-level-4 {color: #000; border: 1px solid #CDF2; background: #CDF2}
             #url tt.desaturated {font-size: 8pt; opacity: .7;}
             #url-follow {
                 display: inline-block; float: right; background: #DDD; padding: 5pt;
@@ -236,7 +236,7 @@ function decorate_url(url) {
             level = 0;
         else if (sep === "=")
             level = 3;
-        else if (sep !== "|")
+        else if ((sep !== "|") && (level < 4))
             level += 1;
     }
     return decorated;
