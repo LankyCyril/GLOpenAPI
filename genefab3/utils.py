@@ -3,7 +3,6 @@ from genefab3.config import TIMESTAMP_FMT, DEBUG_MARKERS
 from re import sub, escape
 from datetime import datetime
 from natsort import natsorted
-from functools import lru_cache
 from copy import deepcopy
 
 
@@ -40,12 +39,6 @@ def extract_file_timestamp(fd, key="date_modified", fallback_key="date_created",
             return fallback_value
         else:
             return int(dt.timestamp())
-
-
-@lru_cache(maxsize=None)
-def force_default_name_delimiter(string):
-    """Replace variable delimiters (._-) with '-' (default)"""
-    return sub(r'[._-]', "-", string)
 
 
 def map_replace(string, mappings):
