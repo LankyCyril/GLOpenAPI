@@ -165,6 +165,9 @@ function refresh_dropdowns(initiator) {
     }
 }
 
+var TARGETS_A = ["wildcard", "existence", "equals", "assay"];
+var TARGETS_B = ["fmt", "debug"];
+
 function housekeeping(initiator) {
     if ($("#view").val() === "")
         $("#view").val("samples");
@@ -177,13 +180,13 @@ function housekeeping(initiator) {
     if ($("#view").val() !== "data") {
         $(".for-data").css("opacity", ".3");
         $(".for-data input").prop("disabled", true);
-        return ["wildcard", "existence", "equals", "assay", "fmt"];
+        return Array.prototype.concat(TARGETS_A, TARGETS_B);
     }
     else {
         $(".for-data").css("opacity", "1");
         $(".for-data input").prop("disabled", false);
         $("input.always-disabled").prop("disabled", true);
-        return ["wildcard", "existence", "equals", "assay", "datatype", "fmt"];
+        return Array.prototype.concat(TARGETS_A, ["datatype"], TARGETS_B);
     }
 }
 
@@ -548,6 +551,22 @@ $(document).ready(function() {
                     </div>
                 </div>
             </div>
+            <!--DEBUG <div>
+                <div><b>Debug:</b></div><br>
+                <div>
+                    <div id='meta-debug-list' class='list'>
+                        <div class='meta-debug list-item'>
+                            <input type='checkbox'>
+                            <em class='key'>&amp;</em>
+                            <em class='key included-key'>debug=</em>
+                            <select class='value-level level-0'>
+                                <option value='0' selected>0</option>
+                                <option value='1'>1</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div> DEBUG-->
         </div>
     </body>
 </html>

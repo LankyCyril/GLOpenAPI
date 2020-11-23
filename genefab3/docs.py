@@ -2,7 +2,7 @@ from collections import defaultdict
 from json import dumps
 from os.path import join, split, abspath
 from natsort import natsorted
-from genefab3.utils import map_replace
+from genefab3.utils import map_replace, is_debug
 
 
 def get_metadata_equals_json(metadata_index_collection):
@@ -73,6 +73,8 @@ def interactive_doc(db, html_path=None, document="docs.html", url_root="/"):
                 "/* METADATA_EXISTENCE */": dumps(existence_json),
                 "/* METADATA_EQUALS */": dumps(equals_json),
                 "/* METADATA_ASSAYS */": dumps(metadata_assays),
+                "<!--DEBUG ": "" if is_debug() else "<!--",
+                " DEBUG-->": "" if is_debug() else "-->",
             },
         )
     else:
