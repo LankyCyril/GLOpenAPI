@@ -32,14 +32,17 @@ def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_
         if value: # metadata field must equal value or one of values
             yield {lookup_key: {"$in": value.split("|")}}, {lookup_key}, None
         else: # metadata field or one of metadata fields must exist
-            block_match = search(r'\.[^\.]+\.$', lookup_key)
+            block_match = search(r'\.[^\.]+\.?$', lookup_key)
             if (not block_match) or (block_match.group().count("|") == 0):
                 # single field must exist (no OR condition):
                 yield {lookup_key: {"$exists": True}}, {lookup_key}, None
             else: # either of the fields must exist (OR condition)
+                postfix = "." if (block_match.group()[-1] == ".") else ""
                 head = lookup_key[:block_match.start()]
                 targets = block_match.group().strip(".").split("|")
-                lookup_keys = {f"{head}.{target}." for target in targets}
+                lookup_keys = {
+                    f"{head}.{target}{postfix}" for target in targets
+                }
                 query = {"$or": [
                     {key: {"$exists": True}} for key in lookup_keys
                 ]}
