@@ -2,7 +2,7 @@ from re import search, sub, escape
 from argparse import Namespace
 from genefab3.config import ANNOTATION_CATEGORIES, DEFAULT_FORMATS
 from genefab3.utils import UniversalSet
-from collections import OrderedDict
+from collections import defaultdict, OrderedDict
 from werkzeug.datastructures import MultiDict
 from genefab3.exceptions import GeneLabParserException
 
@@ -10,16 +10,16 @@ from genefab3.exceptions import GeneLabParserException
 def assay_pair_to_query(key, value):
     """Interpret single key-value pair for dataset / assay constraint"""
     query = {"$or": []}
-    accessions = set()
+    accessions_and_assays = defaultdict(set)
     for expr in value.split("|"):
         if expr.count(".") == 0:
             query["$or"].append({".accession": expr})
-            accessions.add(expr)
+            accessions_and_assays[expr] = set()
         else:
             accession, assay_name = expr.split(".", 1)
             query["$or"].append({".accession": accession, ".assay": assay_name})
-            accessions.add(accession)
-    yield query, None, accessions
+            accessions_and_assays[accession].add(assay_name)
+    yield query, None, accessions_and_assays
 
 
 def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_postfix=False):
@@ -30,12 +30,12 @@ def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_
         else:
             lookup_key = ".".join([isa_category] + fields)
         if value: # metadata field must equal value or one of values
-            yield {lookup_key: {"$in": value.split("|")}}, {lookup_key}, None
+            yield {lookup_key: {"$in": value.split("|")}}, {lookup_key}, {}
         else: # metadata field or one of metadata fields must exist
             block_match = search(r'\.[^\.]+\.?$', lookup_key)
             if (not block_match) or (block_match.group().count("|") == 0):
                 # single field must exist (no OR condition):
-                yield {lookup_key: {"$exists": True}}, {lookup_key}, None
+                yield {lookup_key: {"$exists": True}}, {lookup_key}, {}
             else: # either of the fields must exist (OR condition)
                 postfix = "." if (block_match.group()[-1] == ".") else ""
                 head = lookup_key[:block_match.start()]
@@ -46,7 +46,7 @@ def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_
                 query = {"$or": [
                     {key: {"$exists": True}} for key in lookup_keys
                 ]}
-                yield query, lookup_keys, None
+                yield query, lookup_keys, {}
 
 
 def request_pairs_to_queries(rargs, key):
@@ -78,15 +78,14 @@ def INPLACE_update_context_queries(context, rargs):
     shown = set()
     for key in rargs:
         query_iterator = request_pairs_to_queries(rargs, key)
-        for query, lookup_keys, accessions in query_iterator:
+        for query, lookup_keys, accessions_and_assays in query_iterator:
             context.query["$and"].append(query)
             if lookup_keys:
                 shown.update(lookup_keys)
-            if accessions:
-                context.accessions.update(accessions)
+            for accession, assay_names in accessions_and_assays.items():
+                context.accessions_and_assays[accession] = sorted(assay_names)
             if key in context.kwargs:
                 context.kwargs.pop(key)
-    context.accessions = sorted(context.accessions)
     return shown
 
 
@@ -138,9 +137,13 @@ def validate_context(context):
             raise GeneLabParserException(
                 "/file/ requires a single 'filename=' argument",
             )
-        if len(context.accessions) != 1:
+        if len(context.accessions_and_assays) != 1:
             raise GeneLabParserException(
-                "/file/ requires a single dataset as a 'from=' argument",
+                "/file/ requires a single dataset in the 'from=' argument",
+            )
+        elif len(next(iter(context.accessions_and_assays.values()))) > 1:
+            raise GeneLabParserException(
+                "/file/ requires at most one assay in the 'from=' argument",
             )
         if context.kwargs["fmt"] != "raw":
             raise GeneLabParserException("/file/ only accepts 'fmt=raw'")
@@ -153,7 +156,7 @@ def parse_request(request):
     context = Namespace(
         view="/"+sub(url_root, "", base_url).strip("/")+"/",
         complete_args=request.args,
-        accessions=set(),
+        accessions_and_assays={},
         query={"$and": []}, projection={},
         kwargs=MultiDict(request.args),
     )

@@ -5,14 +5,21 @@ from urllib.request import urlopen
 
 def get_file(db, context):
     """Patch through to cold storage file based on `from=` and `filename=`"""
-    glds = CachedDataset(
-        db=db, accession=context.accessions[0], init_assays=False,
-    )
+    accession = next(iter(context.accessions_and_assays))
+    if context.accessions_and_assays[accession]:
+        assay_name = context.accessions_and_assays[accession][0]
+    else:
+        assay_name = None
+    glds = CachedDataset(db=db, accession=accession, init_assays=False)
     mask = context.kwargs["filename"]
     if (mask[0] == "/") and (mask[-1] == "/"): # regular expression passed
-        fileinfo = glds.get_file_descriptors(regex=mask[1:-1])
+        lookup_kwargs = dict(regex=mask[1:-1])
     else: # simple filename passed, match full
-        fileinfo = glds.get_file_descriptors(name=mask)
+        lookup_kwargs = dict(name=mask)
+    if assay_name: # search within specific assay
+        raise NotImplementedError
+    else: # search in entire dataset
+        fileinfo = glds.get_file_descriptors(**lookup_kwargs)
     if not fileinfo:
         raise GeneLabFileException("Requested file not found")
     elif len(fileinfo) > 1:
