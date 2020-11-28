@@ -1,9 +1,10 @@
 from argparse import Namespace
-from pandas import json_normalize, MultiIndex, isnull, merge
-from re import findall, search, IGNORECASE
+from pandas import json_normalize, MultiIndex, isnull, concat, merge
+from re import findall, search, IGNORECASE, escape, split
 from genefab3.config import RAW_FILE_REGEX
 from genefab3.flask.display import Placeholders
 from pymongo.errors import OperationFailure
+from numpy import nan
 
 
 def isa_sort_dataframe(dataframe):
@@ -100,6 +101,34 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
             return dataframe
 
 
+def filter_filenames(dataframe, mask, startloc):
+    """Constrain dataframe cells only to cells passing `mask` filter"""
+    if mask is None:
+        return dataframe
+    else:
+        if (mask[0] == "/") and (mask[-1] == "/"): # regular expression passed
+            expression = mask[1:-1]
+        else: # simple filename passed, match full
+            expression = r'^' + escape(mask) + r'$'
+        def mapper(cell):
+            if isinstance(cell, str):
+                return ", ".join({
+                    filename for filename in split(r'\s*,\s*', cell)
+                    if search(expression, filename)
+                }) or nan
+            else:
+                return nan
+        return concat(
+            objs=[
+                dataframe.iloc[:,:startloc],
+                dataframe.iloc[:,startloc:].applymap(mapper).dropna(
+                    how="all", axis=1,
+                ),
+            ],
+            axis=1,
+        )
+
+
 def get_assays_by_metas(db, context):
     """Select assays based on annotation filters"""
     return get_annotation_by_metas(db, context, aggregate=True)
@@ -117,8 +146,11 @@ def get_files_by_metas(db, context):
             db, context, include={".sample name"},
             search_with_projection=True, modify=keep_projection,
         ),
-        get_annotation_by_metas(
-            db, context, include={".sample name"},
-            search_with_projection=False, modify=keep_files,
+        filter_filenames(
+            get_annotation_by_metas(
+                db, context, include={".sample name"},
+                search_with_projection=False, modify=keep_files,
+            ),
+            context.kwargs.get("filename"), startloc=3,
         ),
     )
