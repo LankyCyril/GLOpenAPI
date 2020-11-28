@@ -119,10 +119,11 @@ class ColdStorageDataset():
 
 
 class AssayDispatcher(dict):
-    """Contains a dataset's assay objects, indexable by name or by attributes"""
+    """Contains a dataset's assay objects, indexable by name"""
  
     def __init__(self, dataset):
         """Populate dictionary of assay_name -> Assay()"""
+        self.dataset = dataset
         isa_entries_by_assay = defaultdict(list)
         for isa_entry in dataset.isa.assays:
             assay_name = isa_entry[""]["Assay"]

@@ -7,6 +7,9 @@ from werkzeug.datastructures import MultiDict
 from genefab3.exceptions import GeneLabParserException
 
 
+FILE_VIEW_ARGS = {"filename", "from", "fmt", "debug"}
+
+
 def assay_pair_to_query(key, value):
     """Interpret single key-value pair for dataset / assay constraint"""
     query = {"$or": []}
@@ -117,6 +120,15 @@ def INPLACE_fill_context_defaults(context):
         context.kwargs["debug"] = "0"
 
 
+FILE_FILENAME_ERROR = "/file/ requires at most one 'filename=' argument"
+FILE_DATASET_ERROR = "/file/ requires a single dataset in the 'from=' argument"
+FILE_ASSAY_ERROR = "/file/ requires at most one assay in the 'from=' argument"
+FILE_DATASET_TRAILING_ERROR, FILE_ASSAY_TRAILING_ERROR = (
+    "/file/ cannot accept annotation categories for lookups in a dataset",
+    "/file/ requires at most one annotation category for lookups in an assay",
+)
+
+
 def validate_context(context):
     """Check that no arguments conflict"""
     if (context.kwargs["fmt"] == "cls") and (context.view != "/samples/"):
@@ -126,25 +138,20 @@ def validate_context(context):
     if (context.view == "/data/") and ("datatype" not in context.kwargs):
         raise GeneLabParserException("/data/ requires a 'datatype=' argument")
     if context.view == "/file/":
-        ONLY_ARGS = {"filename", "from", "fmt", "debug"}
-        if not (set(context.complete_args) <= ONLY_ARGS):
-            raise GeneLabParserException(
-                "/file/ only accepts arguments '{}='".format(
-                    "=', '".join(sorted(ONLY_ARGS)),
-                ),
-            )
-        if len(context.kwargs.getlist("filename")) != 1:
-            raise GeneLabParserException(
-                "/file/ requires a single 'filename=' argument",
-            )
+        if len(context.kwargs.getlist("filename")) > 1:
+            raise GeneLabParserException(FILE_FILENAME_ERROR)
         if len(context.accessions_and_assays) != 1:
-            raise GeneLabParserException(
-                "/file/ requires a single dataset in the 'from=' argument",
-            )
-        elif len(next(iter(context.accessions_and_assays.values()))) > 1:
-            raise GeneLabParserException(
-                "/file/ requires at most one assay in the 'from=' argument",
-            )
+            raise GeneLabParserException(FILE_DATASET_ERROR)
+        else:
+            assay_names = next(iter(context.accessions_and_assays.values()))
+            if len(assay_names) == 0:
+                if len(context.projection) > 0:
+                    raise GeneLabParserException(FILE_DATASET_TRAILING_ERROR)
+            elif len(assay_names) == 1:
+                if len(context.projection) > 1:
+                    raise GeneLabParserException(FILE_ASSAY_TRAILING_ERROR)
+            elif len(assay_names) > 1:
+                raise GeneLabParserException(FILE_ASSAY_ERROR)
         if context.kwargs["fmt"] != "raw":
             raise GeneLabParserException("/file/ only accepts 'fmt=raw'")
 
