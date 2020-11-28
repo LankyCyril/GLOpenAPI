@@ -1,6 +1,5 @@
 from genefab3.exceptions import GeneLabFileException
 from genefab3.mongo.dataset import CachedDataset
-from re import escape
 from urllib.request import urlopen
 
 
@@ -11,9 +10,9 @@ def get_file(db, context):
     )
     mask = context.kwargs["filename"]
     if (mask[0] == "/") and (mask[-1] == "/"): # regular expression passed
-        fileinfo = glds.resolve_filename(mask[1:-1])
+        fileinfo = glds.get_file_descriptors(regex=mask[1:-1])
     else: # simple filename passed, match full
-        fileinfo = glds.resolve_filename(r'^'+escape(mask)+r'$')
+        fileinfo = glds.get_file_descriptors(name=mask)
     if not fileinfo:
         raise GeneLabFileException("Requested file not found")
     elif len(fileinfo) > 1:
