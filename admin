@@ -33,7 +33,8 @@ def drop(db, what):
     if what == "ALLMETA":
         confirm("Yes, I am really sure I want to drop ALLMETA")
         collection_names = {
-            "dataset_timestamps", "json_cache", "annotations", "metadata",
+            "dataset_timestamps", "json_cache", "annotations",
+            "metadata", "metadata_index",
         }
         for cn in collection_names:
             getattr(db, cn).delete_many({})
@@ -41,6 +42,7 @@ def drop(db, what):
         getattr(db, "log").delete_many({})
     else:
         CachedDataset.drop_cache(db=db, accession=what)
+        update_metadata_index(db)
 
 
 def recache(db, what):
