@@ -1,7 +1,8 @@
 from genefab3.flask.parser import parse_request
 from genefab3.utils import is_debug
 from json import dumps
-from genefab3.exceptions import GeneLabException
+from genefab3.exceptions import GeneLabException, GeneLabParserException
+from genefab3.flask.display.forms import needs_datatype, render_dropdown
 from pandas import DataFrame, MultiIndex
 from genefab3.flask.display.raw import render_raw
 from genefab3.flask.display.dataframe import render_dataframe
@@ -9,7 +10,13 @@ from genefab3.flask.display.dataframe import render_dataframe
 
 def display(db, getter, kwargs, request):
     """Generate object with `getter` and `**kwargs`, dispatch object and trailing request arguments to display handler"""
-    context = parse_request(request)
+    try:
+        context = parse_request(request)
+    except GeneLabParserException as e:
+        if needs_datatype(e) and (request.args.get("fmt") == "browser"):
+            return render_dropdown("datatype", None)
+        else:
+            raise
     if (context.kwargs["debug"] == "1") and is_debug():
         return "<pre>context={}</pre>".format(dumps(context.__dict__, indent=4))
     else:
