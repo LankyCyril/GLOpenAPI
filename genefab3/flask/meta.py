@@ -30,11 +30,11 @@ def isa_sort_dataframe(dataframe):
     )]
 
 
-def keep_projection(dataframe, full_projection):
+def keep_projection(dataframe, display_projection):
     """Drop qualifier fields from single-level dataframe, unless explicitly requested"""
     subkeys_to_drop = {
         c for c in dataframe.columns
-        if (len(findall(r'\..', c)) >= 3) and (c not in full_projection)
+        if (len(findall(r'\..', c)) >= 3) and (c not in display_projection)
     }
     return dataframe.drop(columns=subkeys_to_drop)
 
@@ -50,34 +50,68 @@ def unwind_file_entry(cell):
         return cell
 
 
-def keep_files(dataframe, full_projection):
+def keep_files(dataframe, display_projection):
     """Drop qualifier fields from single-level dataframe, unless explicitly requested OR contain filenames"""
     subkeys_to_drop = {
         c for c in dataframe.columns if (
-            (c not in full_projection) and
+            (c not in display_projection) and
             (not search(RAW_FILE_REGEX, c, flags=IGNORECASE))
         )
     }
     return dataframe.drop(columns=subkeys_to_drop).applymap(unwind_file_entry)
 
 
-def get_annotation_by_metas(db, context, include=(), search_with_projection=True, modify=keep_projection, aggregate=False):
-    """Select assays/samples based on annotation filters"""
-    full_projection = {
-        ".accession": True, ".assay": True, **context.projection,
+def get_projections(projection, include=(), units=False, search_with_projection=True):
+    """Generate display projection (context projection without units), search projection (with units if units=True), normalization level"""
+    display_projection = {
+        ".accession": True, ".assay": True, **projection,
         **{field: True for field in include},
     }
-    try:
-        if search_with_projection:
-            proj = {"_id": False, **full_projection}
+    if not search_with_projection:
+        search_projection = {"_id": False}
+        normlevel = None # will make json_normalize unwind all cells
+    elif units:
+        search_projection = {
+            "_id": False, **display_projection, **{
+                k[:-1]+"unit": True # will request .unit qualifiers if exist
+                for k in projection if k[-2:] == ".."
+            },
+        }
+        normlevel = 2 # will make json_normalize keep {'': value, 'unit': unit}
+    else:
+        search_projection = display_projection
+        normlevel = None # will make json_normalize unwind all cells
+    return search_projection, display_projection, normlevel
+
+
+def format_units(cell):
+    """Convert mini-dictionaries of form {'': value, 'unit': unit} to strings"""
+    if isinstance(cell, dict):
+        if "unit" in cell:
+            return "{} [{}]".format(cell[""], cell["unit"])
         else:
-            proj = {"_id": False}
-        # get target metadata as single-level dataframe:
-        dataframe = json_normalize(list(db.metadata.find(context.query, proj)))
+            return cell[""]
+    else:
+        return cell
+
+
+def get_annotation_by_metas(db, context, include=(), search_with_projection=True, modify=keep_projection, units=False, aggregate=False):
+    """Select assays/samples based on annotation filters"""
+    search_projection, display_projection, normlevel = get_projections(
+        projection=context.projection, include=include, units=units,
+        search_with_projection=search_with_projection,
+    )
+    try:
+        dataframe = json_normalize( # get metadata as single-level dataframe:
+            list(db.metadata.find(context.query, search_projection)),
+            max_level=normlevel, # None unwinds fully, 2 keeps value-unit dicts
+        )
         # modify with injected function:
-        dataframe = modify(dataframe, full_projection)
-        # remove trailing dots and hide columns that are explicitly hidden:
+        dataframe = modify(dataframe, display_projection)
+        # remove trailing dots:
         dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
+        if units: # format value-unit dicts in cells:
+            dataframe = dataframe.applymap(format_units)
         # sort (ISA-aware) and convert to two-level dataframe:
         dataframe = isa_sort_dataframe(dataframe)
         dataframe.columns = MultiIndex.from_tuples(
@@ -136,7 +170,9 @@ def get_assays_by_metas(db, context):
 
 def get_samples_by_metas(db, context):
     """Select samples based on annotation filters"""
-    return get_annotation_by_metas(db, context, include={".sample name"})
+    return get_annotation_by_metas(
+        db, context, include={".sample name"}, units=True,
+    )
 
 
 def get_files_by_metas(db, context):
