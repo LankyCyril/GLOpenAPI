@@ -4,9 +4,7 @@ from genefab3.mongo.json import get_fresh_json
 from genefab3.mongo.utils import replace_doc, harmonize_query
 from datetime import datetime
 from functools import partial
-from genefab3.exceptions import GeneLabDatabaseException
-from re import split
-from genefab3.utils import UniversalSet
+from genefab3.mongo.assay import CachedAssay
 
 
 WARN_NO_META = "%s, %s: no metadata entries"
@@ -77,50 +75,3 @@ class CachedAssayDispatcher(dict):
         self.dataset = dataset
     def __getitem__(self, assay_name):
         return CachedAssay(self.dataset, assay_name)
-
-
-class CachedAssay():
-    """Exposes individual assay information and metadata"""
- 
-    def __init__(self, dataset, assay_name):
-        self.dataset = dataset
-        self.name = assay_name
-        self.db = dataset.db
- 
-    def get_file_descriptors(self, name=None, regex=None, glob=None, projection=None):
-        """Given mask and/or target field, find filenames, urls, and datestamps"""
-        if projection:
-            metadata_candidates = set()
-            query = {".accession": self.dataset.accession, ".assay": self.name}
-            full_projection = {"_id": False, **projection}
-            for entry in self.db.metadata.find(query, full_projection):
-                while isinstance(entry, dict):
-                    if len(entry) == 1:
-                        entry = next(iter(entry.values()))
-                    elif len(entry) > 1:
-                        raise GeneLabDatabaseException(
-                            "Single-field lookup encountered multiple children",
-                        )
-                if isinstance(entry, str):
-                    metadata_candidates.update(split(r'\s*,\s*', entry))
-        else:
-            metadata_candidates = None
-        if sum(arg is not None for arg in (name, regex, glob)) > 0:
-            fileinfo = self.dataset.get_file_descriptors(
-                name=name, regex=regex, glob=glob,
-            )
-            return {
-                filename: descriptor
-                for filename, descriptor in fileinfo.items()
-                if filename in (metadata_candidates or UniversalSet())
-            }
-        elif metadata_candidates:
-            return {
-                filename: descriptor for fileinfo in (
-                    self.dataset.get_file_descriptors(name=name)
-                    for name in metadata_candidates
-                )
-                for filename, descriptor in fileinfo.items()
-            }
-        else:
-            return {} # not enough information to perform lookups
