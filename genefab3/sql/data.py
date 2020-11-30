@@ -13,7 +13,7 @@ def sample_index_to_dict(sample_index):
     sample_dict = defaultdict(lambda: defaultdict(set))
     for accession, assay_name, sample_name in sample_index:
         sample_dict[accession][assay_name].add(sample_name)
-    return sample_dict # {k: {v: w for v, w in d.items()} for k, d in sample_dict.items()}
+    return sample_dict
 
 
 def get_sql_data(db, sample_index, target_file_locator, gene_rows=None):
@@ -37,13 +37,14 @@ def get_sql_data(db, sample_index, target_file_locator, gene_rows=None):
             else: # TODO well this is a complete kludge but will do for today as a concept
                 table = read_csv(next(iter(fileinfo.values())).url, index_col=0)
                 table = table[sorted(sample_names)]
-                table.index.name = "Entry"
                 table.columns = MultiIndex.from_tuples(
                     (accession, assay_name, sample_name)
-                    for sample_name in sorted(sample_names)
+                    for sample_name in list(table.columns)
                 )
                 tables.append(table)
-    return concat(tables, axis=0, sort=False).reset_index()[::-20]
+    merged_table = concat(tables, axis=1, sort=False)
+    merged_table.index.name = "Entry"
+    return merged_table.reset_index()
 
 
 def get_data_placeholder(sample_info, target_file_locator, gene_rows=None):
