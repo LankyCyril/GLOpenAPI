@@ -1,6 +1,6 @@
-from genefab3.exceptions import GeneLabDatabaseException, GeneLabParserException
-from re import split, escape
-from genefab3.utils import UniversalSet
+from genefab3.exceptions import GeneLabParserException
+from re import escape
+from genefab3.utils import UniversalSet, iterate_terminal_leaf_filenames
 
 
 class CachedAssay():
@@ -18,15 +18,7 @@ class CachedAssay():
             {"_id": False, **projection},
         ]
         for entry in self.db.metadata.find(*find_args):
-            while isinstance(entry, dict):
-                if len(entry) == 1:
-                    entry = next(iter(entry.values()))
-                elif len(entry) > 1:
-                    raise GeneLabDatabaseException(
-                        "Single-field lookup encountered multiple children",
-                    )
-            if isinstance(entry, str):
-                yield from split(r'\s*,\s*', entry)
+            yield from iterate_terminal_leaf_filenames(entry)
  
     def get_file_descriptors(self, name=None, regex=None, glob=None, projection=None):
         """Given mask and/or target field, find filenames, urls, and datestamps"""

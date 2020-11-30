@@ -1,9 +1,10 @@
 from os import environ
 from genefab3.config import TIMESTAMP_FMT, DEBUG_MARKERS
-from re import sub, escape
+from re import sub, escape, split
 from datetime import datetime
 from natsort import natsorted
 from copy import deepcopy
+from genefab3.exceptions import GeneLabDatabaseException
 
 
 def is_debug():
@@ -74,3 +75,30 @@ def copy_and_drop(d, keys):
     for key in keys:
         del d_copy[key]
     return d_copy
+
+
+def descend_branch(d, step_tracker=0, max_depth=32):
+    """Descend into a non-bifurcating branch and find the terminal leaf"""
+    if step_tracker >= max_depth:
+        raise GeneLabDatabaseException(
+            "Document branch exceeds maximum depth", max_depth,
+        )
+    else:
+        if isinstance(d, dict):
+            if len(d) == 1:
+                return descend_branch(next(iter(d.values())), step_tracker+1)
+            else:
+                raise GeneLabDatabaseException(
+                    "Document branch expected to be linear, but bifurcates",
+                )
+        else:
+            return d
+
+
+def iterate_terminal_leaf_filenames(d):
+    """Get terminal leaf of document and iterate filenames stored in leaf"""
+    value = descend_branch(d)
+    if isinstance(value, str):
+        return split(r'\s*,\s*', value)
+    else:
+        return []
