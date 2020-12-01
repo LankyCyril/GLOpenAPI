@@ -176,7 +176,7 @@ def get_sql_data(mongo_db, sqlite_db_location, sample_index, datatype, target_fi
         for assay_name, sample_names in sample_dict[accession].items():
             fileinfo = glds.assays[assay_name].get_file_descriptors( # TODO everywhere: file_descriptors, maybe List
                 regex=target_file_locator.regex,
-                projection={target_file_locator.key: True},
+                projection={key: True for key in target_file_locator.keys},
             )
             if len(fileinfo) == 0:
                 raise FileNotFoundError(

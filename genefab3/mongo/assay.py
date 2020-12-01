@@ -1,4 +1,4 @@
-from genefab3.exceptions import GeneLabParserException
+from genefab3.exceptions import GeneLabDatabaseException, GeneLabParserException
 from re import escape
 from genefab3.utils import UniversalSet, iterate_terminal_leaf_filenames
 
@@ -18,7 +18,13 @@ class CachedAssay():
             {"_id": False, **projection},
         ]
         for entry in self.db.metadata.find(*find_args):
-            yield from iterate_terminal_leaf_filenames(entry)
+            try:
+                yield from iterate_terminal_leaf_filenames(entry)
+            except GeneLabDatabaseException:
+                raise GeneLabDatabaseException(
+                    "Could not retrieve filenames from metadata fields",
+                    list(projection.keys()),
+                )
  
     def get_file_descriptors(self, name=None, regex=None, glob=None, projection=None):
         """Given mask and/or target field, find filenames, urls, and datestamps"""

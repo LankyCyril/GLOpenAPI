@@ -38,8 +38,11 @@ ISA_TECHNOLOGY_TYPE_LOCATOR = (
 
 TECHNOLOGY_FILE_LOCATORS = {
     "rna sequencing (rna-seq)": {
-        "unnormalized counts": namedtuple("Locator", ["key", "regex"])(
-            key="assay.parameter value.raw counts data file..",
+        "unnormalized counts": namedtuple("Locator", ["keys", "regex"])(
+            keys=(
+                "assay.parameter value.raw counts data file..",
+                "assay.characteristics.raw counts data file..",
+            ),
             regex=r'rna_seq_Unnormalized_Counts\.csv$',
         ),
     }

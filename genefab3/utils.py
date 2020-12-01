@@ -77,17 +77,21 @@ def copy_and_drop(d, keys):
     return d_copy
 
 
-def descend_branch(d, step_tracker=0, max_depth=32):
+def descend_branch(d, step_tracker=0, max_steps=32):
     """Descend into a non-bifurcating branch and find the terminal leaf"""
-    if step_tracker >= max_depth:
+    if step_tracker >= max_steps:
         raise GeneLabDatabaseException(
-            "Document branch exceeds maximum depth", max_depth,
+            "Document branch exceeds maximum depth", max_steps,
         )
     else:
         if isinstance(d, dict):
-            if len(d) == 1:
+            if len(d) == 0:
+                raise GeneLabDatabaseException(
+                    "Document branch does not contain a terminal leaf",
+                )
+            elif len(d) == 1:
                 return descend_branch(next(iter(d.values())), step_tracker+1)
-            else:
+            elif len(d) > 1:
                 raise GeneLabDatabaseException(
                     "Document branch expected to be linear, but bifurcates",
                 )
@@ -95,13 +99,25 @@ def descend_branch(d, step_tracker=0, max_depth=32):
             return d
 
 
+def iterate_terminal_leaves(d, step_tracker=0, max_steps=32):
+    """Descend into a non-bifurcating branch and find the terminal leaf"""
+    if step_tracker >= max_steps:
+        raise GeneLabDatabaseException(
+            "Document branch exceeds maximum depth", max_steps,
+        )
+    else:
+        if isinstance(d, dict):
+            for i, branch in enumerate(d.values()):
+                yield from iterate_terminal_leaves(branch, step_tracker+i)
+        else:
+            yield d
+
+
 def iterate_terminal_leaf_filenames(d):
     """Get terminal leaf of document and iterate filenames stored in leaf"""
-    value = descend_branch(d)
-    if isinstance(value, str):
-        return split(r'\s*,\s*', value)
-    else:
-        return []
+    for value in iterate_terminal_leaves(d):
+        if isinstance(value, str):
+            yield from split(r'\s*,\s*', value)
 
 
 def infer_file_separator(filename):
