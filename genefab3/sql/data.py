@@ -1,5 +1,6 @@
+from logging import getLogger, DEBUG
 from argparse import Namespace
-from re import search, IGNORECASE
+from genefab3.utils import infer_file_separator
 from pymongo import DESCENDING
 from genefab3.exceptions import GeneLabFileException, GeneLabDatabaseException
 from genefab3.mongo.utils import replace_doc
@@ -20,23 +21,22 @@ class CachedTable():
     is_fresh, status = None, None
     accession, assay_name, sample_names = None, None, None
     data = None
+    logger = None
  
     def __init__(self, mongo_db, sqlite_db_location, file_descriptor, datatype, accession, assay_name, sample_names):
         self.name = f"{datatype}/{accession}/{assay_name}"
+        self.logger = getLogger("genefab3")
+        self.logger.setLevel(DEBUG)
         self.mongo_db, self.sqlite_db_location = mongo_db, sqlite_db_location
         self.datatype, self.accession, self.assay_name, self.sample_names = (
             datatype, accession, assay_name, sample_names,
         )
         self.file = Namespace(
-            name=file_descriptor.filename, url=file_descriptor.url,
+            name=file_descriptor.filename,
+            url=file_descriptor.url,
             timestamp=file_descriptor.timestamp,
+            sep=infer_file_separator(file_descriptor.filename),
         )
-        if search(r'\.csv(\.gz)?$', self.file.name, flags=IGNORECASE):
-            self.file.sep = ","
-        elif search(r'\.tsv(\.gz)?$', self.file.name, flags=IGNORECASE):
-            self.file.sep = "\t"
-        else:
-            raise GeneLabFileException("Unknown file format", self.file.name)
         cache_entry = self.mongo_db.file_descriptors.find_one(
             {"name": self.file.name, "url": self.file.url},
             {"_id": False, "timestamp": True}, sort=[("timestamp", DESCENDING)],
@@ -49,7 +49,7 @@ class CachedTable():
             self.is_fresh = True
             self.file.timestamp = cache_entry.get("timestamp", -1)
         else:
-            self.is_fresh = self.recache()
+            self.is_fresh = self._recache()
             if self.is_fresh:
                 replace_doc(
                     collection=self.mongo_db.file_descriptors,
@@ -57,11 +57,17 @@ class CachedTable():
                     doc={"timestamp": self.file.timestamp},
                 )
  
-    def recache(self):
+    def _recache(self):
         try:
             self.data = read_csv(self.file.url, sep=self.file.sep, index_col=0)
+            # TODO: test index name and make index "only if"; avoid "Unnamed"
         except Exception as e:
-            self.status = e
+            self.logger.error(
+                ("CachedTable: %s at accession %s, assay %s, "
+                "datatype %s, file url '%s'"),
+                repr(e), self.accession, self.assay_name, self.datatype,
+                self.file.url, stack_info=True,
+            )
             return False
         else:
             with closing(connect(self.sqlite_db_location)) as sql_connection:
@@ -70,19 +76,36 @@ class CachedTable():
                         self.name, sql_connection, if_exists="replace",
                     )
                 except Exception as e:
-                    self.status = e
+                    self.logger.error(
+                        ("CachedTable: %s at accession %s, assay %s, "
+                        "datatype %s, file url '%s'"),
+                        repr(e), self.accession, self.assay_name, self.datatype,
+                        self.file.url, stack_info=True,
+                    )
                     sql_connection.rollback()
                     return False
                 else:
+                    self.logger.info(
+                        ("CachedTable: updated accession %s, assay %s, "
+                        "datatype %s, file url '%s'"),
+                        self.accession, self.assay_name, self.datatype,
+                        self.file.url,
+                    )
                     sql_connection.commit()
                     return True
  
-    @property
-    def dataframe(self):
+    def dataframe(self, rows=None):
         if self.data is None:
             with closing(connect(self.sqlite_db_location)) as sql_connection:
-                query = f"SELECT * FROM '{self.name}'"
-                self.data = read_sql(query, sql_connection, index_col="index")
+                try:
+                    self.data = read_sql(
+                        f"SELECT * FROM '{self.name}'",
+                        sql_connection, index_col="index",
+                    )
+                except Exception as e:
+                    raise GeneLabDatabaseException(
+                        str(e), self.accession, self.assay_name, self.datatype,
+                    )
         if not (set(self.sample_names) <= set(self.data.columns)):
             raise GeneLabDatabaseException(
                 "Missing sample names in GeneFab database",
@@ -114,12 +137,12 @@ def get_sql_data(mongo_db, sqlite_db_location, sample_index, datatype, target_fi
     for accession in sample_dict:
         glds = CachedDataset(mongo_db, accession, init_assays=False)
         for assay_name, sample_names in sample_dict[accession].items():
-            fileinfo = glds.assays[assay_name].get_file_descriptors(
+            fileinfo = glds.assays[assay_name].get_file_descriptors( # TODO everywhere: file_descriptors, maybe List
                 regex=target_file_locator.regex,
                 projection={target_file_locator.key: True},
             )
             if len(fileinfo) == 0:
-                raise GeneLabFileException(
+                raise FileNotFoundError(
                     NO_FILES_ERROR, accession, assay_name,
                 )
             elif len(fileinfo) > 1:
@@ -138,7 +161,7 @@ def get_sql_data(mongo_db, sqlite_db_location, sample_index, datatype, target_fi
                 ))
     joined_table = concat( # this is in-memory and faster than sqlite3:
         # wesmckinney.com/blog/high-performance-database-joins-with-pandas-dataframe-more-benchmarks
-        [table.dataframe for table in tables], axis=1, sort=False,
+        [table.dataframe(rows=rows) for table in tables], axis=1, sort=False,
     )
     joined_table.index.name = ("Index", "Index", index_name)
     return joined_table.reset_index()

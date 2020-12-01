@@ -1,10 +1,10 @@
 from os import environ
 from genefab3.config import TIMESTAMP_FMT, DEBUG_MARKERS
-from re import sub, escape, split
+from re import sub, escape, split, search, IGNORECASE
 from datetime import datetime
 from natsort import natsorted
 from copy import deepcopy
-from genefab3.exceptions import GeneLabDatabaseException
+from genefab3.exceptions import GeneLabDatabaseException, GeneLabFileException
 
 
 def is_debug():
@@ -102,3 +102,13 @@ def iterate_terminal_leaf_filenames(d):
         return split(r'\s*,\s*', value)
     else:
         return []
+
+
+def infer_file_separator(filename):
+    """Based on filename, infer whether the file is a CSV or a TSV"""
+    if search(r'\.csv(\.gz)?$', filename, flags=IGNORECASE):
+        return ","
+    elif search(r'\.tsv(\.gz)?$', filename, flags=IGNORECASE):
+        return "\t"
+    else:
+        raise GeneLabFileException("Unknown file format", filename)
