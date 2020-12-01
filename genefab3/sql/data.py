@@ -46,10 +46,10 @@ class CachedTable():
             datatype, accession, assay_name, sample_names,
         )
         self.file = Namespace(
-            name=file_descriptor.filename,
+            name=file_descriptor.name,
             url=file_descriptor.url,
             timestamp=file_descriptor.timestamp,
-            sep=infer_file_separator(file_descriptor.filename),
+            sep=infer_file_separator(file_descriptor.name),
         )
         cache_entry = self.mongo_db.file_descriptors.find_one(
             {"name": self.file.name, "url": self.file.url},
@@ -174,15 +174,15 @@ def get_sql_data(mongo_db, sqlite_db_location, sample_index, datatype, target_fi
     for accession in sample_dict:
         glds = CachedDataset(mongo_db, accession, init_assays=False)
         for assay_name, sample_names in sample_dict[accession].items():
-            fileinfo = glds.assays[assay_name].get_file_descriptors( # TODO everywhere: file_descriptors, maybe List
+            file_descriptors = glds.assays[assay_name].get_file_descriptors(
                 regex=target_file_locator.regex,
                 projection={key: True for key in target_file_locator.keys},
             )
-            if len(fileinfo) == 0:
+            if len(file_descriptors) == 0:
                 raise FileNotFoundError(
                     NO_FILES_ERROR, accession, assay_name,
                 )
-            elif len(fileinfo) > 1:
+            elif len(file_descriptors) > 1:
                 raise GeneLabFileException(
                     AMBIGUOUS_FILES_ERROR, accession, assay_name,
                 )
@@ -190,7 +190,7 @@ def get_sql_data(mongo_db, sqlite_db_location, sample_index, datatype, target_fi
                 tables.append(CachedTable(
                     mongo_db=mongo_db,
                     sqlite_db_location=sqlite_db_location,
-                    file_descriptor=next(iter(fileinfo.values())),
+                    file_descriptor=file_descriptors[0],
                     datatype=datatype,
                     accession=accession,
                     assay_name=assay_name,

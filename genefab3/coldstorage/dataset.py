@@ -92,14 +92,14 @@ class ColdStorageDataset():
             matches = lambda filename: search(regex, filename)
         elif glob is not None:
             matches = lambda filename: search(glob.replace("*", ".*"), filename)
-        return {
-            filename: Namespace(
-                filename=filename, url=self.fileurls.get(filename, None),
+        return [
+            Namespace(
+                name=filename, url=self.fileurls.get(filename, None),
                 timestamp=int(timestamp) if str(timestamp).isdigit() else -1,
             )
             for filename, timestamp in self.filedates.items()
             if matches(filename)
-        }
+        ]
 
     def init_assays(self):
         """Initialize assays via ISA ZIP"""
@@ -108,7 +108,7 @@ class ColdStorageDataset():
             error = "{}: ISA ZIP not found".format(self.accession)
             raise GeneLabFileException(error)
         elif len(isa_zip_descriptors) == 1:
-            self.isa = IsaZip(next(iter(isa_zip_descriptors.values())).url)
+            self.isa = IsaZip(isa_zip_descriptors[0].url)
         else:
             error = "{}: multiple ambiguous ISA ZIPs".format(self.accession)
             raise GeneLabFileException(error)

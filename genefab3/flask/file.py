@@ -22,15 +22,15 @@ def get_file(db, context):
     else: # simple filename passed, match full
         lookup_kwargs = dict(name=mask)
     if assay_name: # search within specific assay
-        fileinfo = glds.assays[assay_name].get_file_descriptors(
+        file_descriptors = glds.assays[assay_name].get_file_descriptors(
             **lookup_kwargs, projection=context.projection,
         )
     else: # search in entire dataset
-        fileinfo = glds.get_file_descriptors(**lookup_kwargs)
-    if not fileinfo:
+        file_descriptors = glds.get_file_descriptors(**lookup_kwargs)
+    if not file_descriptors:
         raise GeneLabFileException("Requested file not found")
-    elif len(fileinfo) > 1:
+    elif len(file_descriptors) > 1:
         raise GeneLabFileException("Multiple files match search criteria")
     else:
-        with urlopen(next(iter(fileinfo.values())).url) as response:
+        with urlopen(file_descriptors[0].url) as response:
             return response.read()

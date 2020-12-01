@@ -35,9 +35,10 @@ class CachedAssay():
         else:
             metadata_candidates = UniversalSet()
         if name or regex or glob:
-            dataset_candidates = set(
-                self.dataset.get_file_descriptors(name, regex, glob),
-            )
+            dataset_candidates = {
+                file_descriptor.name for file_descriptor in
+                self.dataset.get_file_descriptors(name, regex, glob)
+            }
         else:
             dataset_candidates = UniversalSet()
         candidate_filenames = metadata_candidates & dataset_candidates
