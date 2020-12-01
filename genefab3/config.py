@@ -2,6 +2,7 @@ from collections import namedtuple
 
 
 MONGO_DB_NAME = "genefab3"
+SQLITE_DB_LOCATION = "./.sqlite3/genefab3.sqlite"
 
 DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
 

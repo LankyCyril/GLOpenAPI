@@ -2,9 +2,8 @@ from genefab3.config import ISA_TECHNOLOGY_TYPE_LOCATOR, TECHNOLOGY_FILE_LOCATOR
 from genefab3.exceptions import GeneLabMetadataException, GeneLabFileException
 from genefab3.flask.parser import INPLACE_update_context
 from genefab3.flask.meta import get_samples_by_metas
-#from pandas import DataFrame, concat
-#from functools import partial
-from genefab3.sql.data import get_sql_data#, get_data_placeholder
+from genefab3.sql.data import get_sql_data
+from genefab3.config import SQLITE_DB_LOCATION
 
 
 ISA_TECHNOLOGY_NOT_SPECIFIED_ERROR = "{} requires a '{}.{}=' argument".format(
@@ -57,24 +56,12 @@ def get_data_by_metas(db, context):
     annotation_by_metas = get_samples_by_metas(db, context)
     info_cols = list(annotation_by_metas["info"].columns)
     sample_index = annotation_by_metas["info"].set_index(info_cols).index
-    # infer target data file locator:
-    target_file_locator = get_target_file_locator(annotation_by_metas, context)
-    # constrain to gene lists (this is for the future...):
-    gene_rows = None
+    # infer target data file locator and update/retrieve from SQL:
     return get_sql_data(
-        db, sample_index, gene_rows=gene_rows,
-        target_file_locator=target_file_locator,
+        mongo_db=db, sqlite_db_location=SQLITE_DB_LOCATION,
+        sample_index=sample_index, rows=None,
+        datatype=context.kwargs["datatype"].lower(),
+        target_file_locator=get_target_file_locator(
+            annotation_by_metas, context,
+        ),
     )
-    ## retrieve data per-sample and merge:
-    #return DataFrame(
-    #    data=concat(
-    #        sample_index.map(
-    #            partial(
-    #                get_data_placeholder, gene_rows=gene_rows,
-    #                target_file_locator=target_file_locator,
-    #            ),
-    #        ),
-    #        axis=1,
-    #    ),
-    #    columns=sample_index,
-    #)
