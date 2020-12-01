@@ -5,6 +5,7 @@ from pymongo import DESCENDING
 from genefab3.exceptions import GeneLabFileException, GeneLabDatabaseException
 from genefab3.mongo.utils import replace_doc
 from pandas import read_csv, read_sql, DataFrame, MultiIndex, concat
+from pandas.io.sql import DatabaseError as PandasDatabaseError
 from contextlib import closing
 from sqlite3 import connect
 from collections import defaultdict
@@ -14,9 +15,16 @@ from genefab3.mongo.dataset import CachedDataset
 NO_FILES_ERROR = "No data files found for"
 AMBIGUOUS_FILES_ERROR = "Multiple (ambiguous) data files found for"
 MISSING_SAMPLE_NAMES_ERROR = "Missing sample names in GeneFab database"
+MISSING_SQL_TABLE_ERROR = (
+    "Missing data table in GeneFab database "
+    "(will attempt to re-cache on next request)"
+)
 CACHED_TABLE_LOGGER_SUCCESS_MASK, CACHED_TABLE_LOGGER_ERROR_MASK = (
     "CachedTable: updated accession %s, assay %s, datatype '%s', file url '%s'",
     "CachedTable: '%s' at accession %s, assay %s, datatype '%s', file url '%s'",
+)
+CACHED_TABLE_LOGGER_DROP_WARNING = (
+    "CachedTable: dropping timestamp for %s, assay %s, datatype '%s'"
 )
 
 
@@ -62,6 +70,16 @@ class CachedTable():
                     query={"name": self.file.name, "url": self.file.url},
                     doc={"timestamp": self.file.timestamp},
                 )
+ 
+    def _drop_mongo_entry(self):
+        """Erase Mongo DB entry for file descriptor"""
+        self.logger.warning(
+            CACHED_TABLE_LOGGER_DROP_WARNING,
+            self.accession, self.assay_name, self.datatype,
+        )
+        self.mongo_db.file_descriptors.delete_many({
+            "name": self.file.name, "url": self.file.url,
+        })
  
     def _recache(self):
         """Update local table from remote file"""
@@ -110,6 +128,12 @@ class CachedTable():
                     data_subset = read_sql(
                         f"SELECT * FROM '{self.name}'",
                         sql_connection, index_col="index",
+                    )
+                except PandasDatabaseError:
+                    self._drop_mongo_entry()
+                    raise GeneLabDatabaseException(
+                        MISSING_SQL_TABLE_ERROR,
+                        self.accession, self.assay_name, self.datatype,
                     )
                 except Exception as e:
                     raise GeneLabDatabaseException(
