@@ -55,7 +55,8 @@ def get_browser_dataframe_twolevel(df, context, frozen=0):
     formatters = get_browser_formatters(df, context, shortnames)
     return map_replace(
         get_browser_html(), {
-            "// FROZENCOLUMN": str(frozen), "// FORMATTERS": formatters,
+            "// FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
+            "// FORMATTERS": formatters,
             "HTMLINK": build_url(context, drop={"fmt"}) + "fmt=html",
             "CSVLINK": build_url(context, drop={"fmt"}) + "fmt=csv",
             "TSVLINK": build_url(context, drop={"fmt"}) + "fmt=tsv",
@@ -78,7 +79,7 @@ def get_browser_dataframe_threelevel(df, context):
         return next(renamer)
     return get_browser_dataframe_twolevel(
         df.droplevel(0, axis=1).rename(renamer_wrapper, axis=1, level=0),
-        context, frozen="undefined",
+        context,
     )
 
 

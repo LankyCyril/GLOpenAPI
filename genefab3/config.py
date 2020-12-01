@@ -1,4 +1,8 @@
+from collections import namedtuple
+
+
 MONGO_DB_NAME = "genefab3"
+SQLITE_DB_LOCATION = "./.sqlite3/genefab3.sqlite"
 
 DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
 
@@ -32,9 +36,15 @@ ISA_TECHNOLOGY_TYPE_LOCATOR = (
     "investigation.study assays", "study assay technology type",
 )
 
-TECHNOLOGY_FILE_MASKS = {
+TECHNOLOGY_FILE_LOCATORS = {
     "rna sequencing (rna-seq)": {
-        "unnormalized counts": r'rna_seq_Unnormalized_Counts.csv',
+        "unnormalized counts": namedtuple("Locator", ["keys", "regex"])(
+            keys=(
+                "assay.parameter value.raw counts data file..",
+                "assay.characteristics.raw counts data file..",
+            ),
+            regex=r'rna_seq_Unnormalized_Counts\.csv$',
+        ),
     }
 }
 

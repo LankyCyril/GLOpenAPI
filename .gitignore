@@ -4,3 +4,4 @@ sandbox
 data
 __pycache__
 test.py
+.sqlite3

@@ -1,9 +1,10 @@
 from os import environ
 from genefab3.config import TIMESTAMP_FMT, DEBUG_MARKERS
-from re import sub, escape
+from re import sub, escape, split, search, IGNORECASE
 from datetime import datetime
 from natsort import natsorted
 from copy import deepcopy
+from genefab3.exceptions import GeneLabDatabaseException, GeneLabFileException
 
 
 def is_debug():
@@ -74,3 +75,56 @@ def copy_and_drop(d, keys):
     for key in keys:
         del d_copy[key]
     return d_copy
+
+
+def descend_branch(d, step_tracker=0, max_steps=32):
+    """Descend into a non-bifurcating branch and find the terminal leaf"""
+    if step_tracker >= max_steps:
+        raise GeneLabDatabaseException(
+            "Document branch exceeds maximum depth", max_steps,
+        )
+    else:
+        if isinstance(d, dict):
+            if len(d) == 0:
+                raise GeneLabDatabaseException(
+                    "Document branch does not contain a terminal leaf",
+                )
+            elif len(d) == 1:
+                return descend_branch(next(iter(d.values())), step_tracker+1)
+            elif len(d) > 1:
+                raise GeneLabDatabaseException(
+                    "Document branch expected to be linear, but bifurcates",
+                )
+        else:
+            return d
+
+
+def iterate_terminal_leaves(d, step_tracker=0, max_steps=32):
+    """Descend into a non-bifurcating branch and find the terminal leaf"""
+    if step_tracker >= max_steps:
+        raise GeneLabDatabaseException(
+            "Document branch exceeds maximum depth", max_steps,
+        )
+    else:
+        if isinstance(d, dict):
+            for i, branch in enumerate(d.values()):
+                yield from iterate_terminal_leaves(branch, step_tracker+i)
+        else:
+            yield d
+
+
+def iterate_terminal_leaf_filenames(d):
+    """Get terminal leaf of document and iterate filenames stored in leaf"""
+    for value in iterate_terminal_leaves(d):
+        if isinstance(value, str):
+            yield from split(r'\s*,\s*', value)
+
+
+def infer_file_separator(filename):
+    """Based on filename, infer whether the file is a CSV or a TSV"""
+    if search(r'\.csv(\.gz)?$', filename, flags=IGNORECASE):
+        return ","
+    elif search(r'\.tsv(\.gz)?$', filename, flags=IGNORECASE):
+        return "\t"
+    else:
+        raise GeneLabFileException("Unknown file format", filename)

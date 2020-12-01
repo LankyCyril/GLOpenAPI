@@ -19,7 +19,7 @@ def NoLogger():
 class CachedDataset(ColdStorageDataset):
     """ColdStorageDataset via auto-updated metadata in database"""
  
-    def __init__(self, db, accession, logger=None, init_assays=True):
+    def __init__(self, db, accession, logger=None, init_assays=True): # TODO: maybe init_assays is always False
         self.db = db
         self.logger = logger if (logger is not None) else NoLogger()
         super().__init__(
