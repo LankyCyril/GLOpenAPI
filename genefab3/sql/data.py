@@ -13,6 +13,11 @@ from genefab3.mongo.dataset import CachedDataset
 
 NO_FILES_ERROR = "No data files found for"
 AMBIGUOUS_FILES_ERROR = "Multiple (ambiguous) data files found for"
+MISSING_SAMPLE_NAMES_ERROR = "Missing sample names in GeneFab database"
+CACHED_TABLE_LOGGER_SUCCESS_MASK, CACHED_TABLE_LOGGER_ERROR_MASK = (
+    "CachedTable: updated accession %s, assay %s, datatype %s, file url '%s'",
+    "CachedTable: %s at accession %s, assay %s, datatype %s, file url '%s'",
+)
 
 
 class CachedTable():
@@ -24,6 +29,7 @@ class CachedTable():
     logger = None
  
     def __init__(self, mongo_db, sqlite_db_location, file_descriptor, datatype, accession, assay_name, sample_names):
+        """Check cold storage JSON and cache, update cache if remote file was updated"""
         self.name = f"{datatype}/{accession}/{assay_name}"
         self.logger = getLogger("genefab3")
         self.logger.setLevel(DEBUG)
@@ -58,13 +64,13 @@ class CachedTable():
                 )
  
     def _recache(self):
+        """Update local table from remote file"""
         try:
             self.data = read_csv(self.file.url, sep=self.file.sep, index_col=0)
             # TODO: test index name and make index "only if"; avoid "Unnamed"
         except Exception as e:
             self.logger.error(
-                ("CachedTable: %s at accession %s, assay %s, "
-                "datatype %s, file url '%s'"),
+                CACHED_TABLE_LOGGER_ERROR_MASK,
                 repr(e), self.accession, self.assay_name, self.datatype,
                 self.file.url, stack_info=True,
             )
@@ -77,8 +83,7 @@ class CachedTable():
                     )
                 except Exception as e:
                     self.logger.error(
-                        ("CachedTable: %s at accession %s, assay %s, "
-                        "datatype %s, file url '%s'"),
+                        CACHED_TABLE_LOGGER_ERROR_MASK,
                         repr(e), self.accession, self.assay_name, self.datatype,
                         self.file.url, stack_info=True,
                     )
@@ -86,8 +91,7 @@ class CachedTable():
                     return False
                 else:
                     self.logger.info(
-                        ("CachedTable: updated accession %s, assay %s, "
-                        "datatype %s, file url '%s'"),
+                        CACHED_TABLE_LOGGER_SUCCESS_MASK,
                         self.accession, self.assay_name, self.datatype,
                         self.file.url,
                     )
@@ -95,10 +99,13 @@ class CachedTable():
                     return True
  
     def dataframe(self, rows=None):
+        """Render retrieved or cached data as pandas.DataFrame"""
+        if rows is not None:
+            raise NotImplementedError("Selecting rows from a table")
         if self.data is None:
             with closing(connect(self.sqlite_db_location)) as sql_connection:
                 try:
-                    self.data = read_sql(
+                    data_subset = read_sql(
                         f"SELECT * FROM '{self.name}'",
                         sql_connection, index_col="index",
                     )
@@ -106,18 +113,22 @@ class CachedTable():
                     raise GeneLabDatabaseException(
                         str(e), self.accession, self.assay_name, self.datatype,
                     )
-        if not (set(self.sample_names) <= set(self.data.columns)):
+        else:
+            if rows is None:
+                data_subset = self.data
+            else:
+                data_subset = self.data.loc[rows]
+        if not (set(self.sample_names) <= set(data_subset.columns)):
             raise GeneLabDatabaseException(
-                "Missing sample names in GeneFab database",
-                self.accession, self.assay_name,
-                sorted(set(self.sample_names) - set(self.data.columns)),
+                MISSING_SAMPLE_NAMES_ERROR, self.accession, self.assay_name,
+                sorted(set(self.sample_names) - set(data_subset.columns)),
             )
         else:
             return DataFrame(
-                data=self.data.values, index=self.data.index,
+                data=data_subset.values, index=data_subset.index,
                 columns=MultiIndex.from_tuples(
                     (self.accession, self.assay_name, sample_name)
-                    for sample_name in list(self.data.columns)
+                    for sample_name in list(data_subset.columns)
                 )
             )
 
