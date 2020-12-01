@@ -37,9 +37,8 @@ CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
 ## Metadata parameters
 
 ISA_ZIP_REGEX = r'.*_metadata_.*[_-]ISA\.zip$'
-
 ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
-
+METADATA_UNITS_FORMAT = "{value} {{{unit}}}"
 ISA_TECHNOLOGY_TYPE_LOCATOR = (
     "investigation.study assays", "study assay technology type",
 )

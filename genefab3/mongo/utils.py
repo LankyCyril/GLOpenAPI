@@ -1,10 +1,21 @@
 from bson import Code
 from bson.errors import InvalidDocument as InvalidDocumentError
+from pandas import isnull
 from collections.abc import ValuesView
 
 
-def harmonize_query(query, lowercase=True):
+def format_units(entry, unit_key, units_format):
+    """Replace entry[""] with value with formatted entry[unit_key], discard entry[unit_key]"""
+    return {
+        k: units_format.format(value=v, unit=entry[unit_key]) if k == "" else v
+        for k, v in entry.items()
+        if k != unit_key
+    }
+
+
+def harmonize_query(query, lowercase=True, units_format=None):
     """Modify dangerous keys in nested dictionaries ('_id', keys containing '$' and '.')"""
+    unit_key = "unit" if lowercase else "Unit"
     if isinstance(query, dict):
         harmonized = {}
         for k, v in query.items():
@@ -15,14 +26,28 @@ def harmonize_query(query, lowercase=True):
                 harmonized_key = "__id"
             if harmonized_key not in harmonized:
                 if isinstance(v, (list, dict)):
-                    harmonized[harmonized_key] = harmonize_query(v)
+                    harmonized[harmonized_key] = harmonize_query(
+                        v, lowercase=lowercase, units_format=units_format,
+                    )
                 else:
                     harmonized[harmonized_key] = v
             else:
                 raise InvalidDocumentError("Harmonized keys conflict")
-        return harmonized
+        is_unit_formattable = (
+            units_format and ("" in harmonized) and (unit_key in harmonized) and
+            (harmonized[unit_key] != "") and (not isnull(harmonized[unit_key]))
+        )
+        if is_unit_formattable:
+            return format_units(
+                harmonized, unit_key=unit_key, units_format=units_format,
+            )
+        else:
+            return harmonized
     elif isinstance(query, (list, ValuesView)):
-        return [harmonize_query(q) for q in query]
+        return [
+            harmonize_query(q, lowercase=lowercase, units_format=units_format)
+            for q in query
+        ]
     else:
         return query
 

@@ -9,6 +9,7 @@ from threading import Thread
 from genefab3.config import CACHER_THREAD_CHECK_INTERVAL
 from genefab3.config import CACHER_THREAD_RECHECK_DELAY
 from genefab3.mongo.dataset import CachedDataset
+from genefab3.config import METADATA_UNITS_FORMAT
 from time import sleep
 
 
@@ -121,7 +122,10 @@ class CacherThread(Thread):
             else:
                 for accession in accessions - fresh:
                     try:
-                        glds = CachedDataset(self.db, accession, self.logger)
+                        glds = CachedDataset(
+                            self.db, accession, self.logger, init_assays=True,
+                            metadata_units_format=METADATA_UNITS_FORMAT,
+                        )
                     except Exception as e:
                         self.logger.error(
                             "CacherThread: %s at accession %s",
