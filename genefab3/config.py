@@ -1,8 +1,7 @@
 from collections import namedtuple
 
 
-MONGO_DB_NAME = "genefab3"
-SQLITE_DB_LOCATION = "./.sqlite3/genefab3.sqlite"
+## Flask config
 
 DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
 
@@ -10,6 +9,16 @@ COMPRESSIBLE_MIMETYPES = [
     "text/plain", "text/html", "text/css", "text/xml",
     "application/json", "application/javascript"
 ]
+
+DEFAULT_FORMATS = {
+    "/assays/": "tsv", "/samples/": "tsv", "/data/": "tsv", "/files/": "tsv",
+}
+
+
+## Databases and external APIs
+
+MONGO_DB_NAME = "genefab3"
+SQLITE_DB_LOCATION = "./.sqlite3/genefab3.sqlite"
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 COLD_API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
@@ -24,17 +33,19 @@ MAX_JSON_AGE = 10800 # 3 hours (in seconds)
 CACHER_THREAD_CHECK_INTERVAL = 1800 # 30 minutes (in seconds)
 CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
 
+
+## Metadata parameters
+
 ISA_ZIP_REGEX = r'.*_metadata_.*[_-]ISA\.zip$'
 
 ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
 
-DEFAULT_FORMATS = {
-    "/assays/": "tsv", "/samples/": "tsv", "/data/": "tsv", "/files/": "tsv",
-}
-
 ISA_TECHNOLOGY_TYPE_LOCATOR = (
     "investigation.study assays", "study assay technology type",
 )
+
+
+## Data parameters
 
 TECHNOLOGY_FILE_LOCATORS = {
     "rna sequencing (rna-seq)": {
