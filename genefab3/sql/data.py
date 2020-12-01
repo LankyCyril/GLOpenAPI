@@ -15,8 +15,8 @@ NO_FILES_ERROR = "No data files found for"
 AMBIGUOUS_FILES_ERROR = "Multiple (ambiguous) data files found for"
 MISSING_SAMPLE_NAMES_ERROR = "Missing sample names in GeneFab database"
 CACHED_TABLE_LOGGER_SUCCESS_MASK, CACHED_TABLE_LOGGER_ERROR_MASK = (
-    "CachedTable: updated accession %s, assay %s, datatype %s, file url '%s'",
-    "CachedTable: %s at accession %s, assay %s, datatype %s, file url '%s'",
+    "CachedTable: updated accession %s, assay %s, datatype '%s', file url '%s'",
+    "CachedTable: '%s' at accession %s, assay %s, datatype '%s', file url '%s'",
 )
 
 
@@ -66,8 +66,10 @@ class CachedTable():
     def _recache(self):
         """Update local table from remote file"""
         try:
-            self.data = read_csv(self.file.url, sep=self.file.sep, index_col=0)
-            # TODO: test index name and make index "only if"; avoid "Unnamed"
+            self.data = read_csv(self.file.url, sep=self.file.sep)
+            if self.data.columns[0] not in self.sample_names:
+                self.data.set_index(self.data.columns[0], inplace=True)
+                self.data.index.name = None
         except Exception as e:
             self.logger.error(
                 CACHED_TABLE_LOGGER_ERROR_MASK,
