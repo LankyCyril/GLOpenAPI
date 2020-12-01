@@ -39,7 +39,6 @@ def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, report_ch
                     "last_refreshed": int(datetime.now().timestamp()),
                     "raw": fresh_json,
                 },
-                harmonize=False,
             )
             if report_changes and json_cache_info:
                 json_changed = (fresh_json != json_cache_info.get("raw", {}))

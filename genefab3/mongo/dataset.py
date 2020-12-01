@@ -52,7 +52,6 @@ class CachedDataset(ColdStorageDataset):
             replace_doc(
                 db.dataset_timestamps, {"accession": accession},
                 {"last_refreshed": int(datetime.now().timestamp())},
-                harmonize=True,
             )
         except:
             self.drop_cache()

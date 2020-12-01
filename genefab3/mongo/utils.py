@@ -52,14 +52,10 @@ def harmonize_query(query, lowercase=True, units_format=None):
         return query
 
 
-def replace_doc(collection, query, doc, harmonize=False):
+def replace_doc(collection, query, doc):
     """Shortcut to drop all instances and replace with updated instance"""
     collection.delete_many(query)
-    if harmonize:
-        insert_query = harmonize_query({**query, **doc})
-    else:
-        insert_query = {**query, **doc}
-    collection.insert_one(insert_query)
+    collection.insert_one({**query, **doc})
 
 
 def get_collection_fields(collection, skip=set()):
