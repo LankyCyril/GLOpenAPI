@@ -1,6 +1,7 @@
 from bson import Code
 from bson.errors import InvalidDocument as InvalidDocumentError
 from pandas import isnull
+from functools import partial
 from collections.abc import ValuesView
 
 
@@ -26,10 +27,16 @@ def format_units(entry, unit_key, units_format):
     }
 
 
-def harmonize_document(query, lowercase=True, units_format=None, dropna=True):
+def harmonize_document(query, lowercase=True, units_format=None, dropna=True, depth_tracker=0, *, max_depth=32):
     """Modify dangerous keys in nested dictionaries ('_id', keys containing '$' and '.'), normalize case, format units, drop terminal NaNs"""
     unit_key = "unit" if lowercase else "Unit"
-    if isinstance(query, dict):
+    harmonizer_function = partial(
+        harmonize_document, lowercase=lowercase, units_format=units_format,
+        dropna=dropna, depth_tracker=depth_tracker+1,
+    )
+    if depth_tracker >= max_depth:
+        raise InvalidDocumentError("Document exceeds maximum depth", max_depth)
+    elif isinstance(query, dict):
         harmonized = {}
         for key, branch in query.items():
             harmonized_key = key.replace("$", "_").replace(".", "_")
@@ -38,9 +45,7 @@ def harmonize_document(query, lowercase=True, units_format=None, dropna=True):
             if harmonized_key == "_id":
                 harmonized_key = "__id"
             if harmonized_key not in harmonized:
-                harmonized_branch = harmonize_document(
-                    branch, lowercase, units_format, dropna,
-                )
+                harmonized_branch = harmonizer_function(branch)
                 if harmonized_branch:
                     harmonized[harmonized_key] = harmonized_branch
             else:
@@ -50,10 +55,7 @@ def harmonize_document(query, lowercase=True, units_format=None, dropna=True):
         else:
             return harmonized
     elif isinstance(query, (list, ValuesView)):
-        return [
-            harmonize_document(q, lowercase, units_format, dropna)
-            for q in query
-        ]
+        return [hq for hq in (harmonizer_function(q) for q in query) if hq]
     elif (not dropna) or (not isempty(query)):
         return query
     else:
