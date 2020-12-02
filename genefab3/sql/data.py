@@ -78,7 +78,7 @@ class CachedTable():
             makedirs(sqlite_db)
         return path.join(
             sqlite_db, (
-                sub(r'\s+', "_", datatype) +
+                sub(r'\s+', "_", datatype) + "-" +
                 md5(datatype.encode("utf-8")).hexdigest()
             ),
         )

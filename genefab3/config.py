@@ -18,7 +18,7 @@ MONGO_CLIENT_PARAMETERS = dict(
     serverSelectionTimeoutMS=2000,
 )
 MONGO_DB_NAME = "genefab3"
-SQLITE_DB = "./.sqlite3"
+SQLITE_DB = "./.sqlite3/"
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 COLD_API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
