@@ -18,7 +18,7 @@ DEFAULT_FORMATS = {
 ## Databases and external APIs
 
 MONGO_DB_NAME = "genefab3"
-SQLITE_DB_LOCATION = "./.sqlite3/genefab3.sqlite"
+SQLITE_DB = "./.sqlite3"
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
 COLD_API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"

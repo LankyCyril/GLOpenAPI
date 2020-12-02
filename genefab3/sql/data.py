@@ -1,9 +1,12 @@
-from logging import getLogger, DEBUG
 from argparse import Namespace
+from logging import getLogger, DEBUG
+from os import path, makedirs
+from re import sub
+from hashlib import md5
 from genefab3.utils import infer_file_separator
 from pymongo import DESCENDING
-from genefab3.exceptions import GeneLabFileException, GeneLabDatabaseException
 from genefab3.mongo.utils import run_mongo_transaction
+from genefab3.exceptions import GeneLabFileException, GeneLabDatabaseException
 from pandas import read_csv, read_sql, DataFrame, MultiIndex, concat
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 from contextlib import closing
@@ -36,12 +39,13 @@ class CachedTable():
     data = None
     logger = None
  
-    def __init__(self, mongo_db, sqlite_db_location, file_descriptor, datatype, accession, assay_name, sample_names):
+    def __init__(self, dbs, file_descriptor, datatype, accession, assay_name, sample_names):
         """Check cold storage JSON and cache, update cache if remote file was updated"""
-        self.name = f"{datatype}/{accession}/{assay_name}"
+        self.name = f"{accession}/{assay_name}"
         self.logger = getLogger("genefab3")
         self.logger.setLevel(DEBUG)
-        self.mongo_db, self.sqlite_db_location = mongo_db, sqlite_db_location
+        self.mongo_db = dbs.mongo_db
+        self.sqlite_file = self._get_unambiguous_path(dbs.sqlite_db, datatype)
         self.datatype, self.accession, self.assay_name, self.sample_names = (
             datatype, accession, assay_name, sample_names,
         )
@@ -71,6 +75,17 @@ class CachedTable():
                     data={"timestamp": self.file.timestamp},
                 )
  
+    def _get_unambiguous_path(self, sqlite_db, datatype):
+        """Generate SQLite3 filename for datatype"""
+        if not path.exists(sqlite_db):
+            makedirs(sqlite_db)
+        return path.join(
+            sqlite_db, (
+                sub(r'\s+', "_", datatype) +
+                md5(datatype.encode("utf-8")).hexdigest()
+            ),
+        )
+ 
     def _drop_mongo_entry(self):
         """Erase Mongo DB entry for file descriptor"""
         self.logger.warning(
@@ -97,7 +112,7 @@ class CachedTable():
             )
             return False
         else:
-            with closing(connect(self.sqlite_db_location)) as sql_connection:
+            with closing(connect(self.sqlite_file)) as sql_connection:
                 try:
                     self.data.to_sql(
                         self.name, sql_connection, if_exists="replace",
@@ -124,7 +139,7 @@ class CachedTable():
         if rows is not None:
             raise NotImplementedError("Selecting rows from a table")
         if self.data is None:
-            with closing(connect(self.sqlite_db_location)) as sql_connection:
+            with closing(connect(self.sqlite_file)) as sql_connection:
                 try:
                     data_subset = read_sql(
                         f"SELECT * FROM '{self.name}'",
@@ -168,12 +183,12 @@ def sample_index_to_dict(sample_index):
     return sample_dict
 
 
-def get_sql_data(mongo_db, sqlite_db_location, sample_index, datatype, target_file_locator, rows=None, index_name="Entry"):
+def get_sql_data(dbs, sample_index, datatype, target_file_locator, rows=None, index_name="Entry"):
     """Based on a MultiIndex of form (accession, assay_name, sample_name), retrieve data from files in `target_file_locator`"""
     sample_dict = sample_index_to_dict(sample_index)
     tables = []
     for accession in sample_dict:
-        glds = CachedDataset(mongo_db, accession, init_assays=False)
+        glds = CachedDataset(dbs.mongo_db, accession, init_assays=False)
         for assay_name, sample_names in sample_dict[accession].items():
             file_descriptors = glds.assays[assay_name].get_file_descriptors(
                 regex=target_file_locator.regex,
@@ -189,8 +204,7 @@ def get_sql_data(mongo_db, sqlite_db_location, sample_index, datatype, target_fi
                 )
             else:
                 tables.append(CachedTable(
-                    mongo_db=mongo_db,
-                    sqlite_db_location=sqlite_db_location,
+                    dbs=dbs,
                     file_descriptor=file_descriptors[0],
                     datatype=datatype,
                     accession=accession,

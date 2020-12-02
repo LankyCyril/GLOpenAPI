@@ -3,7 +3,6 @@ from genefab3.exceptions import GeneLabMetadataException, GeneLabFileException
 from genefab3.flask.parser import INPLACE_update_context
 from genefab3.flask.meta import get_samples_by_metas
 from genefab3.sql.data import get_sql_data
-from genefab3.config import SQLITE_DB_LOCATION
 
 
 ISA_TECHNOLOGY_NOT_SPECIFIED_ERROR = "{} requires a '{}.{}=' argument".format(
@@ -45,7 +44,7 @@ def get_target_file_locator(annotation_by_metas, context):
             return target_file_locators.pop()
 
 
-def get_data_by_metas(db, context):
+def get_data_by_metas(dbs, context):
     """Select data based on annotation filters"""
     if ".".join(ISA_TECHNOLOGY_TYPE_LOCATOR) not in context.complete_args:
         # inject "investigation.study assays.study assay technology type":
@@ -53,12 +52,12 @@ def get_data_by_metas(db, context):
             context, {".".join(ISA_TECHNOLOGY_TYPE_LOCATOR): ""},
         )
     # get samples view and parse out per-sample accession and assay names:
-    annotation_by_metas = get_samples_by_metas(db, context)
+    annotation_by_metas = get_samples_by_metas(dbs.mongo_db, context)
     info_cols = list(annotation_by_metas["info"].columns)
     sample_index = annotation_by_metas["info"].set_index(info_cols).index
     # infer target data file locator and update/retrieve from SQL:
     return get_sql_data(
-        mongo_db=db, sqlite_db_location=SQLITE_DB_LOCATION,
+        dbs=dbs,
         sample_index=sample_index, rows=None,
         datatype=context.kwargs["datatype"].lower(),
         target_file_locator=get_target_file_locator(

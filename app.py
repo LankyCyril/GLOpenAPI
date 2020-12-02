@@ -2,7 +2,7 @@
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError
 from genefab3.exceptions import GeneLabDatabaseException
-from genefab3.config import MONGO_DB_NAME, COMPRESSIBLE_MIMETYPES
+from genefab3.config import MONGO_DB_NAME, COMPRESSIBLE_MIMETYPES, SQLITE_DB
 from genefab3.utils import is_debug
 from flask import Flask, request
 from flask_compress import Compress
@@ -12,6 +12,7 @@ from logging import getLogger
 from functools import partial
 from genefab3.mongo.cacher import CacherThread
 from genefab3.flask.display import display
+from argparse import Namespace
 
 
 # Backend initialization:
@@ -73,7 +74,8 @@ def file(**kwargs):
 @app.route("/data/", methods=["GET"])
 def data(**kwargs):
     from genefab3.flask.data import get_data_by_metas as getter
-    return display(db, getter, kwargs, request)
+    dbs = Namespace(mongo_db=db, sqlite_db=SQLITE_DB)
+    return display(dbs, getter, kwargs, request)
 
 @app.route("/favicon.<imgtype>")
 def favicon(**kwargs):
