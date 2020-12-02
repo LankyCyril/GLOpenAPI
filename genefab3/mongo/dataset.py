@@ -1,7 +1,7 @@
 from argparse import Namespace
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.mongo.json import get_fresh_json
-from genefab3.mongo.utils import replace_document, harmonize_document
+from genefab3.mongo.utils import run_mongo_transaction, harmonize_document
 from datetime import datetime
 from functools import partial
 from genefab3.mongo.assay import CachedAssay
@@ -30,43 +30,54 @@ class CachedDataset(ColdStorageDataset):
             if init_assays:
                 self.init_assays()
                 if any(self.changed.__dict__.values()):
-                    for assay_name, assay in self.assays.items():
-                        db.metadata.delete_many({
-                            ".accession": accession, ".assay": assay_name,
-                        })
-                        if assay.meta:
-                            db.metadata.insert_many(harmonize_document(
-                                assay.meta.values(),
-                                units_format=metadata_units_format,
-                            ))
-                            for sample_name in assay.meta:
-                                if "Study" not in assay.meta[sample_name]:
-                                    logger.warning(
-                                        WARN_NO_STUDY, accession,
-                                        assay_name, sample_name,
-                                    )
-                        else:
-                            logger.warning(WARN_NO_META, accession, assay_name)
+                    for assay in self.assays.values():
+                        self._recache_assay(
+                            assay, metadata_units_format=metadata_units_format,
+                        )
             else:
                 self.assays = CachedAssayDispatcher(self)
-            replace_document(
-                db.dataset_timestamps, {"accession": accession},
-                {"last_refreshed": int(datetime.now().timestamp())},
+            run_mongo_transaction(
+                action="replace", collection=db.dataset_timestamps,
+                query={"accession": accession},
+                data={"last_refreshed": int(datetime.now().timestamp())},
             )
         except:
             self.drop_cache()
             raise
  
+    def _recache_assay(self, assay, metadata_units_format):
+        run_mongo_transaction(
+            action="delete_many", collection=self.db.metadata,
+            query={".accession": self.accession, ".assay": assay.name},
+        )
+        if assay.meta:
+            run_mongo_transaction(
+                action="insert_many", collection=self.db.metadata,
+                documents=harmonize_document(
+                    assay.meta.values(), units_format=metadata_units_format,
+                ),
+            )
+            for sample_name in assay.meta:
+                if "Study" not in assay.meta[sample_name]:
+                    self.logger.warning(
+                        WARN_NO_STUDY, self.accession, assay.name, sample_name,
+                    )
+        else:
+            self.logger.warning(WARN_NO_META, self.accession, assay.name)
+ 
     def drop_cache(self=None, db=None, accession=None):
-        (db or self.db).dataset_timestamps.delete_many({
-            "accession": accession or self.accession,
-        })
-        (db or self.db).metadata.delete_many({
-            ".accession": accession or self.accession,
-        })
-        (db or self.db).json_cache.delete_many({
-            "identifier": accession or self.accession,
-        })
+        run_mongo_transaction(
+            action="delete_many", collection=(db or self.db).dataset_timestamps,
+            query={"accession": accession or self.accession},
+        )
+        run_mongo_transaction(
+            action="delete_many", collection=(db or self.db).metadata,
+            query={".accession": accession or self.accession},
+        )
+        run_mongo_transaction(
+            action="delete_many", collection=(db or self.db).json_cache,
+            query={"identifier": accession or self.accession},
+        )
 
 
 class CachedAssayDispatcher(dict):

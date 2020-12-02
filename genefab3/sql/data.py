@@ -3,7 +3,7 @@ from argparse import Namespace
 from genefab3.utils import infer_file_separator
 from pymongo import DESCENDING
 from genefab3.exceptions import GeneLabFileException, GeneLabDatabaseException
-from genefab3.mongo.utils import replace_document
+from genefab3.mongo.utils import run_mongo_transaction
 from pandas import read_csv, read_sql, DataFrame, MultiIndex, concat
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 from contextlib import closing
@@ -65,10 +65,10 @@ class CachedTable():
         else:
             self.is_fresh = self._recache()
             if self.is_fresh:
-                replace_document(
-                    collection=self.mongo_db.file_descriptors,
+                run_mongo_transaction(
+                    action="replace", collection=self.mongo_db.file_descriptors,
                     query={"name": self.file.name, "url": self.file.url},
-                    doc={"timestamp": self.file.timestamp},
+                    data={"timestamp": self.file.timestamp},
                 )
  
     def _drop_mongo_entry(self):
@@ -77,9 +77,10 @@ class CachedTable():
             CACHED_TABLE_LOGGER_DROP_WARNING,
             self.accession, self.assay_name, self.datatype,
         )
-        self.mongo_db.file_descriptors.delete_many({
-            "name": self.file.name, "url": self.file.url,
-        })
+        run_mongo_transaction(
+            action="delete_many", collection=self.mongo_db.file_descriptors,
+            query={"name": self.file.name, "url": self.file.url},
+        )
  
     def _recache(self):
         """Update local table from remote file"""

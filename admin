@@ -8,6 +8,7 @@ from genefab3.config import MONGO_DB_NAME
 from genefab3.mongo.dataset import CachedDataset
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.mongo.cacher import update_metadata_index
+from genefab3.mongo.utils import run_mongo_transaction
 from json import dumps
 
 
@@ -37,9 +38,11 @@ def drop(db, what):
             "metadata", "metadata_index",
         }
         for cn in collection_names:
-            getattr(db, cn).delete_many({})
+            run_mongo_transaction(
+                action="delete_many", collection=getattr(db, cn), query={},
+            )
     elif what == "log":
-        getattr(db, "log").delete_many({})
+        run_mongo_transaction(action="delete_many", collection=db.log, query={})
     else:
         CachedDataset.drop_cache(db=db, accession=what)
         update_metadata_index(db)
