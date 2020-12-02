@@ -78,12 +78,3 @@ def data(**kwargs):
 @app.route("/favicon.<imgtype>")
 def favicon(**kwargs):
     return ""
-
-
-# Debug zone:
-
-@app.route("/debug/<meta>/", methods=["GET"])
-def meta(**kwargs):
-    """List names of particular meta"""
-    from genefab3.flask.meta import get_meta_names as getter
-    return display(db, getter, kwargs, request)
