@@ -14,6 +14,9 @@ DEFAULT_FORMATS = {
 
 ## Databases and external APIs
 
+MONGO_CLIENT_PARAMETERS = dict(
+    serverSelectionTimeoutMS=2000,
+)
 MONGO_DB_NAME = "genefab3"
 SQLITE_DB = "./.sqlite3"
 

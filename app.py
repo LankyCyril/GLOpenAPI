@@ -1,16 +1,16 @@
 #!/usr/bin/env python
+from flask import Flask, request
+from genefab3.config import COMPRESSIBLE_MIMETYPES
+from flask_compress import Compress
 from pymongo import MongoClient
+from genefab3.config import MONGO_CLIENT_PARAMETERS, MONGO_DB_NAME, SQLITE_DB
 from pymongo.errors import ServerSelectionTimeoutError
 from genefab3.exceptions import GeneLabDatabaseException
-from genefab3.config import MONGO_DB_NAME, COMPRESSIBLE_MIMETYPES, SQLITE_DB
-from genefab3.utils import is_debug
-from flask import Flask, request
-from flask_compress import Compress
-from os import environ
-from genefab3.exceptions import traceback_printer, exception_catcher, DBLogger
-from logging import getLogger
-from functools import partial
+from genefab3.utils import is_flask_reloaded, is_debug
 from genefab3.mongo.cacher import CacherThread
+from genefab3.exceptions import traceback_printer, exception_catcher, DBLogger
+from functools import partial
+from logging import getLogger
 from genefab3.flask.display import display
 from argparse import Namespace
 
@@ -21,7 +21,7 @@ app = Flask("genefab3")
 COMPRESS_MIMETYPES = COMPRESSIBLE_MIMETYPES
 Compress(app)
 
-mongo = MongoClient(serverSelectionTimeoutMS=2000)
+mongo = MongoClient(**MONGO_CLIENT_PARAMETERS)
 try:
     mongo.server_info()
 except ServerSelectionTimeoutError:
@@ -29,8 +29,7 @@ except ServerSelectionTimeoutError:
 else:
     db = getattr(mongo, MONGO_DB_NAME)
 
-if environ.get("WERKZEUG_RUN_MAIN", None) != "true":
-    # https://stackoverflow.com/a/9476701/590676
+if not is_flask_reloaded():
     CacherThread(db).start()
 
 if is_debug():
