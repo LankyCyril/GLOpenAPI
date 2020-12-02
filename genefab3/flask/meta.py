@@ -1,7 +1,7 @@
 from argparse import Namespace
 from pandas import json_normalize, MultiIndex, isnull, concat, merge
 from re import findall, search, IGNORECASE, escape, split
-from genefab3.config import RAW_FILE_REGEX
+from genefab3.config import RAW_FILE_REGEX, INFO
 from genefab3.flask.display import Placeholders
 from pymongo.errors import OperationFailure
 from numpy import nan
@@ -81,7 +81,7 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
         # sort (ISA-aware) and convert to two-level dataframe:
         dataframe = isa_sort_dataframe(dataframe)
         dataframe.columns = MultiIndex.from_tuples(
-            ("info", ".".join(fields[1:])) if fields[0] == ""
+            (INFO, ".".join(fields[1:])) if fields[0] == ""
             else (".".join(fields[:2]), ".".join(fields[2:]))
             for fields in map(lambda s: s.split("."), dataframe.columns)
         )
@@ -91,7 +91,7 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
         )
     else:
         if aggregate: # coerce to boolean "existence" if requested
-            info_cols = list(dataframe[["info"]].columns)
+            info_cols = list(dataframe[[INFO]].columns)
             if len(info_cols) == dataframe.shape[1]: # only 'info' cols present
                 return dataframe.drop_duplicates()
             else: # metadata cols present and can be collapsed into booleans

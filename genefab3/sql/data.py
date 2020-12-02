@@ -13,6 +13,7 @@ from contextlib import closing
 from sqlite3 import connect
 from collections import defaultdict
 from genefab3.mongo.dataset import CachedDataset
+from genefab3.config import INFO
 
 
 NO_FILES_ERROR = "No data files found for"
@@ -183,7 +184,7 @@ def sample_index_to_dict(sample_index):
     return sample_dict
 
 
-def get_sql_data(dbs, sample_index, datatype, target_file_locator, rows=None, index_name="Entry"):
+def get_sql_data(dbs, sample_index, datatype, target_file_locator, rows=None):
     """Based on a MultiIndex of form (accession, assay_name, sample_name), retrieve data from files in `target_file_locator`"""
     sample_dict = sample_index_to_dict(sample_index)
     tables = []
@@ -215,5 +216,5 @@ def get_sql_data(dbs, sample_index, datatype, target_file_locator, rows=None, in
         # wesmckinney.com/blog/high-performance-database-joins-with-pandas-dataframe-more-benchmarks
         [table.dataframe(rows=rows) for table in tables], axis=1, sort=False,
     )
-    joined_table.index.name = ("Index", "Index", index_name)
+    joined_table.index.name = (INFO, INFO, target_file_locator.row_type)
     return joined_table.reset_index()

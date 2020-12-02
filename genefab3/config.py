@@ -1,6 +1,3 @@
-from collections import namedtuple
-
-
 ## Flask config
 
 DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
@@ -34,26 +31,27 @@ CACHER_THREAD_CHECK_INTERVAL = 1800 # 30 minutes (in seconds)
 CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
 
 
-## Metadata parameters
+## (Meta)data parameters
 
 ISA_ZIP_REGEX = r'.*_metadata_.*[_-]ISA\.zip$'
 ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
+INFO = "info"
 METADATA_UNITS_FORMAT = "{value} {{{unit}}}"
 ISA_TECHNOLOGY_TYPE_LOCATOR = (
     "investigation.study assays", "study assay technology type",
 )
 
-
-## Data parameters
-
+from collections import namedtuple
+Locator = namedtuple("Locator", ["keys", "regex", "row_type"])
 TECHNOLOGY_FILE_LOCATORS = {
     "rna sequencing (rna-seq)": {
-        "unnormalized counts": namedtuple("Locator", ["keys", "regex"])(
+        "unnormalized counts": Locator(
             keys=(
                 "assay.parameter value.raw counts data file..",
                 "assay.characteristics.raw counts data file..",
             ),
             regex=r'rna_seq_Unnormalized_Counts\.csv$',
+            row_type="entry",
         ),
     }
 }
