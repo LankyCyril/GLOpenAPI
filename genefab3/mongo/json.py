@@ -3,7 +3,7 @@ from datetime import datetime
 from pymongo import DESCENDING
 from genefab3.coldstorage.json import download_cold_json
 from genefab3.exceptions import GeneLabJSONException
-from genefab3.mongo.utils import replace_doc
+from genefab3.mongo.utils import replace_document
 
 
 def is_json_cache_fresh(json_cache_info, max_age=MAX_JSON_AGE):
@@ -34,7 +34,7 @@ def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, report_ch
                 msg_mask = "Cannot retrieve cold storage JSON for '{}'"
                 raise GeneLabJSONException(msg_mask.format(identifier))
         else:
-            replace_doc(
+            replace_document(
                 db.json_cache, {"identifier": identifier, "kind": kind}, {
                     "last_refreshed": int(datetime.now().timestamp()),
                     "raw": fresh_json,

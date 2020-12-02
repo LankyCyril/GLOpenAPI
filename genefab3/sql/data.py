@@ -3,7 +3,7 @@ from argparse import Namespace
 from genefab3.utils import infer_file_separator
 from pymongo import DESCENDING
 from genefab3.exceptions import GeneLabFileException, GeneLabDatabaseException
-from genefab3.mongo.utils import replace_doc
+from genefab3.mongo.utils import replace_document
 from pandas import read_csv, read_sql, DataFrame, MultiIndex, concat
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 from contextlib import closing
@@ -65,7 +65,7 @@ class CachedTable():
         else:
             self.is_fresh = self._recache()
             if self.is_fresh:
-                replace_doc(
+                replace_document(
                     collection=self.mongo_db.file_descriptors,
                     query={"name": self.file.name, "url": self.file.url},
                     doc={"timestamp": self.file.timestamp},

@@ -4,6 +4,19 @@ from pandas import isnull
 from collections.abc import ValuesView
 
 
+def isempty(v):
+    """Check if terminal leaf value is a null value or an empty string"""
+    return isnull(v) or (v == "")
+
+
+def is_unit_formattable(entry, unit_key):
+    """Check if entry contains keys "" and unit_key and that entry[unit_key] is not empty"""
+    return (
+        ("" in entry) and (unit_key in entry) and
+        (not isempty(entry[unit_key]))
+    )
+
+
 def format_units(entry, unit_key, units_format):
     """Replace entry[""] with value with formatted entry[unit_key], discard entry[unit_key]"""
     return {
@@ -13,46 +26,41 @@ def format_units(entry, unit_key, units_format):
     }
 
 
-def harmonize_query(query, lowercase=True, units_format=None):
-    """Modify dangerous keys in nested dictionaries ('_id', keys containing '$' and '.')"""
+def harmonize_document(query, lowercase=True, units_format=None, dropna=True):
+    """Modify dangerous keys in nested dictionaries ('_id', keys containing '$' and '.'), normalize case, format units, drop terminal NaNs"""
     unit_key = "unit" if lowercase else "Unit"
     if isinstance(query, dict):
         harmonized = {}
-        for k, v in query.items():
-            harmonized_key = k.replace("$", "_").replace(".", "_")
+        for key, branch in query.items():
+            harmonized_key = key.replace("$", "_").replace(".", "_")
             if lowercase:
                 harmonized_key = harmonized_key.lower()
             if harmonized_key == "_id":
                 harmonized_key = "__id"
             if harmonized_key not in harmonized:
-                if isinstance(v, (list, dict)):
-                    harmonized[harmonized_key] = harmonize_query(
-                        v, lowercase=lowercase, units_format=units_format,
-                    )
-                else:
-                    harmonized[harmonized_key] = v
+                harmonized_branch = harmonize_document(
+                    branch, lowercase, units_format, dropna,
+                )
+                if harmonized_branch:
+                    harmonized[harmonized_key] = harmonized_branch
             else:
                 raise InvalidDocumentError("Harmonized keys conflict")
-        is_unit_formattable = (
-            units_format and ("" in harmonized) and (unit_key in harmonized) and
-            (harmonized[unit_key] != "") and (not isnull(harmonized[unit_key]))
-        )
-        if is_unit_formattable:
-            return format_units(
-                harmonized, unit_key=unit_key, units_format=units_format,
-            )
+        if units_format and is_unit_formattable(harmonized, unit_key):
+            return format_units(harmonized, unit_key, units_format)
         else:
             return harmonized
     elif isinstance(query, (list, ValuesView)):
         return [
-            harmonize_query(q, lowercase=lowercase, units_format=units_format)
+            harmonize_document(q, lowercase, units_format, dropna)
             for q in query
         ]
-    else:
+    elif (not dropna) or (not isempty(query)):
         return query
+    else:
+        return {}
 
 
-def replace_doc(collection, query, doc):
+def replace_document(collection, query, doc):
     """Shortcut to drop all instances and replace with updated instance"""
     collection.delete_many(query)
     collection.insert_one({**query, **doc})

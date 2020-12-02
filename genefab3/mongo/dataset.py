@@ -1,7 +1,7 @@
 from argparse import Namespace
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.mongo.json import get_fresh_json
-from genefab3.mongo.utils import replace_doc, harmonize_query
+from genefab3.mongo.utils import replace_document, harmonize_document
 from datetime import datetime
 from functools import partial
 from genefab3.mongo.assay import CachedAssay
@@ -35,7 +35,7 @@ class CachedDataset(ColdStorageDataset):
                             ".accession": accession, ".assay": assay_name,
                         })
                         if assay.meta:
-                            db.metadata.insert_many(harmonize_query(
+                            db.metadata.insert_many(harmonize_document(
                                 assay.meta.values(),
                                 units_format=metadata_units_format,
                             ))
@@ -49,7 +49,7 @@ class CachedDataset(ColdStorageDataset):
                             logger.warning(WARN_NO_META, accession, assay_name)
             else:
                 self.assays = CachedAssayDispatcher(self)
-            replace_doc(
+            replace_document(
                 db.dataset_timestamps, {"accession": accession},
                 {"last_refreshed": int(datetime.now().timestamp())},
             )
