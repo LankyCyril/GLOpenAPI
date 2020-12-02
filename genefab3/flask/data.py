@@ -1,6 +1,8 @@
-from genefab3.config import ISA_TECHNOLOGY_TYPE_LOCATOR, TECHNOLOGY_FILE_LOCATORS
-from genefab3.config import INFO
+from genefab3.config import ISA_TECHNOLOGY_TYPE_LOCATOR
+from genefab3.config import TECHNOLOGY_FILE_LOCATORS, INFO
 from genefab3.exceptions import GeneLabMetadataException, GeneLabFileException
+from collections import defaultdict
+from genefab3.mongo.dataset import CachedDataset
 from genefab3.flask.parser import INPLACE_update_context
 from genefab3.flask.meta import get_samples_by_metas
 from genefab3.sql.data import get_sql_data
@@ -14,6 +16,8 @@ NO_FILES_FOR_TECHNOLOGY_ERROR, NO_FILES_FOR_DATATYPE_ERROR = (
     "No data files found for datatype '{}'",
 )
 MULTIPLE_TECHNOLOGIES_ERROR = "Multiple incompatible technology types requested"
+NO_FILES_ERROR = "No data files found for"
+AMBIGUOUS_FILES_ERROR = "Multiple (ambiguous) data files found for"
 
 
 def get_target_file_locator(annotation_by_metas, context):
@@ -45,6 +49,39 @@ def get_target_file_locator(annotation_by_metas, context):
             return target_file_locators.pop()
 
 
+def get_sample_tree(annotation_by_metas):
+    """Convert annotation INFO to a nested dictionary"""
+    info_cols = list(annotation_by_metas[INFO].columns)
+    sample_index = annotation_by_metas[INFO].set_index(info_cols).index
+    tree = defaultdict(lambda: defaultdict(set))
+    for accession, assay_name, sample_name in sample_index:
+        tree[accession][assay_name].add(sample_name)
+    return tree
+
+
+def get_file_descriptor_tree(mongo_db, sample_tree, target_file_locator):
+    """Match one unique file per assay in `sample_tree`"""
+    tree = defaultdict(dict)
+    for accession in sample_tree:
+        glds = CachedDataset(mongo_db, accession, init_assays=False)
+        for assay_name, sample_names in sample_tree[accession].items():
+            file_descriptors = glds.assays[assay_name].get_file_descriptors(
+                regex=target_file_locator.regex,
+                projection={key: True for key in target_file_locator.keys},
+            )
+            if len(file_descriptors) == 0:
+                raise FileNotFoundError(
+                    NO_FILES_ERROR, accession, assay_name,
+                )
+            elif len(file_descriptors) > 1:
+                raise GeneLabFileException(
+                    AMBIGUOUS_FILES_ERROR, accession, assay_name,
+                )
+            else:
+                tree[accession][assay_name] = file_descriptors[0]
+    return tree
+
+
 def get_data_by_metas(dbs, context):
     """Select data based on annotation filters"""
     if ".".join(ISA_TECHNOLOGY_TYPE_LOCATOR) not in context.complete_args:
@@ -54,14 +91,18 @@ def get_data_by_metas(dbs, context):
         )
     # get samples view and parse out per-sample accession and assay names:
     annotation_by_metas = get_samples_by_metas(dbs.mongo_db, context)
-    info_cols = list(annotation_by_metas[INFO].columns)
-    sample_index = annotation_by_metas[INFO].set_index(info_cols).index
-    # infer target data file locator and update/retrieve from SQL:
+    sample_tree = get_sample_tree(annotation_by_metas)
+    # infer target data files per assay:
+    target_file_locator = get_target_file_locator(annotation_by_metas, context)
+    file_descriptor_tree = get_file_descriptor_tree(
+        dbs.mongo_db, sample_tree, target_file_locator,
+    )
+    # update/retrieve from SQL:
     return get_sql_data(
         dbs=dbs,
-        sample_index=sample_index, rows=None,
+        sample_tree=sample_tree,
+        file_descriptor_tree=file_descriptor_tree,
         datatype=context.kwargs["datatype"].lower(),
-        target_file_locator=get_target_file_locator(
-            annotation_by_metas, context,
-        ),
+        rows=None,
+        row_type=target_file_locator.row_type,
     )

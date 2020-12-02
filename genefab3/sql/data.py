@@ -6,18 +6,14 @@ from hashlib import md5
 from genefab3.utils import infer_file_separator
 from pymongo import DESCENDING
 from genefab3.mongo.utils import run_mongo_transaction
-from genefab3.exceptions import GeneLabFileException, GeneLabDatabaseException
+from genefab3.exceptions import GeneLabDatabaseException
 from pandas import read_csv, read_sql, DataFrame, MultiIndex, concat
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 from contextlib import closing
 from sqlite3 import connect
-from collections import defaultdict
-from genefab3.mongo.dataset import CachedDataset
 from genefab3.config import INFO
 
 
-NO_FILES_ERROR = "No data files found for"
-AMBIGUOUS_FILES_ERROR = "Multiple (ambiguous) data files found for"
 MISSING_SAMPLE_NAMES_ERROR = "Missing sample names in GeneFab database"
 MISSING_SQL_TABLE_ERROR = (
     "Missing data table in GeneFab database "
@@ -154,13 +150,11 @@ class CachedTable():
                     )
                 except Exception as e:
                     raise GeneLabDatabaseException(
-                        str(e), self.accession, self.assay_name, self.datatype,
+                        type(e).__name__, str(e),
+                        self.accession, self.assay_name, self.datatype,
                     )
         else:
-            if rows is None:
-                data_subset = self.data
-            else:
-                data_subset = self.data.loc[rows]
+            data_subset = self.data if (rows is None) else self.data.loc[rows]
         if not (set(self.sample_names) <= set(data_subset.columns)):
             raise GeneLabDatabaseException(
                 MISSING_SAMPLE_NAMES_ERROR, self.accession, self.assay_name,
@@ -176,45 +170,22 @@ class CachedTable():
             )
 
 
-def sample_index_to_dict(sample_index):
-    """Convert a MultiIndex of form (accession, assay_name, sample_name) to a nested dictionary"""
-    sample_dict = defaultdict(lambda: defaultdict(set))
-    for accession, assay_name, sample_name in sample_index:
-        sample_dict[accession][assay_name].add(sample_name)
-    return sample_dict
-
-
-def get_sql_data(dbs, sample_index, datatype, target_file_locator, rows=None):
+def get_sql_data(dbs, sample_tree, file_descriptor_tree, datatype, rows=None, row_type="entry"):
     """Based on a MultiIndex of form (accession, assay_name, sample_name), retrieve data from files in `target_file_locator`"""
-    sample_dict = sample_index_to_dict(sample_index)
     tables = []
-    for accession in sample_dict:
-        glds = CachedDataset(dbs.mongo_db, accession, init_assays=False)
-        for assay_name, sample_names in sample_dict[accession].items():
-            file_descriptors = glds.assays[assay_name].get_file_descriptors(
-                regex=target_file_locator.regex,
-                projection={key: True for key in target_file_locator.keys},
-            )
-            if len(file_descriptors) == 0:
-                raise FileNotFoundError(
-                    NO_FILES_ERROR, accession, assay_name,
-                )
-            elif len(file_descriptors) > 1:
-                raise GeneLabFileException(
-                    AMBIGUOUS_FILES_ERROR, accession, assay_name,
-                )
-            else:
-                tables.append(CachedTable(
-                    dbs=dbs,
-                    file_descriptor=file_descriptors[0],
-                    datatype=datatype,
-                    accession=accession,
-                    assay_name=assay_name,
-                    sample_names=sample_names,
-                ))
+    for accession in sample_tree:
+        for assay_name, sample_names in sample_tree[accession].items():
+            tables.append(CachedTable(
+                dbs=dbs,
+                file_descriptor=file_descriptor_tree[accession][assay_name],
+                datatype=datatype,
+                accession=accession,
+                assay_name=assay_name,
+                sample_names=sample_names,
+            ))
     joined_table = concat( # this is in-memory and faster than sqlite3:
         # wesmckinney.com/blog/high-performance-database-joins-with-pandas-dataframe-more-benchmarks
         [table.dataframe(rows=rows) for table in tables], axis=1, sort=False,
     )
-    joined_table.index.name = (INFO, INFO, target_file_locator.row_type)
+    joined_table.index.name = (INFO, INFO, row_type)
     return joined_table.reset_index()
