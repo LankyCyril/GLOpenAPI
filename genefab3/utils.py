@@ -2,7 +2,6 @@ from os import environ
 from genefab3.config import TIMESTAMP_FMT, DEBUG_MARKERS
 from re import sub, escape, split, search, IGNORECASE
 from datetime import datetime
-from natsort import natsorted
 from copy import deepcopy
 from genefab3.exceptions import GeneLabDatabaseException, GeneLabFileException
 
@@ -10,20 +9,6 @@ from genefab3.exceptions import GeneLabDatabaseException, GeneLabFileException
 def is_debug():
     """Determine if app is running in debug mode"""
     return (environ.get("FLASK_ENV", None) in DEBUG_MARKERS)
-
-
-def natsorted_dataframe(dataframe, by, ascending=True, sort_trailing_columns=False):
-    """See: https://stackoverflow.com/a/29582718/590676"""
-    if sort_trailing_columns:
-        ns_df = dataframe[by + natsorted(dataframe.columns[len(by):])].copy()
-    else:
-        ns_df = dataframe.copy()
-    for column in by:
-        ns_df[column] = ns_df[column].astype("category")
-        ns_df[column].cat.reorder_categories(
-            natsorted(set(ns_df[column])), inplace=True, ordered=True,
-        )
-    return ns_df.sort_values(by=by, ascending=ascending)
 
 
 def extract_file_timestamp(fd, key="date_modified", fallback_key="date_created", fallback_value=-1, fmt=TIMESTAMP_FMT):
@@ -62,41 +47,12 @@ class UniversalSet(set):
     def __contains__(self, x): return True
 
 
-def copy_and_update(d, key, E):
-    """Deepcopy dictionary `d`, update `d[key]` with data from `E`"""
-    d_copy = deepcopy(d)
-    d_copy[key].update(E)
-    return d_copy
-
-
 def copy_and_drop(d, keys):
     """Deepcopy dictionary `d`, delete `d[key] for key in keys`"""
     d_copy = deepcopy(d)
     for key in keys:
         del d_copy[key]
     return d_copy
-
-
-def descend_branch(d, step_tracker=0, max_steps=32):
-    """Descend into a non-bifurcating branch and find the terminal leaf"""
-    if step_tracker >= max_steps:
-        raise GeneLabDatabaseException(
-            "Document branch exceeds maximum depth", max_steps,
-        )
-    else:
-        if isinstance(d, dict):
-            if len(d) == 0:
-                raise GeneLabDatabaseException(
-                    "Document branch does not contain a terminal leaf",
-                )
-            elif len(d) == 1:
-                return descend_branch(next(iter(d.values())), step_tracker+1)
-            elif len(d) > 1:
-                raise GeneLabDatabaseException(
-                    "Document branch expected to be linear, but bifurcates",
-                )
-        else:
-            return d
 
 
 def iterate_terminal_leaves(d, step_tracker=0, max_steps=32):

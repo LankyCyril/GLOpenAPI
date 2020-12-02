@@ -1,4 +1,3 @@
-from bson import Code
 from bson.errors import InvalidDocument as InvalidDocumentError
 from pandas import isnull
 from functools import partial
@@ -89,12 +88,3 @@ def run_mongo_transaction(action, collection, query=None, data=None, documents=N
                     raise GeneLabDatabaseException(INSERT_MANY_ERROR)
             else:
                 raise GeneLabDatabaseException(ACTION_ERROR, action)
-
-
-def get_collection_fields(collection, skip=set()):
-    """Parse collection for keys, except for `skip`; see: https://stackoverflow.com/a/48117846/590676"""
-    reduced = collection.map_reduce(
-        Code("function() {for (var key in this) {emit(key, null);}}"),
-        Code("function(key, stuff) {return null;}"), "_",
-    )
-    return set(reduced.distinct("_id")) - {"_id"} - skip
