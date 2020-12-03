@@ -4,10 +4,8 @@ from genefab3.config import ANNOTATION_CATEGORIES, DEFAULT_FORMATS
 from genefab3.utils import UniversalSet
 from collections import defaultdict, OrderedDict
 from werkzeug.datastructures import MultiDict
+from genefab3.config import DISALLOWED_CONTEXTS
 from genefab3.exceptions import GeneLabParserException
-
-
-FILE_VIEW_ARGS = {"filename", "from", "fmt", "debug"}
 
 
 def assay_pair_to_query(key, value):
@@ -120,40 +118,16 @@ def INPLACE_fill_context_defaults(context):
         context.kwargs["debug"] = "0"
 
 
-FILE_FILENAME_ERROR = "/file/ requires at most one 'filename=' argument"
-FILE_DATASET_ERROR = "/file/ requires a single dataset in the 'from=' argument"
-FILE_ASSAY_ERROR = "/file/ requires at most one assay in the 'from=' argument"
-FILE_DATASET_TRAILING_ERROR, FILE_ASSAY_TRAILING_ERROR = (
-    "/file/ cannot accept annotation categories for lookups in a dataset",
-    "/file/ requires at most one annotation category for lookups in an assay",
-)
-
-
 def validate_context(context):
     """Check that no arguments conflict"""
-    if (context.kwargs["fmt"] == "cls") and (context.view != "/samples/"):
-        raise GeneLabParserException("'fmt=cls' is only valid for /samples/")
-    if (context.kwargs["fmt"] == "gct") and (context.view != "/data/"):
-        raise GeneLabParserException("'fmt=gct' is only valid for /data/")
-    if (context.view == "/data/") and ("datatype" not in context.kwargs):
-        raise GeneLabParserException("/data/ requires a 'datatype=' argument")
-    if context.view == "/file/":
-        if len(context.kwargs.getlist("filename")) > 1:
-            raise GeneLabParserException(FILE_FILENAME_ERROR)
-        if len(context.accessions_and_assays) != 1:
-            raise GeneLabParserException(FILE_DATASET_ERROR)
-        else:
-            assay_names = next(iter(context.accessions_and_assays.values()))
-            if len(assay_names) == 0:
-                if len(context.projection) > 0:
-                    raise GeneLabParserException(FILE_DATASET_TRAILING_ERROR)
-            elif len(assay_names) == 1:
-                if len(context.projection) > 1:
-                    raise GeneLabParserException(FILE_ASSAY_TRAILING_ERROR)
-            elif len(assay_names) > 1:
-                raise GeneLabParserException(FILE_ASSAY_ERROR)
-        if context.kwargs["fmt"] != "raw":
-            raise GeneLabParserException("/file/ only accepts 'fmt=raw'")
+    for scenario in DISALLOWED_CONTEXTS:
+        scenario_matches = all([
+            f2(f1(getattr(context, attribute), v1), v2)
+            for attribute, (f1, v1, f2, v2)
+            in filter(lambda kv: kv[0] != "_", scenario.items())
+        ])
+        if scenario_matches:
+            raise GeneLabParserException(scenario["_"])
 
 
 def parse_request(request):

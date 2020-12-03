@@ -34,6 +34,49 @@ CACHER_THREAD_CHECK_INTERVAL = 1800 # 30 minutes (in seconds)
 CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
 
 
+## API parser parameters
+
+from operator import eq, ne, gt, getitem, contains, length_hint
+leaf_count = lambda d, _: sum(len(v) for v in d.values())
+
+DISALLOWED_CONTEXTS = [
+    dict(_="'fmt=cls' is only valid for /samples/",
+        view=(eq, "/samples/", eq, False), kwargs=(getitem, "fmt", eq, "cls"),
+    ),
+    dict(_="'fmt=gct' is only valid for /data/",
+        view=(eq, "/data/", eq, False), kwargs=(getitem, "fmt", eq, "gct"),
+    ),
+    dict(_="/data/ requires a 'datatype=' argument",
+        view=(eq, "/data/", eq, True), kwargs=(contains, "datatype", eq, False),
+    ),
+    dict(_="/file/ only accepts 'fmt=raw'",
+        view=(eq, "/file/", eq, True), kwargs=(getitem, "fmt", ne, "raw"),
+    ),
+    dict(_="/file/ requires at most one 'filename=' argument",
+        view=(eq, "/file/", eq, True),
+        kwargs=(lambda d, k: len(d.getlist(k)), "filename", gt, 1),
+    ),
+    dict(_="/file/ requires a single dataset in the 'from=' argument",
+        view=(eq, "/file/", eq, True),
+        accessions_and_assays=(length_hint, 0, ne, 1), # no. of datasets != 1
+    ),
+    dict(_="/file/ metadata categories are only valid for lookups in assays",
+        view=(eq, "/file/", eq, True),
+        accessions_and_assays=(leaf_count, None, eq, 0), # no. of assays == 0
+        projection=(length_hint, 0, gt, 0), # projection present
+    ),
+    dict(_="/file/ accepts at most one metadata category for lookups in assays",
+        view=(eq, "/file/", eq, True),
+        accessions_and_assays=(leaf_count, None, eq, 1), # no. of assays == 1
+        projection=(length_hint, 0, gt, 1), # many fields to look in
+    ),
+    dict(_="/file/ requires at most one assay in the 'from=' argument",
+        view=(eq, "/file/", eq, True),
+        accessions_and_assays=(leaf_count, None, gt, 1), # no. of assays > 1
+    ),
+]
+
+
 ## (Meta)data parameters
 
 ISA_ZIP_REGEX = r'.*_metadata_.*[_-]ISA\.zip$'
@@ -46,6 +89,7 @@ ISA_TECHNOLOGY_TYPE_LOCATOR = (
 
 from collections import namedtuple
 Locator = namedtuple("Locator", ["keys", "regex", "row_type"])
+
 TECHNOLOGY_FILE_LOCATORS = {
     "rna sequencing (rna-seq)": {
         "unnormalized counts": Locator(
