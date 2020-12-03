@@ -4,6 +4,7 @@ from pandas import isnull
 from genefab3.flask.display.formatters import get_browser_formatters, build_url
 from genefab3.utils import map_replace
 from flask import Response
+from genefab3.exceptions import GeneLabFormatException
 
 
 DF_KWS = dict(index=False, header=False, na_rep="NA")
@@ -107,5 +108,5 @@ def render_dataframe(df, context):
         content = get_browser_dataframe(df, context)
         mimetype = "text/html"
     else:
-        raise NotImplementedError("fmt='{}'".format(context.kwargs["fmt"]))
+        raise GeneLabFormatException("fmt='{}'".format(context.kwargs["fmt"]))
     return Response(content, mimetype=mimetype)

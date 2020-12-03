@@ -2,9 +2,11 @@ from genefab3.flask.parser import parse_request
 from genefab3.utils import is_debug
 from json import dumps
 from genefab3.exceptions import GeneLabException, GeneLabParserException
+from genefab3.exceptions import GeneLabFormatException
 from genefab3.flask.display.forms import needs_datatype, render_dropdown
 from pandas import DataFrame, MultiIndex
 from genefab3.flask.display.raw import render_raw
+from genefab3.flask.display.cls import render_cls
 from genefab3.flask.display.dataframe import render_dataframe
 from itertools import cycle
 
@@ -26,10 +28,12 @@ def display(db, getter, kwargs, request):
             raise GeneLabException("No data")
         elif context.kwargs["fmt"] == "raw":
             return render_raw(obj, context)
+        elif context.kwargs["fmt"] == "cls":
+            return render_cls(obj, context)
         elif isinstance(obj, DataFrame):
             return render_dataframe(obj, context)
         else:
-            raise NotImplementedError("Display of {} with 'fmt={}'".format(
+            raise GeneLabFormatException("Display of {} with 'fmt={}'".format(
                 type(obj).__name__, context.kwargs.get("fmt", "[unspecified]"),
             ))
 

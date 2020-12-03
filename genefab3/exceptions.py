@@ -13,6 +13,7 @@ class GeneLabJSONException(GeneLabException): pass
 class GeneLabISAException(GeneLabException): pass
 class GeneLabFileException(GeneLabException): pass
 class GeneLabDataManagerException(GeneLabException): pass
+class GeneLabFormatException(GeneLabException): pass
 
 
 def interpret_exc_info(ei):
