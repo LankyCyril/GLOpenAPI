@@ -1,4 +1,4 @@
-from genefab3.exceptions import GeneLabDatabaseException, GeneLabParserException
+from genefab3.exceptions import GeneLabDatabaseException
 from re import escape
 from genefab3.utils import UniversalSet, iterate_terminal_leaf_filenames
 
@@ -43,7 +43,10 @@ class CachedAssay():
             dataset_candidates = UniversalSet()
         candidate_filenames = metadata_candidates & dataset_candidates
         if isinstance(candidate_filenames, UniversalSet):
-            raise GeneLabParserException("No search criteria specified")
+            raise ValueError(
+                "get_file_descriptors() accepts exactly one "
+                "of `filename`, `regex`, `glob`"
+            )
         elif candidate_filenames:
             return self.dataset.get_file_descriptors(
                 regex=r'^({})$'.format(

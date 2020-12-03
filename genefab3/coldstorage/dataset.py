@@ -83,7 +83,7 @@ class ColdStorageDataset():
         """Given mask, find filenames, urls, and datestamps"""
         if sum(arg is not None for arg in (name, regex, glob)) != 1:
             raise ValueError(
-                "ColdStorageDataset.get_file_descriptors() accepts exactly one "
+                "get_file_descriptors() accepts exactly one "
                 "of `filename`, `regex`, `glob`"
             )
         elif name is not None:

@@ -1,4 +1,4 @@
-from genefab3.exceptions import GeneLabFileException
+from genefab3.exceptions import GeneLabFileException, GeneLabParserException
 from genefab3.mongo.dataset import CachedDataset
 from urllib.request import urlopen
 
@@ -21,12 +21,15 @@ def get_file(db, context):
         lookup_kwargs = dict(regex=mask[1:-1])
     else: # simple filename passed, match full
         lookup_kwargs = dict(name=mask)
-    if assay_name: # search within specific assay
-        file_descriptors = glds.assays[assay_name].get_file_descriptors(
-            **lookup_kwargs, projection=context.projection,
-        )
-    else: # search in entire dataset
-        file_descriptors = glds.get_file_descriptors(**lookup_kwargs)
+    try:
+        if assay_name: # search within specific assay
+            file_descriptors = glds.assays[assay_name].get_file_descriptors(
+                **lookup_kwargs, projection=context.projection,
+            )
+        else: # search in entire dataset
+            file_descriptors = glds.get_file_descriptors(**lookup_kwargs)
+    except ValueError:
+        raise GeneLabParserException("No search criteria specified")
     if not file_descriptors:
         raise GeneLabFileException("Requested file not found")
     elif len(file_descriptors) > 1:
