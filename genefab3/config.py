@@ -38,8 +38,13 @@ CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
 
 from operator import eq, ne, gt, getitem, contains, length_hint
 leaf_count = lambda d, h: sum(length_hint(v, h) for v in d.values())
+listlen = lambda d, k: len(d.getlist(k))
 
 DISALLOWED_CONTEXTS = [
+    dict(_="at least one dataset or annotation category must be specified",
+        projection=(length_hint, 0, eq, 0), # no projection
+        accessions_and_assays=(length_hint, 0, eq, 0), # no datasets
+    ),
     dict(_="'fmt=cls' is only valid for /samples/",
         view=(eq, "/samples/", eq, False), kwargs=(getitem, "fmt", eq, "cls"),
     ),
@@ -53,8 +58,7 @@ DISALLOWED_CONTEXTS = [
         view=(eq, "/file/", eq, True), kwargs=(getitem, "fmt", ne, "raw"),
     ),
     dict(_="/file/ requires at most one 'filename=' argument",
-        view=(eq, "/file/", eq, True),
-        kwargs=(lambda d, k: len(d.getlist(k)), "filename", gt, 1),
+        view=(eq, "/file/", eq, True), kwargs=(listlen, "filename", gt, 1),
     ),
     dict(_="/file/ requires a single dataset in the 'from=' argument",
         view=(eq, "/file/", eq, True),
