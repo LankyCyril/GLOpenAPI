@@ -37,7 +37,7 @@ CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
 ## API parser parameters
 
 from operator import eq, ne, gt, getitem, contains, length_hint
-leaf_count = lambda d, _: sum(len(v) for v in d.values())
+leaf_count = lambda d, h: sum(length_hint(v, h) for v in d.values())
 
 DISALLOWED_CONTEXTS = [
     dict(_="'fmt=cls' is only valid for /samples/",
@@ -62,17 +62,17 @@ DISALLOWED_CONTEXTS = [
     ),
     dict(_="/file/ metadata categories are only valid for lookups in assays",
         view=(eq, "/file/", eq, True),
-        accessions_and_assays=(leaf_count, None, eq, 0), # no. of assays == 0
+        accessions_and_assays=(leaf_count, 0, eq, 0), # no. of assays == 0
         projection=(length_hint, 0, gt, 0), # projection present
     ),
     dict(_="/file/ accepts at most one metadata category for lookups in assays",
         view=(eq, "/file/", eq, True),
-        accessions_and_assays=(leaf_count, None, eq, 1), # no. of assays == 1
+        accessions_and_assays=(leaf_count, 0, eq, 1), # no. of assays == 1
         projection=(length_hint, 0, gt, 1), # many fields to look in
     ),
     dict(_="/file/ requires at most one assay in the 'from=' argument",
         view=(eq, "/file/", eq, True),
-        accessions_and_assays=(leaf_count, None, gt, 1), # no. of assays > 1
+        accessions_and_assays=(leaf_count, 0, gt, 1), # no. of assays > 1
     ),
 ]
 
