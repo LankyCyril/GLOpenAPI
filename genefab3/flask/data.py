@@ -5,6 +5,7 @@ from collections import defaultdict
 from genefab3.mongo.dataset import CachedDataset
 from genefab3.flask.parser import INPLACE_update_context
 from genefab3.flask.meta import get_samples_by_metas
+from genefab3.flask.display import Placeholders
 from genefab3.sql.data import get_sql_data
 
 
@@ -22,7 +23,9 @@ AMBIGUOUS_FILES_ERROR = "Multiple (ambiguous) data files found for"
 
 def get_target_file_locator(annotation_by_metas, context):
     """Infer regex to look up data file(s)"""
-    if ISA_TECHNOLOGY_TYPE_LOCATOR not in annotation_by_metas:
+    if len(annotation_by_metas) == 0:
+        return None # no samples, therefore no data files
+    elif ISA_TECHNOLOGY_TYPE_LOCATOR not in annotation_by_metas:
         raise GeneLabMetadataException(ISA_TECHNOLOGY_NOT_SPECIFIED_ERROR)
     else:
         target_file_locators = set()
@@ -94,15 +97,18 @@ def get_data_by_metas(dbs, context):
     sample_tree = get_sample_tree(annotation_by_metas)
     # infer target data files per assay:
     target_file_locator = get_target_file_locator(annotation_by_metas, context)
-    file_descriptor_tree = get_file_descriptor_tree(
-        dbs.mongo_db, sample_tree, target_file_locator,
-    )
-    # update/retrieve from SQL:
-    return get_sql_data(
-        dbs=dbs,
-        sample_tree=sample_tree,
-        file_descriptor_tree=file_descriptor_tree,
-        datatype=context.kwargs["datatype"].lower(),
-        rows=None,
-        row_type=target_file_locator.row_type,
-    )
+    if target_file_locator is None:
+        return Placeholders.dataframe([INFO], [INFO], ["entry"])
+    else:
+        file_descriptor_tree = get_file_descriptor_tree(
+            dbs.mongo_db, sample_tree, target_file_locator,
+        )
+        # update/retrieve from SQL:
+        return get_sql_data(
+            dbs=dbs,
+            sample_tree=sample_tree,
+            file_descriptor_tree=file_descriptor_tree,
+            datatype=context.kwargs["datatype"].lower(),
+            rows=None,
+            row_type=target_file_locator.row_type,
+        )

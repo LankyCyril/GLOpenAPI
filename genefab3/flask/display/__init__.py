@@ -6,6 +6,7 @@ from genefab3.flask.display.forms import needs_datatype, render_dropdown
 from pandas import DataFrame, MultiIndex
 from genefab3.flask.display.raw import render_raw
 from genefab3.flask.display.dataframe import render_dataframe
+from itertools import cycle
 
 
 def display(db, getter, kwargs, request):
@@ -36,17 +37,11 @@ def display(db, getter, kwargs, request):
 class Placeholders:
     """Defines placeholder objects for situations where empty results need to be displayed"""
  
-    def dataframe(*args, **kwargs):
+    def dataframe(*level_values):
         """Return an empty dataframe with specificed column names"""
-        if args and kwargs:
-            raise NotImplementedError(
-                "Placeholders.dataframe() received too many arguments",
-            )
-        elif args:
-            return DataFrame(columns=args)
-        elif kwargs:
-            return DataFrame(
-                columns=MultiIndex.from_tuples(
-                    (k, v) for k, vv in kwargs.items() for v in vv
-                ),
-            )
+        maxlen = max(map(len, level_values))
+        cyclers = [
+            cycle(values) if (len(values) < maxlen) else iter(values)
+            for values in level_values
+        ]
+        return DataFrame(columns=MultiIndex.from_tuples(zip(*cyclers)))

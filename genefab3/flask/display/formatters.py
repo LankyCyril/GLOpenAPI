@@ -69,7 +69,7 @@ def get_browser_formatters(df, context, shortnames):
     formatters = []
     if df.columns[0] == (INFO, "accession"):
         formatters.append(get_browser_glds_formatter(context))
-    if df.columns[1] == (INFO, "assay"):
+    if (len(df.columns) > 1) and (df.columns[1] == (INFO, "assay")):
         formatters.append(get_browser_assay_formatter(context, shortnames))
     for i, (key, target) in enumerate(df.columns):
         category, *subkeys = key.split(".")

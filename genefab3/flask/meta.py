@@ -87,7 +87,7 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
         )
     except (OperationFailure, TypeError): # no data retrieved/retrievable
         return Placeholders.dataframe(
-            info=["accession", "assay", *(c.strip(".") for c in include)],
+            [INFO], ["accession", "assay", *(c.strip(".") for c in include)],
         )
     else:
         if aggregate: # coerce to boolean "existence" if requested
