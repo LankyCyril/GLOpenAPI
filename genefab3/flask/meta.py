@@ -1,14 +1,14 @@
+from genefab3.config import MONGO_DB_LOCALE, RAW_FILE_REGEX, INFO
 from pymongo import ASCENDING
 from pandas import json_normalize, MultiIndex, isnull, concat, merge
 from genefab3.exceptions import GeneLabDatabaseException
 from argparse import Namespace
 from re import findall, search, IGNORECASE, escape, split
-from genefab3.config import RAW_FILE_REGEX, INFO
 from genefab3.flask.display import Placeholders
 from numpy import nan
 
 
-def get_raw_meta_df(collection, query, projection, include, locale="en_US"):
+def get_raw_meta_df(collection, query, projection, include, locale=MONGO_DB_LOCALE):
     """Get target metadata as a single-level dataframe, numerically sorted by info fields"""
     by = [(field, ASCENDING) for field in [".accession", ".assay", *include]]
     order = {"locale": locale, "numericOrdering": True}
