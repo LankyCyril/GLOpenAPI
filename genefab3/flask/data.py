@@ -56,9 +56,8 @@ def get_target_trees(mongo_db, query, datatype):
             )
         except (KeyError, TypeError):
             raise GeneLabFileException(
-                NO_FILES_FOR_DATATYPE_ERROR,
-                f"accession={accession}", f"assay={assay_name}",
-                f"technology={technology}", f"datatype={datatype}",
+                NO_FILES_FOR_DATATYPE_ERROR, accession, assay_name,
+                technology=technology, datatype=datatype,
             )
         if len(file_locators) > 1:
             raise GeneLabMetadataException(MULTIPLE_TECHNOLOGIES_ERROR)

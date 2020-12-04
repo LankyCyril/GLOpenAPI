@@ -1,9 +1,10 @@
+from genefab3.coldstorage import AssayBase
 from genefab3.exceptions import GeneLabDatabaseException
 from re import escape
 from genefab3.utils import UniversalSet, iterate_terminal_leaf_filenames
 
 
-class CachedAssay():
+class CachedAssay(AssayBase):
     """Exposes individual assay information and metadata"""
  
     def __init__(self, dataset, assay_name):

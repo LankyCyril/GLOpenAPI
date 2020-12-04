@@ -1,3 +1,4 @@
+from genefab3.coldstorage import DatasetBase
 from argparse import Namespace
 from re import search
 from urllib.parse import quote
@@ -11,7 +12,7 @@ from collections import defaultdict
 from genefab3.coldstorage.assay import ColdStorageAssay
 
 
-class ColdStorageDataset():
+class ColdStorageDataset(DatasetBase):
     """Contains GLDS metadata associated with an accession number"""
     json = Namespace()
     changed = Namespace()

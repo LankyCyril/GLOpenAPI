@@ -5,7 +5,37 @@ from traceback import format_tb
 from logging import Handler
 
 
-class GeneLabException(Exception): pass
+class GeneLabException(Exception):
+    def __init__(self, message="Error", accession_or_object=None, explicit_assay_name=None, **kwargs):
+        from genefab3.coldstorage import DatasetBase, AssayBase
+        args = [message]
+        if isinstance(accession_or_object, DatasetBase):
+            accession, assay_name = accession_or_object.accession, None
+        elif isinstance(accession_or_object, AssayBase):
+            accession = accession_or_object.dataset.accession
+            assay_name = accession_or_object.name
+        elif accession_or_object is None:
+            accession, assay_name = None, None
+        else:
+            accession, assay_name = str(accession_or_object), None
+        if explicit_assay_name is not None:
+            assay_name = explicit_assay_name
+        if accession is not None:
+            args.append(f'accession="{accession}"')
+        if assay_name is not None:
+            args.append(f'assay.name="{assay_name}"')
+        for k, v in kwargs.items():
+            args.append(f'{k}="{v}"')
+        super().__init__(*args)
+    def __str__(self):
+        if len(self.args) == 0:
+            return "Error"
+        elif len(self.args) == 1:
+            return self.args[0]
+        else:
+            return self.args[0] + ". Happened with: " + ", ".join(self.args[1:])
+
+
 class GeneLabParserException(GeneLabException): pass
 class GeneLabMetadataException(GeneLabException): pass
 class GeneLabDatabaseException(GeneLabException): pass
@@ -26,6 +56,8 @@ HTTP_ERROR_MASK = """<html>
         <b>HTTP error</b>: <mark>{} ({})</mark><br><br><b>{}</b>: {}
     </body>
 </html>"""
+HTML_LIST_SEP = "<br>&middot;&nbsp;"
+HTTP_DEBUG_ERROR_MASK = "<h2>{}: {}</h2><pre>{}</pre><br><b>{}: {}</b>"
 
 
 def interpret_exc_info(ei):
@@ -52,8 +84,9 @@ def insert_log_entry(log_collection, et=None, ev=None, stack=None, is_exception=
 def traceback_printer(e, db):
     exc_type, exc_value, exc_tb, info = interpret_exc_info(exc_info())
     insert_log_entry(db.log, *info, is_exception=True)
-    error_mask = "<h2>{}: {}</h2><pre>{}</pre><br><b>{}: {}</b>"
-    error_message = error_mask.format(*info, exc_type.__name__, str(exc_value))
+    error_message = HTTP_DEBUG_ERROR_MASK.format(
+        *info, exc_type.__name__, str(exc_value),
+    )
     return error_message, 400
 
 
@@ -71,8 +104,10 @@ def exception_catcher(e, db):
     *_, info = interpret_exc_info(exc_info())
     insert_log_entry(db.log, *info, is_exception=True, code=code)
     error_message = HTTP_ERROR_MASK.format(
-        code, explanation, type(e).__name__,
-        "<br>&middot;&nbsp;".join(e.args) if hasattr(e, "args") else str(e),
+        code, explanation, type(e).__name__, (
+            (HTML_LIST_SEP.join(e.args) if hasattr(e, "args") else str(e))
+            or type(e).__name__
+        ),
     )
     return error_message, code
 
