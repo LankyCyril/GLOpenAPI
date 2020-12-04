@@ -16,6 +16,18 @@ class GeneLabDataManagerException(GeneLabException): pass
 class GeneLabFormatException(GeneLabException): pass
 
 
+HTTP_ERROR_MASK = """<html>
+    <head>
+        <style>
+            * {{font-size: 12pt; font-family: monospace}}
+        </style>
+    </head>
+    <body>
+        <b>HTTP error</b>: <mark>{} ({})</mark><br><br><b>{}</b>: {}
+    </body>
+</html>"""
+
+
 def interpret_exc_info(ei):
     exc_type, exc_value, exc_tb = ei
     info = [
@@ -58,8 +70,11 @@ def exception_catcher(e, db):
         code, explanation = 400, "Bad Request"
     *_, info = interpret_exc_info(exc_info())
     insert_log_entry(db.log, *info, is_exception=True, code=code)
-    error_mask = "<b>HTTP error</b>: {} ({})<br><b>{}</b>: {}"
-    return error_mask.format(code, explanation, type(e).__name__, str(e)), code
+    error_message = HTTP_ERROR_MASK.format(
+        code, explanation, type(e).__name__,
+        "<br>&middot;&nbsp;".join(e.args) if hasattr(e, "args") else str(e),
+    )
+    return error_message, code
 
 
 class DBLogger(Handler):
