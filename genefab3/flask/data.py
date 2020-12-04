@@ -8,29 +8,33 @@ from operator import getitem
 from genefab3.sql.data import get_sql_data
 
 
-NO_FILES_ERROR = "No data files found for"
-AMBIGUOUS_FILES_ERROR = "Multiple (ambiguous) data files found for"
+NO_FILES_ERROR = "No data files found for datatype"
+AMBIGUOUS_FILES_ERROR = "Multiple (ambiguous) data files found for datatype"
 NO_FILES_FOR_DATATYPE_ERROR = "No data files found for datatype"
-MULTIPLE_TECHNOLOGIES_ERROR = "Multiple incompatible technology types requested"
+MULTIPLE_TECHNOLOGIES_ERROR = "Incompatible technology types in request"
 
 
-def get_file_descriptor(mongo_db, accession, assay_name, target_file_locator):
+def get_file_descriptor(mongo_db, accession, assay_name, target_file_locator, datatype):
     """Match one unique file per assay based on `target_file_locator`"""
     glds = CachedDataset(mongo_db, accession, init_assays=False)
     file_descriptors = glds.assays[assay_name].get_file_descriptors(
         regex=target_file_locator.regex,
         projection={key: True for key in target_file_locator.keys},
     )
+    error_args = (
+        f"accession={accession}", f"assay={assay_name}",
+        f"datatype={datatype}",
+    )
     if len(file_descriptors) == 0:
-        raise FileNotFoundError(NO_FILES_ERROR, accession, assay_name)
+        raise FileNotFoundError(NO_FILES_ERROR, *error_args)
     elif len(file_descriptors) > 1:
-        raise GeneLabFileException(AMBIGUOUS_FILES_ERROR, accession, assay_name)
+        raise GeneLabFileException(AMBIGUOUS_FILES_ERROR, *error_args)
     else:
         return file_descriptors[0]
 
 
 def get_target_trees(mongo_db, query, datatype):
-    """...""" # TODO refactor me
+    """Retrieve `accession -> assay -> samples`, `accession -> assay -> file_descriptor` dictionaries, and row_type"""
     sample_tree = defaultdict(lambda: defaultdict(set))
     file_locators = set()
     file_descriptor_tree = defaultdict(dict)
@@ -61,7 +65,7 @@ def get_target_trees(mongo_db, query, datatype):
         else:
             file_descriptor_tree[accession][assay_name] = get_file_descriptor(
                 mongo_db, accession, assay_name,
-                next(iter(file_locators)),
+                next(iter(file_locators)), datatype,
             )
     return sample_tree, file_descriptor_tree, file_locators.pop().row_type
 
