@@ -37,20 +37,23 @@ def infer_target_file_locator(raw_annotation, datatype):
     technologies = set(
         raw_annotation[ISA_TECH_TYPE_LOCATOR].str.lower().drop_duplicates()
     )
-    if len(technologies) == 0:
+    target_file_locators = set()
+    for technology in technologies:
+        try:
+            locator = TECHNOLOGY_FILE_LOCATORS[technology][datatype]
+            target_file_locators.add(locator)
+        except (KeyError, TypeError, IndexError):
+            raise GeneLabFileException(
+                NO_FILES_ERROR, technology=technology, datatype=datatype,
+            )
+    if len(target_file_locators) == 0:
         raise GeneLabFileException(NO_FILES_ERROR, datatype=datatype)
-    elif len(technologies) > 1:
+    elif len(target_file_locators) > 1:
         raise GeneLabMetadataException(
             MULTIPLE_TECHNOLOGIES_ERROR, technologies=technologies,
         )
     else:
-        technology = technologies.pop()
-        try:
-            return TECHNOLOGY_FILE_LOCATORS[technology][datatype]
-        except:
-            raise GeneLabFileException(
-                NO_FILES_ERROR, technology=technology, datatype=datatype,
-            )
+        return target_file_locators.pop()
 
 
 def add_file_descriptors(mongo_db, raw_annotation, datatype):
