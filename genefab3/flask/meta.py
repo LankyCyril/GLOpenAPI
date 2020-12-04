@@ -8,7 +8,7 @@ from genefab3.flask.display import Placeholders
 from numpy import nan
 
 
-def get_mongo_table(collection, query, projection, include, locale="en_US"):
+def get_raw_meta_df(collection, query, projection, include, locale="en_US"):
     """Get target metadata as a single-level dataframe, numerically sorted by info fields"""
     by = [(field, ASCENDING) for field in [".accession", ".assay", *include]]
     order = {"locale": locale, "numericOrdering": True}
@@ -87,7 +87,7 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
         else:
             proj = {"_id": False}
         # get target metadata as single-level dataframe:
-        dataframe = get_mongo_table(db.metadata, context.query, proj, include)
+        dataframe = get_raw_meta_df(db.metadata, context.query, proj, include)
         # modify with injected function:
         dataframe = modify(dataframe, full_projection)
         # remove trailing dots and hide columns that are explicitly hidden:

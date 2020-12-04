@@ -101,11 +101,11 @@ class CachedTable():
             if self.data.columns[0] not in self.sample_names:
                 self.data.set_index(self.data.columns[0], inplace=True)
                 self.data.index.name = None
+            self.data = self.data[self.sample_names]
         except Exception as e:
             self.logger.error(
-                CACHED_TABLE_LOGGER_ERROR_MASK,
-                repr(e), self.accession, self.assay_name, self.datatype,
-                self.file.url, stack_info=True,
+                CACHED_TABLE_LOGGER_ERROR_MASK, repr(e), self.accession,
+                self.assay_name, self.datatype, self.file.url, stack_info=True,
             )
             return False
         else:
@@ -116,17 +116,16 @@ class CachedTable():
                     )
                 except Exception as e:
                     self.logger.error(
-                        CACHED_TABLE_LOGGER_ERROR_MASK,
-                        repr(e), self.accession, self.assay_name, self.datatype,
-                        self.file.url, stack_info=True,
+                        CACHED_TABLE_LOGGER_ERROR_MASK, repr(e), self.accession,
+                        self.assay_name, self.datatype, self.file.url,
+                        stack_info=True,
                     )
                     sql_connection.rollback()
                     return False
                 else:
                     self.logger.info(
-                        CACHED_TABLE_LOGGER_SUCCESS_MASK,
-                        self.accession, self.assay_name, self.datatype,
-                        self.file.url,
+                        CACHED_TABLE_LOGGER_SUCCESS_MASK, self.accession,
+                        self.assay_name, self.datatype, self.file.url,
                     )
                     sql_connection.commit()
                     return True
@@ -170,19 +169,21 @@ class CachedTable():
             )
 
 
-def get_sql_data(dbs, sample_tree, file_descriptor_tree, datatype, rows=None):
-    """Based on a MultiIndex of form (accession, assay_name, sample_name), retrieve data from files in `target_file_locator`"""
-    tables = []
-    for accession in sample_tree:
-        for assay_name, sample_names in sample_tree[accession].items():
-            tables.append(CachedTable(
-                dbs=dbs,
-                file_descriptor=file_descriptor_tree[accession][assay_name],
-                datatype=datatype,
-                accession=accession,
-                assay_name=assay_name,
-                sample_names=sample_names,
-            ))
+def get_sql_data(dbs, raw_annotation, datatype, rows=None):
+    """Based on `raw_annotation` (accessions, assays, sample names, file descriptors), update/retrieve data from SQL database"""
+    groupby = raw_annotation.groupby(
+        [".accession", ".assay"], as_index=False, sort=False,
+    )
+    agg, tables = groupby.agg(list).iterrows(), []
+    for _, (accession, assay_name, sample_names, _, file_descriptors) in agg:
+        tables.append(CachedTable(
+            dbs=dbs,
+            file_descriptor=file_descriptors[0], # all are the same (see merge)
+            datatype=datatype,
+            accession=accession,
+            assay_name=assay_name,
+            sample_names=sample_names,
+        ))
     joined_table = concat( # this is in-memory and faster than sqlite3:
         # wesmckinney.com/blog/high-performance-database-joins-with-pandas-dataframe-more-benchmarks
         [table.dataframe(rows=rows) for table in tables], axis=1, sort=False,
