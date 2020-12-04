@@ -1,4 +1,5 @@
-from genefab3.config import COLD_SEARCH_MASK, MAX_JSON_AGE #, MONGO_DB_LOCALE
+from genefab3.config import COLD_SEARCH_MASK, MAX_JSON_AGE
+from genefab3.config import INFO, MONGO_DB_LOCALE
 from genefab3.mongo.json import get_fresh_json
 from datetime import datetime
 from pandas import Series
@@ -6,7 +7,7 @@ from copy import deepcopy
 from genefab3.mongo.utils import run_mongo_transaction
 from logging import getLogger, DEBUG
 from threading import Thread
-#from pymongo import ASCENDING
+from pymongo import ASCENDING
 from genefab3.config import CACHER_THREAD_CHECK_INTERVAL
 from genefab3.config import CACHER_THREAD_RECHECK_DELAY
 from genefab3.mongo.dataset import CachedDataset
@@ -88,7 +89,7 @@ def INPLACE_update_metadata_index_values(index, metadata):
 
 
 def update_metadata_index(db, template=INDEX_TEMPLATE):
-    """Collect existing keys and values for lookups"""
+    """Collect existing keys and values for lookups; index `INFO` for sorting"""
     index = deepcopy(template)
     INPLACE_update_metadata_index_keys(index, db.metadata)
     INPLACE_update_metadata_index_values(index, db.metadata)
@@ -100,14 +101,20 @@ def update_metadata_index(db, template=INDEX_TEMPLATE):
                 query={"isa_category": isa_category, "subkey": subkey},
                 data={"content": index[isa_category][subkey]},
             )
-    #db.metadata.create_index(
-    #    keys=[
-    #        ("info.accession", ASCENDING),
-    #        ("info.assay", ASCENDING),
-    #        ("info.sample name", ASCENDING),
-    #    ],
-    #    collation={"locale": MONGO_DB_LOCALE, "numericOrdering": True},
-    #)
+    for entry in db.metadata.find():
+        db.metadata.update_one(
+            {"_id": entry["_id"]}, {"$set": {INFO: entry[""]}},
+        )
+    if INFO not in db.metadata.index_information():
+        db.metadata.create_index(
+            name=INFO,
+            keys=[
+                (INFO+".accession", ASCENDING),
+                (INFO+".assay", ASCENDING),
+                (INFO+".sample name", ASCENDING),
+            ],
+            collation={"locale": MONGO_DB_LOCALE, "numericOrdering": True},
+        )
 
 
 class CacherThread(Thread):

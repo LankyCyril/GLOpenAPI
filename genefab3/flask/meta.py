@@ -10,9 +10,14 @@ from numpy import nan
 
 def get_raw_meta_df(collection, query, projection, include, locale=MONGO_DB_LOCALE):
     """Get target metadata as a single-level dataframe, numerically sorted by info fields"""
-    by = [(field, ASCENDING) for field in [".accession", ".assay", *include]]
-    order = {"locale": locale, "numericOrdering": True}
-    entries = collection.find(query, projection).sort(by).collation(order)
+    sort_by = [
+        ("info" + field, ASCENDING)
+        for field in [".accession", ".assay", *include]
+    ]
+    order = {
+        "locale": locale, "numericOrdering": True,
+    }
+    entries = collection.find(query, projection, sort=sort_by).collation(order)
     try:
         return json_normalize(list(entries))
     except Exception as e:
