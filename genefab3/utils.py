@@ -64,7 +64,7 @@ def iterate_terminal_leaves(d, step_tracker=0, max_steps=32):
     """Descend into a non-bifurcating branch and find the terminal leaf"""
     if step_tracker >= max_steps:
         raise GeneLabDatabaseException(
-            "Document branch exceeds maximum depth", max_steps,
+            "Document branch exceeds maximum depth", depth=max_steps,
         )
     else:
         if isinstance(d, dict):
@@ -88,4 +88,4 @@ def infer_file_separator(filename):
     elif search(r'\.tsv(\.gz)?$', filename, flags=IGNORECASE):
         return "\t"
     else:
-        raise GeneLabFileException("Unknown file format", filename)
+        raise GeneLabFileException("Unknown file format", filename=filename)

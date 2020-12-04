@@ -28,19 +28,19 @@ class ColdStorageDataset(DatasetBase):
                 identifier=accession, kind="glds", report_changes=True,
             )
         if not self.json.glds:
-            raise GeneLabJSONException(f"{accession}: no dataset found")
+            raise GeneLabJSONException("No dataset found", accession)
         try:
             assert len(self.json.glds) == 1
             self._id = self.json.glds[0]["_id"]
         except (AssertionError, IndexError, KeyError):
-            raise GeneLabJSONException(f"{accession}: malformed GLDS JSON")
+            raise GeneLabJSONException("Malformed GLDS JSON", accession)
         else:
             j = self.json.glds[0]
             if accession in {j.get("accession"), j.get("legacy_accession")}:
                 self.accession = accession
             else:
-                error = f"{accession}: initializing with wrong JSON"
-                raise GeneLabJSONException(error)
+                error = "Initializing with wrong JSON"
+                raise GeneLabJSONException(error, accession)
         # populate file information:
         self.json.fileurls, self.changed.fileurls = jga("fileurls"), True
         self.json.filedates, self.changed.filedates = jga("filedates"), True
@@ -65,8 +65,7 @@ class ColdStorageDataset(DatasetBase):
                 for fd in self.json.fileurls
             }
         except KeyError:
-            error = "{}: malformed 'files' JSON".format(self.accession)
-            raise GeneLabJSONException(error)
+            raise GeneLabJSONException("Malformed 'files' JSON", self)
  
     @memoized_property
     def filedates(self):
@@ -77,8 +76,7 @@ class ColdStorageDataset(DatasetBase):
                 for fd in self.json.filedates
             }
         except KeyError:
-            error = "{}: malformed 'filelistings' JSON".format(self.accession)
-            raise GeneLabJSONException(error)
+            raise GeneLabJSONException("Malformed 'filelistings' JSON", self)
  
     def get_file_descriptors(self, name=None, regex=None, glob=None):
         """Given mask, find filenames, urls, and datestamps"""
@@ -106,13 +104,11 @@ class ColdStorageDataset(DatasetBase):
         """Initialize assays via ISA ZIP"""
         isa_zip_descriptors = self.get_file_descriptors(regex=ISA_ZIP_REGEX)
         if len(isa_zip_descriptors) == 0:
-            error = "{}: ISA ZIP not found".format(self.accession)
-            raise GeneLabFileException(error)
+            raise GeneLabFileException("ISA ZIP not found", self)
         elif len(isa_zip_descriptors) == 1:
             self.isa = IsaZip(isa_zip_descriptors[0].url)
         else:
-            error = "{}: multiple ambiguous ISA ZIPs".format(self.accession)
-            raise GeneLabFileException(error)
+            raise GeneLabFileException("Multiple ambiguous ISA ZIPs", self)
         # placeholders:
         self.assays = {e[""]["Assay"]: None for e in self.isa.assays}
         # actual assays:

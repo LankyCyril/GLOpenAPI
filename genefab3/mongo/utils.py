@@ -87,4 +87,4 @@ def run_mongo_transaction(action, collection, query=None, data=None, documents=N
                 else:
                     raise GeneLabDatabaseException(INSERT_MANY_ERROR)
             else:
-                raise GeneLabDatabaseException(ACTION_ERROR, action)
+                raise GeneLabDatabaseException(ACTION_ERROR, action=action)

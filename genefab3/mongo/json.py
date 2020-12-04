@@ -31,8 +31,9 @@ def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, report_ch
             try:
                 fresh_json, json_changed = json_cache_info["raw"], False
             except (TypeError, KeyError):
-                msg_mask = "Cannot retrieve cold storage JSON for '{}'"
-                raise GeneLabJSONException(msg_mask.format(identifier))
+                raise GeneLabJSONException(
+                    "Cannot retrieve cold storage JSON", identifier=identifier,
+                )
         else:
             run_mongo_transaction(
                 action="replace", collection=db.json_cache,

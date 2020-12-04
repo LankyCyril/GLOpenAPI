@@ -24,7 +24,7 @@ class CachedAssay(AssayBase):
             except GeneLabDatabaseException:
                 raise GeneLabDatabaseException(
                     "Could not retrieve filenames from metadata fields",
-                    list(projection.keys()),
+                    fields=list(projection.keys()),
                 )
  
     def get_file_descriptors(self, name=None, regex=None, glob=None, projection=None):

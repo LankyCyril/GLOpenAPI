@@ -33,9 +33,10 @@ def display(db, getter, kwargs, request):
         elif isinstance(obj, DataFrame):
             return render_dataframe(obj, context)
         else:
-            raise GeneLabFormatException("Display of {} with 'fmt={}'".format(
-                type(obj).__name__, context.kwargs.get("fmt", "[unspecified]"),
-            ))
+            raise GeneLabFormatException(
+                "Formatting of unsupported object type",
+                object_type=type(obj).__name__, fmt=context.kwargs.get("fmt"),
+            )
 
 
 class Placeholders:

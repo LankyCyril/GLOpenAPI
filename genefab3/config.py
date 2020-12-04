@@ -92,7 +92,7 @@ ISA_TECHNOLOGY_TYPE_LOCATOR = (
 )
 
 from collections import namedtuple
-Locator = namedtuple("Locator", ["keys", "regex", "row_type"])
+Locator = namedtuple("Locator", ["keys", "regex"])
 
 TECHNOLOGY_FILE_LOCATORS = {
     "rna sequencing (rna-seq)": {
@@ -102,10 +102,14 @@ TECHNOLOGY_FILE_LOCATORS = {
                 "assay.characteristics.raw counts data file..",
             ),
             regex=r'rna_seq_Unnormalized_Counts\.csv$',
-            row_type="entry",
         ),
     }
 }
+
+from collections import defaultdict
+ROW_TYPES = defaultdict(lambda: "entry", {
+    "unnormalized counts": "entry",
+})
 
 RAW_FILE_REGEX = r'file|plot'
 DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'

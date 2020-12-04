@@ -108,5 +108,5 @@ def render_dataframe(df, context):
         content = get_browser_dataframe(df, context)
         mimetype = "text/html"
     else:
-        raise GeneLabFormatException("fmt='{}'".format(context.kwargs["fmt"]))
+        raise GeneLabFormatException("Unknown fmt", fmt=context.kwargs["fmt"])
     return Response(content, mimetype=mimetype)

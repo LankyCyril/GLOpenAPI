@@ -24,9 +24,12 @@ class ColdStorageAssay(AssayBase):
                     ee[""] for ee in isa_assay_entry["Sample Name"]
                 }
             except (KeyError, IndexError, TypeError):
-                raise GeneLabISAException(NO_SAMPLE_NAME_ERROR)
+                raise GeneLabISAException(NO_SAMPLE_NAME_ERROR, self)
             if len(entry_sample_names) != 1:
-                raise GeneLabISAException(AMBIGUOUS_SAMPLE_NAME_ERROR)
+                raise GeneLabISAException(
+                    AMBIGUOUS_SAMPLE_NAME_ERROR,
+                    self, sample_names=entry_sample_names,
+                )
             else: # populate metadata from Assay, general Investigation entries
                 sample_name = entry_sample_names.pop()
                 self.meta[sample_name] = self._init_sample_entry_with_assay(
@@ -45,7 +48,7 @@ class ColdStorageAssay(AssayBase):
         try:
             _ = dataset.assays[assay_name]
         except (KeyError, IndexError, TypeError):
-            raise GeneLabException(WRONG_DATASET_ERROR)
+            raise GeneLabException(WRONG_DATASET_ERROR, dataset, assay_name)
  
     def _init_sample_entry_with_assay(self, dataset, isa_assay_entry, assay_name, sample_name):
         """Create sample entry for `sample_name`, associate with accession, Assay tab annotation, Investigation Study Assays entry"""

@@ -11,7 +11,7 @@ from pandas import read_csv, read_sql, DataFrame, MultiIndex, concat
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 from contextlib import closing
 from sqlite3 import connect
-from genefab3.config import INFO
+from genefab3.config import INFO, ROW_TYPES
 
 
 MISSING_SAMPLE_NAMES_ERROR = "Missing sample names in GeneFab database"
@@ -145,20 +145,20 @@ class CachedTable():
                 except PandasDatabaseError:
                     self._drop_mongo_entry()
                     raise GeneLabDatabaseException(
-                        MISSING_SQL_TABLE_ERROR,
-                        self.accession, self.assay_name, self.datatype,
+                        MISSING_SQL_TABLE_ERROR, self.accession,
+                        self.assay_name, datatype=self.datatype,
                     )
                 except Exception as e:
                     raise GeneLabDatabaseException(
-                        type(e).__name__, str(e),
-                        self.accession, self.assay_name, self.datatype,
+                        type(e).__name__+ ": " + str(e),
+                        self.accession, self.assay_name, datatype=self.datatype,
                     )
         else:
             data_subset = self.data if (rows is None) else self.data.loc[rows]
         if not (set(self.sample_names) <= set(data_subset.columns)):
             raise GeneLabDatabaseException(
                 MISSING_SAMPLE_NAMES_ERROR, self.accession, self.assay_name,
-                sorted(set(self.sample_names) - set(data_subset.columns)),
+                names=sorted(set(self.sample_names) - set(data_subset.columns)),
             )
         else:
             return DataFrame(
@@ -170,7 +170,7 @@ class CachedTable():
             )
 
 
-def get_sql_data(dbs, sample_tree, file_descriptor_tree, datatype, rows=None, row_type="entry"):
+def get_sql_data(dbs, sample_tree, file_descriptor_tree, datatype, rows=None):
     """Based on a MultiIndex of form (accession, assay_name, sample_name), retrieve data from files in `target_file_locator`"""
     tables = []
     for accession in sample_tree:
@@ -187,5 +187,5 @@ def get_sql_data(dbs, sample_tree, file_descriptor_tree, datatype, rows=None, ro
         # wesmckinney.com/blog/high-performance-database-joins-with-pandas-dataframe-more-benchmarks
         [table.dataframe(rows=rows) for table in tables], axis=1, sort=False,
     )
-    joined_table.index.name = (INFO, INFO, row_type)
+    joined_table.index.name = (INFO, INFO, ROW_TYPES[datatype])
     return joined_table.reset_index()

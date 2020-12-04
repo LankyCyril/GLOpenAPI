@@ -5,8 +5,8 @@ from pandas import DataFrame, Series
 from flask import Response
 
 
-OBJECT_TYPE_ERROR = "'fmt=cls' requires a two-level dataframe (/samples/)"
-FIELD_COUNT_ERROR = "'fmt=cls' requires exactly one metadata field"
+OBJECT_TYPE_ERROR = "Internal. Two levels of columns (category, field) expected"
+FIELD_COUNT_ERROR = "Exactly one metadata field must be requested"
 
 
 def is_continuous(continuous, dataframe, target):
@@ -25,10 +25,12 @@ def is_continuous(continuous, dataframe, target):
 def render_cls(obj, context, continuous="infer", space_sub=lambda s: sub(r'\s', "", s)):
     """Convert a presumed annotation/factor dataframe to CLS format"""
     if (not isinstance(obj, DataFrame)) or (obj.columns.nlevels != 2):
-        raise GeneLabFormatException(OBJECT_TYPE_ERROR)
+        raise GeneLabFormatException(OBJECT_TYPE_ERROR, fmt="cls")
     target_columns = [(l0, l1) for (l0, l1) in obj.columns if l0 != INFO]
     if len(target_columns) != 1:
-        raise GeneLabFormatException(FIELD_COUNT_ERROR)
+        raise GeneLabFormatException(
+            FIELD_COUNT_ERROR, columns=target_columns, fmt="cls",
+        )
     else:
         target = target_columns[0]
     sample_count = obj.shape[0]

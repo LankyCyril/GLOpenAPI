@@ -17,14 +17,18 @@ def download_cold_json(identifier, kind="other", report_changes=True):
         if accession_number_match:
             accession_number = accession_number_match.group()
         else:
-            raise GeneLabException("Malformed accession number")
+            raise GeneLabException(
+                "Malformed accession number", accession=identifier,
+            )
         url = COLD_FILEURLS_MASK.format(accession_number)
         with urlopen(url) as response:
             raw_json = loads(response.read().decode())
             try:
                 json = raw_json["studies"][identifier]["study_files"]
             except KeyError:
-                raise GeneLabJSONException("Malformed 'files' JSON")
+                raise GeneLabJSONException(
+                    "Malformed 'files' JSON", accession=identifier, url=url,
+                )
     elif kind == "filedates":
         url = COLD_FILEDATES_MASK.format(identifier)
         with urlopen(url) as response:
@@ -34,7 +38,7 @@ def download_cold_json(identifier, kind="other", report_changes=True):
         with urlopen(url) as response:
             json = loads(response.read().decode())
     else:
-        raise GeneLabException("Unknown JSON request: kind='{}'".format(kind))
+        raise GeneLabException("Unknown JSON request", kind=kind)
     if report_changes:
         return json, True
     else:

@@ -38,8 +38,9 @@ class Investigation(dict):
                         else:
                             super().__setitem__(real_name, json[target])
                     except (TypeError, IndexError, KeyError):
-                        error = f"Unexpected structure of {real_name}"
-                        raise GeneLabISAException(error)
+                        raise GeneLabISAException(
+                            "Unexpected structure of field", field=real_name,
+                        )
                 elif target and pattern:
                     try:
                         super().__setitem__(real_name, {
@@ -47,8 +48,9 @@ class Investigation(dict):
                             for entry in json
                         })
                     except (TypeError, AttributeError, IndexError, KeyError):
-                        error = f"Could not break up '{real_name}' by name"
-                        raise GeneLabISAException(error)
+                        raise GeneLabISAException(
+                            "Could not break up field by name", field=real_name,
+                        )
                 else:
                     super().__setitem__(real_name, json)
 
@@ -120,7 +122,10 @@ class StudyEntries(list):
                     if sample_name in self._by_sample_name:
                         error_mask = "Duplicate Sample Name '{}' in studies"
                         error = error_mask.format(sample_name)
-                        raise GeneLabISAException(error)
+                        raise GeneLabISAException(
+                            "Duplicate Sample Name in studies",
+                            sample_name=sample_name,
+                        )
                     else:
                         self._by_sample_name[sample_name] = json
  
@@ -253,8 +258,9 @@ class IsaZip:
                                 raw.assays[name] = reader(handle, **info)
         for tab, value in raw._get_kwargs():
             if not value:
-                error = "{}: missing ISA tab '{}'".format(isa_zip_url, tab)
-                raise GeneLabISAException(error)
+                raise GeneLabISAException(
+                    "Missing ISA tab", url=isa_zip_url, tab=tab,
+                )
         return raw
  
     def _read_investigation(self, handle):
