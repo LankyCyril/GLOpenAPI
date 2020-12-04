@@ -1,33 +1,24 @@
-from argparse import Namespace
+from pymongo import ASCENDING
 from pandas import json_normalize, MultiIndex, isnull, concat, merge
+from genefab3.exceptions import GeneLabDatabaseException
+from argparse import Namespace
 from re import findall, search, IGNORECASE, escape, split
 from genefab3.config import RAW_FILE_REGEX, INFO
 from genefab3.flask.display import Placeholders
-from pymongo.errors import OperationFailure
 from numpy import nan
 
 
-def isa_sort_dataframe(dataframe):
-    """Sort single-level dataframe in order info-investigation-study-assay"""
-    column_order = Namespace(
-        info=set(), investigation=set(), study=set(), assay=set(), other=set(),
-    )
-    for column in dataframe.columns:
-        if column.startswith("."):
-            column_order.info.add(column)
-        elif column.startswith("investigation"):
-            column_order.investigation.add(column)
-        elif column.startswith("study"):
-            column_order.study.add(column)
-        elif column.startswith("assay"):
-            column_order.assay.add(column)
-        else:
-            column_order.other.add(column)
-    return dataframe[(
-        sorted(column_order.info) + sorted(column_order.investigation) +
-        sorted(column_order.study) + sorted(column_order.assay) +
-        sorted(column_order.other)
-    )]
+def get_mongo_table(collection, query, projection, include, locale="en_US"):
+    """Get target metadata as a single-level dataframe, numerically sorted by info fields"""
+    by = [(field, ASCENDING) for field in [".accession", ".assay", *include]]
+    order = {"locale": locale, "numericOrdering": True}
+    entries = collection.find(query, projection).sort(by).collation(order)
+    try:
+        return json_normalize(list(entries))
+    except Exception as e:
+        raise GeneLabDatabaseException(
+            "Could not retrieve sorted metadata", locale=locale, reason=str(e),
+        )
 
 
 def keep_projection(dataframe, full_projection):
@@ -61,6 +52,29 @@ def keep_files(dataframe, full_projection):
     return dataframe.drop(columns=subkeys_to_drop).applymap(unwind_file_entry)
 
 
+def isa_sort_dataframe(dataframe):
+    """Sort single-level dataframe in order info-investigation-study-assay"""
+    column_order = Namespace(
+        info=set(), investigation=set(), study=set(), assay=set(), other=set(),
+    )
+    for column in dataframe.columns:
+        if column.startswith("."):
+            column_order.info.add(column)
+        elif column.startswith("investigation"):
+            column_order.investigation.add(column)
+        elif column.startswith("study"):
+            column_order.study.add(column)
+        elif column.startswith("assay"):
+            column_order.assay.add(column)
+        else:
+            column_order.other.add(column)
+    return dataframe[(
+        sorted(column_order.info) + sorted(column_order.investigation) +
+        sorted(column_order.study) + sorted(column_order.assay) +
+        sorted(column_order.other)
+    )]
+
+
 def get_annotation_by_metas(db, context, include=(), search_with_projection=True, modify=keep_projection, aggregate=False):
     """Select assays/samples based on annotation filters"""
     full_projection = {
@@ -73,7 +87,7 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
         else:
             proj = {"_id": False}
         # get target metadata as single-level dataframe:
-        dataframe = json_normalize(list(db.metadata.find(context.query, proj)))
+        dataframe = get_mongo_table(db.metadata, context.query, proj, include)
         # modify with injected function:
         dataframe = modify(dataframe, full_projection)
         # remove trailing dots and hide columns that are explicitly hidden:
@@ -85,7 +99,7 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
             else (".".join(fields[:2]), ".".join(fields[2:]))
             for fields in map(lambda s: s.split("."), dataframe.columns)
         )
-    except (OperationFailure, TypeError): # no data retrieved/retrievable
+    except TypeError: # no data retrieved
         return Placeholders.dataframe(
             [INFO], ["accession", "assay", *(c.strip(".") for c in include)],
         )
@@ -95,8 +109,8 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
             if len(info_cols) == dataframe.shape[1]: # only 'info' cols present
                 return dataframe.drop_duplicates()
             else: # metadata cols present and can be collapsed into booleans
-                grouper = dataframe.groupby(info_cols, as_index=False)
-                return grouper.agg(lambda a: ~isnull(a).all())
+                gby = dataframe.groupby(info_cols, as_index=False, sort=False)
+                return gby.agg(lambda a: ~isnull(a).all())
         else:
             return dataframe
 
