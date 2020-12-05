@@ -33,6 +33,8 @@ TIMESTAMP_FMT = "%a %b %d %H:%M:%S %Z %Y"
 MAX_JSON_AGE = 10800 # 3 hours (in seconds)
 CACHER_THREAD_CHECK_INTERVAL = 1800 # 30 minutes (in seconds)
 CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
+METADATA_INDEX_WAIT_DELAY = 60 # 1 minute (in seconds)
+METADATA_INDEX_WAIT_STEP = 5
 
 
 ## API parser parameters

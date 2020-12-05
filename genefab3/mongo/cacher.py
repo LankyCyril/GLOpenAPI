@@ -101,9 +101,9 @@ def update_metadata_index(db, template=INDEX_TEMPLATE):
                 query={"isa_category": isa_category, "subkey": subkey},
                 data={"content": index[isa_category][subkey]},
             )
-    if "info_index" not in db.metadata.index_information():
+    if "info" not in db.metadata.index_information():
         db.metadata.create_index(
-            name="info_index",
+            name="info",
             keys=[
                 ("info.accession", ASCENDING),
                 ("info.assay", ASCENDING),

@@ -1,3 +1,5 @@
+from genefab3.config import METADATA_INDEX_WAIT_DELAY, METADATA_INDEX_WAIT_STEP
+from time import sleep
 from genefab3.config import MONGO_DB_LOCALE, RAW_FILE_REGEX
 from pymongo import ASCENDING
 from pandas import json_normalize, MultiIndex, isnull, concat, merge
@@ -8,21 +10,31 @@ from genefab3.flask.display import Placeholders
 from numpy import nan
 
 
-def get_raw_meta_df(collection, query, projection, include, locale=MONGO_DB_LOCALE):
+def get_raw_meta_df(collection, query, projection, include):
     """Get target metadata as a single-level dataframe, numerically sorted by info fields"""
+    for _ in range(0, METADATA_INDEX_WAIT_DELAY, METADATA_INDEX_WAIT_STEP):
+        if "info" in collection.index_information():
+            break
+        else:
+            sleep(METADATA_INDEX_WAIT_STEP)
+    else:
+        raise GeneLabDatabaseException(
+            "Could not retrieve sorted metadata (no index found)",
+        )
     sort_by = [
         (field, ASCENDING)
         for field in ["info.accession", "info.assay", *include]
     ]
     order = {
-        "locale": locale, "numericOrdering": True,
+        "locale": MONGO_DB_LOCALE, "numericOrdering": True,
     }
     entries = collection.find(query, projection, sort=sort_by).collation(order)
     try:
         return json_normalize(list(entries))
     except Exception as e:
         raise GeneLabDatabaseException(
-            "Could not retrieve sorted metadata", locale=locale, reason=str(e),
+            "Could not retrieve sorted metadata",
+            locale=MONGO_DB_LOCALE, reason=str(e),
         )
 
 
