@@ -14,11 +14,13 @@ def assay_pair_to_query(key, value):
     accessions_and_assays = defaultdict(set)
     for expr in value.split("|"):
         if expr.count(".") == 0:
-            query["$or"].append({".accession": expr})
+            query["$or"].append({"info.accession": expr})
             accessions_and_assays[expr] = set()
         else:
             accession, assay_name = expr.split(".", 1)
-            query["$or"].append({".accession": accession, ".assay": assay_name})
+            query["$or"].append({
+                "info.accession": accession, "info.assay": assay_name,
+            })
             accessions_and_assays[accession].add(assay_name)
     yield query, None, accessions_and_assays
 

@@ -136,7 +136,7 @@ class StudyEntries(list):
  
     def _row_to_json(self, row, name, **logger_info):
         """Convert single row of table to nested JSON"""
-        json = {"": {self._self_identifier: name}}
+        json = {"Info": {self._self_identifier: name}}
         protocol_ref, qualifiable = nan, None
         for column, value in row.items():
             field, subfield, extra = self._parse_field(column)

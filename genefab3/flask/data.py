@@ -4,7 +4,7 @@ from genefab3.config import ISA_TECH_TYPE_LOCATOR, TECHNOLOGY_FILE_LOCATORS
 from pandas import merge
 from genefab3.flask.meta import get_raw_meta_df
 from genefab3.flask.display import Placeholders
-from genefab3.config import INFO, ROW_TYPES
+from genefab3.config import ROW_TYPES
 from genefab3.sql.data import get_sql_data
 
 
@@ -59,10 +59,11 @@ def infer_target_file_locator(raw_annotation, datatype):
 def add_file_descriptors(mongo_db, raw_annotation, datatype):
     """Based on technology types in `raw_annotation` and target `datatype`, look up per-assay file descriptors"""
     target_file_locator = infer_target_file_locator(raw_annotation, datatype)
-    per_assay = raw_annotation[[".accession", ".assay"]].drop_duplicates()
+    info_cols = ["info.accession", "info.assay"]
+    per_assay = raw_annotation[info_cols].drop_duplicates()
     per_assay["file descriptor"] = per_assay.apply(
         lambda row: get_file_descriptor(
-            mongo_db, row[".accession"], row[".assay"],
+            mongo_db, row["info.accession"], row["info.assay"],
             target_file_locator, datatype,
         ),
         axis=1,
@@ -73,15 +74,15 @@ def add_file_descriptors(mongo_db, raw_annotation, datatype):
 def get_data_by_metas(dbs, context):
     """Select data based on annotation filters"""
     raw_annotation = get_raw_meta_df(
-        dbs.mongo_db.metadata, context.query, include={".sample name"},
+        dbs.mongo_db.metadata, context.query, include={"info.sample name"},
         projection={
-            ".accession": True, ".assay": True, ".sample name": True,
-            "_id": False, ISA_TECH_TYPE_LOCATOR: True,
+            "_id": False, "info.accession": True, "info.assay": True,
+            "info.sample name": True, ISA_TECH_TYPE_LOCATOR: True,
         }
     )
     if len(raw_annotation) == 0:
         return Placeholders.dataframe(
-            [INFO], [INFO], [ROW_TYPES.default_factory()],
+            ["info"], ["info"], [ROW_TYPES.default_factory()],
         )
     else:
         raw_annotation = add_file_descriptors(

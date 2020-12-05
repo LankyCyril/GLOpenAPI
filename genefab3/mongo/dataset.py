@@ -47,8 +47,10 @@ class CachedDataset(ColdStorageDataset):
  
     def _recache_assay(self, assay, metadata_units_format):
         run_mongo_transaction(
-            action="delete_many", collection=self.db.metadata,
-            query={".accession": self.accession, ".assay": assay.name},
+            action="delete_many", collection=self.db.metadata, query={
+                "info.accession": self.accession,
+                "info.assay": assay.name,
+            },
         )
         if assay.meta:
             run_mongo_transaction(
@@ -72,7 +74,7 @@ class CachedDataset(ColdStorageDataset):
         )
         run_mongo_transaction(
             action="delete_many", collection=(db or self.db).metadata,
-            query={".accession": accession or self.accession},
+            query={"info.accession": accession or self.accession},
         )
         run_mongo_transaction(
             action="delete_many", collection=(db or self.db).json_cache,

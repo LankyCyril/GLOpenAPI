@@ -53,11 +53,11 @@ class ColdStorageAssay(AssayBase):
     def _init_sample_entry_with_assay(self, dataset, isa_assay_entry, assay_name, sample_name):
         """Create sample entry for `sample_name`, associate with accession, Assay tab annotation, Investigation Study Assays entry"""
         sample_entry = {
-            "": {
+            "Info": {
                 "Accession": dataset.accession, "Assay": assay_name,
                 "Sample Name": sample_name,
             },
-            "Assay": copy_and_drop(isa_assay_entry, {""}),
+            "Assay": copy_and_drop(isa_assay_entry, {"Info"}),
             "Investigation": {
                 k: v for k, v in dataset.isa.investigation.items()
                 if (isinstance(v, list) or k == "Investigation")
@@ -71,9 +71,9 @@ class ColdStorageAssay(AssayBase):
     def _extend_sample_entry_with_study(self, sample_entry, dataset, sample_name):
         """Add Study tab annotation, Investigation Study entry"""
         isa_study_entry = dataset.isa.studies._by_sample_name[sample_name]
-        study_name = isa_study_entry[""]["Study"]
-        sample_entry[""]["Study"] = study_name
-        sample_entry["Study"] = copy_and_drop(isa_study_entry, {""})
+        study_name = isa_study_entry["Info"]["Study"]
+        sample_entry["Info"]["Study"] = study_name
+        sample_entry["Study"] = copy_and_drop(isa_study_entry, {"Info"})
         sample_entry["Investigation"]["Study"] = (
             dataset.isa.investigation["Study"].get(study_name, {})
         )

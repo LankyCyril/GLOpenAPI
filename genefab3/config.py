@@ -86,7 +86,6 @@ DISALLOWED_CONTEXTS = [
 
 ISA_ZIP_REGEX = r'.*_metadata_.*[_-]ISA\.zip$'
 ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
-INFO = "info"
 METADATA_UNITS_FORMAT = "{value} {{{unit}}}"
 ISA_TECH_TYPE_LOCATOR = "investigation.study assays.study assay technology type"
 

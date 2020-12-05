@@ -1,4 +1,3 @@
-from genefab3.config import INFO
 from genefab3.exceptions import GeneLabFormatException
 from re import sub
 from pandas import DataFrame, Series
@@ -26,7 +25,7 @@ def render_cls(obj, context, continuous="infer", space_sub=lambda s: sub(r'\s', 
     """Convert a presumed annotation/factor dataframe to CLS format"""
     if (not isinstance(obj, DataFrame)) or (obj.columns.nlevels != 2):
         raise GeneLabFormatException(OBJECT_TYPE_ERROR, fmt="cls")
-    target_columns = [(l0, l1) for (l0, l1) in obj.columns if l0 != INFO]
+    target_columns = [(l0, l1) for (l0, l1) in obj.columns if l0 != "info"]
     if len(target_columns) != 1:
         raise GeneLabFormatException(
             FIELD_COUNT_ERROR, columns=target_columns, fmt="cls",

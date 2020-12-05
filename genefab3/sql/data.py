@@ -11,7 +11,7 @@ from pandas import read_csv, read_sql, DataFrame, MultiIndex, concat
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 from contextlib import closing
 from sqlite3 import connect
-from genefab3.config import INFO, ROW_TYPES
+from genefab3.config import ROW_TYPES
 
 
 MISSING_SAMPLE_NAMES_ERROR = "Missing sample names in GeneFab database"
@@ -172,7 +172,7 @@ class CachedTable():
 def get_sql_data(dbs, raw_annotation, datatype, rows=None):
     """Based on `raw_annotation` (accessions, assays, sample names, file descriptors), update/retrieve data from SQL database"""
     groupby = raw_annotation.groupby(
-        [".accession", ".assay"], as_index=False, sort=False,
+        ["info.accession", "info.assay"], as_index=False, sort=False,
     )
     agg, tables = groupby.agg(list).iterrows(), []
     for _, (accession, assay_name, sample_names, _, file_descriptors) in agg:
@@ -188,5 +188,5 @@ def get_sql_data(dbs, raw_annotation, datatype, rows=None):
         # wesmckinney.com/blog/high-performance-database-joins-with-pandas-dataframe-more-benchmarks
         [table.dataframe(rows=rows) for table in tables], axis=1, sort=False,
     )
-    joined_table.index.name = (INFO, INFO, ROW_TYPES[datatype])
+    joined_table.index.name = ("info", "info", ROW_TYPES[datatype])
     return joined_table.reset_index()

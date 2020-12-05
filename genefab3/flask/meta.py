@@ -1,4 +1,4 @@
-from genefab3.config import MONGO_DB_LOCALE, RAW_FILE_REGEX, INFO
+from genefab3.config import MONGO_DB_LOCALE, RAW_FILE_REGEX
 from pymongo import ASCENDING
 from pandas import json_normalize, MultiIndex, isnull, concat, merge
 from genefab3.exceptions import GeneLabDatabaseException
@@ -11,8 +11,8 @@ from numpy import nan
 def get_raw_meta_df(collection, query, projection, include, locale=MONGO_DB_LOCALE):
     """Get target metadata as a single-level dataframe, numerically sorted by info fields"""
     sort_by = [
-        ("info" + field, ASCENDING)
-        for field in [".accession", ".assay", *include]
+        (field, ASCENDING)
+        for field in ["info.accession", "info.assay", *include]
     ]
     order = {
         "locale": locale, "numericOrdering": True,
@@ -63,7 +63,7 @@ def isa_sort_dataframe(dataframe):
         info=set(), investigation=set(), study=set(), assay=set(), other=set(),
     )
     for column in dataframe.columns:
-        if column.startswith("."):
+        if column.startswith("info"):
             column_order.info.add(column)
         elif column.startswith("investigation"):
             column_order.investigation.add(column)
@@ -83,7 +83,7 @@ def isa_sort_dataframe(dataframe):
 def get_annotation_by_metas(db, context, include=(), search_with_projection=True, modify=keep_projection, aggregate=False):
     """Select assays/samples based on annotation filters"""
     full_projection = {
-        ".accession": True, ".assay": True, **context.projection,
+        "info.accession": True, "info.assay": True, **context.projection,
         **{field: True for field in include},
     }
     try:
@@ -100,17 +100,17 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
         # sort (ISA-aware) and convert to two-level dataframe:
         dataframe = isa_sort_dataframe(dataframe)
         dataframe.columns = MultiIndex.from_tuples(
-            (INFO, ".".join(fields[1:])) if fields[0] == ""
+            (fields[0], ".".join(fields[1:])) if fields[0] == "info"
             else (".".join(fields[:2]), ".".join(fields[2:]))
             for fields in map(lambda s: s.split("."), dataframe.columns)
         )
     except TypeError: # no data retrieved
         return Placeholders.dataframe(
-            [INFO], ["accession", "assay", *(c.strip(".") for c in include)],
+            ["info"], ["accession", "assay", *(c.strip(".") for c in include)],
         )
     else:
         if aggregate: # coerce to boolean "existence" if requested
-            info_cols = list(dataframe[[INFO]].columns)
+            info_cols = list(dataframe[["info"]].columns)
             if len(info_cols) == dataframe.shape[1]: # only 'info' cols present
                 return dataframe.drop_duplicates()
             else: # metadata cols present and can be collapsed into booleans
@@ -155,19 +155,19 @@ def get_assays_by_metas(db, context):
 
 def get_samples_by_metas(db, context):
     """Select samples based on annotation filters"""
-    return get_annotation_by_metas(db, context, include={".sample name"})
+    return get_annotation_by_metas(db, context, include={"info.sample name"})
 
 
 def get_files_by_metas(db, context):
     """Select files based on annotation filters"""
     return merge(
         get_annotation_by_metas(
-            db, context, include={".sample name"},
+            db, context, include={"info.sample name"},
             search_with_projection=True, modify=keep_projection,
         ),
         filter_filenames(
             get_annotation_by_metas(
-                db, context, include={".sample name"},
+                db, context, include={"info.sample name"},
                 search_with_projection=False, modify=keep_files,
             ),
             context.kwargs.get("filename"), startloc=3,

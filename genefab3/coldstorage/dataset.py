@@ -110,7 +110,7 @@ class ColdStorageDataset(DatasetBase):
         else:
             raise GeneLabFileException("Multiple ambiguous ISA ZIPs", self)
         # placeholders:
-        self.assays = {e[""]["Assay"]: None for e in self.isa.assays}
+        self.assays = {e["Info"]["Assay"]: None for e in self.isa.assays}
         # actual assays:
         self.assays = AssayDispatcher(self)
 
@@ -123,7 +123,7 @@ class AssayDispatcher(dict):
         self.dataset = dataset
         isa_entries_by_assay = defaultdict(list)
         for isa_entry in dataset.isa.assays:
-            assay_name = isa_entry[""]["Assay"]
+            assay_name = isa_entry["Info"]["Assay"]
             isa_entries_by_assay[assay_name].append(isa_entry)
         for assay_name, isa_assay_entries in isa_entries_by_assay.items():
             super().__setitem__(

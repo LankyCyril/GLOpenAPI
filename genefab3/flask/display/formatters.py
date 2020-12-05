@@ -1,6 +1,3 @@
-from genefab3.config import INFO
-
-
 def build_url(context, target_view=None, drop=set()):
     """Rebuild URL from request, alter based on `replace` and `drop`"""
     if target_view is None:
@@ -67,14 +64,14 @@ def get_browser_meta_formatter(context, i, category, subkey, target):
 def get_browser_formatters(df, context, shortnames):
     """Get SlickGrid formatters for columns"""
     formatters = []
-    if df.columns[0] == (INFO, "accession"):
+    if df.columns[0] == ("info", "accession"):
         formatters.append(get_browser_glds_formatter(context))
-    if (len(df.columns) > 1) and (df.columns[1] == (INFO, "assay")):
+    if (len(df.columns) > 1) and (df.columns[1] == ("info", "assay")):
         formatters.append(get_browser_assay_formatter(context, shortnames))
     for i, (key, target) in enumerate(df.columns):
         category, *subkeys = key.split(".")
         if len(subkeys) == 1:
-            if category != INFO:
+            if category != "info":
                 formatters.append(
                     get_browser_meta_formatter(
                         context, i, category, subkeys[0], target,
