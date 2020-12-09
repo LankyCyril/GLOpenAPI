@@ -1,4 +1,5 @@
 from argparse import Namespace
+from genefab3.config import COLLECTION_NAMES, ROW_TYPES
 from logging import getLogger, DEBUG
 from os import path, makedirs
 from re import sub
@@ -11,7 +12,6 @@ from pandas import read_csv, read_sql, DataFrame, MultiIndex, concat
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 from contextlib import closing
 from sqlite3 import connect
-from genefab3.config import ROW_TYPES
 
 
 MISSING_SAMPLE_NAMES_ERROR = "Missing sample names in GeneFab database"
@@ -36,7 +36,7 @@ class CachedTable():
     data = None
     logger = None
  
-    def __init__(self, dbs, file_descriptor, datatype, accession, assay_name, sample_names, cname="file_descriptors"):
+    def __init__(self, dbs, file_descriptor, datatype, accession, assay_name, sample_names, cname=COLLECTION_NAMES.FILE_DESCRIPTORS):
         """Check cold storage JSON and cache, update cache if remote file was updated"""
         self.name = f"{accession}/{assay_name}"
         self.logger = getLogger("genefab3")
@@ -83,7 +83,7 @@ class CachedTable():
             ),
         )
  
-    def _drop_mongo_entry(self, cname="file_descriptors"):
+    def _drop_mongo_entry(self, cname=COLLECTION_NAMES.FILE_DESCRIPTORS):
         """Erase Mongo DB entry for file descriptor"""
         self.logger.warning(
             CACHED_TABLE_LOGGER_DROP_WARNING,

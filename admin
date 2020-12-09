@@ -4,7 +4,7 @@ from sys import argv
 from pymongo import MongoClient, DESCENDING
 from bson.objectid import ObjectId
 from datetime import datetime
-from genefab3.config import MONGO_DB_NAME
+from genefab3.config import MONGO_DB_NAME, COLLECTION_NAMES
 from genefab3.mongo.dataset import CachedDataset
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.mongo.cacher import update_metadata_index
@@ -37,15 +37,17 @@ def drop(mongo_db, what):
             "dataset_timestamps", "json_cache", "annotations",
             "metadata", "metadata_index",
         }
-        for cn in collection_names:
+        for cname in collection_names:
             run_mongo_transaction(
                 action="delete_many",
-                collection=getattr(mongo_db, cn),
+                collection=getattr(mongo_db, cname),
                 query={},
             )
     elif what == "log":
         run_mongo_transaction(
-            action="delete_many", collection=mongo_db.log, query={},
+            action="delete_many",
+            collection=getattr(mongo_db, COLLECTION_NAMES.LOG),
+            query={},
         )
     else:
         CachedDataset.drop_cache(mongo_db=mongo_db, accession=what)
@@ -64,7 +66,8 @@ def recache(mongo_db, what):
 
 def showlog_brief_lines(mongo_db, query, max_i):
     sort = [("timestamp", DESCENDING), ("_id", DESCENDING)]
-    for i, entry in enumerate(mongo_db.log.find(query, sort=sort)):
+    log_collection = getattr(mongo_db, COLLECTION_NAMES.LOG)
+    for i, entry in enumerate(log_collection.find(query, sort=sort)):
         fields = [
             entry["_id"],
             format_timestamp(entry["timestamp"]),
@@ -81,7 +84,8 @@ def showlog_brief_lines(mongo_db, query, max_i):
 
 
 def showlog_single_entry(mongo_db, _id):
-    entry = mongo_db.log.find_one({"_id": _id})
+    log_collection = getattr(mongo_db, COLLECTION_NAMES.LOG)
+    entry = log_collection.find_one({"_id": _id})
     fields = [
         "_id  = {}".format(entry["_id"]),
         "time = {}".format(format_timestamp(entry["timestamp"])),
@@ -117,7 +121,10 @@ def showlog(mongo_db, how):
 
 
 def test_isa(mongo_db, accession, assay_name, attribute):
-    if mongo_db.dataset_timestamps.find_one({"accession": accession}):
+    timestamps_collection = getattr(
+        mongo_db, COLLECTION_NAMES.DATASET_TIMESTAMPS,
+    )
+    if timestamps_collection.find_one({"accession": accession}):
         glds = CachedDataset(mongo_db, accession, logger=logger)
     else:
         glds = ColdStorageDataset(accession)

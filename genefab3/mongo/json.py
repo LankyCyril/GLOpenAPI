@@ -1,4 +1,4 @@
-from genefab3.config import MAX_JSON_AGE
+from genefab3.config import MAX_JSON_AGE, COLLECTION_NAMES
 from datetime import datetime
 from pymongo import DESCENDING
 from genefab3.coldstorage.json import download_cold_json
@@ -16,7 +16,7 @@ def is_json_cache_fresh(json_cache_info, max_age=MAX_JSON_AGE):
         return (current_timestamp - cache_timestamp <= max_age)
 
 
-def get_fresh_json(mongo_db, identifier, kind="other", max_age=MAX_JSON_AGE, report_changes=False, cname="json_cache"):
+def get_fresh_json(mongo_db, identifier, kind="other", max_age=MAX_JSON_AGE, report_changes=False, cname=COLLECTION_NAMES.JSON_CACHE):
     """Get JSON from local database if fresh, otherwise update local database and get"""
     json_cache_info = getattr(mongo_db, cname).find_one(
         {"identifier": identifier, "kind": kind},
@@ -52,7 +52,7 @@ def get_fresh_json(mongo_db, identifier, kind="other", max_age=MAX_JSON_AGE, rep
         return fresh_json
 
 
-def drop_json_cache_by_accession(mongo_db, accession, cname="json_cache"):
+def drop_json_cache_by_accession(mongo_db, accession, cname=COLLECTION_NAMES.JSON_CACHE):
     """""" # TODO: docstring
     run_mongo_transaction(
         action="delete_many", collection=getattr(mongo_db, cname),

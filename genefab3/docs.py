@@ -1,3 +1,4 @@
+from genefab3.config import COLLECTION_NAMES
 from collections import defaultdict
 from json import dumps
 from os.path import join, split, abspath
@@ -5,7 +6,7 @@ from natsort import natsorted
 from genefab3.utils import map_replace, is_debug
 
 
-def get_metadata_equals_json(mongo_db, cname="metadata_index"):
+def get_metadata_equals_json(mongo_db, cname=COLLECTION_NAMES.METADATA_INDEX):
     """Generate JSON for documentation section 'meta-equals'"""
     equals_json = defaultdict(dict)
     for entry in getattr(mongo_db, cname).find():
@@ -36,7 +37,7 @@ def get_metadata_wildcards(existence_json):
     return dict(wildcards)
 
 
-def get_metadata_assays(mongo_db, cname="metadata"):
+def get_metadata_assays(mongo_db, cname=COLLECTION_NAMES.METADATA):
     """Generate JSON for documentation section 'meta-assay'"""
     metadata_assays = defaultdict(set)
     for entry in getattr(mongo_db, cname).distinct("info"):

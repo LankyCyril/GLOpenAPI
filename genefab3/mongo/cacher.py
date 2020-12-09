@@ -1,5 +1,5 @@
 from genefab3.config import COLD_SEARCH_MASK, MAX_JSON_AGE
-from genefab3.config import MONGO_DB_LOCALE
+from genefab3.config import COLLECTION_NAMES, MONGO_DB_LOCALE
 from genefab3.mongo.json import get_fresh_json
 from datetime import datetime
 from pandas import Series
@@ -11,7 +11,7 @@ from pymongo import ASCENDING
 from genefab3.config import CACHER_THREAD_CHECK_INTERVAL
 from genefab3.config import CACHER_THREAD_RECHECK_DELAY
 from genefab3.mongo.dataset import CachedDataset
-from genefab3.config import METADATA_UNITS_FORMAT
+from genefab3.config import UNITS_FORMAT
 from time import sleep
 
 
@@ -45,7 +45,7 @@ def list_available_accessions(mongo_db):
     return {raw_json["_id"] for raw_json in raw_datasets_json}
 
 
-def list_fresh_and_stale_accessions(mongo_db, max_age=MAX_JSON_AGE, cname="dataset_timestamps"):
+def list_fresh_and_stale_accessions(mongo_db, max_age=MAX_JSON_AGE, cname=COLLECTION_NAMES.DATASET_TIMESTAMPS):
     """Find accessions in no need / need of update in database"""
     refresh_dates = Series({
         entry["accession"]: entry["last_refreshed"]
@@ -56,7 +56,7 @@ def list_fresh_and_stale_accessions(mongo_db, max_age=MAX_JSON_AGE, cname="datas
     return set(refresh_dates[indexer].index), set(refresh_dates[~indexer].index)
 
 
-def INPLACE_update_metadata_index_keys(mongo_db, index, cname="metadata", final_key_blacklist=FINAL_INDEX_KEY_BLACKLIST):
+def INPLACE_update_metadata_index_keys(mongo_db, index, final_key_blacklist=FINAL_INDEX_KEY_BLACKLIST, cname=COLLECTION_NAMES.METADATA):
     """Populate JSON with all possible metadata keys, also for documentation section 'meta-existence'"""
     for isa_category in index:
         for subkey in index[isa_category]:
@@ -73,7 +73,7 @@ def INPLACE_update_metadata_index_keys(mongo_db, index, cname="metadata", final_
             }
 
 
-def INPLACE_update_metadata_index_values(mongo_db, index, cname="metadata"):
+def INPLACE_update_metadata_index_values(mongo_db, index, cname=COLLECTION_NAMES.METADATA):
     """Generate JSON with all possible metadata values, also for documentation section 'meta-equals'"""
     collection = getattr(mongo_db, cname)
     for isa_category in index:
@@ -89,7 +89,7 @@ def INPLACE_update_metadata_index_values(mongo_db, index, cname="metadata"):
                 index[isa_category][subkey][next_level_key] = values
 
 
-def ensure_info_index(mongo_db, cname="metadata", category="info", keys=["accession", "assay", "sample name"]):
+def ensure_info_index(mongo_db, category="info", keys=["accession", "assay", "sample name"], cname=COLLECTION_NAMES.METADATA):
     """Index `info.*` for sorting"""
     if category not in getattr(mongo_db, cname).index_information():
         getattr(mongo_db, cname).create_index(
@@ -99,7 +99,7 @@ def ensure_info_index(mongo_db, cname="metadata", category="info", keys=["access
         )
 
 
-def update_metadata_index(mongo_db, logger, cname="metadata_index", template=INDEX_TEMPLATE):
+def update_metadata_index(mongo_db, logger, template=INDEX_TEMPLATE, cname=COLLECTION_NAMES.METADATA_INDEX):
     """Collect existing keys and values for lookups"""
     logger.info("CacherThread: reindexing metadata")
     index = deepcopy(template)
@@ -140,8 +140,7 @@ class CacherThread(Thread):
                     try:
                         glds = CachedDataset(
                             self.mongo_db, accession, self.logger,
-                            init_assays=True,
-                            metadata_units_format=METADATA_UNITS_FORMAT,
+                            init_assays=True, units_format=UNITS_FORMAT,
                         )
                     except Exception as e:
                         self.logger.error(

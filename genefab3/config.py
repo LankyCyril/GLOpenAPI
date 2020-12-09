@@ -36,6 +36,16 @@ CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
 METADATA_INDEX_WAIT_DELAY = 60 # 1 minute (in seconds)
 METADATA_INDEX_WAIT_STEP = 5
 
+from argparse import Namespace
+COLLECTION_NAMES = Namespace(
+    LOG="log",
+    JSON_CACHE="json_cache",
+    DATASET_TIMESTAMPS="dataset_timestamps",
+    METADATA="metadata",
+    METADATA_INDEX="metadata_index",
+    FILE_DESCRIPTORS="file_descriptors",
+)
+
 
 ## API parser parameters
 
@@ -88,7 +98,7 @@ DISALLOWED_CONTEXTS = [
 
 ISA_ZIP_REGEX = r'.*_metadata_.*[_-]ISA\.zip$'
 ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
-METADATA_UNITS_FORMAT = "{value} {{{unit}}}"
+UNITS_FORMAT = "{value} {{{unit}}}"
 ISA_TECH_TYPE_LOCATOR = "investigation.study assays.study assay technology type"
 
 from collections import namedtuple

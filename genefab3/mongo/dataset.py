@@ -1,3 +1,4 @@
+from genefab3.config import COLLECTION_NAMES
 from argparse import Namespace
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.mongo.json import get_fresh_json, drop_json_cache_by_accession
@@ -16,7 +17,7 @@ def NoLogger():
     return Namespace(warning=lambda *args, **kwargs: None)
 
 
-def drop_dataset_timestamps(mongo_db, accession, cname="dataset_timestamps"):
+def drop_dataset_timestamps(mongo_db, accession, cname=COLLECTION_NAMES.DATASET_TIMESTAMPS):
     """""" # TODO: docstring
     run_mongo_transaction(
         action="delete_many", collection=getattr(mongo_db, cname),
@@ -27,7 +28,7 @@ def drop_dataset_timestamps(mongo_db, accession, cname="dataset_timestamps"):
 class CachedDataset(ColdStorageDataset):
     """ColdStorageDataset via auto-updated metadata in database"""
  
-    def __init__(self, mongo_db, accession, logger=None, init_assays=True, metadata_units_format=None, cname="dataset_timestamps"):
+    def __init__(self, mongo_db, accession, logger=None, init_assays=True, units_format=None, cname=COLLECTION_NAMES.DATASET_TIMESTAMPS):
         """""" # TODO: docstring
         self.mongo_db = mongo_db
         self.logger = logger if (logger is not None) else NoLogger()
@@ -40,9 +41,7 @@ class CachedDataset(ColdStorageDataset):
                 self.init_assays()
                 if any(self.changed.__dict__.values()):
                     for assay in self.assays.values():
-                        self._recache_assay(
-                            assay, metadata_units_format=metadata_units_format,
-                        )
+                        self._recache_assay(assay, units_format=units_format)
             else:
                 self.assays = CachedAssayDispatcher(self)
             run_mongo_transaction(
@@ -54,7 +53,7 @@ class CachedDataset(ColdStorageDataset):
             self.drop_cache()
             raise
  
-    def _recache_assay(self, assay, metadata_units_format, cname="metadata"):
+    def _recache_assay(self, assay, units_format, cname=COLLECTION_NAMES.METADATA):
         """""" # TODO: docstring
         collection = getattr(self.mongo_db, cname)
         run_mongo_transaction(
@@ -67,7 +66,7 @@ class CachedDataset(ColdStorageDataset):
             run_mongo_transaction(
                 action="insert_many", collection=collection,
                 documents=harmonize_document(
-                    assay.meta.values(), units_format=metadata_units_format,
+                    assay.meta.values(), units_format=units_format,
                 ),
             )
             for sample_name in assay.meta:

@@ -1,3 +1,4 @@
+from genefab3.config import COLLECTION_NAMES
 from flask import request
 from datetime import datetime
 from sys import exc_info
@@ -69,7 +70,7 @@ def interpret_exc_info(ei):
     return exc_type, exc_value, exc_tb, info
 
 
-def insert_log_entry(mongo_db, et=None, ev=None, stack=None, is_exception=False, cname="log", **kwargs):
+def insert_log_entry(mongo_db, et=None, ev=None, stack=None, is_exception=False, cname=COLLECTION_NAMES.LOG, **kwargs):
     try:
         remote_addr, full_path = request.remote_addr, request.full_path
     except RuntimeError:
@@ -93,7 +94,7 @@ def traceback_printer(e, mongo_db):
     return error_message, 400
 
 
-def exception_catcher(e, mongo_db, cname="log"):
+def exception_catcher(e, mongo_db):
     if isinstance(e, FileNotFoundError):
         code, explanation = 404, "Not Found"
     elif isinstance(e, NotImplementedError):

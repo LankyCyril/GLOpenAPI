@@ -1,6 +1,6 @@
 from genefab3.config import METADATA_INDEX_WAIT_DELAY, METADATA_INDEX_WAIT_STEP
 from time import sleep
-from genefab3.config import MONGO_DB_LOCALE, RAW_FILE_REGEX
+from genefab3.config import MONGO_DB_LOCALE, RAW_FILE_REGEX, COLLECTION_NAMES
 from pymongo import ASCENDING
 from pandas import json_normalize, MultiIndex, isnull, concat, merge
 from genefab3.exceptions import GeneLabDatabaseException
@@ -92,7 +92,7 @@ def isa_sort_dataframe(dataframe):
     )]
 
 
-def get_annotation_by_metas(mongo_db, context, include=(), search_with_projection=True, modify=keep_projection, aggregate=False, cname="metadata"):
+def get_annotation_by_metas(mongo_db, context, include=(), search_with_projection=True, modify=keep_projection, aggregate=False, cname=COLLECTION_NAMES.METADATA):
     """Select assays/samples based on annotation filters"""
     full_projection = {
         "info.accession": True, "info.assay": True, **context.projection,

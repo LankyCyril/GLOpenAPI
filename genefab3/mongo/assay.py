@@ -1,4 +1,5 @@
 from genefab3.coldstorage import AssayBase
+from genefab3.config import COLLECTION_NAMES
 from genefab3.exceptions import GeneLabDatabaseException
 from re import escape
 from genefab3.utils import UniversalSet, iterate_terminal_leaf_filenames
@@ -13,7 +14,7 @@ class CachedAssay(AssayBase):
         self.name = assay_name
         self.mongo_db = dataset.mongo_db
  
-    def _iterate_filenames_from_projection(self, projection, cname="metadata"):
+    def _iterate_filenames_from_projection(self, projection, cname=COLLECTION_NAMES.METADATA):
         """Match filenames from end leaves of query in metadata"""
         query = {
             "info.accession": self.dataset.accession,
@@ -60,7 +61,7 @@ class CachedAssay(AssayBase):
             return {}
 
 
-def drop_metadata_by_accession(mongo_db, accession, cname="metadata"):
+def drop_metadata_by_accession(mongo_db, accession, cname=COLLECTION_NAMES.METADATA):
     """""" # TODO: docstring
     run_mongo_transaction(
         action="delete_many", collection=getattr(mongo_db, cname),
