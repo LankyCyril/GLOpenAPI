@@ -16,9 +16,9 @@ def is_json_cache_fresh(json_cache_info, max_age=MAX_JSON_AGE):
         return (current_timestamp - cache_timestamp <= max_age)
 
 
-def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, report_changes=False):
+def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, report_changes=False, cname="json_cache"):
     """Get JSON from local database if fresh, otherwise update local database and get"""
-    json_cache_info = db.json_cache.find_one(
+    json_cache_info = getattr(db, cname).find_one(
         {"identifier": identifier, "kind": kind},
         sort=[("last_refreshed", DESCENDING)],
     )
@@ -36,7 +36,7 @@ def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, report_ch
                 )
         else:
             run_mongo_transaction(
-                action="replace", collection=db.json_cache,
+                action="replace", collection=getattr(db, cname),
                 query={"identifier": identifier, "kind": kind}, data={
                     "last_refreshed": int(datetime.now().timestamp()),
                     "raw": fresh_json,
@@ -50,3 +50,11 @@ def get_fresh_json(db, identifier, kind="other", max_age=MAX_JSON_AGE, report_ch
         return fresh_json, json_changed
     else:
         return fresh_json
+
+
+def drop_json_cache_by_accession(db, accession, cname="json_cache"):
+    """""" # TODO: docstring
+    run_mongo_transaction(
+        action="delete_many", collection=getattr(db, cname),
+        query={"identifier": accession},
+    )

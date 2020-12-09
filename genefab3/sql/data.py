@@ -36,7 +36,7 @@ class CachedTable():
     data = None
     logger = None
  
-    def __init__(self, dbs, file_descriptor, datatype, accession, assay_name, sample_names):
+    def __init__(self, dbs, file_descriptor, datatype, accession, assay_name, sample_names, cname="file_descriptors"):
         """Check cold storage JSON and cache, update cache if remote file was updated"""
         self.name = f"{accession}/{assay_name}"
         self.logger = getLogger("genefab3")
@@ -52,7 +52,7 @@ class CachedTable():
             timestamp=file_descriptor.timestamp,
             sep=infer_file_separator(file_descriptor.name),
         )
-        cache_entry = self.mongo_db.file_descriptors.find_one(
+        cache_entry = getattr(self.mongo_db, cname).find_one(
             {"name": self.file.name, "url": self.file.url},
             {"_id": False, "timestamp": True}, sort=[("timestamp", DESCENDING)],
         )
@@ -67,7 +67,7 @@ class CachedTable():
             self.is_fresh = self._recache()
             if self.is_fresh:
                 run_mongo_transaction(
-                    action="replace", collection=self.mongo_db.file_descriptors,
+                    action="replace", collection=getattr(self.mongo_db, cname),
                     query={"name": self.file.name, "url": self.file.url},
                     data={"timestamp": self.file.timestamp},
                 )
@@ -83,14 +83,14 @@ class CachedTable():
             ),
         )
  
-    def _drop_mongo_entry(self):
+    def _drop_mongo_entry(self, cname="file_descriptors"):
         """Erase Mongo DB entry for file descriptor"""
         self.logger.warning(
             CACHED_TABLE_LOGGER_DROP_WARNING,
             self.accession, self.assay_name, self.datatype,
         )
         run_mongo_transaction(
-            action="delete_many", collection=self.mongo_db.file_descriptors,
+            action="delete_many", collection=getattr(self.mongo_db, cname),
             query={"name": self.file.name, "url": self.file.url},
         )
  

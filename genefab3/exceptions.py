@@ -69,12 +69,12 @@ def interpret_exc_info(ei):
     return exc_type, exc_value, exc_tb, info
 
 
-def insert_log_entry(log_collection, et=None, ev=None, stack=None, is_exception=False, **kwargs):
+def insert_log_entry(db, et=None, ev=None, stack=None, is_exception=False, cname="log", **kwargs):
     try:
         remote_addr, full_path = request.remote_addr, request.full_path
     except RuntimeError:
         remote_addr, full_path = None, None
-    log_collection.insert_one({
+    getattr(db, cname).insert_one({
         "is_exception": is_exception, "type": et, "value": ev, "stack": stack,
         "remote_addr": remote_addr, "full_path": full_path,
         "timestamp": int(datetime.now().timestamp()), **kwargs,
@@ -83,14 +83,14 @@ def insert_log_entry(log_collection, et=None, ev=None, stack=None, is_exception=
 
 def traceback_printer(e, db):
     exc_type, exc_value, exc_tb, info = interpret_exc_info(exc_info())
-    insert_log_entry(db.log, *info, is_exception=True)
+    insert_log_entry(db, *info, is_exception=True, args=getattr(e, "args", []))
     error_message = HTTP_DEBUG_ERROR_MASK.format(
         *info, exc_type.__name__, str(exc_value),
     )
     return error_message, 400
 
 
-def exception_catcher(e, db):
+def exception_catcher(e, db, cname="log"):
     if isinstance(e, FileNotFoundError):
         code, explanation = 404, "Not Found"
     elif isinstance(e, NotImplementedError):
@@ -102,7 +102,9 @@ def exception_catcher(e, db):
     else:
         code, explanation = 400, "Bad Request"
     *_, info = interpret_exc_info(exc_info())
-    insert_log_entry(db.log, *info, is_exception=True, code=code)
+    insert_log_entry(
+        db, *info, is_exception=True, args=getattr(e, "args", []), code=code,
+    )
     error_message = HTTP_ERROR_MASK.format(
         code, explanation, type(e).__name__, (
             (HTML_LIST_SEP.join(e.args) if hasattr(e, "args") else str(e))
@@ -118,6 +120,6 @@ class DBLogger(Handler):
         super().__init__()
     def emit(self, record):
         insert_log_entry(
-            self.db.log, et=record.levelname, ev=record.getMessage(),
+            self.db, et=record.levelname, ev=record.getMessage(),
             stack=record.stack_info, is_exception=False,
         )

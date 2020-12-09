@@ -56,7 +56,7 @@ def infer_target_file_locator(raw_annotation, datatype):
         return target_file_locators.pop()
 
 
-def add_file_descriptors(mongo_db, raw_annotation, datatype):
+def add_file_descriptors_to_raw_annotation(mongo_db, raw_annotation, datatype):
     """Based on technology types in `raw_annotation` and target `datatype`, look up per-assay file descriptors"""
     target_file_locator = infer_target_file_locator(raw_annotation, datatype)
     info_cols = ["info.accession", "info.assay"]
@@ -71,10 +71,12 @@ def add_file_descriptors(mongo_db, raw_annotation, datatype):
     return merge(raw_annotation, per_assay)
 
 
-def get_data_by_metas(dbs, context):
+def get_data_by_metas(dbs, context, cname="metadata"):
     """Select data based on annotation filters"""
     raw_annotation = get_raw_meta_df(
-        dbs.mongo_db.metadata, context.query, include={"info.sample name"},
+        getattr(dbs.mongo_db, cname),
+        context.query,
+        include={"info.sample name"},
         projection={
             "_id": False, "info.accession": True, "info.assay": True,
             "info.sample name": True, ISA_TECH_TYPE_LOCATOR: True,
@@ -85,7 +87,7 @@ def get_data_by_metas(dbs, context):
             ["info"], ["info"], [ROW_TYPES.default_factory()],
         )
     else:
-        raw_annotation = add_file_descriptors(
+        raw_annotation = add_file_descriptors_to_raw_annotation(
             dbs.mongo_db, raw_annotation, context.kwargs["datatype"],
         )
         return get_sql_data(

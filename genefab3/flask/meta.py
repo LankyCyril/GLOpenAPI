@@ -92,7 +92,7 @@ def isa_sort_dataframe(dataframe):
     )]
 
 
-def get_annotation_by_metas(db, context, include=(), search_with_projection=True, modify=keep_projection, aggregate=False):
+def get_annotation_by_metas(db, context, include=(), search_with_projection=True, modify=keep_projection, aggregate=False, cname="metadata"):
     """Select assays/samples based on annotation filters"""
     full_projection = {
         "info.accession": True, "info.assay": True, **context.projection,
@@ -104,7 +104,8 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
         else:
             proj = {"_id": False}
         # get target metadata as single-level dataframe:
-        dataframe = get_raw_meta_df(db.metadata, context.query, proj, include)
+        collection = getattr(db, cname)
+        dataframe = get_raw_meta_df(collection, context.query, proj, include)
         # modify with injected function:
         dataframe = modify(dataframe, full_projection)
         # remove trailing dots and hide columns that are explicitly hidden:
@@ -117,9 +118,7 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
             for fields in map(lambda s: s.split("."), dataframe.columns)
         )
     except TypeError: # no data retrieved
-        return Placeholders.dataframe(
-            ["info"], ["accession", "assay", *(c.strip(".") for c in include)],
-        )
+        return Placeholders.metadata_dataframe(include)
     else:
         if aggregate: # coerce to boolean "existence" if requested
             info_cols = list(dataframe[["info"]].columns)

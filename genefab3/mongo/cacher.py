@@ -45,24 +45,24 @@ def list_available_accessions(db):
     return {raw_json["_id"] for raw_json in raw_datasets_json}
 
 
-def list_fresh_and_stale_accessions(db, max_age=MAX_JSON_AGE):
+def list_fresh_and_stale_accessions(db, max_age=MAX_JSON_AGE, cname="dataset_timestamps"):
     """Find accessions in no need / need of update in database"""
     refresh_dates = Series({
         entry["accession"]: entry["last_refreshed"]
-        for entry in db.dataset_timestamps.find()
+        for entry in getattr(db, cname).find()
     })
     current_timestamp = int(datetime.now().timestamp())
     indexer = ((current_timestamp - refresh_dates) <= max_age)
     return set(refresh_dates[indexer].index), set(refresh_dates[~indexer].index)
 
 
-def INPLACE_update_metadata_index_keys(index, metadata, final_key_blacklist=FINAL_INDEX_KEY_BLACKLIST):
+def INPLACE_update_metadata_index_keys(db, index, cname="metadata", final_key_blacklist=FINAL_INDEX_KEY_BLACKLIST):
     """Populate JSON with all possible metadata keys, also for documentation section 'meta-existence'"""
     for isa_category in index:
         for subkey in index[isa_category]:
             raw_next_level_keyset = set.union(*(
                 set(entry[isa_category][subkey].keys()) for entry in
-                metadata.find(
+                getattr(db, cname).find(
                     {isa_category+"."+subkey: {"$exists": True}},
                     {isa_category+"."+subkey: True},
                 )
@@ -73,44 +73,46 @@ def INPLACE_update_metadata_index_keys(index, metadata, final_key_blacklist=FINA
             }
 
 
-def INPLACE_update_metadata_index_values(index, metadata):
+def INPLACE_update_metadata_index_values(db, index, cname="metadata"):
     """Generate JSON with all possible metadata values, also for documentation section 'meta-equals'"""
+    collection = getattr(db, cname)
     for isa_category in index:
         for subkey in index[isa_category]:
             for next_level_key in index[isa_category][subkey]:
-                values = sorted(map(str, metadata.distinct(
+                values = sorted(map(str, collection.distinct(
                     f"{isa_category}.{subkey}.{next_level_key}.",
                 )))
                 if not values:
-                    values = sorted(map(str, metadata.distinct(
+                    values = sorted(map(str, collection.distinct(
                         f"{isa_category}.{subkey}.{next_level_key}",
                     )))
                 index[isa_category][subkey][next_level_key] = values
 
 
-def update_metadata_index(db, template=INDEX_TEMPLATE):
-    """Collect existing keys and values for lookups; index `info.*` for sorting"""
+def ensure_info_index(db, cname="metadata", category="info", keys=["accession", "assay", "sample name"]):
+    """Index `info.*` for sorting"""
+    if category not in getattr(db, cname).index_information():
+        getattr(db, cname).create_index(
+            name=category,
+            keys=[(f"{category}.{key}", ASCENDING) for key in keys],
+            collation={"locale": MONGO_DB_LOCALE, "numericOrdering": True},
+        )
+
+
+def update_metadata_index(db, logger, cname="metadata_index", template=INDEX_TEMPLATE):
+    """Collect existing keys and values for lookups"""
+    logger.info("CacherThread: reindexing metadata")
     index = deepcopy(template)
-    INPLACE_update_metadata_index_keys(index, db.metadata)
-    INPLACE_update_metadata_index_values(index, db.metadata)
+    INPLACE_update_metadata_index_keys(db, index)
+    INPLACE_update_metadata_index_values(db, index)
     for isa_category in index:
         for subkey in index[isa_category]:
             run_mongo_transaction(
                 action="replace",
-                collection=db.metadata_index,
+                collection=getattr(db, cname),
                 query={"isa_category": isa_category, "subkey": subkey},
                 data={"content": index[isa_category][subkey]},
             )
-    if "info" not in db.metadata.index_information():
-        db.metadata.create_index(
-            name="info",
-            keys=[
-                ("info.accession", ASCENDING),
-                ("info.assay", ASCENDING),
-                ("info.sample name", ASCENDING),
-            ],
-            collation={"locale": MONGO_DB_LOCALE, "numericOrdering": True},
-        )
 
 
 class CacherThread(Thread):
@@ -119,12 +121,13 @@ class CacherThread(Thread):
     def __init__(self, db, check_interval=CACHER_THREAD_CHECK_INTERVAL, recheck_delay=CACHER_THREAD_RECHECK_DELAY):
         self.db, self.check_interval = db, check_interval
         self.recheck_delay = recheck_delay
-        self.logger = getLogger("genefab3")
+        self.logger = getLogger("genefab3") # TODO: write to db.status
         self.logger.setLevel(DEBUG)
         super().__init__()
  
     def run(self):
         while True:
+            ensure_info_index(self.db)
             self.logger.info("CacherThread: Checking cache")
             try:
                 accessions = list_available_accessions(self.db)
@@ -157,7 +160,6 @@ class CacherThread(Thread):
                 )
                 delay = self.check_interval
             finally:
-                self.logger.info("CacherThread: reindexing metadata")
-                update_metadata_index(self.db)
+                update_metadata_index(self.db, self.logger)
                 self.logger.info("CacherThread: sleeping for %d seconds", delay)
                 sleep(delay)
