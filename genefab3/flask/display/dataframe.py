@@ -1,5 +1,6 @@
 from re import sub
 from os import path
+from collections.abc import Iterable
 from pandas import isnull
 from genefab3.flask.display.formatters import get_browser_formatters, build_url
 from genefab3.utils import map_replace
@@ -35,6 +36,19 @@ def get_browser_html(): # TODO in prod: make HTML template static / preload on a
         return html.read()
 
 
+def na_repr(x):
+    """For fmt=browser, convert empty entries to 'NA'"""
+    if isinstance(x, Iterable):
+        if hasattr(x, "__len__") and (len(x) == 0):
+            return "NA"
+        else:
+            return str(x)
+    elif isnull(x):
+        return "NA"
+    else:
+        return str(x)
+
+
 def get_browser_dataframe_twolevel(df, context, frozen=0):
     """Display dataframe with two-level columns using SlickGrid"""
     shortnames = []
@@ -45,8 +59,9 @@ def get_browser_dataframe_twolevel(df, context, frozen=0):
         shortnames.append(s)
         return s
     rowdata = (
-        df.droplevel(0, axis=1).rename(generate_short_names, axis=1)
-        .applymap(lambda x: "NA" if isnull(x) else str(x))
+        df.droplevel(0, axis=1)
+        .rename(generate_short_names, axis=1)
+        .applymap(na_repr)
         .to_json(orient="records")
     )
     cdm = "{{id:'{}',field:'{}',columnGroup:'{}',name:'{}'}},"

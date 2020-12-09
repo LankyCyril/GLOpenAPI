@@ -56,6 +56,7 @@ listlen = lambda d, k: len(d.getlist(k))
 
 DISALLOWED_CONTEXTS = [
     dict(_="at least one dataset or annotation category must be specified",
+        view=(eq, "/status/", eq, False),
         projection=(length_hint, 0, eq, 0), # no projection
         accessions_and_assays=(length_hint, 0, eq, 0), # no datasets
     ),

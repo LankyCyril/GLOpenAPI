@@ -76,6 +76,11 @@ def data(**kwargs):
     dbs = Namespace(mongo_db=mongo_db, sqlite_dir=SQLITE_DIR)
     return display(dbs, getter, kwargs, request)
 
+@app.route("/status/", methods=["GET"])
+def status(**kwargs):
+    from genefab3.flask.status import get_status as getter
+    return display(mongo_db, getter, kwargs, request)
+
 @app.route("/favicon.<imgtype>")
 def favicon(**kwargs):
     return ""

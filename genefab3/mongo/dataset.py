@@ -78,7 +78,6 @@ class CachedDataset(ColdStorageDataset):
             "report timestamp": int(datetime.now().timestamp())
         }
         if error is not None:
-            inserted_data["error message"] = str(error)
             inserted_data["details"].extend(getattr(error, "args", []))
         run_mongo_transaction(
             action="replace", collection=getattr(self.mongo_db, cname),
@@ -109,7 +108,7 @@ class CachedDataset(ColdStorageDataset):
             if sample_names_with_missing_study_entries:
                 self.update_status(
                     accession=self.accession, assay_name=assay.name,
-                    warning="No Study entries", status="warning",
+                    warning="Some Study entries missing", status="warning",
                     details=sorted(sample_names_with_missing_study_entries),
                 )
             else:
