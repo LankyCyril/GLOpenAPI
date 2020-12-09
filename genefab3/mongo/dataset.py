@@ -32,11 +32,11 @@ class CachedDataset(ColdStorageDataset):
         """""" # TODO: docstring
         self.mongo_db = mongo_db
         self.logger = logger if (logger is not None) else NoLogger()
-        super().__init__(
-            accession, init_assays=False,
-            get_json=partial(get_fresh_json, mongo_db=mongo_db),
-        )
         try:
+            super().__init__(
+                accession, init_assays=False,
+                get_json=partial(get_fresh_json, mongo_db=mongo_db),
+            )
             if init_assays:
                 self.init_assays()
                 if any(self.changed.__dict__.values()):
@@ -49,32 +49,78 @@ class CachedDataset(ColdStorageDataset):
                 query={"accession": accession},
                 data={"last_refreshed": int(datetime.now().timestamp())},
             )
-        except:
+        except Exception as e:
             self.drop_cache()
+            self.update_status(accession=accession, status="failure", error=e)
             raise
+        else:
+            self.update_status(accession=accession, status="success")
+
+    def update_status(self, accession, assay_name=None, status="success", warning=None, error=None, details=(), cname=COLLECTION_NAMES.STATUS):
+        """""" # TODO: docstring
+        if assay_name is None:
+            replacement_query = {"kind": "dataset", "accession": accession}
+            if status == "failure":
+                run_mongo_transaction(
+                    action="delete_many",
+                    collection=getattr(self.mongo_db, cname),
+                    query={"accession": accession},
+                )
+        else:
+            replacement_query = {
+                "kind": "assay", "accession": accession,
+                "assay name": assay_name,
+            }
+        inserted_data = {
+            "status": status, "warning": warning,
+            "error": None if (error is None) else type(error).__name__,
+            "details": list(details),
+            "report timestamp": int(datetime.now().timestamp())
+        }
+        if error is not None:
+            inserted_data["error message"] = str(error)
+            inserted_data["details"].extend(getattr(error, "args", []))
+        run_mongo_transaction(
+            action="replace", collection=getattr(self.mongo_db, cname),
+            query=replacement_query, data=inserted_data,
+        )
  
     def _recache_assay(self, assay, units_format, cname=COLLECTION_NAMES.METADATA):
         """""" # TODO: docstring
-        collection = getattr(self.mongo_db, cname)
+        metadata_collection = getattr(self.mongo_db, cname)
+        query = {"info.accession": self.accession, "info.assay": assay.name}
         run_mongo_transaction(
-            action="delete_many", collection=collection, query={
-                "info.accession": self.accession,
-                "info.assay": assay.name,
-            },
+            action="delete_many", collection=metadata_collection, query=query,
         )
         if assay.meta:
             run_mongo_transaction(
-                action="insert_many", collection=collection,
+                action="insert_many", collection=metadata_collection,
                 documents=harmonize_document(
                     assay.meta.values(), units_format=units_format,
                 ),
             )
+            sample_names_with_missing_study_entries = set()
             for sample_name in assay.meta:
                 if "Study" not in assay.meta[sample_name]:
+                    sample_names_with_missing_study_entries.add(sample_name)
                     self.logger.warning(
                         WARN_NO_STUDY, self.accession, assay.name, sample_name,
                     )
+            if sample_names_with_missing_study_entries:
+                self.update_status(
+                    accession=self.accession, assay_name=assay.name,
+                    warning="No Study entries", status="warning",
+                    details=sorted(sample_names_with_missing_study_entries),
+                )
+            else:
+                self.update_status(
+                    accession=self.accession, assay_name=assay.name,
+                )
         else:
+            self.update_status(
+                accession=self.accession, assay_name=assay.name,
+                warning="No metadata entries", status="warning",
+            )
             self.logger.warning(WARN_NO_META, self.accession, assay.name)
  
     def drop_cache(self=None, mongo_db=None, accession=None):
