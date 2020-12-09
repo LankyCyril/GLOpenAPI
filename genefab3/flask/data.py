@@ -4,7 +4,6 @@ from genefab3.config import ISA_TECH_TYPE_LOCATOR, TECHNOLOGY_FILE_LOCATORS
 from pandas import merge
 from genefab3.flask.meta import get_raw_meta_dataframe
 from genefab3.flask.display import Placeholders
-from genefab3.config import ROW_TYPES
 from genefab3.sql.data import get_sql_data
 
 
@@ -81,9 +80,7 @@ def get_data_by_metas(dbs, context):
         }
     )
     if len(raw_annotation) == 0:
-        return Placeholders.dataframe(
-            ["info"], ["info"], [ROW_TYPES.default_factory()],
-        )
+        return Placeholders.data_dataframe()
     else:
         raw_annotation = add_file_descriptors_to_raw_annotation(
             dbs.mongo_db, raw_annotation, context.kwargs["datatype"],

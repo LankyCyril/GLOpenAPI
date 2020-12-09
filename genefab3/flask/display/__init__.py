@@ -9,6 +9,7 @@ from genefab3.flask.display.raw import render_raw
 from genefab3.flask.display.cls import render_cls
 from genefab3.flask.display.dataframe import render_dataframe
 from itertools import cycle
+from genefab3.config import ROW_TYPES
 
 
 def display(db, getter, kwargs, request):
@@ -55,4 +56,10 @@ class Placeholders:
         """Return an empty dataframe that matches metadata format"""
         return Placeholders.dataframe(
             ["info"], ["accession", "assay", *(c.strip(".") for c in include)],
+        )
+ 
+    def data_dataframe():
+        """Return an empty dataframe that matches data format"""
+        return Placeholders.dataframe(
+            ["info"], ["info"], [ROW_TYPES.default_factory()],
         )
