@@ -10,10 +10,11 @@ from genefab3.flask.display import Placeholders
 from numpy import nan
 
 
-def get_raw_meta_df(collection, query, projection, include):
+def get_raw_meta_dataframe(mongo_db, query, projection, include, cname=COLLECTION_NAMES.METADATA):
     """Get target metadata as a single-level dataframe, numerically sorted by info fields"""
+    metadata_collection = getattr(mongo_db, cname)
     for _ in range(0, METADATA_INDEX_WAIT_DELAY, METADATA_INDEX_WAIT_STEP):
-        if "info" in collection.index_information():
+        if "info" in metadata_collection.index_information():
             break
         else:
             sleep(METADATA_INDEX_WAIT_STEP)
@@ -21,14 +22,16 @@ def get_raw_meta_df(collection, query, projection, include):
         raise GeneLabDatabaseException(
             "Could not retrieve sorted metadata (no index found)",
         )
-    sort_by = [
-        (field, ASCENDING)
-        for field in ["info.accession", "info.assay", *include]
-    ]
-    order = {
-        "locale": MONGO_DB_LOCALE, "numericOrdering": True,
-    }
-    entries = collection.find(query, projection, sort=sort_by).collation(order)
+    entries = metadata_collection.find(
+        query, projection,
+        sort=[
+            (field, ASCENDING)
+            for field in ["info.accession", "info.assay", *include]
+        ],
+        collation={
+            "locale": MONGO_DB_LOCALE, "numericOrdering": True,
+        },
+    )
     try:
         return json_normalize(list(entries))
     except Exception as e:
@@ -92,7 +95,7 @@ def isa_sort_dataframe(dataframe):
     )]
 
 
-def get_annotation_by_metas(mongo_db, context, include=(), search_with_projection=True, modify=keep_projection, aggregate=False, cname=COLLECTION_NAMES.METADATA):
+def get_annotation_by_metas(mongo_db, context, include=(), search_with_projection=True, modify=keep_projection, aggregate=False):
     """Select assays/samples based on annotation filters"""
     full_projection = {
         "info.accession": True, "info.assay": True, **context.projection,
@@ -103,9 +106,9 @@ def get_annotation_by_metas(mongo_db, context, include=(), search_with_projectio
             proj = {"_id": False, **full_projection}
         else:
             proj = {"_id": False}
-        # get target metadata as single-level dataframe:
-        collection = getattr(mongo_db, cname)
-        dataframe = get_raw_meta_df(collection, context.query, proj, include)
+        dataframe = get_raw_meta_dataframe( # single-level
+            mongo_db, context.query, proj, include,
+        )
         # modify with injected function:
         dataframe = modify(dataframe, full_projection)
         # remove trailing dots and hide columns that are explicitly hidden:
@@ -117,7 +120,7 @@ def get_annotation_by_metas(mongo_db, context, include=(), search_with_projectio
             else (".".join(fields[:2]), ".".join(fields[2:]))
             for fields in map(lambda s: s.split("."), dataframe.columns)
         )
-    except TypeError: # no data retrieved
+    except TypeError: # no data retrieved; TODO: handle more gracefully
         return Placeholders.metadata_dataframe(include)
     else:
         if aggregate: # coerce to boolean "existence" if requested

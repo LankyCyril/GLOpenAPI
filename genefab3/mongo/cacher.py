@@ -75,15 +75,15 @@ def INPLACE_update_metadata_index_keys(mongo_db, index, final_key_blacklist=FINA
 
 def INPLACE_update_metadata_index_values(mongo_db, index, cname=COLLECTION_NAMES.METADATA):
     """Generate JSON with all possible metadata values, also for documentation section 'meta-equals'"""
-    collection = getattr(mongo_db, cname)
+    metadata_collection = getattr(mongo_db, cname)
     for isa_category in index:
         for subkey in index[isa_category]:
             for next_level_key in index[isa_category][subkey]:
-                values = sorted(map(str, collection.distinct(
+                values = sorted(map(str, metadata_collection.distinct(
                     f"{isa_category}.{subkey}.{next_level_key}.",
                 )))
                 if not values:
-                    values = sorted(map(str, collection.distinct(
+                    values = sorted(map(str, metadata_collection.distinct(
                         f"{isa_category}.{subkey}.{next_level_key}",
                     )))
                 index[isa_category][subkey][next_level_key] = values

@@ -2,8 +2,7 @@ from genefab3.mongo.dataset import CachedDataset
 from genefab3.exceptions import GeneLabMetadataException, GeneLabFileException
 from genefab3.config import ISA_TECH_TYPE_LOCATOR, TECHNOLOGY_FILE_LOCATORS
 from pandas import merge
-from genefab3.config import COLLECTION_NAMES
-from genefab3.flask.meta import get_raw_meta_df
+from genefab3.flask.meta import get_raw_meta_dataframe
 from genefab3.flask.display import Placeholders
 from genefab3.config import ROW_TYPES
 from genefab3.sql.data import get_sql_data
@@ -72,12 +71,10 @@ def add_file_descriptors_to_raw_annotation(mongo_db, raw_annotation, datatype):
     return merge(raw_annotation, per_assay)
 
 
-def get_data_by_metas(dbs, context, cname=COLLECTION_NAMES.METADATA):
+def get_data_by_metas(dbs, context):
     """Select data based on annotation filters"""
-    raw_annotation = get_raw_meta_df(
-        getattr(dbs.mongo_db, cname),
-        context.query,
-        include={"info.sample name"},
+    raw_annotation = get_raw_meta_dataframe(
+        dbs.mongo_db, context.query, include={"info.sample name"},
         projection={
             "_id": False, "info.accession": True, "info.assay": True,
             "info.sample name": True, ISA_TECH_TYPE_LOCATOR: True,

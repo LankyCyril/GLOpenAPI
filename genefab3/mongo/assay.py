@@ -16,12 +16,13 @@ class CachedAssay(AssayBase):
  
     def _iterate_filenames_from_projection(self, projection, cname=COLLECTION_NAMES.METADATA):
         """Match filenames from end leaves of query in metadata"""
+        metadata_collection = getattr(self.mongo_db, cname)
         query = {
             "info.accession": self.dataset.accession,
             "info.assay": self.name,
         }
-        collection = getattr(self.mongo_db, cname)
-        for entry in collection.find(query, {"_id": False, **projection}):
+        proj = {"_id": False, **projection}
+        for entry in metadata_collection.find(query, proj):
             try:
                 yield from iterate_terminal_leaf_filenames(entry)
             except GeneLabDatabaseException:

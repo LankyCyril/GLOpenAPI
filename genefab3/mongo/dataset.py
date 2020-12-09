@@ -87,9 +87,9 @@ class CachedDataset(ColdStorageDataset):
     def _recache_assay(self, assay, units_format, cname=COLLECTION_NAMES.METADATA):
         """""" # TODO: docstring
         metadata_collection = getattr(self.mongo_db, cname)
-        query = {"info.accession": self.accession, "info.assay": assay.name}
         run_mongo_transaction(
-            action="delete_many", collection=metadata_collection, query=query,
+            action="delete_many", collection=metadata_collection,
+            query={"info.accession": self.accession, "info.assay": assay.name},
         )
         if assay.meta:
             run_mongo_transaction(
