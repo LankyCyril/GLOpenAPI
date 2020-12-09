@@ -3,7 +3,7 @@ from genefab3.mongo.dataset import CachedDataset
 from urllib.request import urlopen
 
 
-def get_file(db, context):
+def get_file(mongo_db, context):
     """Patch through to cold storage file based on `from=` and `filename=`"""
     accession = next( # assume only one accession (validated in parser)
         iter(context.accessions_and_assays),
@@ -13,7 +13,9 @@ def get_file(db, context):
         assay_name = context.accessions_and_assays[accession][0]
     else:
         assay_name = None
-    glds = CachedDataset(db=db, accession=accession, init_assays=False)
+    glds = CachedDataset(
+        mongo_db=mongo_db, accession=accession, init_assays=False,
+    )
     mask = context.kwargs.get("filename")
     if mask is None: # nothing passed, assume target field specified
         lookup_kwargs = {}

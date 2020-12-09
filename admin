@@ -29,7 +29,7 @@ def confirm(prompt):
         raise ValueError
 
 
-def drop(db, what):
+def drop(mongo_db, what):
     confirm("Yes, drop " + what)
     if what == "ALLMETA":
         confirm("Yes, I am really sure I want to drop ALLMETA")
@@ -39,28 +39,32 @@ def drop(db, what):
         }
         for cn in collection_names:
             run_mongo_transaction(
-                action="delete_many", collection=getattr(db, cn), query={},
+                action="delete_many",
+                collection=getattr(mongo_db, cn),
+                query={},
             )
     elif what == "log":
-        run_mongo_transaction(action="delete_many", collection=db.log, query={})
+        run_mongo_transaction(
+            action="delete_many", collection=mongo_db.log, query={},
+        )
     else:
-        CachedDataset.drop_cache(db=db, accession=what)
-        update_metadata_index(db)
+        CachedDataset.drop_cache(mongo_db=mongo_db, accession=what)
+        update_metadata_index(mongo_db)
 
 
-def recache(db, what):
+def recache(mongo_db, what):
     if what.startswith("ALL"):
         raise NotImplementedError
     else:
         confirm("Yes, recache " + what)
-        CachedDataset.drop_cache(db=db, accession=what)
-        CachedDataset(db, what, logger=logger)
-        update_metadata_index(db)
+        CachedDataset.drop_cache(mongo_db=mongo_db, accession=what)
+        CachedDataset(mongo_db, what, logger=logger)
+        update_metadata_index(mongo_db)
 
 
-def showlog_brief_lines(db, query, max_i):
+def showlog_brief_lines(mongo_db, query, max_i):
     sort = [("timestamp", DESCENDING), ("_id", DESCENDING)]
-    for i, entry in enumerate(db.log.find(query, sort=sort)):
+    for i, entry in enumerate(mongo_db.log.find(query, sort=sort)):
         fields = [
             entry["_id"],
             format_timestamp(entry["timestamp"]),
@@ -76,8 +80,8 @@ def showlog_brief_lines(db, query, max_i):
             break
 
 
-def showlog_single_entry(db, _id):
-    entry = db.log.find_one({"_id": _id})
+def showlog_single_entry(mongo_db, _id):
+    entry = mongo_db.log.find_one({"_id": _id})
     fields = [
         "_id  = {}".format(entry["_id"]),
         "time = {}".format(format_timestamp(entry["timestamp"])),
@@ -92,7 +96,7 @@ def showlog_single_entry(db, _id):
     print(*fields, sep="\n")
 
 
-def showlog(db, how):
+def showlog(mongo_db, how):
     if how.isdigit() or ((not how.startswith("_id")) and ("=" in how)):
         if how.isdigit():
             query = {}
@@ -105,16 +109,16 @@ def showlog(db, how):
                 v = False
             query = {k: v}
             max_i = float("inf")
-        showlog_brief_lines(db, query, max_i)
+        showlog_brief_lines(mongo_db, query, max_i)
     elif how.startswith("_id="):
-        showlog_single_entry(db, _id=ObjectId(how.lstrip("_id=")))
+        showlog_single_entry(mongo_db, _id=ObjectId(how.lstrip("_id=")))
     else:
         raise NotImplementedError
 
 
-def test_isa(db, accession, assay_name, attribute):
-    if db.dataset_timestamps.find_one({"accession": accession}):
-        glds = CachedDataset(db, accession, logger=logger)
+def test_isa(mongo_db, accession, assay_name, attribute):
+    if mongo_db.dataset_timestamps.find_one({"accession": accession}):
+        glds = CachedDataset(mongo_db, accession, logger=logger)
     else:
         glds = ColdStorageDataset(accession)
     assay = glds.assays[assay_name]
@@ -124,18 +128,18 @@ def test_isa(db, accession, assay_name, attribute):
 
 if len(argv) > 1:
     mongo = MongoClient()
-    db = getattr(mongo, MONGO_DB_NAME)
+    mongo_db = getattr(mongo, MONGO_DB_NAME)
     if argv[1] == "drop":
-        drop(db, argv[2])
+        drop(mongo_db, argv[2])
     elif argv[1] == "recache":
-        recache(db, argv[2])
+        recache(mongo_db, argv[2])
     elif argv[1] == "log":
         if len(argv) > 2:
-            showlog(db, argv[2])
+            showlog(mongo_db, argv[2])
         else:
-            showlog_brief_lines(db, {}, float("inf"))
+            showlog_brief_lines(mongo_db, {}, float("inf"))
     elif argv[1] == "test-isa":
-        test_isa(db, argv[2], argv[3], argv[4])
+        test_isa(mongo_db, argv[2], argv[3], argv[4])
     else:
         raise NotImplementedError
 else:

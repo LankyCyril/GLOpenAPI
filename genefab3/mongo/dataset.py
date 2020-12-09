@@ -16,10 +16,10 @@ def NoLogger():
     return Namespace(warning=lambda *args, **kwargs: None)
 
 
-def drop_dataset_timestamps(db, accession, cname="dataset_timestamps"):
+def drop_dataset_timestamps(mongo_db, accession, cname="dataset_timestamps"):
     """""" # TODO: docstring
     run_mongo_transaction(
-        action="delete_many", collection=getattr(db, cname),
+        action="delete_many", collection=getattr(mongo_db, cname),
         query={"accession": accession},
     )
 
@@ -27,13 +27,13 @@ def drop_dataset_timestamps(db, accession, cname="dataset_timestamps"):
 class CachedDataset(ColdStorageDataset):
     """ColdStorageDataset via auto-updated metadata in database"""
  
-    def __init__(self, db, accession, logger=None, init_assays=True, metadata_units_format=None, cname="dataset_timestamps"):
+    def __init__(self, mongo_db, accession, logger=None, init_assays=True, metadata_units_format=None, cname="dataset_timestamps"):
         """""" # TODO: docstring
-        self.db = db
+        self.mongo_db = mongo_db
         self.logger = logger if (logger is not None) else NoLogger()
         super().__init__(
             accession, init_assays=False,
-            get_json=partial(get_fresh_json, db=db),
+            get_json=partial(get_fresh_json, mongo_db=mongo_db),
         )
         try:
             if init_assays:
@@ -46,7 +46,7 @@ class CachedDataset(ColdStorageDataset):
             else:
                 self.assays = CachedAssayDispatcher(self)
             run_mongo_transaction(
-                action="replace", collection=getattr(db, cname),
+                action="replace", collection=getattr(mongo_db, cname),
                 query={"accession": accession},
                 data={"last_refreshed": int(datetime.now().timestamp())},
             )
@@ -56,7 +56,7 @@ class CachedDataset(ColdStorageDataset):
  
     def _recache_assay(self, assay, metadata_units_format, cname="metadata"):
         """""" # TODO: docstring
-        collection = getattr(self.db, cname)
+        collection = getattr(self.mongo_db, cname)
         run_mongo_transaction(
             action="delete_many", collection=collection, query={
                 "info.accession": self.accession,
@@ -78,11 +78,12 @@ class CachedDataset(ColdStorageDataset):
         else:
             self.logger.warning(WARN_NO_META, self.accession, assay.name)
  
-    def drop_cache(self=None, db=None, accession=None):
+    def drop_cache(self=None, mongo_db=None, accession=None):
         """""" # TODO: docstring
-        drop_dataset_timestamps(db or self.db, accession or self.accession)
-        drop_metadata_by_accession(db or self.db, accession or self.accession)
-        drop_json_cache_by_accession(db or self.db, accession or self.accession)
+        args = [mongo_db or self.mongo_db, accession or self.accession]
+        drop_dataset_timestamps(*args)
+        drop_metadata_by_accession(*args)
+        drop_json_cache_by_accession(*args)
 
 
 class CachedAssayDispatcher(dict):

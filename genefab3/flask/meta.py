@@ -92,7 +92,7 @@ def isa_sort_dataframe(dataframe):
     )]
 
 
-def get_annotation_by_metas(db, context, include=(), search_with_projection=True, modify=keep_projection, aggregate=False, cname="metadata"):
+def get_annotation_by_metas(mongo_db, context, include=(), search_with_projection=True, modify=keep_projection, aggregate=False, cname="metadata"):
     """Select assays/samples based on annotation filters"""
     full_projection = {
         "info.accession": True, "info.assay": True, **context.projection,
@@ -104,7 +104,7 @@ def get_annotation_by_metas(db, context, include=(), search_with_projection=True
         else:
             proj = {"_id": False}
         # get target metadata as single-level dataframe:
-        collection = getattr(db, cname)
+        collection = getattr(mongo_db, cname)
         dataframe = get_raw_meta_df(collection, context.query, proj, include)
         # modify with injected function:
         dataframe = modify(dataframe, full_projection)
@@ -159,26 +159,28 @@ def filter_filenames(dataframe, mask, startloc):
         )
 
 
-def get_assays_by_metas(db, context):
+def get_assays_by_metas(mongo_db, context):
     """Select assays based on annotation filters"""
-    return get_annotation_by_metas(db, context, aggregate=True)
+    return get_annotation_by_metas(mongo_db, context, aggregate=True)
 
 
-def get_samples_by_metas(db, context):
+def get_samples_by_metas(mongo_db, context):
     """Select samples based on annotation filters"""
-    return get_annotation_by_metas(db, context, include={"info.sample name"})
+    return get_annotation_by_metas(
+        mongo_db, context, include={"info.sample name"},
+    )
 
 
-def get_files_by_metas(db, context):
+def get_files_by_metas(mongo_db, context):
     """Select files based on annotation filters"""
     return merge(
         get_annotation_by_metas(
-            db, context, include={"info.sample name"},
+            mongo_db, context, include={"info.sample name"},
             search_with_projection=True, modify=keep_projection,
         ),
         filter_filenames(
             get_annotation_by_metas(
-                db, context, include={"info.sample name"},
+                mongo_db, context, include={"info.sample name"},
                 search_with_projection=False, modify=keep_files,
             ),
             context.kwargs.get("filename"), startloc=3,

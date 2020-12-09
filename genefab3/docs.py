@@ -5,10 +5,10 @@ from natsort import natsorted
 from genefab3.utils import map_replace, is_debug
 
 
-def get_metadata_equals_json(db, cname="metadata_index"):
+def get_metadata_equals_json(mongo_db, cname="metadata_index"):
     """Generate JSON for documentation section 'meta-equals'"""
     equals_json = defaultdict(dict)
-    for entry in getattr(db, cname).find():
+    for entry in getattr(mongo_db, cname).find():
         equals_json[entry["isa_category"]][entry["subkey"]] = {
             key: {value: True for value in values}
             for key, values in entry["content"].items()
@@ -36,10 +36,10 @@ def get_metadata_wildcards(existence_json):
     return dict(wildcards)
 
 
-def get_metadata_assays(db, cname="metadata"):
+def get_metadata_assays(mongo_db, cname="metadata"):
     """Generate JSON for documentation section 'meta-assay'"""
     metadata_assays = defaultdict(set)
-    for entry in getattr(db, cname).distinct("info"):
+    for entry in getattr(mongo_db, cname).distinct("info"):
         metadata_assays[entry["accession"]].add(entry["assay"])
     return {
         k: {**{v: True for v in natsorted(metadata_assays[k])}, "": True}
@@ -47,7 +47,7 @@ def get_metadata_assays(db, cname="metadata"):
     }
 
 
-def interactive_doc(db, html_path=None, document="docs.html", url_root="/"):
+def interactive_doc(mongo_db, html_path=None, document="docs.html", url_root="/"):
     """Serve an interactive documentation page""" # TODO in prod: make HTML template static / preload on app start
     if html_path is None:
         html_path = join(
@@ -62,10 +62,10 @@ def interactive_doc(db, html_path=None, document="docs.html", url_root="/"):
         template = "Hello, Space! (No documentation at %URL_ROOT%)"
         documentation_exists = False
     if documentation_exists:
-        equals_json = get_metadata_equals_json(db)
+        equals_json = get_metadata_equals_json(mongo_db)
         existence_json = get_metadata_existence_json(equals_json)
         wildcards = get_metadata_wildcards(existence_json)
-        metadata_assays = get_metadata_assays(db)
+        metadata_assays = get_metadata_assays(mongo_db)
         return map_replace(
             template, {
                 "%URL_ROOT%": url_root,

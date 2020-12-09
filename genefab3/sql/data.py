@@ -42,7 +42,7 @@ class CachedTable():
         self.logger = getLogger("genefab3")
         self.logger.setLevel(DEBUG)
         self.mongo_db = dbs.mongo_db
-        self.sqlite_file = self._get_unambiguous_path(dbs.sqlite_db, datatype)
+        self.sqlite_db = self._get_unambiguous_path(dbs.sqlite_dir, datatype)
         self.datatype, self.accession, self.assay_name, self.sample_names = (
             datatype, accession, assay_name, sample_names,
         )
@@ -109,7 +109,7 @@ class CachedTable():
             )
             return False
         else:
-            with closing(connect(self.sqlite_file)) as sql_connection:
+            with closing(connect(self.sqlite_db)) as sql_connection:
                 try:
                     self.data.to_sql(
                         self.name, sql_connection, if_exists="replace",
@@ -135,7 +135,7 @@ class CachedTable():
         if rows is not None:
             raise NotImplementedError("Selecting rows from a table")
         if self.data is None:
-            with closing(connect(self.sqlite_file)) as sql_connection:
+            with closing(connect(self.sqlite_db)) as sql_connection:
                 try:
                     data_subset = read_sql(
                         f"SELECT * FROM '{self.name}'",

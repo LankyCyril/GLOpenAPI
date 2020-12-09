@@ -11,7 +11,7 @@ class CachedAssay(AssayBase):
     def __init__(self, dataset, assay_name):
         self.dataset = dataset
         self.name = assay_name
-        self.db = dataset.db
+        self.mongo_db = dataset.mongo_db
  
     def _iterate_filenames_from_projection(self, projection, cname="metadata"):
         """Match filenames from end leaves of query in metadata"""
@@ -19,7 +19,7 @@ class CachedAssay(AssayBase):
             "info.accession": self.dataset.accession,
             "info.assay": self.name,
         }
-        collection = getattr(self.db, cname)
+        collection = getattr(self.mongo_db, cname)
         for entry in collection.find(query, {"_id": False, **projection}):
             try:
                 yield from iterate_terminal_leaf_filenames(entry)
@@ -60,9 +60,9 @@ class CachedAssay(AssayBase):
             return {}
 
 
-def drop_metadata_by_accession(db, accession, cname="metadata"):
+def drop_metadata_by_accession(mongo_db, accession, cname="metadata"):
     """""" # TODO: docstring
     run_mongo_transaction(
-        action="delete_many", collection=getattr(db, cname),
+        action="delete_many", collection=getattr(mongo_db, cname),
         query={"info.accession": accession},
     )
