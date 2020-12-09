@@ -119,21 +119,39 @@ class CacherThread(Thread):
     """Lives in background and keeps local metadata cache and index up to date"""
  
     def __init__(self, mongo_db, check_interval=CACHER_THREAD_CHECK_INTERVAL, recheck_delay=CACHER_THREAD_RECHECK_DELAY):
+        """""" # TODO: docstring
         self.mongo_db, self.check_interval = mongo_db, check_interval
         self.recheck_delay = recheck_delay
-        self.logger = getLogger("genefab3") # TODO: write to mongo_db.status
+        self.logger = getLogger("genefab3")
         self.logger.setLevel(DEBUG)
         super().__init__()
  
+    def _log_info(self, message):
+        self.logger.info(f"CacherThread: {message}")
+
+    def _log_freshness(self, glds):
+        if any(glds.changed.__dict__.values()):
+            chg = "changed"
+        else:
+            chg = "up to date"
+        self.logger.info(f"CacherThread: {chg}, accession={glds.accession}")
+ 
+    def _log_error(self, e, **kwargs):
+        message = f"CacherThread: {repr(e)}"
+        for k, v in kwargs.items():
+            message = message + f", {k}='{v}'"
+        self.logger.error(message, stack_info=True)
+ 
     def run(self):
+        """""" # TODO: docstring
         while True:
             ensure_info_index(self.mongo_db)
-            self.logger.info("CacherThread: Checking cache")
+            self._log_info("Checking cache")
             try:
                 accessions = list_available_accessions(self.mongo_db)
                 fresh, stale = list_fresh_and_stale_accessions(self.mongo_db)
             except Exception as e:
-                self.logger.error("CacherThread: %s", repr(e), stack_info=True)
+                self._log_error(e)
                 delay = self.recheck_delay
             else:
                 for accession in accessions - fresh:
@@ -143,26 +161,16 @@ class CacherThread(Thread):
                             init_assays=True, units_format=UNITS_FORMAT,
                         )
                     except Exception as e:
-                        self.logger.error(
-                            "CacherThread: %s at accession %s",
-                            repr(e), accession, stack_info=True,
-                        )
+                        self._log_error(e, accession=accession)
                     else:
-                        if any(glds.changed.__dict__.values()):
-                            chg = "changed"
-                        else:
-                            chg = "up to date"
-                        self.logger.info("CacherThread: %s %s", accession, chg)
+                        self._log_freshness(glds)
                 for accession in (fresh | stale) - accessions:
                     CachedDataset.drop_cache(
-                        mongo_db=self.mongo_db,
-                        accession=accession,
+                        mongo_db=self.mongo_db, accession=accession,
                     )
-                self.logger.info(
-                    "CacherThread: %d fresh, %d stale", len(fresh), len(stale),
-                )
+                self._log_info(f"{len(fresh)} were fresh, {len(stale)} updated")
                 delay = self.check_interval
             finally:
                 update_metadata_index(self.mongo_db, self.logger)
-                self.logger.info("CacherThread: sleeping for %d seconds", delay)
+                self._log_info(f"Sleeping for {delay} seconds")
                 sleep(delay)

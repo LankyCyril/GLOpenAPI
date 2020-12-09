@@ -38,6 +38,7 @@ METADATA_INDEX_WAIT_STEP = 5
 
 from argparse import Namespace
 COLLECTION_NAMES = Namespace(
+    STATUS="status",
     LOG="log",
     JSON_CACHE="json_cache",
     DATASET_TIMESTAMPS="dataset_timestamps",
