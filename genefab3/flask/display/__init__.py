@@ -7,6 +7,7 @@ from genefab3.flask.display.forms import needs_datatype, render_dropdown
 from pandas import DataFrame, MultiIndex
 from genefab3.flask.display.raw import render_raw
 from genefab3.flask.display.cls import render_cls
+from genefab3.flask.display.gct import render_gct
 from genefab3.flask.display.dataframe import render_dataframe
 from itertools import cycle
 from genefab3.config import ROW_TYPES
@@ -31,6 +32,8 @@ def display(db, getter, kwargs, request):
             return render_raw(obj, context)
         elif context.kwargs["format"] == "cls":
             return render_cls(obj, context)
+        elif context.kwargs["format"] == "gct":
+            return render_gct(obj, context)
         elif isinstance(obj, DataFrame):
             return render_dataframe(obj, context)
         else:
