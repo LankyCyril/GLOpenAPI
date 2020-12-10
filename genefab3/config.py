@@ -51,8 +51,9 @@ COLLECTION_NAMES = Namespace(
 ## API parser parameters
 
 from operator import eq, ne, gt, getitem, contains, length_hint
-leaf_count = lambda d, h: sum(length_hint(v, h) for v in d.values())
+not_in = lambda v, s: v not in s
 listlen = lambda d, k: len(d.getlist(k))
+leaf_count = lambda d, h: sum(length_hint(v, h) for v in d.values())
 
 DISALLOWED_CONTEXTS = [
     dict(_="at least one dataset or annotation category must be specified",
@@ -63,11 +64,17 @@ DISALLOWED_CONTEXTS = [
     dict(_="'format=cls' is only valid for /samples/",
         view=(eq, "/samples/", eq, False), kwargs=(getitem, "format", eq, "cls"),
     ),
+    dict(_="/data/ requires a 'datatype=' argument",
+        view=(eq, "/data/", eq, True), kwargs=(contains, "datatype", eq, False),
+    ),
     dict(_="'format=gct' is only valid for /data/",
         view=(eq, "/data/", eq, False), kwargs=(getitem, "format", eq, "gct"),
     ),
-    dict(_="/data/ requires a 'datatype=' argument",
-        view=(eq, "/data/", eq, True), kwargs=(contains, "datatype", eq, False),
+    dict(_="'format=gct' is not valid for the requested datatype",
+        kwargs=[
+            (getitem, "format", eq, "gct"),
+            (getitem, "datatype", not_in, {"unnormalized counts"}),
+        ],
     ),
     dict(_="/file/ only accepts 'format=raw'",
         view=(eq, "/file/", eq, True), kwargs=(getitem, "format", ne, "raw"),

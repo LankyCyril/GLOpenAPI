@@ -122,12 +122,19 @@ def INPLACE_fill_context_defaults(context):
 
 def validate_context(context):
     """Check that no arguments conflict"""
+    skip_underscore = lambda kv: kv[0] != "_"
     for scenario in DISALLOWED_CONTEXTS:
-        scenario_matches = all([
-            f2(f1(getattr(context, attribute), v1), v2)
-            for attribute, (f1, v1, f2, v2)
-            in filter(lambda kv: kv[0] != "_", scenario.items())
-        ])
+        scenario_matches = True
+        for attribute, rules in filter(skip_underscore, scenario.items()):
+            if isinstance(rules, list):
+                rule_iter = rules
+            else:
+                rule_iter = [rules]
+            for (f1, v1, f2, v2) in rule_iter:
+                scenario_matches = (
+                    scenario_matches and
+                    f2(f1(getattr(context, attribute), v1), v2)
+                )
         if scenario_matches:
             raise GeneLabParserException(scenario["_"])
 
