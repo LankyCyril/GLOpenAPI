@@ -24,11 +24,11 @@ def is_continuous(continuous, dataframe, target):
 def render_cls(obj, context, continuous="infer", space_sub=lambda s: sub(r'\s', "", s)):
     """Convert a presumed annotation/factor dataframe to CLS format"""
     if (not isinstance(obj, DataFrame)) or (obj.columns.nlevels != 2):
-        raise GeneLabFormatException(OBJECT_TYPE_ERROR, fmt="cls")
+        raise GeneLabFormatException(OBJECT_TYPE_ERROR, format="cls")
     target_columns = [(l0, l1) for (l0, l1) in obj.columns if l0 != "info"]
     if len(target_columns) != 1:
         raise GeneLabFormatException(
-            FIELD_COUNT_ERROR, columns=target_columns, fmt="cls",
+            FIELD_COUNT_ERROR, columns=target_columns, format="cls",
         )
     else:
         target = target_columns[0]

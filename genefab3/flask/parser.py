@@ -114,8 +114,8 @@ def INPLACE_update_context(context, rargs):
 
 def INPLACE_fill_context_defaults(context):
     """Fill default arguments based on view and other arguments"""
-    if "fmt" not in context.kwargs:
-        context.kwargs["fmt"] = DEFAULT_FORMATS.get(context.view, "raw")
+    if "format" not in context.kwargs:
+        context.kwargs["format"] = DEFAULT_FORMATS.get(context.view, "raw")
     if "debug" not in context.kwargs:
         context.kwargs["debug"] = "0"
 

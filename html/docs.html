@@ -166,7 +166,7 @@ function refresh_dropdowns(initiator) {
 }
 
 var TARGETS_A = ["wildcard", "existence", "equals", "assay"];
-var TARGETS_B = ["fmt", "debug"];
+var TARGETS_B = ["format", "debug"];
 
 function housekeeping(initiator) {
     if ($("#view").val() === "")
@@ -536,11 +536,11 @@ $(document).ready(function() {
             <div>
                 <div><b>Display in format:</b></div><br>
                 <div>
-                    <div id='meta-fmt-list' class='list'>
-                        <div class='meta-fmt list-item'>
+                    <div id='meta-format-list' class='list'>
+                        <div class='meta-format list-item'>
                             <input type='checkbox' checked disabled>
                             <em class='key'>&amp;</em>
-                            <em class='key included-key'>fmt=</em>
+                            <em class='key included-key'>format=</em>
                             <select class='value-level level-0'>
                                 <option value='browser' selected>browser</option>
                                 <option value='tsv'>tsv</option>

@@ -11,5 +11,5 @@ def render_raw(obj, context):
     else:
         raise GeneLabFormatException(
             "Formatting of unsupported object type",
-            object_type=type(obj).__name__, fmt="raw",
+            object_type=type(obj).__name__, format="raw",
         )

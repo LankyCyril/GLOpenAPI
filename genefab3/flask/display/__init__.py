@@ -17,7 +17,7 @@ def display(db, getter, kwargs, request):
     try:
         context = parse_request(request)
     except GeneLabParserException as e:
-        if needs_datatype(e) and (request.args.get("fmt") == "browser"):
+        if needs_datatype(e) and (request.args.get("format") == "browser"):
             return render_dropdown("datatype", None)
         else:
             raise
@@ -27,16 +27,17 @@ def display(db, getter, kwargs, request):
         obj = getter(db, **kwargs, context=context)
         if obj is None:
             raise GeneLabException("No data")
-        elif context.kwargs["fmt"] == "raw":
+        elif context.kwargs["format"] == "raw":
             return render_raw(obj, context)
-        elif context.kwargs["fmt"] == "cls":
+        elif context.kwargs["format"] == "cls":
             return render_cls(obj, context)
         elif isinstance(obj, DataFrame):
             return render_dataframe(obj, context)
         else:
             raise GeneLabFormatException(
                 "Formatting of unsupported object type",
-                object_type=type(obj).__name__, fmt=context.kwargs.get("fmt"),
+                object_type=type(obj).__name__,
+                format=context.kwargs.get("format"),
             )
 
 

@@ -37,7 +37,7 @@ def get_browser_html(): # TODO in prod: make HTML template static / preload on a
 
 
 def na_repr(x):
-    """For fmt=browser, convert empty entries to 'NA'"""
+    """For format=browser, convert empty entries to 'NA'"""
     if isinstance(x, Iterable):
         if hasattr(x, "__len__") and (len(x) == 0):
             return "NA"
@@ -73,10 +73,10 @@ def get_browser_dataframe_twolevel(df, context, frozen=0):
         get_browser_html(), {
             "// FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
             "// FORMATTERS": formatters,
-            "HTMLINK": build_url(context, drop={"fmt"}) + "fmt=html",
-            "CSVLINK": build_url(context, drop={"fmt"}) + "fmt=csv",
-            "TSVLINK": build_url(context, drop={"fmt"}) + "fmt=tsv",
-            "JSONLINK": build_url(context, drop={"fmt"}) + "fmt=json",
+            "HTMLINK": build_url(context, drop={"format"}) + "format=html",
+            "CSVLINK": build_url(context, drop={"format"}) + "format=csv",
+            "TSVLINK": build_url(context, drop={"format"}) + "format=tsv",
+            "JSONLINK": build_url(context, drop={"format"}) + "format=json",
             "ASSAYSVIEW": build_url(context, "/assays/"),
             "SAMPLESVIEW": build_url(context, "/samples/"),
             "DATAVIEW": build_url(context, "/data/"),
@@ -113,15 +113,17 @@ def get_browser_dataframe(df, context):
 
 def render_dataframe(df, context):
     """Display dataframe with specified format"""
-    if context.kwargs["fmt"] == "tsv":
+    if context.kwargs["format"] == "tsv":
         content = annotate_cols(df, sep="\t") + df.to_csv(sep="\t", **DF_KWS)
         mimetype = "text/plain"
-    elif context.kwargs["fmt"] == "csv":
+    elif context.kwargs["format"] == "csv":
         content = annotate_cols(df, sep=",") + df.to_csv(sep=",", **DF_KWS)
         mimetype = "text/plain"
-    elif context.kwargs["fmt"] in {"interactive", "browser"}:
+    elif context.kwargs["format"] in {"interactive", "browser"}:
         content = get_browser_dataframe(df, context)
         mimetype = "text/html"
     else:
-        raise GeneLabFormatException("Unknown fmt", fmt=context.kwargs["fmt"])
+        raise GeneLabFormatException(
+            "Unknown format", format=context.kwargs["format"],
+        )
     return Response(content, mimetype=mimetype)
