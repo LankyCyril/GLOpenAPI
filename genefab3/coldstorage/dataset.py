@@ -19,7 +19,7 @@ class ColdStorageDataset(DatasetBase):
     isa = None
  
     def __init__(self, accession, json=Namespace(), init_assays=True, get_json=download_cold_json):
-        """Request ISA and store fields"""
+        """Request JSONs (either from cold storage or from local cache) and optionally init assays via an ISA ZIP file"""
         jga = lambda name: getattr(json, name, None)
         # validate JSON and initialize identifiers"
         self.json.glds, self.changed.glds = jga("glds"), True

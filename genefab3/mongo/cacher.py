@@ -119,7 +119,7 @@ class CacherThread(Thread):
     """Lives in background and keeps local metadata cache and index up to date"""
  
     def __init__(self, mongo_db, check_interval=CACHER_THREAD_CHECK_INTERVAL, recheck_delay=CACHER_THREAD_RECHECK_DELAY):
-        """""" # TODO: docstring
+        """Prepare background thread that iteratively watches for changes to datasets"""
         self.mongo_db, self.check_interval = mongo_db, check_interval
         self.recheck_delay = recheck_delay
         self.logger = getLogger("genefab3")
@@ -127,9 +127,11 @@ class CacherThread(Thread):
         super().__init__()
  
     def _log_info(self, message):
+        """Simple wrapper for self.logger.info with parent name (CacherThread) prepended"""
         self.logger.info(f"CacherThread: {message}")
 
     def _log_freshness(self, glds):
+        """Wrapper for self.logger.info with parent name (CacherThread), accession, change status"""
         if any(glds.changed.__dict__.values()):
             chg = "changed"
         else:
@@ -137,13 +139,14 @@ class CacherThread(Thread):
         self.logger.info(f"CacherThread: {chg}, accession={glds.accession}")
  
     def _log_error(self, e, **kwargs):
+        """Wrapper for self.logger.error with parent name (CacherThread), arbitrary arguments"""
         message = f"CacherThread: {repr(e)}"
         for k, v in kwargs.items():
             message = message + f", {k}='{v}'"
         self.logger.error(message, stack_info=True)
  
     def run(self):
-        """""" # TODO: docstring
+        """Detect changes to datasets based on cold storage JSON and re-cache modified ones"""
         while True:
             ensure_info_index(self.mongo_db)
             self._log_info("Checking cache")

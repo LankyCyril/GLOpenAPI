@@ -3,7 +3,6 @@ from genefab3.config import COLLECTION_NAMES
 from genefab3.exceptions import GeneLabDatabaseException
 from re import escape
 from genefab3.utils import UniversalSet, iterate_terminal_leaf_filenames
-from genefab3.mongo.utils import run_mongo_transaction
 
 
 class CachedAssay(AssayBase):
@@ -60,11 +59,3 @@ class CachedAssay(AssayBase):
             )
         else:
             return {}
-
-
-def drop_metadata_by_accession(mongo_db, accession, cname=COLLECTION_NAMES.METADATA):
-    """""" # TODO: docstring
-    run_mongo_transaction(
-        action="delete_many", collection=getattr(mongo_db, cname),
-        query={"info.accession": accession},
-    )

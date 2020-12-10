@@ -53,7 +53,7 @@ def get_fresh_json(mongo_db, identifier, kind="other", max_age=MAX_JSON_AGE, rep
 
 
 def drop_json_cache_by_accession(mongo_db, accession, cname=COLLECTION_NAMES.JSON_CACHE):
-    """""" # TODO: docstring
+    """Remove all entries associated with dataset from db.json_cache"""
     run_mongo_transaction(
         action="delete_many", collection=getattr(mongo_db, cname),
         query={"identifier": accession},

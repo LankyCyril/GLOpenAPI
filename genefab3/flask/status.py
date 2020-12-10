@@ -10,7 +10,7 @@ STATUS_COLUMNS = [
 
 
 def get_status(mongo_db, context, cname=COLLECTION_NAMES.STATUS):
-    """""" # TODO: docstring
+    """Retrieve reports from db.status"""
     status_json = getattr(mongo_db, cname).find(
         {}, {"_id": False, **{c: True for c in STATUS_COLUMNS}},
     )

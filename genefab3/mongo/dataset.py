@@ -5,7 +5,7 @@ from genefab3.mongo.json import get_fresh_json, drop_json_cache_by_accession
 from genefab3.mongo.utils import run_mongo_transaction, harmonize_document
 from datetime import datetime
 from functools import partial
-from genefab3.mongo.assay import CachedAssay, drop_metadata_by_accession
+from genefab3.mongo.assay import CachedAssay
 
 
 WARN_NO_META = "%s, %s: no metadata entries"
@@ -18,10 +18,18 @@ def NoLogger():
 
 
 def drop_dataset_timestamps(mongo_db, accession, cname=COLLECTION_NAMES.DATASET_TIMESTAMPS):
-    """""" # TODO: docstring
+    """Remove all entries associated with dataset from db.dataset_timestamps"""
     run_mongo_transaction(
         action="delete_many", collection=getattr(mongo_db, cname),
         query={"accession": accession},
+    )
+
+
+def drop_metadata_by_accession(mongo_db, accession, cname=COLLECTION_NAMES.METADATA):
+    """Remove all entries associated with dataset from db.metadata"""
+    run_mongo_transaction(
+        action="delete_many", collection=getattr(mongo_db, cname),
+        query={"info.accession": accession},
     )
 
 
@@ -29,7 +37,7 @@ class CachedDataset(ColdStorageDataset):
     """ColdStorageDataset via auto-updated metadata in database"""
  
     def __init__(self, mongo_db, accession, logger=None, init_assays=True, units_format=None, cname=COLLECTION_NAMES.DATASET_TIMESTAMPS):
-        """""" # TODO: docstring
+        """Initialize with latest cached JSONs, recache if stale, init and recache stale assays if requested; drop cache on errors"""
         self.mongo_db = mongo_db
         self.logger = logger if (logger is not None) else NoLogger()
         try:
@@ -57,7 +65,7 @@ class CachedDataset(ColdStorageDataset):
             self.update_status(accession=accession, status="success")
 
     def update_status(self, accession, assay_name=None, status="success", warning=None, error=None, details=(), cname=COLLECTION_NAMES.STATUS):
-        """""" # TODO: docstring
+        """Update status of dataset (and, optionally, assay) in db.status"""
         if assay_name is None:
             replacement_query = {"kind": "dataset", "accession": accession}
             if status == "failure":
@@ -85,7 +93,7 @@ class CachedDataset(ColdStorageDataset):
         )
  
     def _recache_assay(self, assay, units_format, cname=COLLECTION_NAMES.METADATA):
-        """""" # TODO: docstring
+        """Recache assay metadata in db.metadata if any values in parent dataset JSON changed since last run"""
         metadata_collection = getattr(self.mongo_db, cname)
         run_mongo_transaction(
             action="delete_many", collection=metadata_collection,
@@ -123,7 +131,7 @@ class CachedDataset(ColdStorageDataset):
             self.logger.warning(WARN_NO_META, self.accession, assay.name)
  
     def drop_cache(self=None, mongo_db=None, accession=None):
-        """""" # TODO: docstring
+        """Remove all entries associated with dataset from database (dataset_timestamps, metadata, json_cache)"""
         args = [mongo_db or self.mongo_db, accession or self.accession]
         drop_dataset_timestamps(*args)
         drop_metadata_by_accession(*args)
