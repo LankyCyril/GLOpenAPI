@@ -7,13 +7,15 @@ from hashlib import md5
 from genefab3.utils import infer_file_separator
 from pymongo import DESCENDING
 from genefab3.mongo.utils import run_mongo_transaction
-from genefab3.exceptions import GeneLabDatabaseException
+from genefab3.exceptions import GeneLabDatabaseException, GeneLabFileException
 from pandas import read_csv, read_sql, DataFrame, MultiIndex, concat
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 from contextlib import closing
 from sqlite3 import connect
 
 
+NO_FILES_ERROR = "No data files found for datatype"
+AMBIGUOUS_FILES_ERROR = "Multiple (ambiguous) data files found for datatype"
 MISSING_SAMPLE_NAMES_ERROR = "Missing sample names in GeneFab database"
 MISSING_SQL_TABLE_ERROR = (
     "Missing data table in GeneFab database "
@@ -174,16 +176,27 @@ def get_sql_data(dbs, raw_annotation, datatype, rows=None):
     groupby = raw_annotation.groupby(
         ["info.accession", "info.assay"], as_index=False, sort=False,
     )
-    agg, tables = groupby.agg(list).iterrows(), []
+    agg = groupby.agg(list).iterrows()
+    tables = []
     for _, (accession, assay_name, sample_names, _, file_descriptors) in agg:
-        tables.append(CachedTable(
-            dbs=dbs,
-            file_descriptor=file_descriptors[0], # all are the same (see merge)
-            datatype=datatype,
-            accession=accession,
-            assay_name=assay_name,
-            sample_names=sample_names,
-        ))
+        file_descriptors_as_set = set(file_descriptors)
+        if len(file_descriptors_as_set) == 0:
+            raise GeneLabFileException(
+                NO_FILES_ERROR, accession, assay_name, datatype=datatype,
+            )
+        elif len(file_descriptors_as_set) > 1:
+            raise GeneLabFileException(
+                AMBIGUOUS_FILES_ERROR, accession, assay_name, datatype=datatype,
+            )
+        else:
+            tables.append(CachedTable(
+                dbs=dbs,
+                file_descriptor=file_descriptors_as_set.pop(),
+                datatype=datatype,
+                accession=accession,
+                assay_name=assay_name,
+                sample_names=sample_names,
+            ))
     joined_table = concat( # this is in-memory and faster than sqlite3:
         # wesmckinney.com/blog/high-performance-database-joins-with-pandas-dataframe-more-benchmarks
         [table.dataframe(rows=rows) for table in tables], axis=1, sort=False,

@@ -12,6 +12,12 @@ from collections import defaultdict
 from genefab3.coldstorage.assay import ColdStorageAssay
 
 
+class FileDescriptor(Namespace):
+    """Hashable Namespace for atomic values (integers, strings)"""
+    def __hash__(self):
+        return hash(tuple(sorted(self._get_kwargs())))
+
+
 class ColdStorageDataset(DatasetBase):
     """Contains GLDS metadata associated with an accession number"""
     json = Namespace()
@@ -92,7 +98,7 @@ class ColdStorageDataset(DatasetBase):
         elif glob is not None:
             matches = lambda filename: search(glob.replace("*", ".*"), filename)
         return [
-            Namespace(
+            FileDescriptor(
                 name=filename, url=self.fileurls.get(filename, None),
                 timestamp=int(timestamp) if str(timestamp).isdigit() else -1,
             )
