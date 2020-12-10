@@ -56,6 +56,16 @@ def list_fresh_and_stale_accessions(mongo_db, max_age=MAX_JSON_AGE, cname=COLLEC
     return set(refresh_dates[indexer].index), set(refresh_dates[~indexer].index)
 
 
+def ensure_info_index(mongo_db, category="info", keys=["accession", "assay", "sample name"], cname=COLLECTION_NAMES.METADATA):
+    """Index `info.*` for sorting"""
+    if category not in getattr(mongo_db, cname).index_information():
+        getattr(mongo_db, cname).create_index(
+            name=category,
+            keys=[(f"{category}.{key}", ASCENDING) for key in keys],
+            collation={"locale": MONGO_DB_LOCALE, "numericOrdering": True},
+        )
+
+
 def INPLACE_update_metadata_index_keys(mongo_db, index, final_key_blacklist=FINAL_INDEX_KEY_BLACKLIST, cname=COLLECTION_NAMES.METADATA):
     """Populate JSON with all possible metadata keys, also for documentation section 'meta-existence'"""
     for isa_category in index:
@@ -87,16 +97,6 @@ def INPLACE_update_metadata_index_values(mongo_db, index, cname=COLLECTION_NAMES
                         f"{isa_category}.{subkey}.{next_level_key}",
                     )))
                 index[isa_category][subkey][next_level_key] = values
-
-
-def ensure_info_index(mongo_db, category="info", keys=["accession", "assay", "sample name"], cname=COLLECTION_NAMES.METADATA):
-    """Index `info.*` for sorting"""
-    if category not in getattr(mongo_db, cname).index_information():
-        getattr(mongo_db, cname).create_index(
-            name=category,
-            keys=[(f"{category}.{key}", ASCENDING) for key in keys],
-            collation={"locale": MONGO_DB_LOCALE, "numericOrdering": True},
-        )
 
 
 def update_metadata_index(mongo_db, logger, template=INDEX_TEMPLATE, cname=COLLECTION_NAMES.METADATA_INDEX):
