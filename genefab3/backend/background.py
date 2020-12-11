@@ -12,10 +12,10 @@ from time import sleep
 class CacherThread(Thread):
     """Lives in background and keeps local metadata cache, metadata index, and response cache up to date"""
  
-    def __init__(self, mongo_db, check_interval=CACHER_THREAD_CHECK_INTERVAL, recheck_delay=CACHER_THREAD_RECHECK_DELAY):
+    def __init__(self, mongo_db, response_cache, check_interval=CACHER_THREAD_CHECK_INTERVAL, recheck_delay=CACHER_THREAD_RECHECK_DELAY):
         """Prepare background thread that iteratively watches for changes to datasets"""
-        self.mongo_db, self.check_interval = mongo_db, check_interval
-        self.recheck_delay = recheck_delay
+        self.mongo_db, self.response_cache = mongo_db, response_cache
+        self.check_interval, self.recheck_delay = check_interval, recheck_delay
         self.logger = getLogger("genefab3")
         self.logger.setLevel(DEBUG)
         super().__init__()
@@ -31,10 +31,14 @@ class CacherThread(Thread):
             )
             if success:
                 if accessions.to_update | accessions.to_drop:
-                    drop_response_lru_cache(logger=self.logger) # TODO sqlite_db
+                    drop_response_lru_cache(
+                        response_cache=self.response_cache,
+                        logger=self.logger,
+                    )
                 delay = self.check_interval
             else:
                 delay = self.recheck_delay
             update_metadata_value_lookup(self.mongo_db, self.logger)
+            # TODO: shrink response cache to predefined max size
             self.logger.info(f"CacherThread: Sleeping for {delay} seconds")
             sleep(delay)

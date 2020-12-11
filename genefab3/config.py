@@ -19,8 +19,8 @@ MONGO_CLIENT_PARAMETERS = dict(
 )
 MONGO_DB_NAME = "genefab3"
 MONGO_DB_LOCALE = "en_US"
-SQLITE_DIR = "./.sqlite3/"
-RESPONSE_CACHE = "./.flask-cache/response-cache.db"
+SQLITE_DB = "./.sqlite3/data.db"
+RESPONSE_CACHE = "./.sqlite3/response-cache.db"
 
 TIMESTAMP_FMT = "%a %b %d %H:%M:%S %Z %Y"
 

@@ -4,10 +4,8 @@ from genefab3.backend.mongo.writers.file_descriptors import set_cached_file_desc
 from genefab3.backend.mongo.writers.file_descriptors import drop_cached_file_descriptor_timestamp
 from genefab3.backend.sql.writers.data import recache_table
 from logging import getLogger, DEBUG
+from urllib.request import quote
 from genefab3.backend.mongo.utils import infer_file_separator
-from os import path, makedirs
-from re import sub
-from hashlib import md5
 from genefab3.common.exceptions import GeneLabDatabaseException
 from pandas import DataFrame, MultiIndex
 
@@ -33,11 +31,11 @@ class CachedTable():
  
     def __init__(self, dbs, file_descriptor, datatype, accession, assay_name, sample_names, read_raw_sql_table):
         """Check cold storage JSON and cache, update cache if remote file was updated"""
-        self.name = f"{accession}/{assay_name}"
+        self.name = quote(f"{datatype}/{accession}/{assay_name}")
         self.logger = getLogger("genefab3")
         self.logger.setLevel(DEBUG)
         self.mongo_db = dbs.mongo_db
-        self.sqlite_db = self._get_unambiguous_path(dbs.sqlite_dir, datatype)
+        self.sqlite_db = dbs.sqlite_db
         self.read_raw_sql_table = read_raw_sql_table
         self.datatype, self.accession, self.assay_name, self.sample_names = (
             datatype, accession, assay_name, sample_names,
@@ -69,17 +67,6 @@ class CachedTable():
                     self.accession, self.assay_name, self.datatype,
                     self.file.url, stack_info=True,
                 )
- 
-    def _get_unambiguous_path(self, sqlite_db, datatype):
-        """Generate SQLite3 filename for datatype; will fail with generic Python exceptions here or downstream if not writable"""
-        if not path.exists(sqlite_db):
-            makedirs(sqlite_db)
-        return path.join(
-            sqlite_db, (
-                sub(r'\s+', "_", datatype) + "-" +
-                md5(datatype.encode("utf-8")).hexdigest()
-            ),
-        )
  
     def dataframe(self, rows=None):
         """Render retrieved or cached data as pandas.DataFrame"""

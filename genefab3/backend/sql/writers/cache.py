@@ -8,18 +8,18 @@ from sqlite3 import connect, Binary, OperationalError
 RESPONSE_CACHE_SCHEMA = "('api_path' TEXT, 'response' BLOB, 'mimetype' TEXT)"
 
 
-def ensure_response_lru_cache():
+def ensure_response_lru_cache(response_cache=RESPONSE_CACHE):
     """Ensure parent directory exists; will fail with generic Python exceptions here or downstream if not a writable dir"""
-    if not path.exists(path.dirname(RESPONSE_CACHE)):
-        makedirs(path.dirname(RESPONSE_CACHE))
+    if not path.exists(path.dirname(response_cache)):
+        makedirs(path.dirname(response_cache))
 
 
-def cache_response(request, response, table="response_cache", schema=RESPONSE_CACHE_SCHEMA):
+def cache_response(request, response, response_cache=RESPONSE_CACHE, table="response_cache", schema=RESPONSE_CACHE_SCHEMA):
     """Store response object blob in response_cache table, if possible"""
-    ensure_response_lru_cache()
+    ensure_response_lru_cache(response_cache)
     api_path = quote(request.full_path)
     try:
-        with closing(connect(RESPONSE_CACHE)) as sql_connection:
+        with closing(connect(response_cache)) as sql_connection:
             cursor = sql_connection.cursor()
             cursor.execute(f"CREATE TABLE IF NOT EXISTS '{table}' {schema}")
             cursor.execute(
@@ -35,12 +35,13 @@ def cache_response(request, response, table="response_cache", schema=RESPONSE_CA
         pass
 
 
-def drop_response_lru_cache(logger, table="response_cache", schema=RESPONSE_CACHE_SCHEMA):
+def drop_response_lru_cache(logger, response_cache=RESPONSE_CACHE, table="response_cache", schema=RESPONSE_CACHE_SCHEMA):
     """Drop response_cache table"""
     logger.info("Dropping flask response LRU cache")
-    ensure_response_lru_cache()
-    with closing(connect(RESPONSE_CACHE)) as sql_connection:
+    ensure_response_lru_cache(response_cache)
+    with closing(connect(response_cache)) as sql_connection:
         cursor = sql_connection.cursor()
         cursor.execute(f"DROP TABLE IF EXISTS '{table}'")
         cursor.execute(f"CREATE TABLE '{table}' {schema}")
+        # TODO: vacuum gracefully
         sql_connection.commit()

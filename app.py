@@ -3,12 +3,14 @@ from flask import Flask, request
 from genefab3.config import COMPRESSIBLE_MIMETYPES
 from flask_compress import Compress
 from pymongo import MongoClient
-from genefab3.config import MONGO_CLIENT_PARAMETERS, MONGO_DB_NAME, SQLITE_DIR
+from genefab3.config import MONGO_CLIENT_PARAMETERS, MONGO_DB_NAME
+from genefab3.config import RESPONSE_CACHE, SQLITE_DB
 from pymongo.errors import ServerSelectionTimeoutError
 from genefab3.common.exceptions import GeneLabDatabaseException
 from genefab3.frontend.utils import is_flask_reloaded, is_debug
 from genefab3.backend.background import CacherThread
-from genefab3.common.exceptions import traceback_printer, exception_catcher, DBLogger
+from genefab3.common.exceptions import traceback_printer, exception_catcher
+from genefab3.common.exceptions import DBLogger
 from functools import partial
 from logging import getLogger
 from genefab3.frontend.renderer import render
@@ -21,16 +23,16 @@ app = Flask("genefab3")
 COMPRESS_MIMETYPES = COMPRESSIBLE_MIMETYPES
 Compress(app)
 
-mongo = MongoClient(**MONGO_CLIENT_PARAMETERS)
+mongo_client = MongoClient(**MONGO_CLIENT_PARAMETERS)
 try:
-    mongo.server_info()
+    mongo_client.server_info()
 except ServerSelectionTimeoutError:
     raise GeneLabDatabaseException("Could not connect (sensitive info hidden)")
 else:
-    mongo_db = getattr(mongo, MONGO_DB_NAME)
+    mongo_db = getattr(mongo_client, MONGO_DB_NAME)
 
 if not is_flask_reloaded():
-    CacherThread(mongo_db).start()
+    CacherThread(mongo_db=mongo_db, response_cache=RESPONSE_CACHE).start()
 
 if is_debug():
     traceback_printer = app.errorhandler(Exception)(
@@ -73,7 +75,7 @@ def file(**kwargs):
 @app.route("/data/", methods=["GET"])
 def data(**kwargs):
     from genefab3.frontend.getters.data import get_data as getter
-    dbs = namedtuple("dbs", "mongo_db, sqlite_dir")(mongo_db, SQLITE_DIR)
+    dbs = namedtuple("dbs", "mongo_db, sqlite_db")(mongo_db, SQLITE_DB)
     return render(dbs, getter, kwargs, request)
 
 @app.route("/status/", methods=["GET"])
