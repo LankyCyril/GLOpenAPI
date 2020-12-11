@@ -1,4 +1,4 @@
-from genefab3.exceptions import GeneLabFormatException
+from genefab3.common.exceptions import GeneLabFormatException
 from re import sub
 from pandas import DataFrame, Series
 from flask import Response

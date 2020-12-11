@@ -3,7 +3,7 @@ from time import sleep
 from genefab3.config import MONGO_DB_LOCALE, RAW_FILE_REGEX, COLLECTION_NAMES
 from pymongo import ASCENDING
 from pandas import json_normalize, MultiIndex, isnull, concat, merge
-from genefab3.exceptions import GeneLabDatabaseException
+from genefab3.common.exceptions import GeneLabDatabaseException
 from argparse import Namespace
 from re import findall, search, IGNORECASE, escape, split
 from genefab3.flask.display import Placeholders

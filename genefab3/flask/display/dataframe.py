@@ -5,7 +5,7 @@ from pandas import isnull
 from genefab3.flask.display.formatters import get_browser_formatters, build_url
 from genefab3.utils import map_replace
 from flask import Response
-from genefab3.exceptions import GeneLabFormatException
+from genefab3.common.exceptions import GeneLabFormatException
 
 
 DF_KWS = dict(index=False, header=False, na_rep="NA")

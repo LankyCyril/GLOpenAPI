@@ -2,7 +2,7 @@ from genefab3.config import MAX_JSON_AGE, COLLECTION_NAMES
 from datetime import datetime
 from pymongo import DESCENDING
 from genefab3.coldstorage.json import download_cold_json
-from genefab3.exceptions import GeneLabJSONException
+from genefab3.common.exceptions import GeneLabJSONException
 from genefab3.mongo.utils import run_mongo_transaction
 
 

@@ -1,5 +1,5 @@
 from flask import Response
-from genefab3.exceptions import GeneLabFormatException
+from genefab3.common.exceptions import GeneLabFormatException
 
 
 def render_raw(obj, context):

@@ -1,5 +1,5 @@
 from collections import namedtuple
-from genefab3.exceptions import GeneLabDataManagerException
+from genefab3.common.exceptions import GeneLabDataManagerException
 from memoized_property import memoized_property
 
 

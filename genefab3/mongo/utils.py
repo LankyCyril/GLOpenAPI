@@ -2,7 +2,7 @@ from bson.errors import InvalidDocument as InvalidDocumentError
 from pandas import isnull
 from functools import partial
 from collections.abc import ValuesView
-from genefab3.exceptions import GeneLabDatabaseException
+from genefab3.common.exceptions import GeneLabDatabaseException
 
 
 def isempty(v):

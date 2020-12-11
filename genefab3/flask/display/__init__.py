@@ -1,8 +1,8 @@
 from genefab3.flask.parser import parse_request
 from genefab3.utils import is_debug
 from json import dumps
-from genefab3.exceptions import GeneLabException, GeneLabParserException
-from genefab3.exceptions import GeneLabFormatException
+from genefab3.common.exceptions import GeneLabException, GeneLabParserException
+from genefab3.common.exceptions import GeneLabFormatException
 from genefab3.flask.display.forms import needs_datatype, render_dropdown
 from genefab3.sql.cache import retrieve_cached_response, cache_response
 from pandas import DataFrame, MultiIndex

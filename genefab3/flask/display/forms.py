@@ -1,4 +1,4 @@
-from genefab3.exceptions import GeneLabParserException
+from genefab3.common.exceptions import GeneLabParserException
 from flask import Response
 
 

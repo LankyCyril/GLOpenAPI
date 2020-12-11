@@ -3,7 +3,7 @@ from genefab3.config import TIMESTAMP_FMT, DEBUG_MARKERS
 from re import sub, escape, split, search, IGNORECASE
 from datetime import datetime
 from copy import deepcopy
-from genefab3.exceptions import GeneLabDatabaseException, GeneLabFileException
+from genefab3.common.exceptions import GeneLabDatabaseException, GeneLabFileException
 
 
 def is_flask_reloaded():

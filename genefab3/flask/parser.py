@@ -5,7 +5,7 @@ from genefab3.utils import UniversalSet
 from collections import defaultdict, OrderedDict
 from werkzeug.datastructures import MultiDict
 from genefab3.config import DISALLOWED_CONTEXTS
-from genefab3.exceptions import GeneLabParserException
+from genefab3.common.exceptions import GeneLabParserException
 
 
 def assay_pair_to_query(key, value):

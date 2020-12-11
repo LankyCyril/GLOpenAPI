@@ -1,5 +1,5 @@
 from genefab3.common.types import AssayBaseClass
-from genefab3.exceptions import GeneLabException, GeneLabISAException
+from genefab3.common.exceptions import GeneLabException, GeneLabISAException
 from genefab3.utils import copy_and_drop
 
 

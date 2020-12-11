@@ -3,7 +3,7 @@ from genefab3.config import COLD_GLDS_MASK
 from genefab3.config import COLD_FILEURLS_MASK, COLD_FILEDATES_MASK
 from json import loads
 from re import search
-from genefab3.exceptions import GeneLabException, GeneLabJSONException
+from genefab3.common.exceptions import GeneLabException, GeneLabJSONException
 
 
 def download_cold_json(identifier, kind="other", report_changes=True):

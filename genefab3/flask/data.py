@@ -1,5 +1,5 @@
 from genefab3.mongo.dataset import CachedDataset
-from genefab3.exceptions import GeneLabMetadataException, GeneLabFileException
+from genefab3.common.exceptions import GeneLabMetadataException, GeneLabFileException
 from genefab3.config import ISA_TECH_TYPE_LOCATOR, TECHNOLOGY_FILE_LOCATORS
 from pandas import merge
 from genefab3.flask.meta import get_raw_meta_dataframe

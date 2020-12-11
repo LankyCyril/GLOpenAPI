@@ -1,5 +1,5 @@
 from logging import getLogger, CRITICAL
-from genefab3.exceptions import GeneLabISAException
+from genefab3.common.exceptions import GeneLabISAException
 from re import search, sub
 from collections import defaultdict
 from numpy import nan
