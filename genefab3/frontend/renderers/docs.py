@@ -7,7 +7,7 @@ from genefab3.common.utils import map_replace
 from genefab3.frontend.utils import is_debug
 
 
-def get_metadata_equals_json(mongo_db, cname=COLLECTION_NAMES.METADATA_INDEX):
+def get_metadata_equals_json(mongo_db, cname=COLLECTION_NAMES.METADATA_VALUE_LOOKUP):
     """Generate JSON for documentation section 'meta-equals'"""
     equals_json = defaultdict(dict)
     for entry in getattr(mongo_db, cname).find():

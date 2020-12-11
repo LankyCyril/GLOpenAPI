@@ -37,7 +37,7 @@ COLLECTION_NAMES = SimpleNamespace(
     JSON_CACHE="json_cache",
     DATASET_TIMESTAMPS="dataset_timestamps",
     METADATA="metadata",
-    METADATA_INDEX="metadata_index",
+    METADATA_VALUE_LOOKUP="metadata_value_lookup",
     FILE_DESCRIPTORS="file_descriptors",
 )
 

@@ -114,7 +114,7 @@ def recache_metadata(mongo_db, logger):
         return accessions, True
 
 
-def INPLACE_update_metadata_index_keys(mongo_db, index, final_key_blacklist=FINAL_INDEX_KEY_BLACKLIST, cname=COLLECTION_NAMES.METADATA):
+def INPLACE_update_metadata_value_lookup_keys(mongo_db, index, final_key_blacklist=FINAL_INDEX_KEY_BLACKLIST, cname=COLLECTION_NAMES.METADATA):
     """Populate JSON with all possible metadata keys, also for documentation section 'meta-existence'"""
     for isa_category in index:
         for subkey in index[isa_category]:
@@ -131,7 +131,7 @@ def INPLACE_update_metadata_index_keys(mongo_db, index, final_key_blacklist=FINA
             }
 
 
-def INPLACE_update_metadata_index_values(mongo_db, index, cname=COLLECTION_NAMES.METADATA):
+def INPLACE_update_metadata_value_lookup_values(mongo_db, index, cname=COLLECTION_NAMES.METADATA):
     """Generate JSON with all possible metadata values, also for documentation section 'meta-equals'"""
     metadata_collection = getattr(mongo_db, cname)
     for isa_category in index:
@@ -147,12 +147,12 @@ def INPLACE_update_metadata_index_values(mongo_db, index, cname=COLLECTION_NAMES
                 index[isa_category][subkey][next_level_key] = values
 
 
-def update_metadata_index(mongo_db, logger, template=INDEX_TEMPLATE, cname=COLLECTION_NAMES.METADATA_INDEX):
+def update_metadata_value_lookup(mongo_db, logger, template=INDEX_TEMPLATE, cname=COLLECTION_NAMES.METADATA_VALUE_LOOKUP):
     """Collect existing keys and values for lookups"""
     logger.info("CacherThread: reindexing metadata")
     index = deepcopy(template)
-    INPLACE_update_metadata_index_keys(mongo_db, index)
-    INPLACE_update_metadata_index_values(mongo_db, index)
+    INPLACE_update_metadata_value_lookup_keys(mongo_db, index)
+    INPLACE_update_metadata_value_lookup_values(mongo_db, index)
     for isa_category in index:
         for subkey in index[isa_category]:
             run_mongo_transaction(

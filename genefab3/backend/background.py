@@ -4,7 +4,7 @@ from genefab3.config import CACHER_THREAD_RECHECK_DELAY
 from logging import getLogger, DEBUG
 from genefab3.backend.mongo.writers.metadata import ensure_info_index
 from genefab3.backend.mongo.writers.metadata import recache_metadata
-from genefab3.backend.mongo.writers.metadata import update_metadata_index
+from genefab3.backend.mongo.writers.metadata import update_metadata_value_lookup
 from genefab3.backend.sql.writers.cache import drop_response_lru_cache
 from time import sleep
 
@@ -35,6 +35,6 @@ class CacherThread(Thread):
                 delay = self.check_interval
             else:
                 delay = self.recheck_delay
-            update_metadata_index(self.mongo_db, self.logger)
+            update_metadata_value_lookup(self.mongo_db, self.logger)
             self.logger.info(f"CacherThread: Sleeping for {delay} seconds")
             sleep(delay)
