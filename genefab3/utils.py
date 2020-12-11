@@ -1,8 +1,7 @@
 from os import environ
 from genefab3.config import TIMESTAMP_FMT, DEBUG_MARKERS
-from re import sub, escape, split, search, IGNORECASE
+from re import split, search, IGNORECASE
 from datetime import datetime
-from copy import deepcopy
 from genefab3.common.exceptions import GeneLabDatabaseException, GeneLabFileException
 
 
@@ -30,23 +29,6 @@ def extract_file_timestamp(fd, key="date_modified", fallback_key="date_created",
             return fallback_value
         else:
             return int(dt.timestamp())
-
-
-def map_replace(string, mappings):
-    """Perform multiple replacements in one go"""
-    return sub(
-        r'|'.join(map(escape, mappings.keys())),
-        lambda m: mappings[m.group()],
-        string,
-    )
-
-
-def copy_and_drop(d, keys):
-    """Deepcopy dictionary `d`, delete `d[key] for key in keys`"""
-    d_copy = deepcopy(d)
-    for key in keys:
-        del d_copy[key]
-    return d_copy
 
 
 def iterate_terminal_leaves(d, step_tracker=0, max_steps=32):
