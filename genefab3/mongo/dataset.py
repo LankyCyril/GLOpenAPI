@@ -99,16 +99,16 @@ class CachedDataset(ColdStorageDataset):
             action="delete_many", collection=metadata_collection,
             query={"info.accession": self.accession, "info.assay": assay.name},
         )
-        if assay.meta:
+        if assay.metadata:
             run_mongo_transaction(
                 action="insert_many", collection=metadata_collection,
                 documents=harmonize_document(
-                    assay.meta.values(), units_format=units_format,
+                    assay.metadata.values(), units_format=units_format,
                 ),
             )
             sample_names_with_missing_study_entries = set()
-            for sample_name in assay.meta:
-                if "Study" not in assay.meta[sample_name]:
+            for sample_name in assay.metadata:
+                if "Study" not in assay.metadata[sample_name]:
                     sample_names_with_missing_study_entries.add(sample_name)
                     self.logger.warning(
                         WARN_NO_STUDY, self.accession, assay.name, sample_name,

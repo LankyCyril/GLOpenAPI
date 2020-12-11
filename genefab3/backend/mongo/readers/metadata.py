@@ -7,7 +7,7 @@ from pandas import json_normalize, MultiIndex, isnull
 from types import SimpleNamespace
 
 
-def get_raw_meta_dataframe(mongo_db, query, projection, include, cname=COLLECTION_NAMES.METADATA):
+def get_raw_metadata_dataframe(mongo_db, query, projection, include, cname=COLLECTION_NAMES.METADATA):
     """Get target metadata as a single-level dataframe, numerically sorted by info fields"""
     metadata_collection = getattr(mongo_db, cname)
     for _ in range(0, METADATA_INDEX_WAIT_DELAY, METADATA_INDEX_WAIT_STEP):
@@ -61,7 +61,7 @@ def isa_sort_dataframe(dataframe):
     )]
 
 
-def get_annotation_by_metas(mongo_db, context, include=(), search_with_projection=True, modify=lambda _:_, aggregate=False):
+def get_annotation_by_metadata(mongo_db, context, include=(), search_with_projection=True, modify=lambda _:_, aggregate=False):
     """Select assays/samples based on annotation filters"""
     full_projection = {
         "info.accession": True, "info.assay": True, **context.projection,
@@ -72,7 +72,7 @@ def get_annotation_by_metas(mongo_db, context, include=(), search_with_projectio
             proj = {"_id": False, **full_projection}
         else:
             proj = {"_id": False}
-        dataframe = get_raw_meta_dataframe( # single-level
+        dataframe = get_raw_metadata_dataframe( # single-level
             mongo_db, context.query, proj, include,
         )
         # modify with injected function:

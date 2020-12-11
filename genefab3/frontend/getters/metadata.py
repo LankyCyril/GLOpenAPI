@@ -3,7 +3,7 @@ from pandas import concat, merge
 from re import findall, search, IGNORECASE, escape, split
 from genefab3.frontend.renderer import Placeholders
 from numpy import nan
-from genefab3.backend.mongo.readers.meta import get_annotation_by_metas
+from genefab3.backend.mongo.readers.metadata import get_annotation_by_metadata
 
 
 def keep_projection(dataframe, full_projection):
@@ -65,9 +65,9 @@ def filter_filenames(dataframe, mask, startloc):
         )
 
 
-def get_assays_by_metas(mongo_db, context):
+def get_assays(mongo_db, context):
     """Select assays based on annotation filters"""
-    dataframe = get_annotation_by_metas(
+    dataframe = get_annotation_by_metadata(
         mongo_db, context, modify=keep_projection, aggregate=True,
     )
     if dataframe is None:
@@ -76,9 +76,9 @@ def get_assays_by_metas(mongo_db, context):
         return dataframe
 
 
-def get_samples_by_metas(mongo_db, context):
+def get_samples(mongo_db, context):
     """Select samples based on annotation filters"""
-    dataframe = get_annotation_by_metas(
+    dataframe = get_annotation_by_metadata(
         mongo_db, context, include={"info.sample name"}, modify=keep_projection,
     )
     if dataframe is None:
@@ -87,9 +87,9 @@ def get_samples_by_metas(mongo_db, context):
         return dataframe
 
 
-def get_files_by_metas(mongo_db, context):
+def get_files(mongo_db, context):
     """Select files based on annotation filters"""
-    annotation_dataframe = get_annotation_by_metas(
+    annotation_dataframe = get_annotation_by_metadata(
         mongo_db, context, include={"info.sample name"},
         search_with_projection=True, modify=keep_projection,
     ),
@@ -97,7 +97,7 @@ def get_files_by_metas(mongo_db, context):
         return Placeholders.metadata_dataframe(include={"info.sample name"})
     else:
         files_dataframe = filter_filenames(
-            get_annotation_by_metas(
+            get_annotation_by_metadata(
                 mongo_db, context, include={"info.sample name"},
                 search_with_projection=False, modify=keep_files,
             ),

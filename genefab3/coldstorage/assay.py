@@ -17,7 +17,7 @@ class ColdStorageAssay(AssayBaseClass):
         self._assert_correct_dataset(dataset, assay_name)
         self.dataset = dataset
         self.name = assay_name
-        self.meta = {}
+        self.metadata = {}
         for isa_assay_entry in isa_assay_entries:
             try: # check validity / uniqueness of Sample Name entries
                 entry_sample_names = {
@@ -32,15 +32,15 @@ class ColdStorageAssay(AssayBaseClass):
                 )
             else: # populate metadata from Assay, general Investigation entries
                 sample_name = entry_sample_names.pop()
-                self.meta[sample_name] = self._init_sample_entry_with_assay(
+                self.metadata[sample_name] = self._init_sample_entry_with_assay(
                     dataset, isa_assay_entry, assay_name, sample_name,
                 )
         # populate annotation from Study and Investigation entries:
-        for sample_name in self.meta:
+        for sample_name in self.metadata:
             if sample_name in dataset.isa.studies._by_sample_name:
                 # populate annotation from Study entries matching Sample Names:
                 self._extend_sample_entry_with_study(
-                    self.meta[sample_name], dataset, sample_name,
+                    self.metadata[sample_name], dataset, sample_name,
                 )
  
     def _assert_correct_dataset(self, dataset, assay_name):
