@@ -1,9 +1,9 @@
 from logging import getLogger, CRITICAL
-from genefab3.exceptions import GeneLabISAException
+from genefab3.common.exceptions import GeneLabISAException
 from re import search, sub
 from collections import defaultdict
 from numpy import nan
-from argparse import Namespace
+from types import SimpleNamespace
 from urllib.request import urlopen
 from zipfile import ZipFile
 from io import BytesIO, StringIO
@@ -237,7 +237,7 @@ class IsaZip:
  
     def _ingest_raw_isa(self, isa_zip_url):
         """Unpack ZIP from URL and delegate to top-level parsers"""
-        raw = Namespace(investigation=None, studies={}, assays={})
+        raw = SimpleNamespace(investigation=None, studies={}, assays={})
         with urlopen(isa_zip_url) as response:
             with ZipFile(BytesIO(response.read())) as archive:
                 for filepath in archive.namelist():
@@ -256,7 +256,7 @@ class IsaZip:
                             elif kind == "a":
                                 reader = self._read_tab
                                 raw.assays[name] = reader(handle, **info)
-        for tab, value in raw._get_kwargs():
+        for tab, value in raw.__dict__.items():
             if not value:
                 raise GeneLabISAException(
                     "Missing ISA tab", url=isa_zip_url, tab=tab,

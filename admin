@@ -5,11 +5,11 @@ from pymongo import MongoClient, DESCENDING
 from bson.objectid import ObjectId
 from datetime import datetime
 from genefab3.config import MONGO_DB_NAME, COLLECTION_NAMES
-from genefab3.mongo.dataset import CachedDataset
+from genefab3.backend.mongo.dataset import CachedDataset
 from genefab3.coldstorage.dataset import ColdStorageDataset
-from genefab3.mongo.cacher import update_metadata_index
-from genefab3.sql.cache import drop_response_lru_cache
-from genefab3.mongo.utils import run_mongo_transaction
+from genefab3.backend.mongo.writers.metadata import update_metadata_value_lookup
+from genefab3.backend.sql.writers.cache import drop_response_lru_cache
+from genefab3.backend.mongo.utils import run_mongo_transaction
 from json import dumps
 
 
@@ -36,7 +36,7 @@ def drop(mongo_db, what):
         confirm("Yes, I am really sure I want to drop ALLMETA")
         collection_names = {
             "dataset_timestamps", "json_cache", "annotations",
-            "metadata", "metadata_index",
+            "metadata", "metadata_value_lookup",
         }
         for cname in collection_names:
             run_mongo_transaction(
@@ -52,7 +52,7 @@ def drop(mongo_db, what):
         )
     else:
         CachedDataset.drop_cache(mongo_db=mongo_db, accession=what)
-        update_metadata_index(mongo_db, logger=logger)
+        update_metadata_value_lookup(mongo_db, logger=logger)
         drop_response_lru_cache(logger=logger)
 
 
@@ -63,7 +63,7 @@ def recache(mongo_db, what):
         confirm("Yes, recache " + what)
         CachedDataset.drop_cache(mongo_db=mongo_db, accession=what)
         CachedDataset(mongo_db, what, logger=logger)
-        update_metadata_index(mongo_db, logger=logger)
+        update_metadata_value_lookup(mongo_db, logger=logger)
         drop_response_lru_cache(logger=logger)
 
 
@@ -130,7 +130,7 @@ def test_isa(mongo_db, accession, assay_name, attribute):
     if timestamps_collection.find_one({"accession": accession}):
         glds = CachedDataset(mongo_db, accession, logger=logger)
     else:
-        glds = ColdStorageDataset(accession)
+        glds = ColdStorageDataset(accession, logger=logger)
     assay = glds.assays[assay_name]
     data = getattr(assay, attribute)
     print(dumps(data, indent=4, sort_keys=True))

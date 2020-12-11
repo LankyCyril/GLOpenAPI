@@ -30,14 +30,14 @@ CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
 METADATA_INDEX_WAIT_DELAY = 60 # 1 minute (in seconds)
 METADATA_INDEX_WAIT_STEP = 5
 
-from argparse import Namespace
-COLLECTION_NAMES = Namespace(
+from types import SimpleNamespace
+COLLECTION_NAMES = SimpleNamespace(
     STATUS="status",
     LOG="log",
     JSON_CACHE="json_cache",
     DATASET_TIMESTAMPS="dataset_timestamps",
     METADATA="metadata",
-    METADATA_INDEX="metadata_index",
+    METADATA_VALUE_LOOKUP="metadata_value_lookup",
     FILE_DESCRIPTORS="file_descriptors",
 )
 
