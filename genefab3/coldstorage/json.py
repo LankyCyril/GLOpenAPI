@@ -1,9 +1,27 @@
+from genefab3.config import TIMESTAMP_FMT
+from datetime import datetime
 from urllib.request import urlopen
 from genefab3.config import COLD_GLDS_MASK
 from genefab3.config import COLD_FILEURLS_MASK, COLD_FILEDATES_MASK
 from json import loads
 from re import search
 from genefab3.common.exceptions import GeneLabException, GeneLabJSONException
+
+
+def extract_file_timestamp(fd, key="date_modified", fallback_key="date_created", fallback_value=-1, fmt=TIMESTAMP_FMT):
+    """Convert date like 'Fri Oct 11 22:02:48 EDT 2019' to timestamp"""
+    strdate = fd.get(key)
+    if strdate is None:
+        strdate = fd.get(fallback_key)
+    if strdate is None:
+        return fallback_value
+    else:
+        try:
+            dt = datetime.strptime(strdate, fmt)
+        except ValueError:
+            return fallback_value
+        else:
+            return int(dt.timestamp())
 
 
 def download_cold_json(identifier, kind="other", report_changes=True):

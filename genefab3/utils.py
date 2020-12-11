@@ -1,7 +1,6 @@
 from os import environ
-from genefab3.config import TIMESTAMP_FMT, DEBUG_MARKERS
+from genefab3.config import DEBUG_MARKERS
 from re import split, search, IGNORECASE
-from datetime import datetime
 from genefab3.common.exceptions import GeneLabDatabaseException, GeneLabFileException
 
 
@@ -13,22 +12,6 @@ def is_flask_reloaded():
 def is_debug():
     """Determine if app is running in debug mode"""
     return (environ.get("FLASK_ENV", None) in DEBUG_MARKERS)
-
-
-def extract_file_timestamp(fd, key="date_modified", fallback_key="date_created", fallback_value=-1, fmt=TIMESTAMP_FMT):
-    """Convert date like 'Fri Oct 11 22:02:48 EDT 2019' to timestamp"""
-    strdate = fd.get(key)
-    if strdate is None:
-        strdate = fd.get(fallback_key)
-    if strdate is None:
-        return fallback_value
-    else:
-        try:
-            dt = datetime.strptime(strdate, fmt)
-        except ValueError:
-            return fallback_value
-        else:
-            return int(dt.timestamp())
 
 
 def iterate_terminal_leaves(d, step_tracker=0, max_steps=32):

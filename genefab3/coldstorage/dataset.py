@@ -5,7 +5,7 @@ from genefab3.coldstorage.json import download_cold_json
 from genefab3.common.exceptions import GeneLabJSONException, GeneLabFileException
 from memoized_property import memoized_property
 from genefab3.config import GENELAB_ROOT, ISA_ZIP_REGEX
-from genefab3.utils import extract_file_timestamp
+from genefab3.coldstorage.json import extract_file_timestamp
 from genefab3.coldstorage.isa import IsaZip
 from collections import defaultdict
 from genefab3.coldstorage.assay import ColdStorageAssay
