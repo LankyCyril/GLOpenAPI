@@ -4,13 +4,13 @@ from genefab3.mongo.json import get_fresh_json
 from datetime import datetime
 from pandas import Series
 from copy import deepcopy
-from genefab3.mongo.utils import run_mongo_transaction
+from genefab3.backend.mongo.utils import run_mongo_transaction
 from logging import getLogger, DEBUG
 from threading import Thread
 from pymongo import ASCENDING
 from genefab3.config import CACHER_THREAD_CHECK_INTERVAL
 from genefab3.config import CACHER_THREAD_RECHECK_DELAY
-from genefab3.mongo.dataset import CachedDataset
+from genefab3.backend.mongo.dataset import CachedDataset
 from genefab3.config import UNITS_FORMAT
 from genefab3.sql.cache import drop_response_lru_cache
 from time import sleep

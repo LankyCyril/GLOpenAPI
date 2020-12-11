@@ -3,7 +3,7 @@ from datetime import datetime
 from pymongo import DESCENDING
 from genefab3.coldstorage.json import download_cold_json
 from genefab3.common.exceptions import GeneLabJSONException
-from genefab3.mongo.utils import run_mongo_transaction
+from genefab3.backend.mongo.utils import run_mongo_transaction
 
 
 def is_json_cache_fresh(json_cache_info, max_age=MAX_JSON_AGE):

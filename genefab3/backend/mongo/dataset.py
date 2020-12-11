@@ -2,10 +2,10 @@ from genefab3.config import COLLECTION_NAMES
 from types import SimpleNamespace
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.mongo.json import get_fresh_json, drop_json_cache_by_accession
-from genefab3.mongo.utils import run_mongo_transaction, harmonize_document
+from genefab3.backend.mongo.utils import run_mongo_transaction, harmonize_document
 from datetime import datetime
 from functools import partial
-from genefab3.mongo.assay import CachedAssay
+from genefab3.backend.mongo.assay import CachedAssay
 
 
 WARN_NO_META = "%s, %s: no metadata entries"

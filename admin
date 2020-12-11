@@ -5,11 +5,11 @@ from pymongo import MongoClient, DESCENDING
 from bson.objectid import ObjectId
 from datetime import datetime
 from genefab3.config import MONGO_DB_NAME, COLLECTION_NAMES
-from genefab3.mongo.dataset import CachedDataset
+from genefab3.backend.mongo.dataset import CachedDataset
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.mongo.cacher import update_metadata_index
 from genefab3.sql.cache import drop_response_lru_cache
-from genefab3.mongo.utils import run_mongo_transaction
+from genefab3.backend.mongo.utils import run_mongo_transaction
 from json import dumps
 
 
