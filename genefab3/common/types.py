@@ -1,4 +1,13 @@
 from genefab3.common.exceptions import GeneLabDataManagerException
+from types import SimpleNamespace
+
+
+def PlaceholderLogger():
+    """Placeholder that masquerades as a logger but does not do anything"""
+    return SimpleNamespace(
+        info=lambda *args, **kwargs: None,
+        warning=lambda *args, **kwargs: None,
+    )
 
 
 class UniversalSet(set):

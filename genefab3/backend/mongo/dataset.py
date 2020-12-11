@@ -1,5 +1,4 @@
 from genefab3.config import COLLECTION_NAMES
-from types import SimpleNamespace
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.backend.mongo.writers.json import get_fresh_json, drop_json_cache_by_accession
 from genefab3.backend.mongo.utils import run_mongo_transaction
@@ -11,11 +10,6 @@ from genefab3.backend.mongo.assay import CachedAssay
 
 WARN_NO_META = "%s, %s: no metadata entries"
 WARN_NO_STUDY = "%s, %s, %s: no Study entries"
-
-
-def NoLogger():
-    """Placeholder that masquerades as a logger but does not do anything"""
-    return SimpleNamespace(warning=lambda *args, **kwargs: None)
 
 
 def drop_dataset_timestamps(mongo_db, accession, cname=COLLECTION_NAMES.DATASET_TIMESTAMPS):
@@ -40,11 +34,11 @@ class CachedDataset(ColdStorageDataset):
     def __init__(self, mongo_db, accession, logger=None, init_assays=True, units_format=None, cname=COLLECTION_NAMES.DATASET_TIMESTAMPS):
         """Initialize with latest cached JSONs, recache if stale, init and recache stale assays if requested; drop cache on errors"""
         self.mongo_db = mongo_db
-        self.logger = logger if (logger is not None) else NoLogger()
         try:
             super().__init__(
                 accession, init_assays=False,
                 get_json=partial(get_fresh_json, mongo_db=mongo_db),
+                logger=logger,
             )
             if init_assays:
                 self.init_assays()

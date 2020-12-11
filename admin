@@ -130,7 +130,7 @@ def test_isa(mongo_db, accession, assay_name, attribute):
     if timestamps_collection.find_one({"accession": accession}):
         glds = CachedDataset(mongo_db, accession, logger=logger)
     else:
-        glds = ColdStorageDataset(accession)
+        glds = ColdStorageDataset(accession, logger=logger)
     assay = glds.assays[assay_name]
     data = getattr(assay, attribute)
     print(dumps(data, indent=4, sort_keys=True))

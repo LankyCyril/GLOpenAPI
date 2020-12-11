@@ -2,6 +2,7 @@ from genefab3.common.types import DatasetBaseClass, DatasetJSONs, FileDescriptor
 from re import search
 from urllib.parse import quote
 from genefab3.coldstorage.json import download_cold_json
+from genefab3.common.types import PlaceholderLogger
 from genefab3.common.exceptions import GeneLabJSONException, GeneLabFileException
 from memoized_property import memoized_property
 from genefab3.config import GENELAB_ROOT, ISA_ZIP_REGEX
@@ -17,8 +18,9 @@ class ColdStorageDataset(DatasetBaseClass):
     changed = DatasetJSONs()
     isa = None
  
-    def __init__(self, accession, json=DatasetJSONs(), init_assays=True, get_json=download_cold_json):
+    def __init__(self, accession, json=DatasetJSONs(), init_assays=True, get_json=download_cold_json, logger=None):
         """Request JSONs (either from cold storage or from local cache) and optionally init assays via an ISA ZIP file"""
+        self.logger = logger if (logger is not None) else PlaceholderLogger()
         self.json.glds, self.changed.glds = json.glds, True
         if not self.json.glds:
             self.json.glds, self.changed.glds = get_json(
