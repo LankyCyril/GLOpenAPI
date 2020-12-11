@@ -3,7 +3,7 @@ from genefab3.frontend.utils import is_debug
 from json import dumps
 from genefab3.common.exceptions import GeneLabException, GeneLabParserException
 from genefab3.common.exceptions import GeneLabFormatException
-from genefab3.frontend.rendereres.forms import needs_datatype, render_dropdown
+from genefab3.frontend.renderers.forms import needs_datatype, render_dropdown
 from genefab3.backend.sql.readers.cache import retrieve_cached_response
 from genefab3.backend.sql.writers.cache import cache_response
 from pandas import DataFrame, MultiIndex

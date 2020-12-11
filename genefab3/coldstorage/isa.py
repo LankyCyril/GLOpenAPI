@@ -256,7 +256,7 @@ class IsaZip:
                             elif kind == "a":
                                 reader = self._read_tab
                                 raw.assays[name] = reader(handle, **info)
-        for tab, value in raw.__dict__.values():
+        for tab, value in raw.__dict__.items():
             if not value:
                 raise GeneLabISAException(
                     "Missing ISA tab", url=isa_zip_url, tab=tab,
