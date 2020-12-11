@@ -9,7 +9,7 @@ from genefab3.backend.mongo.dataset import CachedDataset
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.backend.mongo.writers.metadata import update_metadata_value_lookup
 from genefab3.backend.sql.writers.cache import drop_response_lru_cache
-from genefab3.backend.mongo.writers.metadata import run_mongo_transaction
+from genefab3.backend.mongo.utils import run_mongo_transaction
 from json import dumps
 
 

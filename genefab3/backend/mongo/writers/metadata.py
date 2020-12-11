@@ -1,4 +1,3 @@
-from genefab3.common.exceptions import GeneLabDatabaseException
 from genefab3.config import COLLECTION_NAMES, MONGO_DB_LOCALE
 from pymongo import ASCENDING
 from types import SimpleNamespace
@@ -7,6 +6,7 @@ from genefab3.backend.mongo.writers.json import list_fresh_and_stale_accessions
 from genefab3.backend.mongo.dataset import CachedDataset
 from genefab3.config import UNITS_FORMAT
 from copy import deepcopy
+from genefab3.backend.mongo.utils import run_mongo_transaction
 
 
 INDEX_TEMPLATE = {
@@ -28,35 +28,6 @@ INDEX_TEMPLATE = {
 }
 
 FINAL_INDEX_KEY_BLACKLIST = {"comment"}
-
-REPLACE_ERROR = "run_mongo_transaction('replace') without a query and/or data"
-DELETE_MANY_ERROR = "run_mongo_transaction('delete_many') without a query"
-INSERT_MANY_ERROR = "run_mongo_transaction('insert_many') without documents"
-ACTION_ERROR = "run_mongo_transaction() with an unsupported action"
-
-
-def run_mongo_transaction(action, collection, query=None, data=None, documents=None):
-    """Shortcut to drop all instances and replace with updated instance""" # TODO: move to utils
-    with collection.database.client.start_session() as session:
-        with session.start_transaction():
-            if action == "replace":
-                if (query is not None) and (data is not None):
-                    collection.delete_many(query)
-                    collection.insert_one({**query, **data})
-                else:
-                    raise GeneLabDatabaseException(REPLACE_ERROR)
-            elif action == "delete_many":
-                if query is not None:
-                    collection.delete_many(query)
-                else:
-                    raise GeneLabDatabaseException(DELETE_MANY_ERROR)
-            elif action == "insert_many":
-                if documents is not None:
-                    collection.insert_many(documents)
-                else:
-                    raise GeneLabDatabaseException(INSERT_MANY_ERROR)
-            else:
-                raise GeneLabDatabaseException(ACTION_ERROR, action=action)
 
 
 def ensure_info_index(mongo_db, logger, category="info", keys=["accession", "assay", "sample name"], cname=COLLECTION_NAMES.METADATA):

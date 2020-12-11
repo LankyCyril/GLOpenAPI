@@ -1,5 +1,5 @@
 from genefab3.config import COLLECTION_NAMES
-from genefab3.backend.mongo.writers.metadata import run_mongo_transaction
+from genefab3.backend.mongo.utils import run_mongo_transaction
 
 
 def set_cached_file_descriptor_timestamp(mongo_db, file, cname=COLLECTION_NAMES.FILE_DESCRIPTORS):
