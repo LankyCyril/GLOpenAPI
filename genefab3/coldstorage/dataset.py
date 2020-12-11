@@ -95,7 +95,7 @@ class ColdStorageDataset(DatasetBaseClass):
                 name=filename, url=self.fileurls.get(filename, None),
                 timestamp=self.filedates.get(filename, None),
             )
-            for filename in set(self.filedates) | set(self.fileurls)
+            for filename in set(self.filedates) & set(self.fileurls)
             if matches(filename)
         ]
 
