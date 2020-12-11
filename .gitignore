@@ -5,3 +5,4 @@ data
 __pycache__
 test.py
 .sqlite3
+.flask-cache

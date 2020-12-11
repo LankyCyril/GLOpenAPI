@@ -12,7 +12,7 @@ from genefab3.config import CACHER_THREAD_CHECK_INTERVAL
 from genefab3.config import CACHER_THREAD_RECHECK_DELAY
 from genefab3.mongo.dataset import CachedDataset
 from genefab3.config import UNITS_FORMAT
-from genefab3.sql.cache import drop_object_lru_cache
+from genefab3.sql.cache import drop_response_lru_cache
 from time import sleep
 
 
@@ -178,7 +178,7 @@ class CacherThread(Thread):
                     )
                 self._log_info(f"{len(fresh)} were fresh, {len(stale)} updated")
                 if accessions_to_update | accessions_to_drop:
-                    drop_object_lru_cache()
+                    drop_response_lru_cache(logger=self.logger)
                 delay = self.check_interval
             finally:
                 update_metadata_index(self.mongo_db, self.logger)

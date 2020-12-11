@@ -12,7 +12,7 @@ DEFAULT_FORMATS = {
 }
 
 
-## Databases and external APIs
+## Databases
 
 MONGO_CLIENT_PARAMETERS = dict(
     serverSelectionTimeoutMS=2000,
@@ -20,13 +20,7 @@ MONGO_CLIENT_PARAMETERS = dict(
 MONGO_DB_NAME = "genefab3"
 MONGO_DB_LOCALE = "en_US"
 SQLITE_DIR = "./.sqlite3/"
-
-GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
-COLD_API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
-COLD_SEARCH_MASK = COLD_API_ROOT + "/data/search/?term=GLDS&type=cgene&size={}"
-COLD_GLDS_MASK = COLD_API_ROOT + "/data/study/data/{}/"
-COLD_FILEURLS_MASK = COLD_API_ROOT + "/data/glds/files/{}"
-COLD_FILEDATES_MASK = COLD_API_ROOT + "/data/study/filelistings/{}"
+RESPONSE_CACHE = "./.flask-cache/response-cache.db"
 
 TIMESTAMP_FMT = "%a %b %d %H:%M:%S %Z %Y"
 
@@ -48,7 +42,17 @@ COLLECTION_NAMES = Namespace(
 )
 
 
-## API parser parameters
+## External APIs
+
+GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
+COLD_API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
+COLD_SEARCH_MASK = COLD_API_ROOT + "/data/search/?term=GLDS&type=cgene&size={}"
+COLD_GLDS_MASK = COLD_API_ROOT + "/data/study/data/{}/"
+COLD_FILEURLS_MASK = COLD_API_ROOT + "/data/glds/files/{}"
+COLD_FILEDATES_MASK = COLD_API_ROOT + "/data/study/filelistings/{}"
+
+
+## GeneFab API parser parameters
 
 from operator import eq, ne, gt, getitem, contains, length_hint
 not_in = lambda v, s: v not in s

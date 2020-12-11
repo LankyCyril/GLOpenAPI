@@ -75,7 +75,7 @@ class CachedTable():
                 )
  
     def _get_unambiguous_path(self, sqlite_db, datatype):
-        """Generate SQLite3 filename for datatype"""
+        """Generate SQLite3 filename for datatype; will fail with generic Python exceptions here or downstream if not writable"""
         if not path.exists(sqlite_db):
             makedirs(sqlite_db)
         return path.join(

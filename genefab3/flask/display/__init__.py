@@ -4,6 +4,7 @@ from json import dumps
 from genefab3.exceptions import GeneLabException, GeneLabParserException
 from genefab3.exceptions import GeneLabFormatException
 from genefab3.flask.display.forms import needs_datatype, render_dropdown
+from genefab3.sql.cache import retrieve_cached_response, cache_response
 from pandas import DataFrame, MultiIndex
 from genefab3.flask.display.raw import render_raw
 from genefab3.flask.display.cls import render_cls
@@ -25,23 +26,29 @@ def display(db, getter, kwargs, request):
     if (context.kwargs["debug"] == "1") and is_debug():
         return "<pre>context={}</pre>".format(dumps(context.__dict__, indent=4))
     else:
-        obj = getter(db, **kwargs, context=context)
-        if obj is None:
-            raise GeneLabException("No data")
-        elif context.kwargs["format"] == "raw":
-            return render_raw(obj, context)
-        elif context.kwargs["format"] == "cls":
-            return render_cls(obj, context)
-        elif context.kwargs["format"] == "gct":
-            return render_gct(obj, context)
-        elif isinstance(obj, DataFrame):
-            return render_dataframe(obj, context)
+        cached_response = retrieve_cached_response(request)
+        if cached_response is not None:
+            return cached_response
         else:
-            raise GeneLabFormatException(
-                "Formatting of unsupported object type",
-                object_type=type(obj).__name__,
-                format=context.kwargs.get("format"),
-            )
+            obj = getter(db, **kwargs, context=context)
+            if obj is None:
+                raise GeneLabException("No data")
+            elif context.kwargs["format"] == "raw":
+                response = render_raw(obj, context)
+            elif context.kwargs["format"] == "cls":
+                response = render_cls(obj, context)
+            elif context.kwargs["format"] == "gct":
+                response = render_gct(obj, context)
+            elif isinstance(obj, DataFrame):
+                response = render_dataframe(obj, context)
+            else:
+                raise GeneLabFormatException(
+                    "Formatting of unsupported object type",
+                    object_type=type(obj).__name__,
+                    format=context.kwargs.get("format"),
+                )
+            cache_response(request, response)
+            return response
 
 
 class Placeholders:
