@@ -11,7 +11,7 @@ from genefab3.mongo.cacher import CacherThread
 from genefab3.common.exceptions import traceback_printer, exception_catcher, DBLogger
 from functools import partial
 from logging import getLogger
-from genefab3.flask.display import display
+from genefab3.flask.renderer import render
 from argparse import Namespace
 
 
@@ -53,33 +53,33 @@ def documentation():
 @app.route("/assays/", methods=["GET"])
 def assays(**kwargs):
     from genefab3.flask.meta import get_assays_by_metas as getter
-    return display(mongo_db, getter, kwargs, request)
+    return render(mongo_db, getter, kwargs, request)
 
 @app.route("/samples/", methods=["GET"])
 def samples(**kwargs):
     from genefab3.flask.meta import get_samples_by_metas as getter
-    return display(mongo_db, getter, kwargs, request)
+    return render(mongo_db, getter, kwargs, request)
 
 @app.route("/files/", methods=["GET"])
 def files(**kwargs):
     from genefab3.flask.meta import get_files_by_metas as getter
-    return display(mongo_db, getter, kwargs, request)
+    return render(mongo_db, getter, kwargs, request)
 
 @app.route("/file/", methods=["GET"])
 def file(**kwargs):
     from genefab3.flask.file import get_file as getter
-    return display(mongo_db, getter, kwargs, request)
+    return render(mongo_db, getter, kwargs, request)
 
 @app.route("/data/", methods=["GET"])
 def data(**kwargs):
     from genefab3.flask.data import get_data_by_metas as getter
     dbs = Namespace(mongo_db=mongo_db, sqlite_dir=SQLITE_DIR)
-    return display(dbs, getter, kwargs, request)
+    return render(dbs, getter, kwargs, request)
 
 @app.route("/status/", methods=["GET"])
 def status(**kwargs):
     from genefab3.flask.status import get_status as getter
-    return display(mongo_db, getter, kwargs, request)
+    return render(mongo_db, getter, kwargs, request)
 
 @app.route("/favicon.<imgtype>")
 def favicon(**kwargs):

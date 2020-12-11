@@ -3,19 +3,19 @@ from genefab3.flask.utils import is_debug
 from json import dumps
 from genefab3.common.exceptions import GeneLabException, GeneLabParserException
 from genefab3.common.exceptions import GeneLabFormatException
-from genefab3.flask.display.forms import needs_datatype, render_dropdown
+from genefab3.flask.rendereres.forms import needs_datatype, render_dropdown
 from genefab3.sql.cache import retrieve_cached_response, cache_response
 from pandas import DataFrame, MultiIndex
-from genefab3.flask.display.raw import render_raw
-from genefab3.flask.display.cls import render_cls
-from genefab3.flask.display.gct import render_gct
-from genefab3.flask.display.dataframe import render_dataframe
+from genefab3.flask.renderers.raw import render_raw
+from genefab3.flask.renderers.cls import render_cls
+from genefab3.flask.renderers.gct import render_gct
+from genefab3.flask.renderers.dataframe import render_dataframe
 from itertools import cycle
 from genefab3.config import ROW_TYPES
 
 
-def display(db, getter, kwargs, request):
-    """Generate object with `getter` and `**kwargs`, dispatch object and trailing request arguments to display handler"""
+def render(db, getter, kwargs, request):
+    """Generate object with `getter` and `**kwargs`, dispatch object and trailing request arguments to renderer"""
     try:
         context = parse_request(request)
     except GeneLabParserException as e:
