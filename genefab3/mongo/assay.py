@@ -2,7 +2,8 @@ from genefab3.common.types import AssayBaseClass
 from genefab3.config import COLLECTION_NAMES
 from genefab3.common.exceptions import GeneLabDatabaseException
 from re import escape
-from genefab3.utils import UniversalSet, iterate_terminal_leaf_filenames
+from genefab3.common.types import UniversalSet
+from genefab3.utils import iterate_terminal_leaf_filenames
 
 
 class CachedAssay(AssayBaseClass):
