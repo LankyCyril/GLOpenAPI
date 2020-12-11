@@ -1,4 +1,5 @@
 from re import sub
+from genefab3.common.utils import walk_up
 from os import path
 from collections.abc import Iterable
 from pandas import isnull
@@ -19,13 +20,6 @@ def annotate_cols(dataframe, sep):
             dataframe.columns.to_frame().T.to_csv(sep=sep, **DF_KWS),
         ),
     )
-
-
-def walk_up(from_path, n_steps):
-    if n_steps >= 1:
-        return walk_up(path.split(from_path)[0], n_steps-1)
-    else:
-        return from_path
 
 
 def get_browser_html(): # TODO in prod: make HTML template static / preload on app start

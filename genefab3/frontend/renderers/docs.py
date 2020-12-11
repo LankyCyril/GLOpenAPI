@@ -1,7 +1,8 @@
 from genefab3.config import COLLECTION_NAMES
 from collections import defaultdict
 from json import dumps
-from os.path import join, split, abspath
+from os import path
+from genefab3.common.utils import walk_up
 from natsort import natsorted
 from genefab3.common.utils import map_replace
 from genefab3.frontend.utils import is_debug
@@ -52,9 +53,8 @@ def get_metadata_assays(mongo_db, cname=COLLECTION_NAMES.METADATA):
 def interactive_doc(mongo_db, html_path=None, document="docs.html", url_root="/"):
     """Serve an interactive documentation page""" # TODO in prod: make HTML template static / preload on app start
     if html_path is None:
-        html_path = join(
-            split(split(abspath(__file__))[0])[0],
-            "html", document
+        html_path = path.join(
+            walk_up(path.abspath(__file__), 4), "html", document,
         )
     try:
         with open(html_path, mode="rt") as handle:
