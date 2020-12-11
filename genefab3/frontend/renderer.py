@@ -63,7 +63,7 @@ class Placeholders:
         ]
         return DataFrame(columns=MultiIndex.from_tuples(zip(*cyclers)))
  
-    def metadata_dataframe(include):
+    def metadata_dataframe(include=set()):
         """Return an empty dataframe that matches metadata format"""
         return Placeholders.dataframe(
             ["info"], ["accession", "assay", *(c.strip(".") for c in include)],

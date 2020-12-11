@@ -52,33 +52,33 @@ def root(**kwargs):
 
 @app.route("/assays/", methods=["GET"])
 def assays(**kwargs):
-    from genefab3.frontend.meta import get_assays_by_metas as getter
+    from genefab3.frontend.getters.metadata import get_assays as getter
     return render(mongo_db, getter, kwargs, request)
 
 @app.route("/samples/", methods=["GET"])
 def samples(**kwargs):
-    from genefab3.frontend.meta import get_samples_by_metas as getter
+    from genefab3.frontend.getters.metadata import get_samples as getter
     return render(mongo_db, getter, kwargs, request)
 
 @app.route("/files/", methods=["GET"])
 def files(**kwargs):
-    from genefab3.frontend.meta import get_files_by_metas as getter
+    from genefab3.frontend.getters.metadata import get_files as getter
     return render(mongo_db, getter, kwargs, request)
 
 @app.route("/file/", methods=["GET"])
 def file(**kwargs):
-    from genefab3.frontend.file import get_file as getter
+    from genefab3.frontend.getters.file import get_file as getter
     return render(mongo_db, getter, kwargs, request)
 
 @app.route("/data/", methods=["GET"])
 def data(**kwargs):
-    from genefab3.frontend.data import get_data_by_metas as getter
+    from genefab3.frontend.getters.data import get_data as getter
     dbs = namedtuple("dbs", "mongo_db, sqlite_dir")(mongo_db, SQLITE_DIR)
     return render(dbs, getter, kwargs, request)
 
 @app.route("/status/", methods=["GET"])
 def status(**kwargs):
-    from genefab3.frontend.status import get_status as getter
+    from genefab3.frontend.getters.status import get_status as getter
     return render(mongo_db, getter, kwargs, request)
 
 @app.route("/favicon.<imgtype>")

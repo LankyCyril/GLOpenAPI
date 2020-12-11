@@ -1,13 +1,10 @@
+from genefab3.config import COLLECTION_NAMES, MONGO_DB_LOCALE
 from genefab3.config import METADATA_INDEX_WAIT_DELAY, METADATA_INDEX_WAIT_STEP
 from time import sleep
-from genefab3.config import MONGO_DB_LOCALE, RAW_FILE_REGEX, COLLECTION_NAMES
-from pymongo import ASCENDING
-from pandas import json_normalize, MultiIndex, isnull, concat, merge
 from genefab3.common.exceptions import GeneLabDatabaseException
+from pymongo import ASCENDING
+from pandas import json_normalize, MultiIndex, isnull
 from types import SimpleNamespace
-from re import findall, search, IGNORECASE, escape, split
-from genefab3.frontend.renderer import Placeholders
-from numpy import nan
 
 
 def get_raw_meta_dataframe(mongo_db, query, projection, include, cname=COLLECTION_NAMES.METADATA):
@@ -41,37 +38,6 @@ def get_raw_meta_dataframe(mongo_db, query, projection, include, cname=COLLECTIO
         )
 
 
-def keep_projection(dataframe, full_projection):
-    """Drop qualifier fields from single-level dataframe, unless explicitly requested"""
-    subkeys_to_drop = {
-        c for c in dataframe.columns
-        if (len(findall(r'\..', c)) >= 3) and (c not in full_projection)
-    }
-    return dataframe.drop(columns=subkeys_to_drop)
-
-
-def unwind_file_entry(cell):
-    """Unwind lists of dicts returned for some complex unfiltered fields from database"""
-    if isinstance(cell, list):
-        try:
-            return cell[0][""]
-        except (KeyError, IndexError):
-            return str(cell)
-    else:
-        return cell
-
-
-def keep_files(dataframe, full_projection):
-    """Drop qualifier fields from single-level dataframe, unless explicitly requested OR contain filenames"""
-    subkeys_to_drop = {
-        c for c in dataframe.columns if (
-            (c not in full_projection) and
-            (not search(RAW_FILE_REGEX, c, flags=IGNORECASE))
-        )
-    }
-    return dataframe.drop(columns=subkeys_to_drop).applymap(unwind_file_entry)
-
-
 def isa_sort_dataframe(dataframe):
     """Sort single-level dataframe in order info-investigation-study-assay"""
     column_order = SimpleNamespace(
@@ -95,7 +61,7 @@ def isa_sort_dataframe(dataframe):
     )]
 
 
-def get_annotation_by_metas(mongo_db, context, include=(), search_with_projection=True, modify=keep_projection, aggregate=False):
+def get_annotation_by_metas(mongo_db, context, include=(), search_with_projection=True, modify=lambda _:_, aggregate=False):
     """Select assays/samples based on annotation filters"""
     full_projection = {
         "info.accession": True, "info.assay": True, **context.projection,
@@ -121,7 +87,7 @@ def get_annotation_by_metas(mongo_db, context, include=(), search_with_projectio
             for fields in map(lambda s: s.split("."), dataframe.columns)
         )
     except TypeError: # no data retrieved; TODO: handle more gracefully
-        return Placeholders.metadata_dataframe(include)
+        return None
     else:
         if aggregate: # coerce to boolean "existence" if requested
             info_cols = list(dataframe[["info"]].columns)
@@ -132,60 +98,3 @@ def get_annotation_by_metas(mongo_db, context, include=(), search_with_projectio
                 return gby.agg(lambda a: ~isnull(a).all())
         else:
             return dataframe
-
-
-def filter_filenames(dataframe, mask, startloc):
-    """Constrain dataframe cells only to cells passing `mask` filter"""
-    if mask is None:
-        return dataframe
-    else:
-        if (mask[0] == "/") and (mask[-1] == "/"): # regular expression passed
-            expression = mask[1:-1]
-        else: # simple filename passed, match full
-            expression = r'^' + escape(mask) + r'$'
-        def mapper(cell):
-            if isinstance(cell, str):
-                return ", ".join({
-                    filename for filename in split(r'\s*,\s*', cell)
-                    if search(expression, filename)
-                }) or nan
-            else:
-                return nan
-        return concat(
-            objs=[
-                dataframe.iloc[:,:startloc],
-                dataframe.iloc[:,startloc:].applymap(mapper).dropna(
-                    how="all", axis=1,
-                ),
-            ],
-            axis=1,
-        )
-
-
-def get_assays_by_metas(mongo_db, context):
-    """Select assays based on annotation filters"""
-    return get_annotation_by_metas(mongo_db, context, aggregate=True)
-
-
-def get_samples_by_metas(mongo_db, context):
-    """Select samples based on annotation filters"""
-    return get_annotation_by_metas(
-        mongo_db, context, include={"info.sample name"},
-    )
-
-
-def get_files_by_metas(mongo_db, context):
-    """Select files based on annotation filters"""
-    return merge(
-        get_annotation_by_metas(
-            mongo_db, context, include={"info.sample name"},
-            search_with_projection=True, modify=keep_projection,
-        ),
-        filter_filenames(
-            get_annotation_by_metas(
-                mongo_db, context, include={"info.sample name"},
-                search_with_projection=False, modify=keep_files,
-            ),
-            context.kwargs.get("filename"), startloc=3,
-        ),
-    )
