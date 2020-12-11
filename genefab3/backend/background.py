@@ -21,7 +21,7 @@ class CacherThread(Thread):
         super().__init__()
  
     def run(self):
-        """""" # TODO: docstring
+        """Continuously run MongoDB and SQLite3 cachers"""
         while True:
             ensure_info_index(
                 mongo_db=self.mongo_db, logger=self.logger,

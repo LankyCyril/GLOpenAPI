@@ -13,7 +13,7 @@ from genefab3.coldstorage.assay import ColdStorageAssay
 
 
 class ColdStorageDataset(DatasetBaseClass):
-    """Contains GLDS metadata associated with an accession number""" # TODO: may not need __init__(json=...)
+    """Contains GLDS metadata associated with an accession number"""
     json = DatasetJSONs()
     changed = DatasetJSONs()
     isa = None
