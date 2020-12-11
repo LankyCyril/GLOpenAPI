@@ -8,6 +8,7 @@ from genefab3.config import MONGO_DB_NAME, COLLECTION_NAMES
 from genefab3.mongo.dataset import CachedDataset
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.mongo.cacher import update_metadata_index
+from genefab3.sql.cache import drop_response_lru_cache
 from genefab3.mongo.utils import run_mongo_transaction
 from json import dumps
 
@@ -51,7 +52,8 @@ def drop(mongo_db, what):
         )
     else:
         CachedDataset.drop_cache(mongo_db=mongo_db, accession=what)
-        update_metadata_index(mongo_db)
+        update_metadata_index(mongo_db, logger=logger)
+        drop_response_lru_cache(logger=logger)
 
 
 def recache(mongo_db, what):
@@ -61,7 +63,8 @@ def recache(mongo_db, what):
         confirm("Yes, recache " + what)
         CachedDataset.drop_cache(mongo_db=mongo_db, accession=what)
         CachedDataset(mongo_db, what, logger=logger)
-        update_metadata_index(mongo_db)
+        update_metadata_index(mongo_db, logger=logger)
+        drop_response_lru_cache(logger=logger)
 
 
 def showlog_brief_lines(mongo_db, query, max_i):
