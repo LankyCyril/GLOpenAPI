@@ -1,6 +1,6 @@
 from genefab3.config import COLD_SEARCH_MASK, MAX_JSON_AGE
 from genefab3.config import COLLECTION_NAMES, MONGO_DB_LOCALE
-from genefab3.mongo.json import get_fresh_json
+from genefab3.backend.mongo.writers.json import get_fresh_json
 from datetime import datetime
 from pandas import Series
 from copy import deepcopy

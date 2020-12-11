@@ -1,7 +1,7 @@
 from genefab3.config import COLLECTION_NAMES
 from types import SimpleNamespace
 from genefab3.coldstorage.dataset import ColdStorageDataset
-from genefab3.mongo.json import get_fresh_json, drop_json_cache_by_accession
+from genefab3.backend.mongo.writers.json import get_fresh_json, drop_json_cache_by_accession
 from genefab3.backend.mongo.writers.metadata import run_mongo_transaction
 from genefab3.backend.mongo.utils import harmonize_document
 from datetime import datetime
