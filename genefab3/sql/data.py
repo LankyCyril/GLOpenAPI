@@ -6,7 +6,7 @@ from re import sub
 from hashlib import md5
 from genefab3.backend.mongo.utils import infer_file_separator
 from pymongo import DESCENDING
-from genefab3.backend.mongo.utils import run_mongo_transaction
+from genefab3.backend.mongo.writers.metadata import run_mongo_transaction
 from genefab3.common.exceptions import GeneLabDatabaseException, GeneLabFileException
 from pandas import read_csv, read_sql, DataFrame, MultiIndex, concat
 from pandas.io.sql import DatabaseError as PandasDatabaseError

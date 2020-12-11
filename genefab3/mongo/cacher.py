@@ -4,7 +4,7 @@ from genefab3.mongo.json import get_fresh_json
 from datetime import datetime
 from pandas import Series
 from copy import deepcopy
-from genefab3.backend.mongo.utils import run_mongo_transaction
+from genefab3.backend.mongo.writers.metadata import run_mongo_transaction
 from logging import getLogger, DEBUG
 from threading import Thread
 from pymongo import ASCENDING
