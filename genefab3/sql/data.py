@@ -4,7 +4,7 @@ from logging import getLogger, DEBUG
 from os import path, makedirs
 from re import sub
 from hashlib import md5
-from genefab3.utils import infer_file_separator
+from genefab3.mongo.utils import infer_file_separator
 from pymongo import DESCENDING
 from genefab3.mongo.utils import run_mongo_transaction
 from genefab3.common.exceptions import GeneLabDatabaseException, GeneLabFileException
