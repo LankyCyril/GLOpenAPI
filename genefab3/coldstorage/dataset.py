@@ -1,5 +1,4 @@
-from genefab3.coldstorage import DatasetBase
-from argparse import Namespace
+from genefab3.common.types import DatasetBaseClass, DatasetJSONs, FileDescriptor
 from re import search
 from urllib.parse import quote
 from genefab3.coldstorage.json import download_cold_json
@@ -12,23 +11,15 @@ from collections import defaultdict
 from genefab3.coldstorage.assay import ColdStorageAssay
 
 
-class FileDescriptor(Namespace):
-    """Hashable Namespace for atomic values (integers, strings)"""
-    def __hash__(self):
-        return hash(tuple(sorted(self._get_kwargs())))
-
-
-class ColdStorageDataset(DatasetBase):
-    """Contains GLDS metadata associated with an accession number"""
-    json = Namespace()
-    changed = Namespace()
+class ColdStorageDataset(DatasetBaseClass):
+    """Contains GLDS metadata associated with an accession number""" # TODO: may not need __init__(json=...)
+    json = DatasetJSONs()
+    changed = DatasetJSONs()
     isa = None
  
-    def __init__(self, accession, json=Namespace(), init_assays=True, get_json=download_cold_json):
+    def __init__(self, accession, json=DatasetJSONs(), init_assays=True, get_json=download_cold_json):
         """Request JSONs (either from cold storage or from local cache) and optionally init assays via an ISA ZIP file"""
-        jga = lambda name: getattr(json, name, None)
-        # validate JSON and initialize identifiers"
-        self.json.glds, self.changed.glds = jga("glds"), True
+        self.json.glds, self.changed.glds = json.glds, True
         if not self.json.glds:
             self.json.glds, self.changed.glds = get_json(
                 identifier=accession, kind="glds", report_changes=True,
@@ -48,8 +39,8 @@ class ColdStorageDataset(DatasetBase):
                 error = "Initializing with wrong JSON"
                 raise GeneLabJSONException(error, accession)
         # populate file information:
-        self.json.fileurls, self.changed.fileurls = jga("fileurls"), True
-        self.json.filedates, self.changed.filedates = jga("filedates"), True
+        self.json.fileurls, self.changed.fileurls = json.fileurls, True
+        self.json.filedates, self.changed.filedates = json.filedates, True
         if not self.json.fileurls:
             self.json.fileurls, self.changed.fileurls = get_json(
                 identifier=accession, kind="fileurls", report_changes=True,
@@ -100,9 +91,9 @@ class ColdStorageDataset(DatasetBase):
         return [
             FileDescriptor(
                 name=filename, url=self.fileurls.get(filename, None),
-                timestamp=int(timestamp) if str(timestamp).isdigit() else -1,
+                timestamp=self.filedates.get(filename, None),
             )
-            for filename, timestamp in self.filedates.items()
+            for filename in set(self.filedates) | set(self.fileurls)
             if matches(filename)
         ]
 
