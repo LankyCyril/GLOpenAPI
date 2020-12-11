@@ -12,6 +12,8 @@ def ensure_response_lru_cache(response_cache=RESPONSE_CACHE):
     """Ensure parent directory exists; will fail with generic Python exceptions here or downstream if not a writable dir"""
     if not path.exists(path.dirname(response_cache)):
         makedirs(path.dirname(response_cache))
+        with closing(connect(response_cache)) as sql_connection:
+            sql_connection.cursor().execute("PRAGMA auto_vacuum = 1")
 
 
 def cache_response(request, response, response_cache=RESPONSE_CACHE, table="response_cache", schema=RESPONSE_CACHE_SCHEMA):
@@ -43,5 +45,4 @@ def drop_response_lru_cache(logger, response_cache=RESPONSE_CACHE, table="respon
         cursor = sql_connection.cursor()
         cursor.execute(f"DROP TABLE IF EXISTS '{table}'")
         cursor.execute(f"CREATE TABLE '{table}' {schema}")
-        # TODO: vacuum gracefully
         sql_connection.commit()
