@@ -1,4 +1,4 @@
-from genefab3.coldstorage import AssayBase
+from genefab3.common.types import AssayBaseClass
 from genefab3.exceptions import GeneLabException, GeneLabISAException
 from genefab3.utils import copy_and_drop
 
@@ -8,7 +8,7 @@ NO_SAMPLE_NAME_ERROR = "Could not retrieve Sample Name from Assay entry"
 AMBIGUOUS_SAMPLE_NAME_ERROR = "Ambiguous Sample Names for one Assay entry"
 
 
-class ColdStorageAssay(AssayBase):
+class ColdStorageAssay(AssayBaseClass):
     """Stores individual assay information and metadata"""
     name = None
  
