@@ -1,6 +1,5 @@
 from collections import namedtuple
 from genefab3.common.exceptions import GeneLabDataManagerException
-from memoized_property import memoized_property
 
 
 class DatasetBaseClass():
@@ -22,7 +21,7 @@ class FileDescriptor():
             raise GeneLabDataManagerException("No URL for file", name=self.name)
         else:
             return self._url
-    @memoized_property
+    @property
     def timestamp(self):
         if isinstance(self._timestamp, int):
             return self._timestamp
@@ -30,6 +29,11 @@ class FileDescriptor():
             return int(self._timestamp)
         else:
             return -1
+    def __eq__(self, other):
+        return (
+            (self.name == other.name) and (self._url == other._url) and
+            (self._timestamp == other._timestamp)
+        )
     def __hash__(self):
         return hash((self.name, self._url, self._timestamp))
 
