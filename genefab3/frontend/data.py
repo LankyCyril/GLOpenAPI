@@ -2,8 +2,8 @@ from genefab3.mongo.dataset import CachedDataset
 from genefab3.common.exceptions import GeneLabMetadataException, GeneLabFileException
 from genefab3.config import ISA_TECH_TYPE_LOCATOR, TECHNOLOGY_FILE_LOCATORS
 from pandas import merge
-from genefab3.flask.meta import get_raw_meta_dataframe
-from genefab3.flask.renderer import Placeholders
+from genefab3.frontend.meta import get_raw_meta_dataframe
+from genefab3.frontend.renderer import Placeholders
 from genefab3.sql.data import get_sql_data
 
 

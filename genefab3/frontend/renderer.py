@@ -1,15 +1,15 @@
-from genefab3.flask.parser import parse_request
-from genefab3.flask.utils import is_debug
+from genefab3.frontend.parser import parse_request
+from genefab3.frontend.utils import is_debug
 from json import dumps
 from genefab3.common.exceptions import GeneLabException, GeneLabParserException
 from genefab3.common.exceptions import GeneLabFormatException
-from genefab3.flask.rendereres.forms import needs_datatype, render_dropdown
+from genefab3.frontend.rendereres.forms import needs_datatype, render_dropdown
 from genefab3.sql.cache import retrieve_cached_response, cache_response
 from pandas import DataFrame, MultiIndex
-from genefab3.flask.renderers.raw import render_raw
-from genefab3.flask.renderers.cls import render_cls
-from genefab3.flask.renderers.gct import render_gct
-from genefab3.flask.renderers.dataframe import render_dataframe
+from genefab3.frontend.renderers.raw import render_raw
+from genefab3.frontend.renderers.cls import render_cls
+from genefab3.frontend.renderers.gct import render_gct
+from genefab3.frontend.renderers.dataframe import render_dataframe
 from itertools import cycle
 from genefab3.config import ROW_TYPES
 

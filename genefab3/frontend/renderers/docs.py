@@ -4,7 +4,7 @@ from json import dumps
 from os.path import join, split, abspath
 from natsort import natsorted
 from genefab3.common.utils import map_replace
-from genefab3.flask.utils import is_debug
+from genefab3.frontend.utils import is_debug
 
 
 def get_metadata_equals_json(mongo_db, cname=COLLECTION_NAMES.METADATA_INDEX):

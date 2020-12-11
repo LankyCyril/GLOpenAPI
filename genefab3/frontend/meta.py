@@ -6,7 +6,7 @@ from pandas import json_normalize, MultiIndex, isnull, concat, merge
 from genefab3.common.exceptions import GeneLabDatabaseException
 from types import SimpleNamespace
 from re import findall, search, IGNORECASE, escape, split
-from genefab3.flask.renderer import Placeholders
+from genefab3.frontend.renderer import Placeholders
 from numpy import nan
 
 
