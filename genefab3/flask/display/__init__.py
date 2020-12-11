@@ -1,5 +1,5 @@
 from genefab3.flask.parser import parse_request
-from genefab3.utils import is_debug
+from genefab3.flask.utils import is_debug
 from json import dumps
 from genefab3.common.exceptions import GeneLabException, GeneLabParserException
 from genefab3.common.exceptions import GeneLabFormatException
