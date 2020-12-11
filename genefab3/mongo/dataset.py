@@ -1,5 +1,5 @@
 from genefab3.config import COLLECTION_NAMES
-from argparse import Namespace
+from types import SimpleNamespace
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.mongo.json import get_fresh_json, drop_json_cache_by_accession
 from genefab3.mongo.utils import run_mongo_transaction, harmonize_document
@@ -14,7 +14,7 @@ WARN_NO_STUDY = "%s, %s, %s: no Study entries"
 
 def NoLogger():
     """Placeholder that masquerades as a logger but does not do anything"""
-    return Namespace(warning=lambda *args, **kwargs: None)
+    return SimpleNamespace(warning=lambda *args, **kwargs: None)
 
 
 def drop_dataset_timestamps(mongo_db, accession, cname=COLLECTION_NAMES.DATASET_TIMESTAMPS):

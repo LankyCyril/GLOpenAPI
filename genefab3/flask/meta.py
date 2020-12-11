@@ -4,7 +4,7 @@ from genefab3.config import MONGO_DB_LOCALE, RAW_FILE_REGEX, COLLECTION_NAMES
 from pymongo import ASCENDING
 from pandas import json_normalize, MultiIndex, isnull, concat, merge
 from genefab3.common.exceptions import GeneLabDatabaseException
-from argparse import Namespace
+from types import SimpleNamespace
 from re import findall, search, IGNORECASE, escape, split
 from genefab3.flask.renderer import Placeholders
 from numpy import nan
@@ -74,7 +74,7 @@ def keep_files(dataframe, full_projection):
 
 def isa_sort_dataframe(dataframe):
     """Sort single-level dataframe in order info-investigation-study-assay"""
-    column_order = Namespace(
+    column_order = SimpleNamespace(
         info=set(), investigation=set(), study=set(), assay=set(), other=set(),
     )
     for column in dataframe.columns:

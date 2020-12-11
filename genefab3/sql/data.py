@@ -1,4 +1,4 @@
-from argparse import Namespace
+from types import SimpleNamespace
 from genefab3.config import COLLECTION_NAMES, ROW_TYPES
 from logging import getLogger, DEBUG
 from os import path, makedirs
@@ -32,7 +32,7 @@ CACHED_TABLE_LOGGER_DROP_WARNING = (
 
 class CachedTable():
     """Abstracts SQL table generated from a CSV/TSV file"""
-    file = Namespace(name=None, url=None, timestamp=None, sep=None)
+    file = SimpleNamespace(name=None, url=None, timestamp=None, sep=None)
     is_fresh, status = None, None
     accession, assay_name, sample_names = None, None, None
     data = None
@@ -48,7 +48,7 @@ class CachedTable():
         self.datatype, self.accession, self.assay_name, self.sample_names = (
             datatype, accession, assay_name, sample_names,
         )
-        self.file = Namespace(
+        self.file = SimpleNamespace(
             name=file_descriptor.name,
             url=file_descriptor.url,
             timestamp=file_descriptor.timestamp,

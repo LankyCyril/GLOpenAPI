@@ -12,7 +12,7 @@ from genefab3.common.exceptions import traceback_printer, exception_catcher, DBL
 from functools import partial
 from logging import getLogger
 from genefab3.flask.renderer import render
-from argparse import Namespace
+from collections import namedtuple
 
 
 # Backend initialization:
@@ -73,7 +73,7 @@ def file(**kwargs):
 @app.route("/data/", methods=["GET"])
 def data(**kwargs):
     from genefab3.flask.data import get_data_by_metas as getter
-    dbs = Namespace(mongo_db=mongo_db, sqlite_dir=SQLITE_DIR)
+    dbs = namedtuple("dbs", "mongo_db, sqlite_dir")(mongo_db, SQLITE_DIR)
     return render(dbs, getter, kwargs, request)
 
 @app.route("/status/", methods=["GET"])
