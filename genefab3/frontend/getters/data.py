@@ -4,7 +4,7 @@ from genefab3.config import ISA_TECH_TYPE_LOCATOR, TECHNOLOGY_FILE_LOCATORS
 from pandas import merge
 from genefab3.backend.mongo.readers.metadata import get_raw_metadata_dataframe
 from genefab3.frontend.renderer import Placeholders
-from genefab3.sql.data import get_sql_data
+from genefab3.backend.sql.readers.data import get_sql_data
 
 
 NO_FILES_ERROR = "No data files found for datatype"

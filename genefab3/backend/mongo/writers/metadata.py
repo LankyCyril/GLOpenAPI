@@ -36,7 +36,7 @@ ACTION_ERROR = "run_mongo_transaction() with an unsupported action"
 
 
 def run_mongo_transaction(action, collection, query=None, data=None, documents=None):
-    """Shortcut to drop all instances and replace with updated instance"""
+    """Shortcut to drop all instances and replace with updated instance""" # TODO: move to utils
     with collection.database.client.start_session() as session:
         with session.start_transaction():
             if action == "replace":
