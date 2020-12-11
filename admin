@@ -7,8 +7,8 @@ from datetime import datetime
 from genefab3.config import MONGO_DB_NAME, COLLECTION_NAMES
 from genefab3.backend.mongo.dataset import CachedDataset
 from genefab3.coldstorage.dataset import ColdStorageDataset
-from genefab3.mongo.cacher import update_metadata_index
-from genefab3.sql.cache import drop_response_lru_cache
+from genefab3.backend.mongo.writers.metadata import update_metadata_index
+from genefab3.backend.sql.writers.cache import drop_response_lru_cache
 from genefab3.backend.mongo.writers.metadata import run_mongo_transaction
 from json import dumps
 

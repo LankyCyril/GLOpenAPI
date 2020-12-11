@@ -7,7 +7,7 @@ from genefab3.config import MONGO_CLIENT_PARAMETERS, MONGO_DB_NAME, SQLITE_DIR
 from pymongo.errors import ServerSelectionTimeoutError
 from genefab3.common.exceptions import GeneLabDatabaseException
 from genefab3.frontend.utils import is_flask_reloaded, is_debug
-from genefab3.mongo.cacher import CacherThread
+from genefab3.backend.background import CacherThread
 from genefab3.common.exceptions import traceback_printer, exception_catcher, DBLogger
 from functools import partial
 from logging import getLogger

@@ -1,9 +1,10 @@
-from genefab3.config import MAX_JSON_AGE, COLLECTION_NAMES
+from genefab3.config import MAX_JSON_AGE, COLLECTION_NAMES, COLD_SEARCH_MASK
 from datetime import datetime
 from pymongo import DESCENDING
 from genefab3.coldstorage.json import download_cold_json
 from genefab3.common.exceptions import GeneLabJSONException
 from genefab3.backend.mongo.writers.metadata import run_mongo_transaction
+from pandas import Series
 
 
 def is_json_cache_fresh(json_cache_info, max_age=MAX_JSON_AGE):
@@ -50,6 +51,26 @@ def get_fresh_json(mongo_db, identifier, kind="other", max_age=MAX_JSON_AGE, rep
         return fresh_json, json_changed
     else:
         return fresh_json
+
+
+def list_available_accessions(mongo_db):
+    """List datasets in cold storage"""
+    url_n = COLD_SEARCH_MASK.format(0)
+    n_datasets = get_fresh_json(mongo_db, url_n)["hits"]["total"]
+    url_all = COLD_SEARCH_MASK.format(n_datasets)
+    raw_datasets_json = get_fresh_json(mongo_db, url_all)["hits"]["hits"]
+    return {raw_json["_id"] for raw_json in raw_datasets_json}
+
+
+def list_fresh_and_stale_accessions(mongo_db, max_age=MAX_JSON_AGE, cname=COLLECTION_NAMES.DATASET_TIMESTAMPS):
+    """Find accessions in no need / need of update in database"""
+    refresh_dates = Series({
+        entry["accession"]: entry["last_refreshed"]
+        for entry in getattr(mongo_db, cname).find()
+    })
+    current_timestamp = int(datetime.now().timestamp())
+    indexer = ((current_timestamp - refresh_dates) <= max_age)
+    return set(refresh_dates[indexer].index), set(refresh_dates[~indexer].index)
 
 
 def drop_json_cache_by_accession(mongo_db, accession, cname=COLLECTION_NAMES.JSON_CACHE):
