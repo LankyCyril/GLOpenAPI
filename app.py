@@ -46,8 +46,8 @@ getLogger("genefab3").addHandler(DBLogger(mongo_db))
 # App routes:
 
 @app.route("/", methods=["GET"])
-def documentation():
-    from genefab3.docs import interactive_doc
+def root(**kwargs):
+    from genefab3.flask.renderers.docs import interactive_doc
     return interactive_doc(mongo_db, url_root=request.url_root.rstrip("/"))
 
 @app.route("/assays/", methods=["GET"])
