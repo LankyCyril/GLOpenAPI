@@ -133,7 +133,7 @@ class CacherThread(Thread):
 
     def _log_freshness(self, glds):
         """Wrapper for self.logger.info with parent name (CacherThread), accession, change status"""
-        if any(glds.changed.__dict__.values()):
+        if any(glds.changed):
             chg = "changed"
         else:
             chg = "up to date"

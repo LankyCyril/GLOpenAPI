@@ -1,4 +1,3 @@
-from collections import namedtuple
 from genefab3.common.exceptions import GeneLabDataManagerException
 
 
@@ -7,8 +6,16 @@ class DatasetBaseClass():
     pass
 
 
-DatasetJSONs = namedtuple("DatasetJSONs", ("glds", "fileurls", "filedates"))
-DatasetJSONs.__new__.__defaults__ = (None,) * 3
+class DatasetJSONs():
+    """Holds 'glds', 'fileurls', 'filedates', but nothing else"""
+    glds, fileurls, filedates = None, None, None
+    def __setattr__(self, a, v):
+        if hasattr(self, a):
+            self.__dict__[a] = v
+        else:
+            raise AttributeError(f"Cannot set DatasetJSONs.{a}")
+    def __iter__(self):
+        yield from (self.glds, self.fileurls, self.filedates)
 
 
 class FileDescriptor():

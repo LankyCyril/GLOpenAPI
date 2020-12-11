@@ -47,7 +47,7 @@ class CachedDataset(ColdStorageDataset):
             )
             if init_assays:
                 self.init_assays()
-                if any(self.changed.__dict__.values()):
+                if any(self.changed):
                     for assay in self.assays.values():
                         self._recache_assay(assay, units_format=units_format)
             else:
