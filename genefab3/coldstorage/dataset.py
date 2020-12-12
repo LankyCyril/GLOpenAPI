@@ -85,8 +85,7 @@ class ColdStorageDataset(DatasetBaseClass):
             matches = lambda filename: search(glob.replace("*", ".*"), filename)
         return [
             FileDescriptor(
-                name=filename, url=self.fileurls.get(filename, None),
-                timestamp=self.filedates.get(filename, None),
+                filename, self.fileurls[filename], self.filedates[filename],
             )
             for filename in set(self.filedates) & set(self.fileurls)
             if matches(filename)
@@ -101,9 +100,8 @@ class ColdStorageDataset(DatasetBaseClass):
             self.isa = IsaZip(isa_zip_descriptors[0].url)
         else:
             raise GeneLabFileException("Multiple ambiguous ISA ZIPs", self)
-        # placeholders:
+        # first declare placeholders, then rewrite them with actual assays:
         self.assays = {e["Info"]["Assay"]: None for e in self.isa.assays}
-        # actual assays:
         self.assays = AssayDispatcher(self)
 
 
