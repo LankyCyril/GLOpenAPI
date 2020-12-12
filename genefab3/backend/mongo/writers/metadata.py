@@ -1,8 +1,8 @@
 from genefab3.config import COLLECTION_NAMES, MONGO_DB_LOCALE
 from pymongo import ASCENDING
 from types import SimpleNamespace
-from genefab3.backend.mongo.writers.json import list_available_accessions
-from genefab3.backend.mongo.writers.json import list_fresh_and_stale_accessions
+from genefab3.backend.mongo.dataset import list_available_accessions
+from genefab3.backend.mongo.dataset import list_fresh_and_stale_accessions
 from genefab3.backend.mongo.dataset import CachedDataset
 from genefab3.config import UNITS_FORMAT
 from copy import deepcopy

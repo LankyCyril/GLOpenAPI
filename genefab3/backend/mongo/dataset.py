@@ -1,4 +1,4 @@
-from genefab3.config import COLLECTION_NAMES
+from genefab3.config import COLLECTION_NAMES, COLD_SEARCH_MASK, MAX_JSON_AGE
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.backend.mongo.writers.json import get_fresh_json, drop_json_cache_by_accession
 from genefab3.backend.mongo.utils import run_mongo_transaction
@@ -6,6 +6,7 @@ from genefab3.backend.mongo.utils import harmonize_document
 from datetime import datetime
 from functools import partial
 from genefab3.backend.mongo.assay import CachedAssay
+from pandas import Series
 
 
 WARN_NO_META = "%s, %s: no metadata entries"
@@ -131,6 +132,26 @@ class CachedDataset(ColdStorageDataset):
         drop_dataset_timestamps(*args)
         drop_metadata_by_accession(*args)
         drop_json_cache_by_accession(*args)
+
+
+def list_available_accessions(mongo_db):
+    """List datasets in cold storage"""
+    url_n = COLD_SEARCH_MASK.format(0)
+    n_datasets = get_fresh_json(mongo_db, url_n)["hits"]["total"]
+    url_all = COLD_SEARCH_MASK.format(n_datasets)
+    raw_datasets_json = get_fresh_json(mongo_db, url_all)["hits"]["hits"]
+    return {raw_json["_id"] for raw_json in raw_datasets_json}
+
+
+def list_fresh_and_stale_accessions(mongo_db, max_age=MAX_JSON_AGE, cname=COLLECTION_NAMES.DATASET_TIMESTAMPS):
+    """Find accessions in no need / need of update in database"""
+    refresh_dates = Series({
+        entry["accession"]: entry["last_refreshed"]
+        for entry in getattr(mongo_db, cname).find()
+    })
+    current_timestamp = int(datetime.now().timestamp())
+    indexer = ((current_timestamp - refresh_dates) < -100000000000000) #= max_age)
+    return set(refresh_dates[indexer].index), set(refresh_dates[~indexer].index)
 
 
 class CachedAssayDispatcher(dict):
