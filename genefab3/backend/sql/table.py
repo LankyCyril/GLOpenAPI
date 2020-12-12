@@ -30,7 +30,7 @@ class CachedTable():
     logger = None
  
     def __init__(self, dbs, file_descriptor, datatype, accession, assay_name, sample_names, read_raw_sql_table):
-        """Check cold storage JSON and cache, update cache if remote file was updated"""
+        """Check cold storage and cached timestamps for file, update cache if remote file was updated"""
         self.name = quote(f"{datatype}/{accession}/{assay_name}")
         self.logger = getLogger("genefab3")
         self.logger.setLevel(DEBUG)
