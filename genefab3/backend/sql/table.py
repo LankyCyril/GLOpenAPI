@@ -1,7 +1,8 @@
 from types import SimpleNamespace
-from genefab3.backend.mongo.readers.file_descriptors import get_cached_file_descriptor_timestamp
-from genefab3.backend.mongo.writers.file_descriptors import set_cached_file_descriptor_timestamp
-from genefab3.backend.mongo.writers.file_descriptors import drop_cached_file_descriptor_timestamp
+from genefab3.backend.mongo.readers.file_descriptors import (
+    get_cached_file_descriptor_timestamp, set_cached_file_descriptor_timestamp,
+    drop_cached_file_descriptor_timestamp,
+)
 from genefab3.backend.sql.writers.data import recache_table
 from logging import getLogger, DEBUG
 from urllib.request import quote

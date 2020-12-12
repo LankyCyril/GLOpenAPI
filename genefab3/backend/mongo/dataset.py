@@ -1,6 +1,7 @@
 from genefab3.config import COLLECTION_NAMES, COLD_SEARCH_MASK, MAX_JSON_AGE
 from genefab3.coldstorage.dataset import ColdStorageDataset
-from genefab3.backend.mongo.writers.json import get_fresh_json, drop_json_cache_by_accession
+from genefab3.backend.mongo.writers.json import get_fresh_json
+from genefab3.backend.mongo.writers.json import drop_json_cache_by_accession
 from genefab3.backend.mongo.utils import run_mongo_transaction
 from genefab3.backend.mongo.utils import harmonize_document
 from datetime import datetime

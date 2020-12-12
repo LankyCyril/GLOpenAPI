@@ -3,7 +3,8 @@ from re import search
 from urllib.parse import quote
 from genefab3.coldstorage.json import download_cold_json
 from genefab3.common.types import PlaceholderLogger, FileDescriptor
-from genefab3.common.exceptions import GeneLabJSONException, GeneLabFileException
+from genefab3.common.exceptions import GeneLabJSONException
+from genefab3.common.exceptions import GeneLabFileException
 from memoized_property import memoized_property
 from genefab3.config import GENELAB_ROOT, ISA_ZIP_REGEX
 from genefab3.coldstorage.json import extract_file_timestamp

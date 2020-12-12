@@ -1,4 +1,5 @@
-from genefab3.common.exceptions import GeneLabDatabaseException, GeneLabFileException
+from genefab3.common.exceptions import GeneLabDatabaseException
+from genefab3.common.exceptions import GeneLabFileException
 from re import split, search, IGNORECASE
 from bson.errors import InvalidDocument as InvalidDocumentError
 from pandas import isnull

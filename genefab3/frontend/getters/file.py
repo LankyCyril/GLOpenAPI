@@ -1,4 +1,5 @@
-from genefab3.common.exceptions import GeneLabFileException, GeneLabParserException
+from genefab3.common.exceptions import GeneLabFileException
+from genefab3.common.exceptions import GeneLabParserException
 from genefab3.backend.mongo.dataset import CachedDataset
 from urllib.request import urlopen
 
