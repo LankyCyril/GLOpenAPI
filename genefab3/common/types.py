@@ -31,16 +31,10 @@ class AssayBaseClass():
     pass
 
 
-class DatasetJSONs():
-    """Holds 'glds', 'fileurls', 'filedates', but nothing else"""
-    glds, fileurls, filedates = None, None, None
-    def __setattr__(self, a, v):
-        if hasattr(self, a):
-            self.__dict__[a] = v
-        else:
-            raise AttributeError(f"Cannot set DatasetJSONs.{a}")
+class IterableNamespace(SimpleNamespace):
+    """SimpleNamespace that iterates its values (can be used for tests with all(), any(), etc)"""
     def __iter__(self):
-        yield from (self.glds, self.fileurls, self.filedates)
+        yield from self.__dict__.values()
 
 
 class FileDescriptor():
