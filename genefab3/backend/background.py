@@ -30,7 +30,8 @@ class CacherThread(Thread):
                 mongo_db=self.mongo_db, logger=self.logger,
             )
             if success:
-                if accessions.to_update | accessions.to_drop:
+                if accessions.updated | accessions.removed | accessions.failed:
+                # TODO: drop only the cached responses involving these datasets
                     drop_response_lru_cache(
                         response_cache=self.response_cache,
                         logger=self.logger,
