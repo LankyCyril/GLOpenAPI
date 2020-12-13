@@ -39,8 +39,8 @@ class CacherThread(Thread):
                     logger=self.logger,
                 )
                 shrink_response_cache(
-                    self.response_cache, max_size=RESPONSE_CACHE_MAX_SIZE,
-                    logger=self.logger,
+                    response_cache=self.response_cache,
+                    max_size=RESPONSE_CACHE_MAX_SIZE, logger=self.logger,
                 )
                 delay = self.check_interval
             else:

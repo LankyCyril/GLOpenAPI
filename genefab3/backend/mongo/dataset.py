@@ -151,7 +151,7 @@ def list_fresh_and_stale_accessions(mongo_db, max_age=MAX_JSON_AGE, cname=COLLEC
         for entry in getattr(mongo_db, cname).find()
     })
     current_timestamp = int(datetime.now().timestamp())
-    indexer = ((current_timestamp - refresh_dates) < -100000000000000) #= max_age)
+    indexer = ((current_timestamp - refresh_dates) <= max_age)
     return set(refresh_dates[indexer].index), set(refresh_dates[~indexer].index)
 
 
