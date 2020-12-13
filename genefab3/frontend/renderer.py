@@ -57,7 +57,8 @@ def render(db, getter, kwargs, request):
         else:
             obj = getter(db, **kwargs, context=context)
             response = render_as_format(obj, context)
-            cache_response(context, response, response_cache=RESPONSE_CACHE)
+            if USE_RESPONSE_CACHE:
+                cache_response(context, response, response_cache=RESPONSE_CACHE)
             return response
 
 
