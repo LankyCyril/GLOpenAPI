@@ -92,7 +92,7 @@ def get_files(mongo_db, context):
     annotation_dataframe = get_annotation_by_metadata(
         mongo_db, context, include={"info.sample name"},
         search_with_projection=True, modify=keep_projection,
-    ),
+    )
     if annotation_dataframe is None:
         return Placeholders.metadata_dataframe(include={"info.sample name"})
     else:
