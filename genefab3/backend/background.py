@@ -6,6 +6,8 @@ from genefab3.backend.mongo.writers.metadata import ensure_info_index
 from genefab3.backend.mongo.writers.metadata import recache_metadata
 from genefab3.backend.mongo.writers.metadata import update_metadata_value_lookup
 from genefab3.backend.sql.writers.cache import drop_cached_responses
+from genefab3.backend.sql.writers.cache import shrink_response_cache
+from genefab3.config import RESPONSE_CACHE_MAX_SIZE
 from time import sleep
 
 
@@ -30,15 +32,18 @@ class CacherThread(Thread):
                 mongo_db=self.mongo_db, logger=self.logger,
             )
             if success:
+                update_metadata_value_lookup(self.mongo_db, self.logger)
                 drop_cached_responses(
                     accessions.updated | accessions.removed | accessions.failed,
                     response_cache=self.response_cache,
                     logger=self.logger,
                 )
+                shrink_response_cache(
+                    self.response_cache, max_size=RESPONSE_CACHE_MAX_SIZE,
+                    logger=self.logger,
+                )
                 delay = self.check_interval
             else:
                 delay = self.recheck_delay
-            update_metadata_value_lookup(self.mongo_db, self.logger)
-            # TODO: shrink response cache to predefined max size
             self.logger.info(f"CacherThread: Sleeping for {delay} seconds")
             sleep(delay)

@@ -1,5 +1,5 @@
-from genefab3.config import RESPONSE_CACHE, RESPONSE_CACHE_SCHEMAS
-from genefab3.config import ZLIB_COMPRESS_RESPONSE_CACHE
+from genefab3.config import RESPONSE_CACHE, ZLIB_COMPRESS_RESPONSE_CACHE
+from genefab3.config import RESPONSE_CACHE_SCHEMAS, RESPONSE_CACHE_MAX_SIZE
 from os import path, makedirs
 from urllib.request import quote
 from datetime import datetime
@@ -104,3 +104,8 @@ def drop_cached_responses(accessions, logger, response_cache=RESPONSE_CACHE, sch
                         len(identity_entries), accession,
                     )
                     sql_connection.commit()
+
+
+def shrink_response_cache(logger, response_cache=RESPONSE_CACHE, max_size=RESPONSE_CACHE_MAX_SIZE):
+    """Drop oldest cached responses to keep file size on disk under `max_size`"""
+    logger.warning("Shrinking Flask response cache not implemented yet")
