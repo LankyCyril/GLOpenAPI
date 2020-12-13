@@ -4,9 +4,9 @@ def build_url(context, target_view=None, drop=set()):
         url_components = [context.view + "?"]
     else:
         url_components = [target_view + "?"]
-    for arg in context.complete_args:
+    for arg, values in context.complete_args.items():
         if arg not in drop:
-            for value in context.complete_args.getlist(arg):
+            for value in values:
                 if value == "":
                     url_components.append(arg+"&")
                 else:

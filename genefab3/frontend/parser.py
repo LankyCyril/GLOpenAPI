@@ -145,7 +145,7 @@ def parse_request(request):
     base_url = request.base_url.strip("/")
     context = Namespace(
         view="/"+sub(url_root, "", base_url).strip("/")+"/",
-        complete_args=request.args,
+        complete_args=request.args.to_dict(flat=False),
         accessions_and_assays={},
         query={"$and": []}, projection={},
         kwargs=MultiDict(request.args),
