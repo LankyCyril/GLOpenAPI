@@ -5,6 +5,7 @@ from pandas import DataFrame
 
 
 def walk_up(from_path, n_steps):
+    """Get path of directory `n_steps` above `from_path`"""
     if n_steps >= 1:
         return walk_up(path.split(from_path)[0], n_steps-1)
     else:
