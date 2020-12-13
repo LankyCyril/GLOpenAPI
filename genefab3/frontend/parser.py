@@ -6,6 +6,8 @@ from collections import defaultdict, OrderedDict
 from werkzeug.datastructures import MultiDict
 from genefab3.config import DISALLOWED_CONTEXTS
 from genefab3.common.exceptions import GeneLabParserException
+from urllib.request import quote
+from json import dumps
 
 
 def assay_pair_to_query(key, value):
@@ -161,5 +163,8 @@ def parse_request(request):
     )
     INPLACE_update_context(context, request.args)
     INPLACE_fill_context_defaults(context)
+    context.identity = quote(
+        context.view + dumps(context.complete_args, sort_keys=True)
+    )
     validate_context(context)
     return context

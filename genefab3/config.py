@@ -19,11 +19,6 @@ MONGO_CLIENT_PARAMETERS = dict(
 )
 MONGO_DB_NAME = "genefab3"
 MONGO_DB_LOCALE = "en_US"
-SQLITE_DB = "./.sqlite3/data.db"
-
-RESPONSE_CACHE = "./.sqlite3/response-cache.db"
-USE_RESPONSE_CACHE = False
-ZLIB_COMPRESS_RESPONSE_CACHE = True
 
 MAX_JSON_AGE = 10800 # 3 hours (in seconds)
 CACHER_THREAD_CHECK_INTERVAL = 1800 # 30 minutes (in seconds)
@@ -41,6 +36,23 @@ COLLECTION_NAMES = SimpleNamespace(
     METADATA_VALUE_LOOKUP="metadata_value_lookup",
     FILE_DESCRIPTORS="file_descriptors",
 )
+
+SQLITE_DB = "./.sqlite3/data.db"
+
+RESPONSE_CACHE = "./.sqlite3/response-cache.db"
+USE_RESPONSE_CACHE = True
+ZLIB_COMPRESS_RESPONSE_CACHE = True
+
+from werkzeug.datastructures import ImmutableDict
+RESPONSE_CACHE_SCHEMAS = ImmutableDict({
+    "response_cache": """(
+        'context_identity' TEXT, 'api_path' TEXT, 'timestamp' INTEGER,
+        'response' BLOB, 'nbytes' INTEGER, 'mimetype' TEXT
+    )""",
+    "accessions_used": """(
+        'context_identity' TEXT, 'accession' TEXT
+    )""",
+})
 
 
 ## External APIs
