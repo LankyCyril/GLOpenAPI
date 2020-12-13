@@ -68,13 +68,39 @@ def cache_response(context, response, accessions, response_cache=RESPONSE_CACHE,
             sql_connection.commit()
 
 
-def drop_response_lru_cache(logger, response_cache=RESPONSE_CACHE, schemas=RESPONSE_CACHE_SCHEMAS):
+def drop_cached_responses(accessions, logger, response_cache=RESPONSE_CACHE, schemas=RESPONSE_CACHE_SCHEMAS):
     """Drop response_cache table"""
-    logger.info("Dropping flask response LRU cache")
-    ensure_response_lru_cache(response_cache, schemas)
-    with closing(connect(response_cache)) as sql_connection:
-        cursor = sql_connection.cursor()
-        for table, schema in schemas.items():
-            cursor.execute(f"DROP TABLE IF EXISTS '{table}'")
-            cursor.execute(f"CREATE TABLE '{table}' {schema}")
-        sql_connection.commit()
+    if accessions:
+        logger.info("Dropping cached Flask responses")
+        ensure_response_lru_cache(response_cache, schemas)
+        with closing(connect(response_cache)) as sql_connection:
+            for accession in accessions:
+                try:
+                    cursor = sql_connection.cursor()
+                    query = f"""
+                        SELECT context_identity FROM 'accessions_used'
+                        WHERE accession = '{accession}'
+                    """
+                    identity_entries = cursor.execute(query).fetchall()
+                    for entry in identity_entries:
+                        context_identity = entry[0]
+                        cursor.execute(f"""
+                            DELETE FROM 'accessions_used'
+                            WHERE context_identity = '{context_identity}'
+                        """)
+                        cursor.execute(f"""
+                            DELETE FROM 'response_cache'
+                            WHERE context_identity = '{context_identity}'
+                        """)
+                except OperationalError as e:
+                    sql_connection.rollback()
+                    logger.warning(
+                        "Could not drop cached Flask responses for %s: %s",
+                        accession, repr(e),
+                    )
+                else:
+                    logger.info(
+                        "Dropped %s cached Flask responses for %s",
+                        len(identity_entries), accession,
+                    )
+                    sql_connection.commit()

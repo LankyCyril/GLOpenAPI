@@ -5,7 +5,7 @@ from logging import getLogger, DEBUG
 from genefab3.backend.mongo.writers.metadata import ensure_info_index
 from genefab3.backend.mongo.writers.metadata import recache_metadata
 from genefab3.backend.mongo.writers.metadata import update_metadata_value_lookup
-from genefab3.backend.sql.writers.cache import drop_response_lru_cache
+from genefab3.backend.sql.writers.cache import drop_cached_responses
 from time import sleep
 
 
@@ -30,12 +30,11 @@ class CacherThread(Thread):
                 mongo_db=self.mongo_db, logger=self.logger,
             )
             if success:
-                if accessions.updated | accessions.removed | accessions.failed:
-                # TODO: drop only the cached responses involving these datasets
-                    drop_response_lru_cache(
-                        response_cache=self.response_cache,
-                        logger=self.logger,
-                    )
+                drop_cached_responses(
+                    accessions.updated | accessions.removed | accessions.failed,
+                    response_cache=self.response_cache,
+                    logger=self.logger,
+                )
                 delay = self.check_interval
             else:
                 delay = self.recheck_delay
