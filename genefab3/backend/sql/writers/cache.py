@@ -18,10 +18,10 @@ def ensure_response_lru_cache(response_cache=RESPONSE_CACHE, table="response_cac
             cursor.execute(f"CREATE TABLE IF NOT EXISTS '{table}' {schema}")
 
 
-def cache_response(request, response, response_cache=RESPONSE_CACHE, table="response_cache", schema=RESPONSE_CACHE_SCHEMA):
+def cache_response(context, response, response_cache=RESPONSE_CACHE, table="response_cache", schema=RESPONSE_CACHE_SCHEMA):
     """Store response object blob in response_cache table, if possible"""
     ensure_response_lru_cache(response_cache, table, schema)
-    api_path = quote(request.full_path)
+    api_path = quote(context.full_path)
     try:
         with closing(connect(response_cache)) as sql_connection:
             cursor = sql_connection.cursor()

@@ -5,9 +5,9 @@ from urllib.request import quote
 from flask import Response
 
 
-def retrieve_cached_response(request, response_cache=RESPONSE_CACHE, table="response_cache"):
+def retrieve_cached_response(context, response_cache=RESPONSE_CACHE, table="response_cache"):
     """Retrieve cached response object blob from response_cache table if possible; otherwise return None"""
-    api_path = quote(request.full_path)
+    api_path = quote(context.full_path)
     query = f"""SELECT * FROM '{table}' WHERE api_path = '{api_path}'"""
     try:
         with closing(connect(response_cache)) as sql_connection:
