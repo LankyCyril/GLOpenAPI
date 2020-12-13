@@ -4,6 +4,7 @@ from re import findall, search, IGNORECASE, escape, split
 from genefab3.frontend.renderer import Placeholders
 from numpy import nan
 from genefab3.backend.mongo.readers.metadata import get_annotation_by_metadata
+from genefab3.common.utils import INPLACE_set_attributes
 
 
 def keep_projection(dataframe, full_projection):
@@ -73,6 +74,7 @@ def get_assays(mongo_db, context):
     if dataframe is None:
         return Placeholders.metadata_dataframe()
     else:
+        INPLACE_set_attributes(dataframe, genefab_type="annotation")
         return dataframe
 
 
@@ -84,6 +86,7 @@ def get_samples(mongo_db, context):
     if dataframe is None:
         return Placeholders.metadata_dataframe(include={"info.sample name"})
     else:
+        INPLACE_set_attributes(dataframe, genefab_type="annotation")
         return dataframe
 
 
@@ -106,4 +109,6 @@ def get_files(mongo_db, context):
         if files_dataframe is None:
             return Placeholders.metadata_dataframe(include={"info.sample name"})
         else:
-            return merge(annotation_dataframe, files_dataframe)
+            dataframe = merge(annotation_dataframe, files_dataframe)
+            INPLACE_set_attributes(dataframe, genefab_type="annotation")
+            return dataframe

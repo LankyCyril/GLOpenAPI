@@ -6,6 +6,7 @@ from pandas import merge
 from genefab3.backend.mongo.readers.metadata import get_raw_metadata_dataframe
 from genefab3.frontend.renderer import Placeholders
 from genefab3.backend.sql.readers.data import get_sql_data
+from genefab3.common.utils import INPLACE_set_attributes
 
 
 NO_FILES_ERROR = "No data files found for datatype"
@@ -86,9 +87,11 @@ def get_data(dbs, context):
         raw_annotation = add_file_descriptors_to_raw_annotation(
             dbs.mongo_db, raw_annotation, context.kwargs["datatype"],
         )
-        return get_sql_data(
+        dataframe = get_sql_data(
             dbs=dbs,
             raw_annotation=raw_annotation,
             datatype=context.kwargs["datatype"],
             rows=None,
         )
+        INPLACE_set_attributes(dataframe, genefab_type="datatable")
+        return dataframe

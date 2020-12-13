@@ -1,18 +1,18 @@
-from genefab3.frontend.parser import parse_request
-from genefab3.frontend.utils import is_debug
-from json import dumps
-from genefab3.common.exceptions import GeneLabException, GeneLabParserException
-from genefab3.common.exceptions import GeneLabFormatException
-from genefab3.frontend.renderers.forms import needs_datatype, render_dropdown
-from genefab3.backend.sql.readers.cache import retrieve_cached_response
-from genefab3.backend.sql.writers.cache import cache_response
-from pandas import DataFrame, MultiIndex
+from genefab3.common.exceptions import GeneLabException, GeneLabFormatException
 from genefab3.frontend.renderers.raw import render_raw
 from genefab3.frontend.renderers.cls import render_cls
 from genefab3.frontend.renderers.gct import render_gct
+from pandas import DataFrame, MultiIndex
 from genefab3.frontend.renderers.dataframe import render_dataframe
-from itertools import cycle
+from genefab3.frontend.parser import parse_request
+from genefab3.common.exceptions import GeneLabParserException
+from genefab3.frontend.renderers.forms import needs_datatype, render_dropdown
+from genefab3.frontend.utils import is_debug
+from json import dumps
 from genefab3.config import USE_RESPONSE_CACHE, RESPONSE_CACHE, ROW_TYPES
+from genefab3.backend.sql.readers.cache import retrieve_cached_response
+from genefab3.backend.sql.writers.cache import cache_response
+from itertools import cycle
 
 
 def render_as_format(obj, context):

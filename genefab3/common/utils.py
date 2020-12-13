@@ -1,6 +1,7 @@
 from os import path
 from re import sub, escape
 from copy import deepcopy
+from pandas import DataFrame
 
 
 def walk_up(from_path, n_steps):
@@ -25,3 +26,26 @@ def copy_and_drop(d, keys):
     for key in keys:
         del d_copy[key]
     return d_copy
+
+
+def INPLACE_set_attributes(dataframe, **kwargs):
+    """Add custom attributes to dataframe"""
+    if not isinstance(dataframe, DataFrame):
+        raise TypeError("Not a DataFrame")
+    else:
+        for a, v in kwargs.items():
+            try:
+                dataframe._metadata.append(a)
+                setattr(dataframe, a, v)
+            except AttributeError:
+                raise AttributeError(f"Cannot set attribute {a} of DataFrame")
+
+
+def get_attribute(dataframe, a):
+    """Retrieve custom attribute of dataframe"""
+    if not isinstance(dataframe, DataFrame):
+        raise TypeError("Not a DataFrame")
+    elif a not in dataframe._metadata:
+        raise AttributeError(f"DataFrame does not have attribute {a}")
+    else:
+        return getattr(dataframe, a)
