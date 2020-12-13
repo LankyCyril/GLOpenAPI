@@ -2,7 +2,6 @@ from genefab3.config import RESPONSE_CACHE, RESPONSE_CACHE_SCHEMAS
 from genefab3.config import ZLIB_COMPRESS_RESPONSE_CACHE
 from os import path, makedirs
 from urllib.request import quote
-from json import dumps
 from datetime import datetime
 from sqlite3 import Binary, connect, OperationalError
 from contextlib import closing
