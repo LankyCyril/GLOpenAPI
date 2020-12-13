@@ -7,8 +7,10 @@ from flask import Response
 
 if ZLIB_COMPRESS_RESPONSE_CACHE:
     from zlib import decompress
+    from zlib import error as ZlibError
 else:
     decompress = lambda _:_
+    ZlibError = NotImplementedError
 
 
 def retrieve_cached_response(context, response_cache=RESPONSE_CACHE, table="response_cache"):
@@ -26,6 +28,9 @@ def retrieve_cached_response(context, response_cache=RESPONSE_CACHE, table="resp
     except OperationalError:
         row = None
     if isinstance(row, tuple) and (len(row) == 2):
-        return Response(response=decompress(row[0]), mimetype=row[1])
+        try:
+            return Response(response=decompress(row[0]), mimetype=row[1])
+        except ZlibError: # maybe the cached version wasn't compressed, but...
+            return None # cannot guarantee validity; this stages for replacement
     else:
         return None
