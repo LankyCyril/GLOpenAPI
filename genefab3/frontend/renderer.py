@@ -4,6 +4,7 @@ from genefab3.frontend.renderers.cls import render_cls
 from genefab3.frontend.renderers.gct import render_gct
 from pandas import DataFrame, MultiIndex
 from genefab3.frontend.renderers.dataframe import render_dataframe
+from genefab3.common.utils import get_attribute
 from genefab3.frontend.parser import parse_request
 from genefab3.common.exceptions import GeneLabParserException
 from genefab3.frontend.renderers.forms import needs_datatype, render_dropdown
@@ -34,6 +35,25 @@ def render_as_format(obj, context):
         )
 
 
+def get_accessions_used(obj, context):
+    """Infer which accessions were involved in generating `obj`"""
+    if isinstance(obj, DataFrame):
+        genefab_type = get_attribute(obj, "genefab_type")
+        if genefab_type == "annotation":
+            accessions_in_object = set(
+                obj[("info", "accession")].drop_duplicates(),
+            )
+        elif genefab_type == "datatable":
+            accessions_in_object = set(
+                obj.columns.get_level_values(0).drop_duplicates(),
+            ) - {"info"}
+        else:
+            accessions_in_object = set()
+    else:
+        accessions_in_object = set()
+    return accessions_in_object | set(context.accessions_and_assays)
+
+
 def render(db, getter, kwargs, request):
     """Generate object with `getter` and `**kwargs`, dispatch object and trailing request arguments to renderer"""
     try:
@@ -57,8 +77,12 @@ def render(db, getter, kwargs, request):
         else:
             obj = getter(db, **kwargs, context=context)
             response = render_as_format(obj, context)
-            if USE_RESPONSE_CACHE:
-                cache_response(context, response, response_cache=RESPONSE_CACHE)
+            accessions_used = get_accessions_used(obj, context)
+            if USE_RESPONSE_CACHE and accessions_used:
+                cache_response(
+                    context, response, accessions=accessions_used,
+                    response_cache=RESPONSE_CACHE,
+                )
             return response
 
 

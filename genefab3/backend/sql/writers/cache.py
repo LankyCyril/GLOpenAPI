@@ -27,8 +27,8 @@ def ensure_response_lru_cache(response_cache=RESPONSE_CACHE, table="response_cac
         sql_connection.commit()
 
 
-def cache_response(context, response, response_cache=RESPONSE_CACHE, table="response_cache", schema=RESPONSE_CACHE_SCHEMA):
-    """Store response object blob in response_cache table, if possible"""
+def cache_response(context, response, accessions, response_cache=RESPONSE_CACHE, table="response_cache", schema=RESPONSE_CACHE_SCHEMA):
+    """Store response object blob in response_cache table, if possible""" # TODO: accessions_used
     ensure_response_lru_cache(response_cache, table, schema)
     api_path = quote(context.full_path)
     api_args = quote(dumps(context.complete_args, sort_keys=True))

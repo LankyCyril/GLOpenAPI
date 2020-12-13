@@ -46,6 +46,6 @@ def get_attribute(dataframe, a):
     if not isinstance(dataframe, DataFrame):
         raise TypeError("Not a DataFrame")
     elif a not in dataframe._metadata:
-        raise AttributeError(f"DataFrame does not have attribute {a}")
+        return None
     else:
         return getattr(dataframe, a)
