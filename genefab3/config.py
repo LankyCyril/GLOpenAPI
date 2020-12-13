@@ -25,8 +25,6 @@ RESPONSE_CACHE = "./.sqlite3/response-cache.db"
 USE_RESPONSE_CACHE = False
 ZLIB_COMPRESS_RESPONSE_CACHE = True
 
-TIMESTAMP_FMT = "%a %b %d %H:%M:%S %Z %Y"
-
 MAX_JSON_AGE = 10800 # 3 hours (in seconds)
 CACHER_THREAD_CHECK_INTERVAL = 1800 # 30 minutes (in seconds)
 CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
@@ -53,6 +51,8 @@ COLD_SEARCH_MASK = COLD_API_ROOT + "/data/search/?term=GLDS&type=cgene&size={}"
 COLD_GLDS_MASK = COLD_API_ROOT + "/data/study/data/{}/"
 COLD_FILEURLS_MASK = COLD_API_ROOT + "/data/glds/files/{}"
 COLD_FILEDATES_MASK = COLD_API_ROOT + "/data/study/filelistings/{}"
+
+TIMESTAMP_FMT = "%a %b %d %H:%M:%S %Z %Y"
 
 
 ## GeneFab API parser parameters
