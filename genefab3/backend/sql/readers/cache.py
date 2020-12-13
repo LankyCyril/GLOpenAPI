@@ -1,10 +1,14 @@
-from genefab3.config import RESPONSE_CACHE
+from genefab3.config import ZLIB_COMPRESS_RESPONSE_CACHE, RESPONSE_CACHE
 from urllib.request import quote
 from json import dumps
 from contextlib import closing
 from sqlite3 import connect, OperationalError
 from flask import Response
-from zlib import decompress
+
+if ZLIB_COMPRESS_RESPONSE_CACHE:
+    from zlib import decompress
+else:
+    decompress = lambda _:_
 
 
 def retrieve_cached_response(context, response_cache=RESPONSE_CACHE, table="response_cache"):

@@ -20,8 +20,10 @@ MONGO_CLIENT_PARAMETERS = dict(
 MONGO_DB_NAME = "genefab3"
 MONGO_DB_LOCALE = "en_US"
 SQLITE_DB = "./.sqlite3/data.db"
-USE_RESPONSE_CACHE = False
+
 RESPONSE_CACHE = "./.sqlite3/response-cache.db"
+USE_RESPONSE_CACHE = False
+ZLIB_COMPRESS_RESPONSE_CACHE = True
 
 TIMESTAMP_FMT = "%a %b %d %H:%M:%S %Z %Y"
 

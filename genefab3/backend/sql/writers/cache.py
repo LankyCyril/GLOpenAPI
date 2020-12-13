@@ -1,11 +1,15 @@
+from genefab3.config import ZLIB_COMPRESS_RESPONSE_CACHE, RESPONSE_CACHE
 from os import path, makedirs
-from genefab3.config import RESPONSE_CACHE
 from urllib.request import quote
 from json import dumps
 from datetime import datetime
 from sqlite3 import Binary, connect, OperationalError
-from zlib import compress
 from contextlib import closing
+
+if ZLIB_COMPRESS_RESPONSE_CACHE:
+    from zlib import compress
+else:
+    compress = lambda _:_
 
 
 RESPONSE_CACHE_SCHEMA = """(
