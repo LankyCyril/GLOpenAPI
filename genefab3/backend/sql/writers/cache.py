@@ -4,6 +4,7 @@ from urllib.request import quote
 from json import dumps
 from datetime import datetime
 from sqlite3 import Binary, connect, OperationalError
+from zlib import compress
 from contextlib import closing
 
 
@@ -31,7 +32,7 @@ def cache_response(context, response, response_cache=RESPONSE_CACHE, table="resp
     ensure_response_lru_cache(response_cache, table, schema)
     api_path = quote(context.full_path)
     api_args = quote(dumps(context.complete_args, sort_keys=True))
-    blob = Binary(response.get_data())
+    blob = Binary(compress(response.get_data()))
     timestamp = int(datetime.now().timestamp())
     try:
         with closing(connect(response_cache)) as sql_connection:

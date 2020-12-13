@@ -4,6 +4,7 @@ from json import dumps
 from contextlib import closing
 from sqlite3 import connect, OperationalError
 from flask import Response
+from zlib import decompress
 
 
 def retrieve_cached_response(context, response_cache=RESPONSE_CACHE, table="response_cache"):
@@ -21,6 +22,6 @@ def retrieve_cached_response(context, response_cache=RESPONSE_CACHE, table="resp
     except OperationalError:
         row = None
     if isinstance(row, tuple) and (len(row) == 2):
-        return Response(response=row[0], mimetype=row[1])
+        return Response(response=decompress(row[0]), mimetype=row[1])
     else:
         return None
