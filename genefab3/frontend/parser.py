@@ -137,6 +137,14 @@ def validate_context(context):
                 )
         if scenario_matches:
             raise GeneLabParserException(scenario["_"])
+    trailing_keys = set(context.kwargs) - {
+        "datatype", "filename", "format", "debug",
+    }
+    if trailing_keys:
+        raise GeneLabParserException(
+            "Unrecognized arguments",
+            **{k: context.kwargs[k] for k in trailing_keys}
+        )
 
 
 def parse_request(request):
