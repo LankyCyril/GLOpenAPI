@@ -68,6 +68,9 @@ DISALLOWED_CONTEXTS = [
         projection=(length_hint, 0, eq, 0), # no projection
         accessions_and_assays=(length_hint, 0, eq, 0), # no datasets
     ),
+    dict(_="metadata queries are not valid for /status/",
+        view=(eq, "/status/", eq, True), query=(leaf_count, 0, gt, 0),
+    ),
     dict(_="'format=cls' is only valid for /samples/",
         view=(eq, "/samples/", eq, False), kwargs=(getitem, "format", eq, "cls"),
     ),
