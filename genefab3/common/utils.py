@@ -1,7 +1,7 @@
 from os import path
 from re import sub, escape
 from copy import deepcopy
-from pandas import DataFrame
+from pandas import DataFrame, Series
 
 
 def walk_up(from_path, n_steps):
@@ -46,7 +46,9 @@ def get_attribute(dataframe, a):
     """Retrieve custom attribute of dataframe"""
     if not isinstance(dataframe, DataFrame):
         raise TypeError("Not a DataFrame")
-    elif a not in dataframe._metadata:
-        return None
     else:
-        return getattr(dataframe, a)
+        value = getattr(dataframe, a, None)
+        if isinstance(value, (Series, DataFrame)):
+            return None
+        else:
+            return value
