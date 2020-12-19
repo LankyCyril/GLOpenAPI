@@ -3,7 +3,7 @@ from genefab3.common.exceptions import GeneLabDatabaseException
 from genefab3.common.exceptions import GeneLabJSONException
 from genefab3.common.exceptions import GeneLabDataManagerException
 from collections.abc import Hashable
-from genefab3.common.types import PlaceholderLogger
+from genefab3.common.types_legacy import PlaceholderLogger
 from datetime import datetime
 from itertools import zip_longest
 from numpy import nan

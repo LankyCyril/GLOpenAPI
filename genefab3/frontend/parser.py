@@ -1,7 +1,7 @@
 from re import search, sub, escape
 from argparse import Namespace
 from genefab3.config import ANNOTATION_CATEGORIES, DEFAULT_FORMATS
-from genefab3.common.types import UniversalSet
+from genefab3.common.types_legacy import UniversalSet
 from collections import defaultdict, OrderedDict
 from werkzeug.datastructures import MultiDict
 from genefab3.config import DISALLOWED_CONTEXTS
