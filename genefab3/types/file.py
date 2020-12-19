@@ -3,13 +3,14 @@ from genefab3.common.exceptions import GeneLabDatabaseException
 from genefab3.common.exceptions import GeneLabJSONException
 from genefab3.common.exceptions import GeneLabDataManagerException
 from collections.abc import Hashable
+from genefab3.common.types import PlaceholderLogger
 from datetime import datetime
 from itertools import zip_longest
 from numpy import nan
 from werkzeug.datastructures import ImmutableDict
 from urllib.request import urlopen
 from contextlib import closing
-from sqlite3 import connect, Binary
+from sqlite3 import connect, Binary, OperationalError
 
 
 noop = lambda _:_
@@ -84,16 +85,26 @@ class HashableEnough():
 class SQLiteObject():
     """..."""
  
-    def __init__(self, sqlite_db, identifier, table_schemas, trigger, update, retrieve):
+    def __init__(self, sqlite_db, identifier_dict, table_schemas, trigger, update, retrieve, logger=None):
         # TODO: auto_vacuum
         self.__sqlite_db, self.__table_schemas = sqlite_db, table_schemas
-        self.__identifier_field, self.__identifier_value = identifier
+        if len(identifier_dict) != 1:
+            raise GeneLabDatabaseException(
+                "SQLiteObject(): Only one 'identifier' field can be specified",
+                identifier=identifier_dict,
+            )
+        else:
+            self.__identifier_field, self.__identifier_value = next(
+                iter(identifier_dict.items()),
+            )
+            self.__identifier_dict = ImmutableTree(identifier_dict)
         if sqlite_db is not None:
             for table, schema in table_schemas.items():
                 self.__ensure_table(table, schema)
         self.__trigger_spec = ImmutableTree(trigger)
         self.__retrieve_spec = ImmutableTree(retrieve)
         self.__update_spec = ImmutableTree(update)
+        self.__logger = logger or PlaceholderLogger()
  
     def __ensure_table(self, table, schema):
         with closing(connect(self.__sqlite_db)) as connection:
@@ -107,12 +118,6 @@ class SQLiteObject():
     def __update(self, trigger_field, trigger_value):
         for table, spec in self.__update_spec.items():
             fields, values = sorted(spec), []
-            for field in fields:
-                value = spec[field]()
-                if self.__table_schemas[table][field] == "BLOB":
-                    values.append(Binary(bytes(value)))
-                else:
-                    values.append(value)
             delete_action = f"""
                 DELETE FROM '{table}'
                 WHERE {trigger_field} = '{trigger_value}'
@@ -122,16 +127,42 @@ class SQLiteObject():
                 INSERT INTO '{table}' ({", ".join(fields)})
                 VALUES ({", ".join("?" for _ in fields)})
             """
+            for field in fields:
+                value = spec[field]()
+                if self.__table_schemas[table][field] == "BLOB":
+                    values.append(Binary(bytes(value)))
+                else:
+                    values.append(value)
             with closing(connect(self.__sqlite_db)) as connection:
-                connection.cursor().execute(delete_action)
-                connection.cursor().execute(insert_action, values)
-                # TODO except operational error -- rollback all, warn stale
-                connection.commit()
+                try:
+                    connection.cursor().execute(delete_action)
+                    connection.cursor().execute(insert_action, values)
+                except OperationalError:
+                    self.__logger.warning(
+                        "Could not update SQLiteObject (%s == %s)",
+                        self.__identifier_field, self.__identifier_value,
+                    )
+                    connection.rollback()
+                else:
+                    connection.commit()
+ 
+    def __drop_self_from(self, connection, table):
+        try:
+            connection.cursor.execute(f"""
+                DELETE FROM '{table}' WHERE
+                {self.__identifier_field} = '{self.__identifier_value}'
+            """)
+        except OperationalError:
+            self.__logger.warning(
+                "Could not drop multiple entries for same %s == %s",
+                self.__identifier_field, self.__identifier_value,
+            )
  
     def __retrieve(self):
         if sum(1 for _ in iterate_terminal_leaves(self.__retrieve_spec)) != 1:
             raise GeneLabDatabaseException(
-                "Only a single 'retrieve' field can be specified",
+                "SQLiteObject(): Only one 'retrieve' field can be specified",
+                identifier=self.__identifier_dict,
             )
         else:
             table = next(iter(self.__retrieve_spec))
@@ -145,22 +176,23 @@ class SQLiteObject():
             ret = connection.cursor().execute(query).fetchall()
             if len(ret) == 0:
                 raise GeneLabDatabaseException(
-                    "No data found", table=table,
-                    **{self.__identifier_field: self.__identifier_value},
+                    "No data found", identifier=self.__identifier_dict,
                 )
             elif (len(ret) == 1) and (len(ret[0]) == 1):
                 return postprocess_function(ret[0][0])
             else:
-                raise GeneLabDatabaseException( # TODO: drop and raise
-                    "Multiple entries in database", table=table,
-                    **{self.__identifier_field: self.__identifier_value},
+                self.__drop_self_from(connection, table)
+                raise GeneLabDatabaseException(
+                    "Entries conflict (will attempt to fix on next request)",
+                    identifier=self.__identifier_dict,
                 )
  
     @property
     def data(self):
         if sum(1 for _ in iterate_terminal_leaves(self.__trigger_spec)) != 1:
             raise GeneLabDatabaseException(
-                "Only a single 'trigger' field can be specified",
+                "SQLiteObject(): Only one 'trigger' field can be specified",
+                identifier=self.__identifier_dict,
             )
         else:
             table = next(iter(self.__trigger_spec))
@@ -173,15 +205,16 @@ class SQLiteObject():
             """
             ret = connection.cursor().execute(query).fetchall()
             if len(ret) == 0:
-                trigger_value = nan
+                trigger_value = None
             elif (len(ret) == 1) and (len(ret[0]) == 1):
                 trigger_value = ret[0][0]
             else:
-                raise GeneLabDatabaseException( # TODO: drop and set to nan
-                    "Multiple entries in database", table=table,
-                    field=self.__identifier_field,
-                    value=self.__identifier_value,
+                self.__logger.warning(
+                    "Conflicting trigger values for SQLiteObject (%s == %s)",
+                    self.__identifier_field, self.__identifier_value,
                 )
+                self.__drop_self_from(connection, table)
+                trigger_value = None
         if trigger_function(trigger_value):
             self.__update(trigger_field, trigger_value)
         return self.__retrieve()
@@ -192,7 +225,7 @@ class SQLiteBlob(SQLiteObject):
  
     def __init__(self, sqlite_db, table, identifier, timestamp, url, compressor, decompressor):
         SQLiteObject.__init__(
-            self, sqlite_db, identifier=("identifier", identifier),
+            self, sqlite_db, {"identifier": identifier},
             table_schemas={
                 table: {
                     "identifier": "TEXT",
@@ -202,7 +235,8 @@ class SQLiteBlob(SQLiteObject):
             },
             trigger={
                 table: {
-                    "timestamp": lambda value: not (timestamp <= value)
+                    "timestamp": lambda value:
+                        (value is None) or (timestamp > value)
                 },
             },
             update={
