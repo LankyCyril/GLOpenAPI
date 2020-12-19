@@ -82,6 +82,15 @@ class HashableEnough():
         return hash(tuple(self.__iter_identity_values__()))
 
 
+def is_singular_spec(spec):
+    if not isinstance(spec, dict):
+        return False
+    elif sum(1 for _ in iterate_terminal_leaves(spec)) != 1:
+        return False
+    else:
+        return True
+
+
 class SQLiteObject():
     """..."""
  
@@ -116,35 +125,36 @@ class SQLiteObject():
             connection.commit()
  
     def __update(self, trigger_field, trigger_value):
-        for table, spec in self.__update_spec.items():
-            fields, values = sorted(spec), []
-            delete_action = f"""
-                DELETE FROM '{table}'
-                WHERE {trigger_field} = '{trigger_value}'
-                AND {self.__identifier_field} = '{self.__identifier_value}'
-            """
-            insert_action = f"""
-                INSERT INTO '{table}' ({", ".join(fields)})
-                VALUES ({", ".join("?" for _ in fields)})
-            """
-            for field in fields:
-                value = spec[field]()
-                if self.__table_schemas[table][field] == "BLOB":
-                    values.append(Binary(bytes(value)))
-                else:
-                    values.append(value)
-            with closing(connect(self.__sqlite_db)) as connection:
-                try:
-                    connection.cursor().execute(delete_action)
-                    connection.cursor().execute(insert_action, values)
-                except OperationalError:
-                    self.__logger.warning(
-                        "Could not update SQLiteObject (%s == %s)",
-                        self.__identifier_field, self.__identifier_value,
-                    )
-                    connection.rollback()
-                else:
-                    connection.commit()
+        for table, specs in self.__update_spec.items():
+            for spec in specs:
+                fields, values = sorted(spec), []
+                delete_action = f"""
+                    DELETE FROM '{table}'
+                    WHERE {trigger_field} = '{trigger_value}'
+                    AND {self.__identifier_field} = '{self.__identifier_value}'
+                """
+                insert_action = f"""
+                    INSERT INTO '{table}' ({", ".join(fields)})
+                    VALUES ({", ".join("?" for _ in fields)})
+                """
+                for field in fields:
+                    value = spec[field]()
+                    if self.__table_schemas[table][field] == "BLOB":
+                        values.append(Binary(bytes(value)))
+                    else:
+                        values.append(value)
+                with closing(connect(self.__sqlite_db)) as connection:
+                    try:
+                        connection.cursor().execute(delete_action)
+                        connection.cursor().execute(insert_action, values)
+                    except OperationalError:
+                        self.__logger.warning(
+                            "Could not update SQLiteObject (%s == %s)",
+                            self.__identifier_field, self.__identifier_value,
+                        )
+                        connection.rollback()
+                    else:
+                        connection.commit()
  
     def __drop_self_from(self, connection, table):
         try:
@@ -159,7 +169,7 @@ class SQLiteObject():
             )
  
     def __retrieve(self):
-        if sum(1 for _ in iterate_terminal_leaves(self.__retrieve_spec)) != 1:
+        if not is_singular_spec(self.__retrieve_spec):
             raise GeneLabDatabaseException(
                 "SQLiteObject(): Only one 'retrieve' field can be specified",
                 identifier=self.__identifier_dict,
@@ -189,7 +199,7 @@ class SQLiteObject():
  
     @property
     def data(self):
-        if sum(1 for _ in iterate_terminal_leaves(self.__trigger_spec)) != 1:
+        if not is_singular_spec(self.__trigger_spec):
             raise GeneLabDatabaseException(
                 "SQLiteObject(): Only one 'trigger' field can be specified",
                 identifier=self.__identifier_dict,
@@ -240,11 +250,11 @@ class SQLiteBlob(SQLiteObject):
                 },
             },
             update={
-                table: {
+                table: [{
                     "identifier": lambda: identifier,
                     "timestamp": lambda: timestamp,
                     "blob": lambda: self.__download(url, compressor),
-                },
+                }],
             },
             retrieve={
                 table: {
