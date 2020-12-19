@@ -15,32 +15,34 @@ from sqlite3 import connect, Binary
 noop = lambda _:_
 
 
-def iterate_terminal_leaves(d, depth_tracker=1, max_depth=32):
-    """Descend into a non-bifurcating branch and find the terminal leaf"""
-    if depth_tracker >= max_depth:
+def iterate_terminal_leaves(d, step_tracker=1, max_steps=256):
+    """Descend into branches breadth-first and iterate terminal leaves"""
+    if step_tracker >= max_steps:
         raise ValueError(
-            "Dictionary exceeded depth threshold", f"max_depth={max_depth}",
+            "Dictionary exceeded nestedness threshold", max_steps,
         )
     else:
         if isinstance(d, dict):
-            for branch in d.values():
-                yield from iterate_terminal_leaves(branch, depth_tracker+1)
+            for i, branch in enumerate(d.values(), start=1):
+                yield from iterate_terminal_leaves(branch, step_tracker+i)
         else:
             yield d
 
 
-def NestedImmutableDict(d, depth_tracker=1, max_depth=12):
-    if depth_tracker >= max_depth:
-        raise GeneLabDatabaseException(
-            "SQL table spec exceeded depth threshold", max_depth=max_depth,
-        )
+def ImmutableTree(d, step_tracker=1, max_steps=256):
+    """..."""
+    if step_tracker >= max_steps:
+        raise ValueError("Tree exceeded nestedness threshold", max_steps)
     elif isinstance(d, dict):
         return ImmutableDict({
-            k: NestedImmutableDict(v, depth_tracker+1)
-            for k, v in d.items()
+            k: ImmutableTree(v, step_tracker+i)
+            for i, (k, v) in enumerate(d.items(), start=1)
         })
-    elif isinstance(d, list):
-        return tuple(d)
+    elif isinstance(d, (list, tuple)):
+        return tuple(
+            ImmutableTree(v, step_tracker+i)
+            for i, v in enumerate(d, start=1)
+        )
     else:
         return d
 
@@ -89,9 +91,9 @@ class SQLiteObject():
         if sqlite_db is not None:
             for table, schema in table_schemas.items():
                 self.__ensure_table(table, schema)
-        self.__trigger_spec = NestedImmutableDict(trigger)
-        self.__retrieve_spec = NestedImmutableDict(retrieve)
-        self.__update_spec = NestedImmutableDict(update)
+        self.__trigger_spec = ImmutableTree(trigger)
+        self.__retrieve_spec = ImmutableTree(retrieve)
+        self.__update_spec = ImmutableTree(update)
  
     def __ensure_table(self, table, schema):
         with closing(connect(self.__sqlite_db)) as connection:
