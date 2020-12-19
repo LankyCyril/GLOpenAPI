@@ -8,7 +8,7 @@ from logging import Handler
 
 class GeneLabException(Exception):
     def __init__(self, message="Error", accession_or_object=None, explicit_assay_name=None, **kwargs):
-        from genefab3.common.types_legacy import DatasetBaseClass, AssayBaseClass
+        from genefab3.common.types import DatasetBaseClass, AssayBaseClass
         args = [message]
         if isinstance(accession_or_object, DatasetBaseClass):
             accession, assay_name = accession_or_object.accession, None

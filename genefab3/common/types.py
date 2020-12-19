@@ -1,7 +1,43 @@
+from types import SimpleNamespace
 from werkzeug.datastructures import ImmutableDict
 from numpy import nan
 from collections.abc import Hashable
 from itertools import zip_longest
+
+
+def PlaceholderLogger():
+    """Placeholder that masquerades as a logger but does not do anything"""
+    return SimpleNamespace(
+        info=lambda *args, **kwargs: None,
+        warning=lambda *args, **kwargs: None,
+    )
+
+
+class UniversalSet(set):
+    """Naive universal set"""
+    def __and__(self, x): return x
+    def __iand__(self, x): return x
+    def __rand__(self, x): return x
+    def __or__(self, x): return self
+    def __ior__(self, x): return self
+    def __ror__(self, x): return self
+    def __contains__(self, x): return True
+
+
+class DatasetBaseClass():
+    """Placeholder for identifying classes representing datasets"""
+    pass
+
+
+class AssayBaseClass():
+    """Placeholder for identifying classes representing assays"""
+    pass
+
+
+class IterableNamespace(SimpleNamespace):
+    """SimpleNamespace that iterates its values (can be used for tests with all(), any(), etc)"""
+    def __iter__(self):
+        yield from self.__dict__.values()
 
 
 def ImmutableTree(d, step_tracker=1, max_steps=256):
@@ -24,12 +60,12 @@ def ImmutableTree(d, step_tracker=1, max_steps=256):
 
 class HashableEnough():
     """Provides facilities to describe equality within a class based on a subset of fields"""
-
+ 
     def __init__(self, identity_fields, as_strings=()):
         """Describe equality within a class based on a subset of fields"""
         self.__identity_fields = tuple(identity_fields)
         self.__as_strings = set(as_strings)
-
+ 
     def __iter_identity_values__(self):
         """Iterate values of identity fields in a hash-friendly manner"""
         for field in self.__identity_fields:
@@ -43,7 +79,7 @@ class HashableEnough():
                 )
             else:
                 yield value
-
+ 
     def __eq__(self, other):
         """Compare values of identity fields between self and other"""
         return all(s == o for s, o in zip_longest(
@@ -51,7 +87,7 @@ class HashableEnough():
             getattr(other, "__iter_identity_values__", lambda: ())(),
             fillvalue=nan,
         ))
-
+ 
     def __hash__(self):
         """Hash values of identity fields as a tuple"""
         return hash(tuple(self.__iter_identity_values__()))

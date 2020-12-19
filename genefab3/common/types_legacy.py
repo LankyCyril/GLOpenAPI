@@ -1,40 +1,4 @@
 from genefab3.common.exceptions import GeneLabDataManagerException
-from types import SimpleNamespace
-
-
-def PlaceholderLogger():
-    """Placeholder that masquerades as a logger but does not do anything"""
-    return SimpleNamespace(
-        info=lambda *args, **kwargs: None,
-        warning=lambda *args, **kwargs: None,
-    )
-
-
-class UniversalSet(set):
-    """Naive universal set"""
-    def __and__(self, x): return x
-    def __iand__(self, x): return x
-    def __rand__(self, x): return x
-    def __or__(self, x): return self
-    def __ior__(self, x): return self
-    def __ror__(self, x): return self
-    def __contains__(self, x): return True
-
-
-class DatasetBaseClass():
-    """Placeholder for identifying classes representing datasets"""
-    pass
-
-
-class AssayBaseClass():
-    """Placeholder for identifying classes representing assays"""
-    pass
-
-
-class IterableNamespace(SimpleNamespace):
-    """SimpleNamespace that iterates its values (can be used for tests with all(), any(), etc)"""
-    def __iter__(self):
-        yield from self.__dict__.values()
 
 
 class FileDescriptor():

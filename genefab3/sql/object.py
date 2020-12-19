@@ -1,7 +1,6 @@
 from genefab3.common.utils import iterate_terminal_leaves
 from genefab3.common.exceptions import GeneLabDatabaseException
-from genefab3.common.types import ImmutableTree
-from genefab3.common.types_legacy import PlaceholderLogger
+from genefab3.common.types import ImmutableTree, PlaceholderLogger
 from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
 

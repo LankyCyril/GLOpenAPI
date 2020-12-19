@@ -1,8 +1,9 @@
-from genefab3.common.types_legacy import DatasetBaseClass, IterableNamespace
+from genefab3.common.types import DatasetBaseClass, IterableNamespace
 from re import search
 from urllib.parse import quote
 from genefab3.coldstorage.json import download_cold_json
-from genefab3.common.types_legacy import PlaceholderLogger, FileDescriptor
+from genefab3.common.types import PlaceholderLogger
+from genefab3.common.types_legacy import FileDescriptor
 from genefab3.common.exceptions import GeneLabJSONException
 from genefab3.common.exceptions import GeneLabFileException
 from memoized_property import memoized_property
