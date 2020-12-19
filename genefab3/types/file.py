@@ -94,19 +94,19 @@ def is_singular_spec(spec):
 class SQLiteObject():
     """..."""
  
-    def __init__(self, sqlite_db, identifier_dict, table_schemas, trigger, update, retrieve, logger=None):
+    def __init__(self, sqlite_db, signature, table_schemas, trigger, update, retrieve, logger=None):
         # TODO: auto_vacuum
         self.__sqlite_db, self.__table_schemas = sqlite_db, table_schemas
-        if len(identifier_dict) != 1:
+        if len(signature) != 1:
             raise GeneLabDatabaseException(
                 "SQLiteObject(): Only one 'identifier' field can be specified",
-                identifier=identifier_dict,
+                signatures=signature,
             )
         else:
             self.__identifier_field, self.__identifier_value = next(
-                iter(identifier_dict.items()),
+                iter(signature.items()),
             )
-            self.__identifier_dict = ImmutableTree(identifier_dict)
+            self.__signature = ImmutableTree(signature)
         if sqlite_db is not None:
             for table, schema in table_schemas.items():
                 self.__ensure_table(table, schema)
@@ -172,7 +172,7 @@ class SQLiteObject():
         if not is_singular_spec(self.__retrieve_spec):
             raise GeneLabDatabaseException(
                 "SQLiteObject(): Only one 'retrieve' field can be specified",
-                identifier=self.__identifier_dict,
+                signature=self.__signature,
             )
         else:
             table = next(iter(self.__retrieve_spec))
@@ -186,7 +186,7 @@ class SQLiteObject():
             ret = connection.cursor().execute(query).fetchall()
             if len(ret) == 0:
                 raise GeneLabDatabaseException(
-                    "No data found", identifier=self.__identifier_dict,
+                    "No data found", signature=self.__signature,
                 )
             elif (len(ret) == 1) and (len(ret[0]) == 1):
                 return postprocess_function(ret[0][0])
@@ -194,7 +194,7 @@ class SQLiteObject():
                 self.__drop_self_from(connection, table)
                 raise GeneLabDatabaseException(
                     "Entries conflict (will attempt to fix on next request)",
-                    identifier=self.__identifier_dict,
+                    signature=self.__signature,
                 )
  
     @property
@@ -202,7 +202,7 @@ class SQLiteObject():
         if not is_singular_spec(self.__trigger_spec):
             raise GeneLabDatabaseException(
                 "SQLiteObject(): Only one 'trigger' field can be specified",
-                identifier=self.__identifier_dict,
+                signature=self.__signature,
             )
         else:
             table = next(iter(self.__trigger_spec))
@@ -235,7 +235,7 @@ class SQLiteBlob(SQLiteObject):
  
     def __init__(self, sqlite_db, table, identifier, timestamp, url, compressor, decompressor):
         SQLiteObject.__init__(
-            self, sqlite_db, {"identifier": identifier},
+            self, sqlite_db, signature={"identifier": identifier},
             table_schemas={
                 table: {
                     "identifier": "TEXT",
