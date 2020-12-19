@@ -83,12 +83,16 @@ class HashableEnough():
 
 
 def is_singular_spec(spec):
-    if not isinstance(spec, dict):
+    """..."""
+    try:
+        if not isinstance(spec, dict):
+            return False
+        elif sum(1 for _ in iterate_terminal_leaves(spec)) != 1:
+            return False
+        else:
+            return True
+    except ValueError:
         return False
-    elif sum(1 for _ in iterate_terminal_leaves(spec)) != 1:
-        return False
-    else:
-        return True
 
 
 class SQLiteObject():
@@ -106,13 +110,24 @@ class SQLiteObject():
             self.__identifier_field, self.__identifier_value = next(
                 iter(signature.items()),
             )
-            self.__signature = ImmutableTree(signature)
+            try:
+                self.__signature = ImmutableTree(signature)
+            except ValueError:
+                raise GeneLabDatabaseException(
+                    "SQLiteObject(): Bad signature", signature=signature,
+                )
         if sqlite_db is not None:
             for table, schema in table_schemas.items():
                 self.__ensure_table(table, schema)
-        self.__trigger_spec = ImmutableTree(trigger)
-        self.__retrieve_spec = ImmutableTree(retrieve)
-        self.__update_spec = ImmutableTree(update)
+        try:
+            self.__trigger_spec = ImmutableTree(trigger)
+            self.__retrieve_spec = ImmutableTree(retrieve)
+            self.__update_spec = ImmutableTree(update)
+        except ValueError:
+            raise GeneLabDatabaseException(
+                "SQLiteObject(): Bad spec", trigger=trigger,
+                update=update, retrieve=retrieve,
+            )
         self.__logger = logger or PlaceholderLogger()
  
     def __ensure_table(self, table, schema):
