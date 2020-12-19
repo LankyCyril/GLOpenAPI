@@ -52,3 +52,17 @@ def get_attribute(dataframe, a):
             return None
         else:
             return value
+
+
+def iterate_terminal_leaves(d, step_tracker=1, max_steps=256):
+    """Descend into branches breadth-first and iterate terminal leaves"""
+    if step_tracker >= max_steps:
+        raise ValueError(
+            "Dictionary exceeded nestedness threshold", max_steps,
+        )
+    else:
+        if isinstance(d, dict):
+            for i, branch in enumerate(d.values(), start=1):
+                yield from iterate_terminal_leaves(branch, step_tracker+i)
+        else:
+            yield d
