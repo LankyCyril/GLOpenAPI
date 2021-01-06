@@ -17,7 +17,7 @@ DEFAULT_FORMATS = {
 MONGO_CLIENT_PARAMETERS = dict(
     serverSelectionTimeoutMS=2000,
 )
-MONGO_DB_NAME = "genefab3"
+MONGO_DB_NAME = "genefab3_testing"
 MONGO_DB_LOCALE = "en_US"
 
 MAX_JSON_AGE = 10800 # 3 hours (in seconds)
@@ -37,9 +37,9 @@ COLLECTION_NAMES = SimpleNamespace(
     FILE_DESCRIPTORS="file_descriptors",
 )
 
-SQLITE_DB = "./.sqlite3/data.db"
+SQLITE_DB = "./.sqlite3/data_testing.db"
 
-RESPONSE_CACHE = "./.sqlite3/response-cache.db"
+RESPONSE_CACHE = "./.sqlite3/response-cache_testing.db"
 USE_RESPONSE_CACHE = True
 ZLIB_COMPRESS_RESPONSE_CACHE = True
 RESPONSE_CACHE_MAX_SIZE = 24*1024*1024*1024 # 24 GiB
