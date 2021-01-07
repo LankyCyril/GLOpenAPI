@@ -3,6 +3,8 @@ from genefab3.common.exceptions import GeneLabDatabaseException
 from genefab3.common.types import ImmutableTree, PlaceholderLogger
 from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
+from pandas import read_sql, DataFrame
+from pandas.io.sql import DatabaseError
 
 
 def is_singular_spec(spec):
@@ -41,7 +43,8 @@ class SQLiteObject():
                 )
         if sqlite_db is not None: # TODO: auto_vacuum
             for table, schema in table_schemas.items():
-                self.__ensure_table(table, schema)
+                if schema is not None:
+                    self.__ensure_table(table, schema)
         try:
             self.__trigger_spec = ImmutableTree(trigger)
             self.__retrieve_spec = ImmutableTree(retrieve)
@@ -63,38 +66,67 @@ class SQLiteObject():
             )
             connection.commit()
  
+    def __update_fields(self, table, spec, trigger_field, trigger_value):
+        """Update table field(s) in SQLite and drop `trigger_field` (which should be replaced according to spec)"""
+        fields, values = sorted(spec), []
+        for field in fields:
+            value = spec[field]()
+            if self.__table_schemas[table][field] == "BLOB":
+                values.append(Binary(bytes(value)))
+            else:
+                values.append(value)
+        delete_action = f"""
+            DELETE FROM '{table}'
+            WHERE {trigger_field} = '{trigger_value}'
+            AND {self.__identifier_field} = '{self.__identifier_value}'
+        """
+        insert_action = f"""
+            INSERT INTO '{table}' ({", ".join(fields)})
+            VALUES ({", ".join("?" for _ in fields)})
+        """
+        with closing(connect(self.__sqlite_db)) as connection:
+            try:
+                connection.cursor().execute(delete_action)
+                connection.cursor().execute(insert_action, values)
+            except OperationalError:
+                self.__logger.warning(
+                    "Could not update SQLiteObject (%s == %s)",
+                    self.__identifier_field, self.__identifier_value,
+                )
+                connection.rollback()
+            else:
+                connection.commit()
+ 
+    def __update_table(self, table, spec, trigger_field, trigger_value):
+        """Update table in SQLite"""
+        dataframe = spec()
+        if not isinstance(dataframe, DataFrame):
+            raise GeneLabDatabaseException(
+                "Cached table must be represented as a DataFrame",
+                object_type=type(dataframe).__name__,
+            )
+        elif dataframe.index.name not in {None, "index"}:
+            raise GeneLabDatabaseException(
+                "Cached DataFrame index must be None or 'index'",
+                index_name=dataframe.index.name,
+            )
+        else:
+            with closing(connect(self.__sqlite_db)) as connection:
+                dataframe.to_sql(
+                    table, connection, index=True,
+                    if_exists="replace",
+                )
+ 
     def __update(self, trigger_field, trigger_value):
-        """Update the table (or blob) in SQLite and rewrite `trigger_field` with the incoming value, if in table"""
+        """Update table or table field in SQLite and drop `trigger_field` (to be replaced according to spec)"""
         for table, specs in self.__update_spec.items():
             for spec in specs:
-                fields, values = sorted(spec), []
-                delete_action = f"""
-                    DELETE FROM '{table}'
-                    WHERE {trigger_field} = '{trigger_value}'
-                    AND {self.__identifier_field} = '{self.__identifier_value}'
-                """
-                insert_action = f"""
-                    INSERT INTO '{table}' ({", ".join(fields)})
-                    VALUES ({", ".join("?" for _ in fields)})
-                """
-                for field in fields:
-                    value = spec[field]()
-                    if self.__table_schemas[table][field] == "BLOB":
-                        values.append(Binary(bytes(value)))
-                    else:
-                        values.append(value)
-                with closing(connect(self.__sqlite_db)) as connection:
-                    try:
-                        connection.cursor().execute(delete_action)
-                        connection.cursor().execute(insert_action, values)
-                    except OperationalError:
-                        self.__logger.warning(
-                            "Could not update SQLiteObject (%s == %s)",
-                            self.__identifier_field, self.__identifier_value,
-                        )
-                        connection.rollback()
-                    else:
-                        connection.commit()
+                if isinstance(spec, dict):
+                    self.__update_fields(
+                        table, spec, trigger_field, trigger_value,
+                    )
+                else:
+                    self.__update_table(table, spec)
  
     def __drop_self_from(self, connection, table):
         """Helper method (during an open connection) to drop rows matching `self.signature` from `table`"""
@@ -109,18 +141,8 @@ class SQLiteObject():
                 self.__identifier_field, self.__identifier_value,
             )
  
-    def __retrieve(self):
-        """Retrieve target table (or blob) from database"""
-        if not is_singular_spec(self.__retrieve_spec):
-            # TODO: interpret target as being a table instead
-            raise GeneLabDatabaseException(
-                "SQLiteObject(): Only one 'retrieve' field can be specified",
-                signature=self.__signature,
-            )
-        else:
-            table = next(iter(self.__retrieve_spec))
-            field = next(iter(self.__retrieve_spec[table]))
-            postprocess_function = self.__retrieve_spec[table][field]
+    def __retrieve_field(self, table, field, postprocess_function):
+        """Retrieve target table field from database"""
         with closing(connect(self.__sqlite_db)) as connection:
             query = f"""
                 SELECT {field} from '{table}'
@@ -139,6 +161,36 @@ class SQLiteObject():
                     "Entries conflict (will attempt to fix on next request)",
                     signature=self.__signature,
                 )
+ 
+    def __retrieve_table(self, table, postprocess_function):
+        """Retrieve target table from database"""
+        with closing(connect(self.__sqlite_db)) as connection:
+            query = f"SELECT * from '{table}'"
+            try:
+                return postprocess_function(
+                    read_sql(query, connection, index_col="index"),
+                )
+            except (OperationalError, DatabaseError):
+                raise GeneLabDatabaseException(
+                    "No data found", signature=self.__signature,
+                )
+ 
+    def __retrieve(self):
+        """Retrieve target table or table field from database"""
+        if not is_singular_spec(self.__retrieve_spec):
+            raise GeneLabDatabaseException(
+                "SQLiteObject(): Only one 'retrieve' field can be specified",
+                signature=self.__signature,
+            )
+        else:
+            table = next(iter(self.__retrieve_spec))
+            if isinstance(self.__retrieve_spec[table], dict):
+                field = next(iter(self.__retrieve_spec[table]))
+                postprocess_function = self.__retrieve_spec[table][field]
+                return self.__retrieve_field(table, field, postprocess_function)
+            else:
+                postprocess_function = self.__retrieve_spec[table]
+                return self.__retrieve_table(table, postprocess_function)
  
     @property
     def data(self):

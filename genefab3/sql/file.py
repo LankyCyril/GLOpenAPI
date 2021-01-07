@@ -1,4 +1,4 @@
-from genefab3.common.utils import HashableEnough
+from genefab3.common.types import HashableEnough
 from genefab3.sql.blob import SQLiteBlob
 from genefab3.common.exceptions import GeneLabJSONException
 from genefab3.common.exceptions import GeneLabDataManagerException
