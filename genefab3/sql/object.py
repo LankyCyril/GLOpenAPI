@@ -101,14 +101,20 @@ class SQLiteObject():
         """Update table in SQLite"""
         dataframe = spec()
         if not isinstance(dataframe, DataFrame):
-            raise GeneLabDatabaseException(
-                "Cached table must be represented as a DataFrame",
-                object_type=type(dataframe).__name__,
+            raise NotImplementedError(
+                "Cached table not represented as a pandas DataFrame",
+            )
+        elif dataframe.columns.nlevels != 1:
+            raise NotImplementedError(
+                "Cached DataFrame with MultiIndex columns",
+            )
+        elif dataframe.index.nlevels != 1:
+            raise NotImplementedError(
+                "Cached DataFrame with MultiIndex index",
             )
         elif dataframe.index.name not in {None, "index"}:
-            raise GeneLabDatabaseException(
-                "Cached DataFrame index must be None or 'index'",
-                index_name=dataframe.index.name,
+            raise NotImplementedError(
+                "Cached DataFrame index name neither 'index' nor None",
             )
         else:
             with closing(connect(self.__sqlite_db)) as connection:

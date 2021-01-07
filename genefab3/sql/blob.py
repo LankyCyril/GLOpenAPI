@@ -1,7 +1,7 @@
 from genefab3.sql.object import SQLiteObject
 
 
-noop = lambda _:_
+passthrough = lambda _:_
 
 
 class SQLiteBlob(SQLiteObject):
@@ -27,12 +27,12 @@ class SQLiteBlob(SQLiteObject):
                 table: [{
                     "identifier": lambda: identifier,
                     "timestamp": lambda: timestamp,
-                    "blob": lambda: (compressor or noop)(data),
+                    "blob": lambda: (compressor or passthrough)(data),
                 }],
             },
             retrieve={
                 table: {
-                    "blob": noop if decompressor is None else decompressor,
+                    "blob": decompressor or passthrough,
                 },
             },
         )
