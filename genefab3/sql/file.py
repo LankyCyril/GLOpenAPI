@@ -2,6 +2,7 @@ from genefab3.common.types import HashableEnough
 from genefab3.sql.blob import SQLiteBlob
 from genefab3.common.exceptions import GeneLabJSONException
 from genefab3.common.exceptions import GeneLabDataManagerException
+from urllib.request import urlopen
 
 
 class CacheableFile(HashableEnough, SQLiteBlob):
@@ -39,10 +40,16 @@ class CacheableFile(HashableEnough, SQLiteBlob):
             json_timestamp_extractor=json_timestamp_extractor,
         )
         SQLiteBlob.__init__(
-            self, sqlite_db=sqlite_db, table="blobs",
+            self, data=self.__download(url),
+            sqlite_db=sqlite_db, table="blobs",
             identifier=self.url, timestamp=self.timestamp,
-            url=self.url, compressor=compressor, decompressor=decompressor,
+            compressor=compressor, decompressor=decompressor,
         )
         HashableEnough.__init__(
             self, self.__identity_fields,
         )
+ 
+    def __download(self, url):
+        """Download data from URL as-is"""
+        with urlopen(url) as response:
+            return response.read()
