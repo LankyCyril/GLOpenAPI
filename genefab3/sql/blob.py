@@ -7,7 +7,7 @@ passthrough = lambda _:_
 class SQLiteBlob(SQLiteObject):
     """Represents an SQLiteObject initialized with a spec suitable for a binary blob"""
  
-    def __init__(self, data, sqlite_db, table, identifier, timestamp, compressor, decompressor):
+    def __init__(self, data_getter, sqlite_db, table, identifier, timestamp, compressor, decompressor):
         SQLiteObject.__init__(
             self, sqlite_db, signature={"identifier": identifier},
             table_schemas={
@@ -27,7 +27,7 @@ class SQLiteBlob(SQLiteObject):
                 table: [{
                     "identifier": lambda: identifier,
                     "timestamp": lambda: timestamp,
-                    "blob": lambda: (compressor or passthrough)(data),
+                    "blob": lambda: (compressor or passthrough)(data_getter()),
                 }],
             },
             retrieve={

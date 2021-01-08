@@ -97,7 +97,7 @@ class SQLiteObject():
             else:
                 connection.commit()
  
-    def __update_table(self, table, spec, trigger_field, trigger_value):
+    def __update_table(self, table, spec):
         """Update table in SQLite"""
         dataframe = spec()
         if not isinstance(dataframe, DataFrame):
