@@ -4,7 +4,6 @@ from re import search, sub
 from collections import defaultdict
 from numpy import nan
 from types import SimpleNamespace
-from urllib.request import urlopen
 from zipfile import ZipFile
 from io import BytesIO, StringIO
 from os import path
@@ -225,41 +224,40 @@ class AssayEntries(StudyEntries):
 
 
 class IsaZip:
-    """Stores GLDS ISA information retrieved from ISA ZIP file URL"""
+    """Stores GLDS ISA information retrieved from ISA ZIP file stream"""
  
-    def __init__(self, isa_zip_url):
+    def __init__(self, isa_file):
         """Unpack ZIP from URL and delegate to sub-parsers"""
-        info = dict(isa_zip_url=isa_zip_url)
-        self.raw = self._ingest_raw_isa(isa_zip_url)
+        info = dict(url=isa_file.url)
+        self.raw = self._ingest_raw_isa(isa_file)
         self.investigation = Investigation(self.raw.investigation)
         self.studies = StudyEntries(self.raw.studies, **info)
         self.assays = AssayEntries(self.raw.assays, **info)
  
-    def _ingest_raw_isa(self, isa_zip_url):
+    def _ingest_raw_isa(self, isa_file):
         """Unpack ZIP from URL and delegate to top-level parsers"""
         raw = SimpleNamespace(investigation=None, studies={}, assays={})
-        with urlopen(isa_zip_url) as response:
-            with ZipFile(BytesIO(response.read())) as archive:
-                for filepath in archive.namelist():
-                    _, filename = path.split(filepath)
-                    info = dict(isa_zip_url=isa_zip_url, filename=filename)
-                    matcher = search(r'^([isa])_(.+)\.txt$', filename)
-                    if matcher:
-                        kind, name = matcher.groups()
-                        with archive.open(filepath) as handle:
-                            if kind == "i":
-                                reader = self._read_investigation
-                                raw.investigation = reader(handle)
-                            elif kind == "s":
-                                reader = self._read_tab
-                                raw.studies[name] = reader(handle, **info)
-                            elif kind == "a":
-                                reader = self._read_tab
-                                raw.assays[name] = reader(handle, **info)
+        with ZipFile(BytesIO(isa_file.data)) as archive:
+            for filepath in archive.namelist():
+                _, filename = path.split(filepath)
+                info = dict(url=isa_file.url, filename=filename)
+                matcher = search(r'^([isa])_(.+)\.txt$', filename)
+                if matcher:
+                    kind, name = matcher.groups()
+                    with archive.open(filepath) as handle:
+                        if kind == "i":
+                            reader = self._read_investigation
+                            raw.investigation = reader(handle)
+                        elif kind == "s":
+                            reader = self._read_tab
+                            raw.studies[name] = reader(handle, **info)
+                        elif kind == "a":
+                            reader = self._read_tab
+                            raw.assays[name] = reader(handle, **info)
         for tab, value in raw.__dict__.items():
             if not value:
                 raise GeneLabISAException(
-                    "Missing ISA tab", url=isa_zip_url, tab=tab,
+                    "Missing ISA tab", url=isa_file.url, tab=tab,
                 )
         return raw
  

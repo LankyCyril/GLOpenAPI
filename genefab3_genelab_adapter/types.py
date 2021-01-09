@@ -21,7 +21,7 @@ def read_json(url):
         return loads(response.read().decode())
 
 
-def GeneLabAccessionFactory():
+def GeneLabAccessionEnumerator():
     try:
         n_datasets = read_json(COLD_SEARCH_MASK.format(0))["hits"]["total"]
         return {

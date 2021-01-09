@@ -8,7 +8,7 @@ class GeneFabClient():
         self, *,
         locale, mongo_db,
         sqlite_blobs, sqlite_tables, sqlite_cache,
-        DatasetFactory, Dataset,
+        AccessionEnumerator, Dataset,
         cacher_start_condition=lambda: True,
         cacher_interval=1800,
         cacher_recheck_delay=300,

@@ -1,1 +1,1 @@
-from .types import GeneLabAccessionFactory, GeneLabDataset
+from .types import GeneLabAccessionEnumerator, GeneLabDataset
