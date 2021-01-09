@@ -10,6 +10,7 @@ class Dataset():
  
     def __init__(self, accession, mongo_db, sqlite_blobs):
         self.accession = accession
+        self.changed = None
         class_name = "genefab3.db.types.Dataset"
         if not hasattr(self, "file_descriptors"):
             raise GeneLabConfigurationException(
@@ -31,3 +32,4 @@ class Dataset():
                 url=isa_desc["url"], timestamp=isa_desc["timestamp"],
             )
             self.isa = IsaZip(isa_file)
+            self.changed = self.changed or isa_file.changed

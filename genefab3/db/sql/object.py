@@ -55,6 +55,7 @@ class SQLiteObject():
                 trigger=trigger, update=update, retrieve=retrieve,
             )
         self.__logger = logger or PlaceholderLogger()
+        self.changed = None
  
     def __ensure_table(self, table, schema):
         """Create table with schema, provided as a dictionary"""
@@ -219,5 +220,8 @@ class SQLiteObject():
                 self.__drop_self_from(connection, table)
                 trigger_value = None
         if trigger_function(trigger_value):
+            self.changed = True
             self.__update(trigger_field, trigger_value)
+        else:
+            self.changed = False
         return self.__retrieve()
