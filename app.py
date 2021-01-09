@@ -8,8 +8,8 @@ from pymongo.errors import ServerSelectionTimeoutError
 from genefab3.common.exceptions import GeneLabDatabaseException
 from genefab3.client import GeneFabClient
 from genefab3.config import LOCALE, SQLITE_BLOBS, SQLITE_TABLES, SQLITE_CACHE
-from genefab3_genelab_adapter.methods import get_accessions, get_files, get_isa
-from genefab3_genelab_adapter.methods import TARGET_FILE_LOCATORS
+from genefab3_genelab_adapter.types import GeneLabAccessionFactory, GeneLabDataset
+from genefab3_genelab_adapter.config import TARGET_FILE_LOCATORS
 from os import environ
 
 
@@ -33,9 +33,8 @@ genefab3_client = GeneFabClient(
     sqlite_blobs=SQLITE_BLOBS,
     sqlite_tables=SQLITE_TABLES,
     sqlite_cache=SQLITE_CACHE,
-    get_accessions=get_accessions,
-    get_files=get_files,
-    get_isa=get_isa,
+    AccessionFactory=GeneLabAccessionFactory,
+    Dataset=GeneLabDataset,
     target_file_locators=TARGET_FILE_LOCATORS,
     cacher_start_condition=lambda: environ.get("WERKZEUG_RUN_MAIN") != "true",
 )

@@ -8,15 +8,13 @@ class GeneFabClient():
         self, *,
         locale, mongo_db,
         sqlite_blobs, sqlite_tables, sqlite_cache,
-        get_accessions, get_files, get_isa, target_file_locators,
+        DatasetFactory, Dataset,
         cacher_start_condition=lambda: True,
         cacher_interval=1800,
         cacher_recheck_delay=300,
     ):
-        """Initialize metadata and response cachers, extend Dataset class with methods targeting given storage"""
-        self.locale, self.mongo_db, self.get_accessions = (
-            locale, mongo_db, get_accessions,
-        )
+        """Initialize metadata and response cachers, pass DatasetFactory and Dataset to them"""
+        self.locale, self.mongo_db = locale, mongo_db
         if len(set(sqlite_blobs, sqlite_tables, sqlite_cache)) != 3:
             raise GeneLabConfigurationException(
                 "SQLite databases must all be distinct to avoid name conflicts",
