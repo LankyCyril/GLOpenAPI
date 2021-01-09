@@ -27,9 +27,5 @@ class SQLiteBlob(SQLiteObject):
                     "blob": lambda: (compressor or passthrough)(data_getter()),
                 }],
             },
-            retrieve={
-                table: {
-                    "blob": decompressor or passthrough,
-                },
-            },
+            retrieve={table: {"blob": decompressor or passthrough}},
         )

@@ -10,7 +10,7 @@ class SQLiteTable(SQLiteObject):
         if table == timestamp_table:
             raise GeneLabDatabaseException(
                 "Table name cannot be equal to a reserved table name",
-                timestamp_table=timestamp_table,
+                table=table, identifier=identifier,
             )
         SQLiteObject.__init__(
             self, sqlite_db, signature={"identifier": identifier},

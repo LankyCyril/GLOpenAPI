@@ -11,7 +11,7 @@ from pandas import read_csv
 from pandas.errors import ParserError as PandasParserError
 
 
-class CacheableBinaryFile(HashableEnough, SQLiteBlob):
+class CachedBinaryFile(HashableEnough, SQLiteBlob):
     """Represents an SQLiteObject that stores up-to-date file contents as a binary blob"""
  
     def __init__(self, *, name, url, timestamp, sqlite_db, aux_table="blobs", compressor=None, decompressor=None):
@@ -35,7 +35,7 @@ class CacheableBinaryFile(HashableEnough, SQLiteBlob):
             return response.read()
 
 
-class CacheableTableFile(HashableEnough, SQLiteTable):
+class CachedTableFile(HashableEnough, SQLiteTable):
     """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
  
     def __init__(self, *, name, url, timestamp, sqlite_db, aux_table="timestamp_table", **pandas_kws):
@@ -62,15 +62,14 @@ class CacheableTableFile(HashableEnough, SQLiteTable):
                 copyfileobj(response, handle)
             with open(tempfile, mode="rb") as handle:
                 magic = handle.read(3)
-                if magic == b"\x1f\x8b\x08":
-                    compression = "gzip"
-                    from gzip import open as _open
-                elif magic == b"\x42\x5a\x68":
-                    compression = "bz2"
-                    from bz2 import open as _open
-                else:
-                    compression = "infer"
-                    _open = open
+            if magic == b"\x1f\x8b\x08":
+                compression = "gzip"
+                from gzip import open as _open
+            elif magic == b"\x42\x5a\x68":
+                compression = "bz2"
+                from bz2 import open as _open
+            else:
+                compression, _open = "infer", open
             try:
                 with _open(tempfile, mode="rt", newline="") as handle:
                     sep = Sniffer().sniff(handle.read(2**20)).delimiter
@@ -79,6 +78,5 @@ class CacheableTableFile(HashableEnough, SQLiteTable):
                 )
             except (IOError, UnicodeDecodeError, CSVError, PandasParserError):
                 raise GeneLabFileException(
-                    "Not recognized as a table file",
-                    name=self.name, url=self.url,
+                    "Not recognized as a table file", name=self.name, url=url,
                 )
