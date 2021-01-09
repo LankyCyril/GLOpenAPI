@@ -1,7 +1,5 @@
-from genefab3.sql.object import SQLiteObject
-
-
-passthrough = lambda _:_
+from genefab3.db.sql.object import SQLiteObject
+from genefab3.common.types import passthrough
 
 
 class SQLiteBlob(SQLiteObject):
@@ -19,8 +17,7 @@ class SQLiteBlob(SQLiteObject):
             },
             trigger={
                 table: {
-                    "timestamp": lambda value:
-                        (value is None) or (timestamp > value)
+                    "timestamp": lambda val: (val is None) or (timestamp > val),
                 },
             },
             update={

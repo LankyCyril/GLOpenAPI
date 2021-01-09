@@ -1,8 +1,6 @@
-from genefab3.sql.object import SQLiteObject
+from genefab3.db.sql.object import SQLiteObject
 from genefab3.common.exceptions import GeneLabDatabaseException
-
-
-passthrough = lambda _:_
+from genefab3.common.types import passthrough
 
 
 class SQLiteTable(SQLiteObject):
@@ -22,8 +20,7 @@ class SQLiteTable(SQLiteObject):
             },
             trigger={
                 timestamp_table: {
-                    "timestamp": lambda value:
-                        (value is None) or (timestamp > value)
+                    "timestamp": lambda val: (val is None) or (timestamp > val),
                 },
             },
             update={

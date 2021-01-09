@@ -5,6 +5,9 @@ from collections.abc import Hashable
 from itertools import zip_longest
 
 
+passthrough = lambda _:_
+
+
 def PlaceholderLogger():
     """Placeholder that masquerades as a logger but does not do anything"""
     return SimpleNamespace(

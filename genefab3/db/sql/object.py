@@ -51,8 +51,8 @@ class SQLiteObject():
             self.__update_spec = ImmutableTree(update)
         except ValueError:
             raise GeneLabDatabaseException(
-                "SQLiteObject(): Bad spec", trigger=trigger,
-                update=update, retrieve=retrieve,
+                "SQLiteObject(): Bad spec",
+                trigger=trigger, update=update, retrieve=retrieve,
             )
         self.__logger = logger or PlaceholderLogger()
  
@@ -61,8 +61,8 @@ class SQLiteObject():
         with closing(connect(self.__sqlite_db)) as connection:
             connection.cursor().execute(
                 "CREATE TABLE IF NOT EXISTS '{}' ({})".format(
-                    table, ", ".join(f"'{f}' {k}" for f, k in schema.items())
-                )
+                    table, ", ".join(f"'{f}' {k}" for f, k in schema.items()),
+                ),
             )
             connection.commit()
  
@@ -76,8 +76,7 @@ class SQLiteObject():
             else:
                 values.append(value)
         delete_action = f"""
-            DELETE FROM '{table}'
-            WHERE {trigger_field} = '{trigger_value}'
+            DELETE FROM '{table}' WHERE {trigger_field} = '{trigger_value}'
             AND {self.__identifier_field} = '{self.__identifier_value}'
         """
         insert_action = f"""
@@ -104,24 +103,16 @@ class SQLiteObject():
             raise NotImplementedError(
                 "Cached table not represented as a pandas DataFrame",
             )
-        elif dataframe.columns.nlevels != 1:
+        if dataframe.index.nlevels != 1:
+            raise NotImplementedError("MultiIndex in cached DataFrame")
+        if dataframe.columns.nlevels != 1:
+            raise NotImplementedError("MultiIndex columns in cached DataFrame")
+        if dataframe.index.name not in {None, "index"}:
             raise NotImplementedError(
-                "Cached DataFrame with MultiIndex columns",
+                "Cached DataFrame index name is neither 'index' nor None",
             )
-        elif dataframe.index.nlevels != 1:
-            raise NotImplementedError(
-                "Cached DataFrame with MultiIndex index",
-            )
-        elif dataframe.index.name not in {None, "index"}:
-            raise NotImplementedError(
-                "Cached DataFrame index name neither 'index' nor None",
-            )
-        else:
-            with closing(connect(self.__sqlite_db)) as connection:
-                dataframe.to_sql(
-                    table, connection, index=True,
-                    if_exists="replace",
-                )
+        with closing(connect(self.__sqlite_db)) as connection:
+            dataframe.to_sql(table, connection, index=True, if_exists="replace")
  
     def __update(self, trigger_field, trigger_value):
         """Update table or table field in SQLite and drop `trigger_field` (to be replaced according to spec)"""
@@ -151,8 +142,8 @@ class SQLiteObject():
         """Retrieve target table field from database"""
         with closing(connect(self.__sqlite_db)) as connection:
             query = f"""
-                SELECT {field} from '{table}'
-                WHERE {self.__identifier_field} = '{self.__identifier_value}'
+                SELECT {field} from '{table}' WHERE
+                {self.__identifier_field} = '{self.__identifier_value}'
             """
             ret = connection.cursor().execute(query).fetchall()
             if len(ret) == 0:
