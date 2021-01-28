@@ -37,9 +37,9 @@ COLLECTION_NAMES = SimpleNamespace(
     FILE_DESCRIPTORS="file_descriptors",
 )
 
-SQLITE_DB = "./.sqlite3/data.db"
+SQLITE_DB = "./.genefab3.sqlite/data.db"
 
-RESPONSE_CACHE = "./.sqlite3/response-cache.db"
+RESPONSE_CACHE = "./.genefab3.sqlite/response-cache.db"
 USE_RESPONSE_CACHE = True
 ZLIB_COMPRESS_RESPONSE_CACHE = True
 RESPONSE_CACHE_MAX_SIZE = 24*1024*1024*1024 # 24 GiB
