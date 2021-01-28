@@ -11,6 +11,7 @@ from genefab3.frontend.renderers.forms import needs_datatype, render_dropdown
 from genefab3.frontend.utils import is_debug
 from json import dumps
 from genefab3.config import USE_RESPONSE_CACHE, RESPONSE_CACHE, ROW_TYPES
+from werkzeug.wrappers.response import Response
 from genefab3.backend.sql.readers.cache import retrieve_cached_response
 from genefab3.backend.sql.writers.cache import cache_response
 from itertools import cycle
@@ -76,7 +77,13 @@ def render(db, getter, kwargs, request):
             return cached_response
         else:
             obj = getter(db, **kwargs, context=context)
-            response = render_as_format(obj, context)
+            if isinstance(obj, Response): # already a response, e.g. a redirect
+                if obj.status_code // 100 == 3: # redirect
+                    return obj # skipping cache
+                else:
+                    response = obj
+            else: # not a response, need to wrap
+                response = render_as_format(obj, context)
             accessions_used = get_accessions_used(obj, context)
             if USE_RESPONSE_CACHE and accessions_used:
                 cache_response(

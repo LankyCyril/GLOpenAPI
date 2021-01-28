@@ -1,7 +1,7 @@
 from genefab3.common.exceptions import GeneLabFileException
 from genefab3.common.exceptions import GeneLabParserException
 from genefab3.backend.mongo.dataset import CachedDataset
-from urllib.request import urlopen
+from flask import redirect
 
 
 def get_file(mongo_db, context):
@@ -38,5 +38,4 @@ def get_file(mongo_db, context):
     elif len(file_descriptors) > 1:
         raise GeneLabFileException("Multiple files match search criteria")
     else:
-        with urlopen(file_descriptors[0].url) as response:
-            return response.read()
+        return redirect(file_descriptors[0].url)
