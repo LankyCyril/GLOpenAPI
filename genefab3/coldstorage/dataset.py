@@ -71,6 +71,16 @@ class ColdStorageDataset(DatasetBaseClass):
         except KeyError:
             raise GeneLabJSONException("Malformed 'filelistings' JSON", self)
  
+    @memoized_property
+    def fileversions(self):
+        """Parse file dates JSON reported by cold storage for version numbers"""
+        try:
+            return {
+                fd["file_name"]: fd["version"] for fd in self.json.filedates
+            }
+        except KeyError:
+            raise GeneLabJSONException("Malformed 'filelistings' JSON", self)
+ 
     def get_file_descriptors(self, name=None, regex=None, glob=None):
         """Given mask, find filenames, urls, and datestamps"""
         if sum(arg is not None for arg in (name, regex, glob)) != 1:
@@ -86,10 +96,15 @@ class ColdStorageDataset(DatasetBaseClass):
             matches = lambda filename: search(glob.replace("*", ".*"), filename)
         return [
             FileDescriptor(
-                filename, self.fileurls[filename], self.filedates[filename],
+                filename, ( # TODO: FIXME: temporary fix
+                    GENELAB_ROOT + "/genelab/static/media/dataset/" +
+                    quote(filename) +
+                    "?version={}".format(self.fileversions[filename])
+                ),
+                self.filedates[filename],
             )
             for filename in set(self.filedates) & set(self.fileurls)
-            if matches(filename)
+            if matches(filename) and (filename in self.fileversions)
         ]
 
     def init_assays(self):
