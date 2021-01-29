@@ -5,4 +5,5 @@ data
 __pycache__
 test.py
 .sqlite3
+.genefab3.sqlite
 .flask-cache
