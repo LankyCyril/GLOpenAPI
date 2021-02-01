@@ -1,5 +1,4 @@
-from genefab3.config import TIMESTAMP_FMT
-from datetime import datetime
+from dateutil.parser import parse as dateutil_parse
 from urllib.request import urlopen
 from genefab3.config import COLD_GLDS_MASK
 from genefab3.config import COLD_FILEURLS_MASK, COLD_FILEDATES_MASK
@@ -8,16 +7,17 @@ from re import search
 from genefab3.common.exceptions import GeneLabException, GeneLabJSONException
 
 
-def extract_file_timestamp(fd, key="date_modified", fallback_key="date_created", fallback_value=-1, fmt=TIMESTAMP_FMT):
+def extract_file_timestamp(fd, key="date_modified", fallback_key="date_created", fallback_value=-1):
     """Convert date like 'Fri Oct 11 22:02:48 EDT 2019' to timestamp"""
     strdate = fd.get(key)
     if strdate is None:
         strdate = fd.get(fallback_key)
     if strdate is None:
         return fallback_value
+        # TODO: fallback_value should be None when checking freshness
     else:
         try:
-            dt = datetime.strptime(strdate, fmt)
+            dt = dateutil_parse(strdate) # TODO: more timezones (PDT, PST, ...)
         except ValueError:
             return fallback_value
         else:
