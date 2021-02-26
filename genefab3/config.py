@@ -134,7 +134,7 @@ UNITS_FORMAT = "{value} {{{unit}}}"
 ISA_TECH_TYPE_LOCATOR = "investigation.study assays.study assay technology type"
 
 from collections import namedtuple
-Locator = namedtuple("Locator", ["keys", "regex"])
+Locator = namedtuple("Locator", ["keys", "regex", "nargs"])
 
 TECHNOLOGY_FILE_LOCATORS = {
     "rna sequencing (rna-seq)": {
@@ -144,6 +144,7 @@ TECHNOLOGY_FILE_LOCATORS = {
                 "assay.characteristics.raw counts data file..",
             ),
             regex=r'rna_seq_Unnormalized_Counts\.csv$',
+            nargs=float("inf"),
         ),
     }
 }

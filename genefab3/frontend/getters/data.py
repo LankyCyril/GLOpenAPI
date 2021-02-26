@@ -12,6 +12,7 @@ from genefab3.common.utils import INPLACE_set_attributes
 NO_FILES_ERROR = "No data files found for datatype"
 AMBIGUOUS_FILES_ERROR = "Multiple (ambiguous) data files found for datatype"
 MULTIPLE_TECHNOLOGIES_ERROR = "Incompatible technology types in request"
+TOO_MANY_FILES_ERROR = "Number of assays to combine exceeds limit for datatype"
 
 
 def get_file_descriptor(mongo_db, accession, assay_name, target_file_locator, datatype):
@@ -69,7 +70,14 @@ def add_file_descriptors_to_raw_annotation(mongo_db, raw_annotation, datatype):
         ),
         axis=1,
     )
-    return merge(raw_annotation, per_assay)
+    n_files = len(set(per_assay["file descriptor"].drop_duplicates()))
+    if n_files > target_file_locator.nargs:
+        raise GeneLabFileException(
+            TOO_MANY_FILES_ERROR, datatype=datatype,
+            limit=target_file_locator.nargs,
+        )
+    else:
+        return merge(raw_annotation, per_assay)
 
 
 def get_data(dbs, context):
