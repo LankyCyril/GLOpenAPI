@@ -1,9 +1,9 @@
 def build_url(context, target_view=None, drop=set()):
     """Rebuild URL from request, alter based on `replace` and `drop`"""
     if target_view is None:
-        url_components = [context.view + "?"]
+        url_components = [context.url_root.rstrip("/"), context.view + "?"]
     else:
-        url_components = [target_view + "?"]
+        url_components = [context.url_root.rstrip("/"), target_view + "?"]
     for arg, values in context.complete_args.items():
         if arg not in drop:
             for value in values:

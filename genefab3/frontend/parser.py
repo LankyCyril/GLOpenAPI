@@ -155,6 +155,7 @@ def parse_request(request):
     base_url = request.base_url.strip("/")
     context = Namespace(
         full_path=request.full_path,
+        url_root=request.url_root,
         view="/"+sub(url_root, "", base_url).strip("/")+"/",
         complete_args=request.args.to_dict(flat=False),
         accessions_and_assays={},
