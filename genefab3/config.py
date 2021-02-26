@@ -146,6 +146,16 @@ TECHNOLOGY_FILE_LOCATORS = {
             regex=r'rna_seq_Unnormalized_Counts\.csv$',
             nargs=float("inf"),
         ),
+        "differential expression": Locator(
+            keys=(),
+            regex=r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression\.csv$',
+            nargs=1,
+        ),
+        "visualization table": Locator(
+            keys=(),
+            regex=r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table\.csv$',
+            nargs=1,
+        ),
     }
 }
 
@@ -155,6 +165,4 @@ ROW_TYPES = defaultdict(lambda: "entry", {
 })
 
 RAW_FILE_REGEX = r'file|plot'
-DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'
-VIZ_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table.csv$'
 PCA_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$'

@@ -20,7 +20,7 @@ def get_file_descriptor(mongo_db, accession, assay_name, target_file_locator, da
     glds = CachedDataset(mongo_db, accession, init_assays=False)
     file_descriptors = glds.assays[assay_name].get_file_descriptors(
         regex=target_file_locator.regex,
-        projection={key: True for key in target_file_locator.keys},
+        projection={key: True for key in target_file_locator.keys} or None,
     )
     if len(file_descriptors) == 0:
         raise GeneLabFileException(
