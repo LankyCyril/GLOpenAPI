@@ -1,1 +1,1 @@
-from .types import GeneLabAccessionEnumerator, GeneLabDataset
+from .methods import get_genelab_accessions, get_dataset_files
