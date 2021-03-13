@@ -56,18 +56,6 @@ RESPONSE_CACHE_SCHEMAS = ImmutableDict({
 })
 
 
-## External APIs
-
-GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
-COLD_API_ROOT = "https://genelab-data.ndc.nasa.gov/genelab"
-COLD_SEARCH_MASK = COLD_API_ROOT + "/data/search/?term=GLDS&type=cgene&size={}"
-COLD_GLDS_MASK = COLD_API_ROOT + "/data/study/data/{}/"
-COLD_FILEURLS_MASK = COLD_API_ROOT + "/data/glds/files/{}"
-COLD_FILEDATES_MASK = COLD_API_ROOT + "/data/study/filelistings/{}"
-
-TIMESTAMP_FMT = "%a %b %d %H:%M:%S %Z %Y"
-
-
 ## GeneFab API parser parameters
 
 from operator import eq, ne, gt, getitem, contains, length_hint
@@ -128,7 +116,6 @@ DISALLOWED_CONTEXTS = [
 
 ## (Meta)data parameters
 
-ISA_ZIP_REGEX = r'.*_metadata_.*[_-]ISA\.zip$'
 ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
 UNITS_FORMAT = "{value} {{{unit}}}"
 ISA_TECH_TYPE_LOCATOR = "investigation.study assays.study assay technology type"
@@ -148,12 +135,4 @@ TECHNOLOGY_FILE_LOCATORS = {
     }
 }
 
-from collections import defaultdict
-ROW_TYPES = defaultdict(lambda: "entry", {
-    "unnormalized counts": "entry",
-})
-
 RAW_FILE_REGEX = r'file|plot'
-DEG_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression.csv$'
-VIZ_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table.csv$'
-PCA_CSV_REGEX = r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$'
