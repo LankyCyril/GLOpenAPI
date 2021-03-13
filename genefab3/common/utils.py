@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from requests import head as request_head
 from urllib.request import urlopen
 from urllib.error import URLError
@@ -7,22 +8,28 @@ from copy import deepcopy
 from pandas import DataFrame, Series
 
 
-def WithEitherURL(method, _urls, _target_arg="url", **kwargs):
-    """Iterate `urls` and call `method` with the first reachable URL"""
-    for url in _urls:
-        with request_head(url, allow_redirects=True) as response:
-            if response.ok:
-                return method(**kwargs, **{_target_arg: url})
-    else:
-        for url in _urls:
-            try:
-                urlopen(url)
-            except URLError:
-                continue
-            else:
-                return method(**kwargs, **{_target_arg: url})
+@contextmanager
+def pick_reachable_url(urls, desc=None):
+    """Iterate `urls` and get the first reachable URL"""
+    def _pick():
+        for url in urls:
+            with request_head(url, allow_redirects=True) as response:
+                if response.ok:
+                    return url
         else:
-            raise URLError(f"No URLs are reachable: {_urls}")
+            for url in urls:
+                try:
+                    urlopen(url)
+                except URLError:
+                    continue
+                else:
+                    return url
+            else:
+                if desc:
+                    raise URLError(f"No URLs are reachable for {desc}: {urls}")
+                else:
+                    raise URLError(f"No URLs are reachable: {urls}")
+    yield _pick()
 
 
 def walk_up(from_path, n_steps):

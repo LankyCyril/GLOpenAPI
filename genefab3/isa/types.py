@@ -1,5 +1,5 @@
 from genefab3.common.exceptions import GeneLabFileException
-from genefab3.common.utils import WithEitherURL
+from genefab3.common.utils import pick_reachable_url
 from genefab3.db.sql.file import CachedBinaryFile
 from genefab3.isa.parser import IsaZip
 from memoized_property import memoized_property
@@ -16,16 +16,16 @@ class Dataset():
         }
         if len(isa_files) != 1:
             raise GeneLabFileException(
-                "ISA descriptor must contain exactly one file",
+                "File entries for Dataset must contain exactly one ISA file",
                 accession, filenames=sorted(isa_files),
             )
         else:
             isa_name, isa_desc = next(iter(isa_files.items()))
-            isa_file = WithEitherURL(
-                CachedBinaryFile, isa_desc["urls"],
-                name=isa_name, sqlite_db=self.sqlite_blobs,
-                timestamp=isa_desc["timestamp"],
-            )
+            with pick_reachable_url(isa_desc["urls"]) as url:
+                isa_file = CachedBinaryFile(
+                    name=isa_name, sqlite_db=self.sqlite_blobs,
+                    url=url, timestamp=isa_desc["timestamp"],
+                )
             self.isa = IsaZip(
                 data=isa_file.data,
                 logger_info=dict(filename=isa_file.name, url=isa_file.url),
