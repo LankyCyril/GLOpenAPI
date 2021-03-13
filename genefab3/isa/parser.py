@@ -102,7 +102,7 @@ class StudyEntries(list):
     """Stores GLDS ISA Tab 'studies' records as a nested JSON"""
     _self_identifier = "Study"
  
-    def __init__(self, raw_tabs, **logger_info):
+    def __init__(self, raw_tabs, logger_info):
         """Convert tables to nested JSONs"""
         if self._self_identifier == "Study":
             self._by_sample_name = {}
@@ -115,7 +115,7 @@ class StudyEntries(list):
                     raise GeneLabISAException(error)
                 else:
                     sample_name = row["Sample Name"]
-                json = self._row_to_json(row, name, **logger_info)
+                json = self._row_to_json(row, name, logger_info)
                 super().append(json)
                 if self._self_identifier == "Study":
                     if sample_name in self._by_sample_name:
@@ -133,7 +133,7 @@ class StudyEntries(list):
         error_mask = "Unique look up by sample name within {} not allowed"
         raise GeneLabISAException(error_mask.format(type(self).__name__))
  
-    def _row_to_json(self, row, name, **logger_info):
+    def _row_to_json(self, row, name, logger_info):
         """Convert single row of table to nested JSON"""
         json = {"Info": {self._self_identifier: name}}
         protocol_ref, qualifiable = nan, None
@@ -154,9 +154,9 @@ class StudyEntries(list):
                 if qualifiable is None:
                     raise GeneLabISAException("Qualifier before main field")
                 else:
-                    info = {**logger_info, "name": name}
                     self._INPLACE_qualify(
-                        qualifiable, field, subfield, value, **info,
+                        qualifiable, field, subfield, value,
+                        logger_info={**logger_info, "name": name},
                     )
         return json
  
@@ -201,7 +201,7 @@ class StudyEntries(list):
                 qualifiable["Protocol REF"] = protocol_ref
             return qualifiable
  
-    def _INPLACE_qualify(self, qualifiable, field, subfield, value, **logger_info):
+    def _INPLACE_qualify(self, qualifiable, field, subfield, value, logger_info):
         """Add qualifier to field at pointer (qualifiable)"""
         if field == "Comment": # make {"Comment": {"mood": "cheerful"}}
             if "Comment" not in qualifiable:
@@ -226,21 +226,19 @@ class AssayEntries(StudyEntries):
 class IsaZip:
     """Stores GLDS ISA information retrieved from ISA ZIP file stream"""
  
-    def __init__(self, isa_file):
+    def __init__(self, data, logger_info):
         """Unpack ZIP from URL and delegate to sub-parsers"""
-        info = dict(url=isa_file.url)
-        self.raw = self._ingest_raw_isa(isa_file)
+        self.raw = self._ingest_raw_isa(data, logger_info)
         self.investigation = Investigation(self.raw.investigation)
-        self.studies = StudyEntries(self.raw.studies, **info)
-        self.assays = AssayEntries(self.raw.assays, **info)
+        self.studies = StudyEntries(self.raw.studies, logger_info)
+        self.assays = AssayEntries(self.raw.assays, logger_info)
  
-    def _ingest_raw_isa(self, isa_file):
+    def _ingest_raw_isa(self, data, logger_info):
         """Unpack ZIP from URL and delegate to top-level parsers"""
         raw = SimpleNamespace(investigation=None, studies={}, assays={})
-        with ZipFile(BytesIO(isa_file.data)) as archive:
+        with ZipFile(BytesIO(data)) as archive:
             for filepath in archive.namelist():
                 _, filename = path.split(filepath)
-                info = dict(url=isa_file.url, filename=filename)
                 matcher = search(r'^([isa])_(.+)\.txt$', filename)
                 if matcher:
                     kind, name = matcher.groups()
@@ -250,14 +248,14 @@ class IsaZip:
                             raw.investigation = reader(handle)
                         elif kind == "s":
                             reader = self._read_tab
-                            raw.studies[name] = reader(handle, **info)
+                            raw.studies[name] = reader(handle, logger_info)
                         elif kind == "a":
                             reader = self._read_tab
-                            raw.assays[name] = reader(handle, **info)
+                            raw.assays[name] = reader(handle, logger_info)
         for tab, value in raw.__dict__.items():
             if not value:
                 raise GeneLabISAException(
-                    "Missing ISA tab", url=isa_file.url, tab=tab,
+                    "Missing ISA tab", tab=tab, **logger_info,
                 )
         return raw
  
@@ -272,7 +270,7 @@ class IsaZip:
         getLogger("isatools").setLevel(CRITICAL+1)
         return load_investigation(safe_handle)
  
-    def _read_tab(self, handle, **logger_info):
+    def _read_tab(self, handle, logger_info):
         """Read TSV file, absorbing encoding errors, and allowing for duplicate column names"""
         byte_tee = BytesIO(handle.read())
         reader_kwargs = dict(

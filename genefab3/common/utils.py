@@ -1,7 +1,28 @@
+from requests import head as request_head
+from urllib.request import urlopen
+from urllib.error import URLError
 from os import path
 from re import sub, escape
 from copy import deepcopy
 from pandas import DataFrame, Series
+
+
+def WithEitherURL(method, _urls, _target_arg="url", **kwargs):
+    """Iterate `urls` and call `method` with the first reachable URL"""
+    for url in _urls:
+        with request_head(url, allow_redirects=True) as response:
+            if response.ok:
+                return method(**kwargs, **{_target_arg: url})
+    else:
+        for url in _urls:
+            try:
+                urlopen(url)
+            except URLError:
+                continue
+            else:
+                return method(**kwargs, **{_target_arg: url})
+        else:
+            raise URLError(f"No URLs are reachable: {_urls}")
 
 
 def walk_up(from_path, n_steps):
