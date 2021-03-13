@@ -38,3 +38,7 @@ class Dataset():
         pass
         # TODO: sample_records (converted from self.isa) to be cached into mongo
         # TODO: file_descriptors to be cached into mongo
+
+
+class Assay():
+    pass

@@ -7,11 +7,11 @@ from logging import Handler
 
 class GeneLabException(Exception):
     def __init__(self, message="Error", accession_or_object=None, explicit_assay_name=None, **kwargs):
-        from genefab3.common.types import DatasetBaseClass, AssayBaseClass
+        from genefab3.isa.types import Dataset, Assay
         args = [message]
-        if isinstance(accession_or_object, DatasetBaseClass):
+        if isinstance(accession_or_object, Dataset):
             accession, assay_name = accession_or_object.accession, None
-        elif isinstance(accession_or_object, AssayBaseClass):
+        elif isinstance(accession_or_object, Assay):
             accession = accession_or_object.dataset.accession
             assay_name = accession_or_object.name
         elif accession_or_object is None:
