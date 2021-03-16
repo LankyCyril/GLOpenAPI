@@ -2,6 +2,8 @@ from pandas import isnull
 from functools import partial
 from bson.errors import InvalidDocument as InvalidDocumentError
 from collections.abc import ValuesView
+from logging import getLogger
+from genefab3.common.exceptions import GeneLabDatabaseException
 
 
 def isempty(v):
@@ -59,3 +61,46 @@ def harmonize_document(query, lowercase=True, units_format=None, dropna=True, de
         return query
     else:
         return {}
+
+
+INSERT_MANY_ERROR = "run_mongo_transaction('insert_many') without documents"
+ACTION_ERROR = "run_mongo_transaction() with an unsupported action"
+
+
+def run_mongo_transaction(action, collection, *, query=None, data=None, documents=None):
+    """Shortcut to replace/delete/insert all matching instances in one transaction"""
+    error_message, unused_arguments = None, None
+    with collection.database.client.start_session() as session:
+        with session.start_transaction():
+            if action == "replace":
+                if (query is not None) and (data is not None):
+                    collection.delete_many(query)
+                    collection.insert_one({**query, **data})
+                    if documents is not None:
+                        unused_arguments = "`documents`"
+                else:
+                    error_message = "no `query` and/or `data` specified"
+            elif action == "delete_many":
+                if query is not None:
+                    collection.delete_many(query)
+                    if (data is not None) or (documents is not None):
+                        unused_arguments = "`data`, `documents`"
+                else:
+                    error_message = "no `query` specified"
+            elif action == "insert_many":
+                if documents is not None:
+                    collection.insert_many(documents)
+                    if (query is not None) or (data is not None):
+                        unused_arguments = "`query`, `data`"
+                else:
+                    error_message = "no `documents` specified"
+            else:
+                error_message = "unsupported action"
+    if unused_arguments:
+        message = "run_mongo_transaction('%s'): %s unused in this action"
+        getLogger("genefab3").warning(message, action, unused_arguments)
+    if error_message:
+        raise GeneLabDatabaseException(
+            error_message, action=action, collection=collection,
+            query=query, data=data, documents=documents,
+        )

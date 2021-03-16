@@ -30,8 +30,7 @@ class Dataset():
                 data=isa_file.data,
                 logger_info=dict(filename=isa_file.name, url=isa_file.url),
             )
-            self.changed = None # TODO: detect any changes in `files`
-            self.changed = self.changed or isa_file.changed
+            self.isa.changed = isa_file.changed
  
     @property
     def samples(self):
