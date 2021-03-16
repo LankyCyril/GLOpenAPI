@@ -10,22 +10,24 @@ class GeneLabException(Exception):
         from genefab3.isa.types import Dataset, Assay
         args = [message]
         if isinstance(accession_or_object, Dataset):
-            accession, assay_name = accession_or_object.accession, None
+            self.accession = accession_or_object.accession
+            self.assay_name = None
         elif isinstance(accession_or_object, Assay):
-            accession = accession_or_object.dataset.accession
-            assay_name = accession_or_object.name
+            self.accession = accession_or_object.dataset.accession
+            self.assay_name = accession_or_object.name
         elif accession_or_object is None:
-            accession, assay_name = None, None
+            self.accession, self.assay_name = None, None
         else:
-            accession, assay_name = str(accession_or_object), None
+            self.accession, self.assay_name = str(accession_or_object), None
         if explicit_assay_name is not None:
-            assay_name = explicit_assay_name
-        if accession is not None:
-            args.append(f'accession="{accession}"')
-        if assay_name is not None:
-            args.append(f'assay.name="{assay_name}"')
-        for k, v in kwargs.items():
-            args.append(f'{k}="{v}"')
+            self.assay_name = explicit_assay_name
+        if self.accession is not None:
+            args.append(f'accession="{self.accession}"')
+        if self.assay_name is not None:
+            args.append(f'assay.name="{self.assay_name}"')
+        self.kwargs = kwargs
+        for k, v in self.kwargs.items():
+            args.append(f'{k}={repr(v)}')
         super().__init__(*args)
     def __str__(self):
         if len(self.args) == 0:
