@@ -1,5 +1,6 @@
 from json import dumps
 from base64 import encodebytes
+from zlib import compress
 from genefab3.common.exceptions import GeneLabConfigurationException
 from genefab3.db.mongo.utils import run_mongo_transaction
 
@@ -22,8 +23,8 @@ class CachedDocumentByValue():
         else:
             self.identifier, self.value = identifier, value
             try:
-                self.base64value = encodebytes(
-                    dumps(value, sort_keys=True).encode(),
+                self.base64value = compress(
+                    encodebytes(dumps(value, sort_keys=True).encode()),
                 )
             except TypeError as e:
                 raise GeneLabConfigurationException(
