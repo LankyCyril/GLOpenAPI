@@ -2,7 +2,7 @@ from contextlib import closing
 from sqlite3 import connect
 from pandas import read_sql, concat
 from pandas.io.sql import DatabaseError as PandasDatabaseError
-from genefab3.common.exceptions import GeneLabFileException
+from genefab3.common.exceptions import GeneFabFileException
 from genefab3.backend.sql.table import CachedTable
 from genefab3.config import ROW_TYPES
 
@@ -33,11 +33,11 @@ def get_sql_data(dbs, raw_annotation, datatype, rows=None):
     for _, (accession, assay_name, sample_names, _, file_descriptors) in agg:
         file_descriptors_as_set = set(file_descriptors)
         if len(file_descriptors_as_set) == 0:
-            raise GeneLabFileException(
+            raise GeneFabFileException(
                 NO_FILES_ERROR, accession, assay_name, datatype=datatype,
             )
         elif len(file_descriptors_as_set) > 1:
-            raise GeneLabFileException(
+            raise GeneFabFileException(
                 AMBIGUOUS_FILES_ERROR, accession, assay_name, datatype=datatype,
             )
         else:

@@ -1,7 +1,7 @@
 from urllib.request import urlopen
 from json import loads
 from natsort import natsorted
-from genefab3.common.exceptions import GeneLabJSONException
+from genefab3.common.exceptions import GeneFabJSONException
 from pandas import json_normalize, Timestamp
 from urllib.parse import quote
 from re import search
@@ -89,12 +89,12 @@ def get_dataset_files(accession):
         assert len(glds_json) == 1
         _id = glds_json[0]["_id"]
     except (AssertionError, IndexError, KeyError, TypeError):
-        raise GeneLabJSONException("Malformed GLDS JSON", accession)
+        raise GeneFabJSONException("Malformed GLDS JSON", accession)
     try:
         filelisting_entries = read_json(COLD_FILELISTINGS_MASK.format(_id))
         assert isinstance(filelisting_entries, list)
     except AssertionError:
-        raise GeneLabJSONException("Malformed 'filelistings' JSON", _id=_id)
+        raise GeneFabJSONException("Malformed 'filelistings' JSON", _id=_id)
     else:
         files = json_normalize(filelisting_entries)
     files["date_created"] = as_timestamp(files, "date_created")
@@ -115,4 +115,4 @@ def get_genelab_accessions():
             read_json(COLD_SEARCH_MASK.format(n_datasets))["hits"]["hits"]
         )
     except (KeyError, TypeError):
-        raise GeneLabJSONException("Malformed GeneLab search JSON")
+        raise GeneFabJSONException("Malformed GeneLab search JSON")

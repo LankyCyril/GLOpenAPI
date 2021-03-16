@@ -6,7 +6,7 @@ from genefab3.backend.sql.writers.data import recache_table
 from logging import getLogger, DEBUG
 from urllib.request import quote
 from genefab3.backend.mongo.utils import infer_file_separator
-from genefab3.common.exceptions import GeneLabDatabaseException
+from genefab3.common.exceptions import GeneFabDatabaseException
 from pandas import DataFrame, MultiIndex
 
 
@@ -78,14 +78,14 @@ class CachedTable():
                 drop_cached_file_descriptor_timestamp(
                     self.mongo_db, self.file,
                 )
-                raise GeneLabDatabaseException(
+                raise GeneFabDatabaseException(
                     MISSING_SQL_TABLE_ERROR, self.accession,
                     self.assay_name, datatype=self.datatype,
                 )
         else:
             data_subset = self.data if (rows is None) else self.data.loc[rows]
         if not (set(self.sample_names) <= set(data_subset.columns)):
-            raise GeneLabDatabaseException(
+            raise GeneFabDatabaseException(
                 MISSING_SAMPLE_NAMES_ERROR, self.accession, self.assay_name,
                 names=sorted(set(self.sample_names) - set(data_subset.columns)),
             )

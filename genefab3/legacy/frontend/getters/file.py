@@ -1,5 +1,5 @@
-from genefab3.common.exceptions import GeneLabFileException
-from genefab3.common.exceptions import GeneLabParserException
+from genefab3.common.exceptions import GeneFabFileException
+from genefab3.common.exceptions import GeneFabParserException
 from genefab3.backend.mongo.dataset import CachedDataset
 from urllib.request import urlopen
 
@@ -32,11 +32,11 @@ def get_file(mongo_db, context):
         else: # search in entire dataset
             file_descriptors = glds.get_file_descriptors(**lookup_kwargs)
     except ValueError:
-        raise GeneLabParserException("No search criteria specified")
+        raise GeneFabParserException("No search criteria specified")
     if not file_descriptors:
-        raise GeneLabFileException("Requested file not found")
+        raise GeneFabFileException("Requested file not found")
     elif len(file_descriptors) > 1:
-        raise GeneLabFileException("Multiple files match search criteria")
+        raise GeneFabFileException("Multiple files match search criteria")
     else:
         with urlopen(file_descriptors[0].url) as response:
             return response.read()

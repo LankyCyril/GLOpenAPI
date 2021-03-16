@@ -1,4 +1,4 @@
-from genefab3.common.exceptions import GeneLabFormatException
+from genefab3.common.exceptions import GeneFabFormatException
 from re import sub
 from pandas import DataFrame, Series
 from flask import Response
@@ -24,10 +24,10 @@ def is_continuous(continuous, dataframe, target):
 def render_cls(obj, context, continuous="infer", space_sub=lambda s: sub(r'\s', "", s)):
     """Convert a presumed annotation/factor dataframe to CLS format"""
     if (not isinstance(obj, DataFrame)) or (obj.columns.nlevels != 2):
-        raise GeneLabFormatException(OBJECT_TYPE_ERROR, format="cls")
+        raise GeneFabFormatException(OBJECT_TYPE_ERROR, format="cls")
     target_columns = [(l0, l1) for (l0, l1) in obj.columns if l0 != "info"]
     if len(target_columns) != 1:
-        raise GeneLabFormatException(
+        raise GeneFabFormatException(
             FIELD_COUNT_ERROR, columns=target_columns, format="cls",
         )
     else:

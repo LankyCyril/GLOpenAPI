@@ -1,6 +1,6 @@
 from genefab3.common.utils import iterate_terminal_leaves
-from genefab3.common.exceptions import GeneLabDatabaseException
-from genefab3.common.exceptions import GeneLabFileException
+from genefab3.common.exceptions import GeneFabDatabaseException
+from genefab3.common.exceptions import GeneFabFileException
 from re import split, search, IGNORECASE
 
 
@@ -11,7 +11,7 @@ def iterate_terminal_leaf_filenames(d):
             if isinstance(value, str):
                 yield from split(r'\s*,\s*', value)
     except ValueError as e:
-        raise GeneLabDatabaseException(
+        raise GeneFabDatabaseException(
             "Document branch exceeds nestedness threshold",
             max_steps=e.args[1],
         )
@@ -24,4 +24,4 @@ def infer_file_separator(filename):
     elif search(r'\.tsv(\.gz)?$', filename, flags=IGNORECASE):
         return "\t"
     else:
-        raise GeneLabFileException("Unknown file format", filename=filename)
+        raise GeneFabFileException("Unknown file format", filename=filename)

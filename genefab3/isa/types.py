@@ -1,4 +1,4 @@
-from genefab3.common.exceptions import GeneLabFileException, GeneLabISAException
+from genefab3.common.exceptions import GeneFabFileException, GeneFabISAException
 from genefab3.common.utils import pick_reachable_url
 from genefab3.db.sql.file import CachedBinaryFile
 from genefab3.isa.parser import IsaZip
@@ -15,7 +15,7 @@ class Dataset():
             if descriptor.get("datatype") == "isa"
         }
         if len(isa_files) != 1:
-            raise GeneLabFileException(
+            raise GeneFabFileException(
                 "File entries for Dataset must contain exactly one ISA file",
                 accession, filenames=sorted(isa_files),
             )
@@ -102,7 +102,7 @@ class Sample(dict):
         try:
             return entry[key][subkey]
         except (TypeError, KeyError):
-            raise GeneLabISAException(
+            raise GeneFabISAException(
                 "Could not retrieve value of `key.subkey` from Assay entry",
                 self.dataset, key=key, subkey=subkey,
             )
@@ -114,12 +114,12 @@ class Sample(dict):
             if "" in branch:
                 values.add(branch[""])
         if len(values) == 0:
-            raise GeneLabISAException(
+            raise GeneFabISAException(
                 "Could not retrieve any value of `key` from Assay entry",
                 self.dataset, assay_name=self.assay_name, key=key,
             )
         elif len(values) > 1:
-            raise GeneLabISAException(
+            raise GeneFabISAException(
                 f"Ambiguous values of `key` for one Assay entry",
                 self.dataset, assay_name=self.assay_name,
                 key=key, values=sorted(values),

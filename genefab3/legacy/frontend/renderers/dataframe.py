@@ -7,7 +7,7 @@ from genefab3.frontend.renderers.formatters import get_browser_formatters
 from genefab3.frontend.renderers.formatters import build_url
 from genefab3.common.utils import map_replace
 from flask import Response
-from genefab3.common.exceptions import GeneLabFormatException
+from genefab3.common.exceptions import GeneFabFormatException
 
 
 DF_KWS = dict(index=False, header=False, na_rep="NA")
@@ -118,7 +118,7 @@ def render_dataframe(df, context):
         content = get_browser_dataframe(df, context)
         mimetype = "text/html"
     else:
-        raise GeneLabFormatException(
+        raise GeneFabFormatException(
             "Unknown format", format=context.kwargs["format"],
         )
     return Response(content, mimetype=mimetype)

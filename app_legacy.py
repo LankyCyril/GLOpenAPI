@@ -6,7 +6,7 @@ from pymongo import MongoClient
 from genefab3.config import MONGO_CLIENT_PARAMETERS, MONGO_DB_NAME
 from genefab3.config import RESPONSE_CACHE, SQLITE_DB
 from pymongo.errors import ServerSelectionTimeoutError
-from genefab3.common.exceptions import GeneLabDatabaseException
+from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.frontend.utils import is_flask_reloaded, is_debug
 from genefab3.backend.background import CacherThread
 from genefab3.common.exceptions import traceback_printer, exception_catcher
@@ -27,7 +27,7 @@ mongo_client = MongoClient(**MONGO_CLIENT_PARAMETERS)
 try:
     mongo_client.server_info()
 except ServerSelectionTimeoutError:
-    raise GeneLabDatabaseException("Could not connect (sensitive info hidden)")
+    raise GeneFabDatabaseException("Could not connect (sensitive info hidden)")
 else:
     mongo_db = getattr(mongo_client, MONGO_DB_NAME)
 

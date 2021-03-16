@@ -5,7 +5,7 @@ from genefab3.common.types import UniversalSet
 from collections import defaultdict, OrderedDict
 from werkzeug.datastructures import MultiDict
 from genefab3.config import DISALLOWED_CONTEXTS
-from genefab3.common.exceptions import GeneLabParserException
+from genefab3.common.exceptions import GeneFabParserException
 from urllib.request import quote
 from json import dumps
 
@@ -138,12 +138,12 @@ def validate_context(context):
                     f2(f1(getattr(context, attribute), v1), v2)
                 )
         if scenario_matches:
-            raise GeneLabParserException(scenario["_"])
+            raise GeneFabParserException(scenario["_"])
     trailing_keys = set(context.kwargs) - {
         "datatype", "filename", "format", "debug",
     }
     if trailing_keys:
-        raise GeneLabParserException(
+        raise GeneFabParserException(
             "Unrecognized arguments",
             **{k: context.kwargs[k] for k in trailing_keys}
         )

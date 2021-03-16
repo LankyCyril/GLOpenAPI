@@ -1,7 +1,7 @@
 from json import dumps
 from base64 import encodebytes
 from zlib import compress
-from genefab3.common.exceptions import GeneLabConfigurationException
+from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.db.mongo.utils import run_mongo_transaction
 
 
@@ -11,12 +11,12 @@ class CachedDocumentByValue():
     def __init__(self, identifier, collection, value):
         """Match existing documents by base64-encoded `value`, update if changed, report state in self.changed"""
         if not isinstance(identifier, dict):
-            raise GeneLabConfigurationException(
+            raise GeneFabConfigurationException(
                 "CachedDocumentByValue(): `identifier` is not a dictionary",
                 identifier=identifier,
             )
         elif "base64value" in identifier:
-            raise GeneLabConfigurationException(
+            raise GeneFabConfigurationException(
                 "CachedDocumentByValue(): `identifier` uses a reserved key",
                 identifier=identifier, key="base64value",
             )
@@ -27,7 +27,7 @@ class CachedDocumentByValue():
                     encodebytes(dumps(value, sort_keys=True).encode()),
                 )
             except TypeError as e:
-                raise GeneLabConfigurationException(
+                raise GeneFabConfigurationException(
                     "CachedDocumentByValue(): " + str(e),
                     identifier=identifier, value=value,
                 )

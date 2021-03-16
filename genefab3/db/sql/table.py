@@ -1,5 +1,5 @@
 from genefab3.db.sql.object import SQLiteObject
-from genefab3.common.exceptions import GeneLabDatabaseException
+from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.types import passthrough
 
 
@@ -8,7 +8,7 @@ class SQLiteTable(SQLiteObject):
  
     def __init__(self, data_getter, sqlite_db, table, timestamp_table, identifier, timestamp):
         if table == timestamp_table:
-            raise GeneLabDatabaseException(
+            raise GeneFabDatabaseException(
                 "Table name cannot be equal to a reserved table name",
                 table=table, identifier=identifier,
             )

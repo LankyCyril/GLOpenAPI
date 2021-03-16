@@ -5,7 +5,7 @@ from traceback import format_tb
 from logging import Handler
 
 
-class GeneLabException(Exception):
+class GeneFabException(Exception):
     def __init__(self, message="Error", accession_or_object=None, explicit_assay_name=None, **kwargs):
         from genefab3.isa.types import Dataset, Assay
         args = [message]
@@ -38,15 +38,15 @@ class GeneLabException(Exception):
             return self.args[0] + ". Happened with: " + ", ".join(self.args[1:])
 
 
-class GeneLabConfigurationException(GeneLabException): pass
-class GeneLabParserException(GeneLabException): pass
-class GeneLabMetadataException(GeneLabException): pass
-class GeneLabDatabaseException(GeneLabException): pass
-class GeneLabJSONException(GeneLabException): pass
-class GeneLabISAException(GeneLabException): pass
-class GeneLabFileException(GeneLabException): pass
-class GeneLabDataManagerException(GeneLabException): pass
-class GeneLabFormatException(GeneLabException): pass
+class GeneFabConfigurationException(GeneFabException): pass
+class GeneFabParserException(GeneFabException): pass
+class GeneFabMetadataException(GeneFabException): pass
+class GeneFabDatabaseException(GeneFabException): pass
+class GeneFabJSONException(GeneFabException): pass
+class GeneFabISAException(GeneFabException): pass
+class GeneFabFileException(GeneFabException): pass
+class GeneFabDataManagerException(GeneFabException): pass
+class GeneFabFormatException(GeneFabException): pass
 
 
 HTTP_ERROR_MASK = """<html>
@@ -101,9 +101,9 @@ def exception_catcher(e, mongo_db, cname):
         code, explanation = 404, "Not Found"
     elif isinstance(e, NotImplementedError):
         code, explanation = 501, "Not Implemented"
-    elif isinstance(e, GeneLabDataManagerException):
+    elif isinstance(e, GeneFabDataManagerException):
         code, explanation = 500, "GeneLab Data Manager Internal Server Error"
-    elif isinstance(e, GeneLabDatabaseException):
+    elif isinstance(e, GeneFabDatabaseException):
         code, explanation = 500, "GeneLab Database Error"
     else:
         code, explanation = 400, "Bad Request"

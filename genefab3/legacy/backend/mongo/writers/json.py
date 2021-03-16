@@ -2,7 +2,7 @@ from genefab3.config import MAX_JSON_AGE, COLLECTION_NAMES
 from datetime import datetime
 from pymongo import DESCENDING
 from genefab3.coldstorage.json import download_cold_json
-from genefab3.common.exceptions import GeneLabJSONException
+from genefab3.common.exceptions import GeneFabJSONException
 from genefab3.backend.mongo.utils import run_mongo_transaction
 
 
@@ -31,7 +31,7 @@ def get_fresh_json(mongo_db, identifier, kind="other", max_age=MAX_JSON_AGE, rep
             try:
                 fresh_json, json_changed = json_cache_info["raw"], False
             except (TypeError, KeyError):
-                raise GeneLabJSONException(
+                raise GeneFabJSONException(
                     "Cannot retrieve cold storage JSON", identifier=identifier,
                 )
         else:

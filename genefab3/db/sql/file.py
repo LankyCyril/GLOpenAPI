@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 from shutil import copyfileobj
 from os import path
 from csv import Error as CSVError, Sniffer
-from genefab3.common.exceptions import GeneLabFileException
+from genefab3.common.exceptions import GeneFabFileException
 from pandas import read_csv
 from pandas.errors import ParserError as PandasParserError
 
@@ -77,6 +77,6 @@ class CachedTableFile(HashableEnough, SQLiteTable):
                     url, sep=sep, compression=compression, **pandas_kws,
                 )
             except (IOError, UnicodeDecodeError, CSVError, PandasParserError):
-                raise GeneLabFileException(
+                raise GeneFabFileException(
                     "Not recognized as a table file", name=self.name, url=url,
                 )

@@ -1,4 +1,4 @@
-from genefab3.common.exceptions import GeneLabException, GeneLabFormatException
+from genefab3.common.exceptions import GeneFabException, GeneFabFormatException
 from genefab3.frontend.renderers.raw import render_raw
 from genefab3.frontend.renderers.cls import render_cls
 from genefab3.frontend.renderers.gct import render_gct
@@ -6,7 +6,7 @@ from pandas import DataFrame, MultiIndex
 from genefab3.frontend.renderers.dataframe import render_dataframe
 from genefab3.common.utils import get_attribute
 from genefab3.frontend.parser import parse_request
-from genefab3.common.exceptions import GeneLabParserException
+from genefab3.common.exceptions import GeneFabParserException
 from genefab3.frontend.renderers.forms import needs_datatype, render_dropdown
 from genefab3.frontend.utils import is_debug
 from json import dumps
@@ -19,7 +19,7 @@ from itertools import cycle
 def render_as_format(obj, context):
     """Invoke renderer based on requested format"""
     if obj is None:
-        raise GeneLabException("No data")
+        raise GeneFabException("No data")
     elif context.kwargs["format"] == "raw":
         return render_raw(obj, context)
     elif context.kwargs["format"] == "cls":
@@ -29,7 +29,7 @@ def render_as_format(obj, context):
     elif isinstance(obj, DataFrame):
         return render_dataframe(obj, context)
     else:
-        raise GeneLabFormatException(
+        raise GeneFabFormatException(
             "Formatting of unsupported object type",
             object_type=type(obj).__name__, format=context.kwargs.get("format"),
         )
@@ -58,7 +58,7 @@ def render(db, getter, kwargs, request):
     """Generate object with `getter` and `**kwargs`, dispatch object and trailing request arguments to renderer"""
     try:
         context = parse_request(request)
-    except GeneLabParserException as e:
+    except GeneFabParserException as e:
         if needs_datatype(e) and (request.args.get("format") == "browser"):
             return render_dropdown("datatype", None)
         else:

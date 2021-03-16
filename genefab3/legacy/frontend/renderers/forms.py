@@ -1,4 +1,4 @@
-from genefab3.common.exceptions import GeneLabParserException
+from genefab3.common.exceptions import GeneFabParserException
 from flask import Response
 
 
@@ -25,7 +25,7 @@ function follow() {
 
 
 def needs_datatype(e):
-    return isinstance(e, GeneLabParserException) and ("datatype=" in str(e))
+    return isinstance(e, GeneFabParserException) and ("datatype=" in str(e))
 
 
 def render_dropdown(obj, context):

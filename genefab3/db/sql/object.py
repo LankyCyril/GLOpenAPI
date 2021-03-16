@@ -1,5 +1,5 @@
 from genefab3.common.utils import iterate_terminal_leaves
-from genefab3.common.exceptions import GeneLabDatabaseException
+from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.types import ImmutableTree, PlaceholderLogger
 from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
@@ -27,7 +27,7 @@ class SQLiteObject():
         """Parse the update/retrieve spec and the re-cache trigger condition; create tables if they do not exist"""
         self.__sqlite_db, self.__table_schemas = sqlite_db, table_schemas
         if len(signature) != 1:
-            raise GeneLabDatabaseException(
+            raise GeneFabDatabaseException(
                 "SQLiteObject(): Only one 'identifier' field can be specified",
                 signatures=signature,
             )
@@ -38,7 +38,7 @@ class SQLiteObject():
             try:
                 self.__signature = ImmutableTree(signature)
             except ValueError:
-                raise GeneLabDatabaseException(
+                raise GeneFabDatabaseException(
                     "SQLiteObject(): Bad signature", signature=signature,
                 )
         if sqlite_db is not None: # TODO: auto_vacuum
@@ -50,7 +50,7 @@ class SQLiteObject():
             self.__retrieve_spec = ImmutableTree(retrieve)
             self.__update_spec = ImmutableTree(update)
         except ValueError:
-            raise GeneLabDatabaseException(
+            raise GeneFabDatabaseException(
                 "SQLiteObject(): Bad spec",
                 trigger=trigger, update=update, retrieve=retrieve,
             )
@@ -148,14 +148,14 @@ class SQLiteObject():
             """
             ret = connection.cursor().execute(query).fetchall()
             if len(ret) == 0:
-                raise GeneLabDatabaseException(
+                raise GeneFabDatabaseException(
                     "No data found", signature=self.__signature,
                 )
             elif (len(ret) == 1) and (len(ret[0]) == 1):
                 return postprocess_function(ret[0][0])
             else:
                 self.__drop_self_from(connection, table)
-                raise GeneLabDatabaseException(
+                raise GeneFabDatabaseException(
                     "Entries conflict (will attempt to fix on next request)",
                     signature=self.__signature,
                 )
@@ -169,14 +169,14 @@ class SQLiteObject():
                     read_sql(query, connection, index_col="index"),
                 )
             except (OperationalError, DatabaseError):
-                raise GeneLabDatabaseException(
+                raise GeneFabDatabaseException(
                     "No data found", signature=self.__signature,
                 )
  
     def __retrieve(self):
         """Retrieve target table or table field from database"""
         if not is_singular_spec(self.__retrieve_spec):
-            raise GeneLabDatabaseException(
+            raise GeneFabDatabaseException(
                 "SQLiteObject(): Only one 'retrieve' field can be specified",
                 signature=self.__signature,
             )
@@ -194,7 +194,7 @@ class SQLiteObject():
     def data(self):
         """Main interface: returns data associated with this SQLiteObject; will have auto-updated itself in the process if necessary"""
         if not is_singular_spec(self.__trigger_spec):
-            raise GeneLabDatabaseException(
+            raise GeneFabDatabaseException(
                 "SQLiteObject(): Only one 'trigger' field can be specified",
                 signature=self.__signature,
             )

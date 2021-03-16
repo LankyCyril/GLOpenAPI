@@ -1,6 +1,6 @@
 from urllib.request import urlopen
 from json import loads
-from genefab3.common.exceptions import GeneLabJSONException, GeneLabFileException
+from genefab3.common.exceptions import GeneFabJSONException, GeneFabFileException
 from genefab3.db.types import Dataset
 from memoized_property import memoized_property
 from pandas import json_normalize, isnull, Timestamp
@@ -29,7 +29,7 @@ def GeneLabAccessionEnumerator():
             read_json(COLD_SEARCH_MASK.format(n_datasets))["hits"]["hits"]
         }
     except (KeyError, TypeError):
-        raise GeneLabJSONException("Malformed GeneLab search JSON")
+        raise GeneFabJSONException("Malformed GeneLab search JSON")
 
 
 class GeneLabDataset(Dataset):
@@ -41,12 +41,12 @@ class GeneLabDataset(Dataset):
             assert len(glds_json) == 1
             _id = glds_json[0]["_id"]
         except (AssertionError, IndexError, KeyError, TypeError):
-            raise GeneLabJSONException("Malformed GLDS JSON", self.accession)
+            raise GeneFabJSONException("Malformed GLDS JSON", self.accession)
         try:
             filelisting_entries = read_json(COLD_FILELISTINGS_MASK.format(_id))
             assert isinstance(filelisting_entries, list)
         except AssertionError:
-            raise GeneLabJSONException("Malformed 'filelistings' JSON", _id=_id)
+            raise GeneFabJSONException("Malformed 'filelistings' JSON", _id=_id)
         else:
             files = json_normalize(filelisting_entries)
         if "date_created" in files:
@@ -77,12 +77,12 @@ class GeneLabDataset(Dataset):
             if search(ISA_ZIP_REGEX, filename)
         }
         if len(candidates) == 0:
-            raise GeneLabFileException("ISA ZIP not found", self.accession)
+            raise GeneFabFileException("ISA ZIP not found", self.accession)
         elif len(candidates) == 1:
             filename = candidates.pop()
             return {filename: self.file_descriptors[filename]}
         else:
-            raise GeneLabFileException(
+            raise GeneFabFileException(
                 "Multiple ambiguous ISA ZIPs", self.accession,
                 filenames=sorted(candidates),
             )

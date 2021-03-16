@@ -5,7 +5,7 @@ from flask_compress import Compress
 from pymongo import MongoClient
 from genefab3.config import MONGO_CLIENT_PARAMETERS, MONGO_DB_NAME
 from pymongo.errors import ServerSelectionTimeoutError
-from genefab3.common.exceptions import GeneLabDatabaseException
+from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.client import GeneFabClient
 from genefab3.config import LOCALE, SQLITE_BLOBS, SQLITE_TABLES, SQLITE_CACHE
 from genefab3_genelab_adapter import GeneLabAccessionEnumerator, GeneLabDataset
@@ -22,7 +22,7 @@ mongo_client = MongoClient(**MONGO_CLIENT_PARAMETERS)
 try:
     mongo_client.server_info()
 except ServerSelectionTimeoutError:
-    raise GeneLabDatabaseException("Could not connect (sensitive info hidden)")
+    raise GeneFabDatabaseException("Could not connect (sensitive info hidden)")
 else:
     mongo_db = getattr(mongo_client, MONGO_DB_NAME)
 

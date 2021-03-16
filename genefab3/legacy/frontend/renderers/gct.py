@@ -1,4 +1,4 @@
-from genefab3.common.exceptions import GeneLabFormatException
+from genefab3.common.exceptions import GeneFabFormatException
 from pandas import DataFrame
 from re import sub, MULTILINE
 from flask import Response
@@ -16,7 +16,7 @@ GCT_SUB_KWS = dict(pattern=r'^(.+?\t)', repl=r'\1\1', flags=MULTILINE)
 def render_gct(obj, context):
     """Convert a presumed data dataframe to GCT format"""
     if (not isinstance(obj, DataFrame)) or (obj.columns.nlevels != 3):
-        raise GeneLabFormatException(OBJECT_TYPE_ERROR, format="gct")
+        raise GeneFabFormatException(OBJECT_TYPE_ERROR, format="gct")
     return Response(
         response=(
             "#1.2\n{}\t{}\n".format(obj.shape[0], obj.shape[1]-1) +

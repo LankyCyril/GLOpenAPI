@@ -1,4 +1,4 @@
-from genefab3.common.exceptions import GeneLabConfigurationException
+from genefab3.common.exceptions import GeneFabConfigurationException
 
 
 class GeneFabClient():
@@ -16,7 +16,7 @@ class GeneFabClient():
         """Initialize metadata and response cachers, pass DatasetFactory and Dataset to them"""
         self.locale, self.mongo_db = locale, mongo_db
         if len(set(sqlite_blobs, sqlite_tables, sqlite_cache)) != 3:
-            raise GeneLabConfigurationException(
+            raise GeneFabConfigurationException(
                 "SQLite databases must all be distinct to avoid name conflicts",
                 sqlite_blobs=sqlite_blobs, sqlite_tables=sqlite_tables,
                 sqlite_cache=sqlite_cache,

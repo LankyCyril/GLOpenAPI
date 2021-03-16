@@ -1,4 +1,4 @@
-from genefab3.common.exceptions import GeneLabDataManagerException
+from genefab3.common.exceptions import GeneFabDataManagerException
 
 
 class FileDescriptor():
@@ -8,7 +8,7 @@ class FileDescriptor():
     @property
     def url(self):
         if self._url is None:
-            raise GeneLabDataManagerException("No URL for file", name=self.name)
+            raise GeneFabDataManagerException("No URL for file", name=self.name)
         else:
             return self._url
     @property

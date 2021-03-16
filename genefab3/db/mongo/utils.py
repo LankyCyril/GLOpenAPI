@@ -3,7 +3,7 @@ from functools import partial
 from bson.errors import InvalidDocument as InvalidDocumentError
 from collections.abc import ValuesView
 from logging import getLogger
-from genefab3.common.exceptions import GeneLabDatabaseException
+from genefab3.common.exceptions import GeneFabDatabaseException
 
 
 def isempty(v):
@@ -100,7 +100,7 @@ def run_mongo_transaction(action, collection, *, query=None, data=None, document
         message = "run_mongo_transaction('%s'): %s unused in this action"
         getLogger("genefab3").warning(message, action, unused_arguments)
     if error_message:
-        raise GeneLabDatabaseException(
+        raise GeneFabDatabaseException(
             error_message, action=action, collection=collection,
             query=query, data=data, documents=documents,
         )

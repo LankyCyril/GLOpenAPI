@@ -1,7 +1,7 @@
 from genefab3.config import COLLECTION_NAMES, MONGO_DB_LOCALE
 from genefab3.config import METADATA_INDEX_WAIT_DELAY, METADATA_INDEX_WAIT_STEP
 from time import sleep
-from genefab3.common.exceptions import GeneLabDatabaseException
+from genefab3.common.exceptions import GeneFabDatabaseException
 from pymongo import ASCENDING
 from pandas import json_normalize, MultiIndex, isnull
 from types import SimpleNamespace
@@ -16,7 +16,7 @@ def get_raw_metadata_dataframe(mongo_db, query, projection, include, cname=COLLE
         else:
             sleep(METADATA_INDEX_WAIT_STEP)
     else:
-        raise GeneLabDatabaseException(
+        raise GeneFabDatabaseException(
             "Could not retrieve sorted metadata (no index found)",
         )
     entries = metadata_collection.find(
@@ -32,7 +32,7 @@ def get_raw_metadata_dataframe(mongo_db, query, projection, include, cname=COLLE
     try:
         return json_normalize(list(entries))
     except Exception as e:
-        raise GeneLabDatabaseException(
+        raise GeneFabDatabaseException(
             "Could not retrieve sorted metadata",
             locale=MONGO_DB_LOCALE, reason=str(e),
         )

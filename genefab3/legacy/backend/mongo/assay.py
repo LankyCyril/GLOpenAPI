@@ -1,6 +1,6 @@
 from genefab3.common.types import AssayBaseClass
 from genefab3.config import COLLECTION_NAMES
-from genefab3.common.exceptions import GeneLabDatabaseException
+from genefab3.common.exceptions import GeneFabDatabaseException
 from re import escape
 from genefab3.common.types import UniversalSet
 from genefab3.backend.mongo.utils import iterate_terminal_leaf_filenames
@@ -25,8 +25,8 @@ class CachedAssay(AssayBaseClass):
         for entry in metadata_collection.find(query, proj):
             try:
                 yield from iterate_terminal_leaf_filenames(entry)
-            except GeneLabDatabaseException:
-                raise GeneLabDatabaseException(
+            except GeneFabDatabaseException:
+                raise GeneFabDatabaseException(
                     "Could not retrieve filenames from metadata fields",
                     fields=list(projection.keys()),
                 )

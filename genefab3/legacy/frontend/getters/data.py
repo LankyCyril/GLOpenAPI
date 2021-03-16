@@ -1,6 +1,6 @@
 from genefab3.backend.mongo.dataset import CachedDataset
-from genefab3.common.exceptions import GeneLabMetadataException
-from genefab3.common.exceptions import GeneLabFileException
+from genefab3.common.exceptions import GeneFabMetadataException
+from genefab3.common.exceptions import GeneFabFileException
 from genefab3.config import ISA_TECH_TYPE_LOCATOR, TECHNOLOGY_FILE_LOCATORS
 from pandas import merge
 from genefab3.backend.mongo.readers.metadata import get_raw_metadata_dataframe
@@ -22,11 +22,11 @@ def get_file_descriptor(mongo_db, accession, assay_name, target_file_locator, da
         projection={key: True for key in target_file_locator.keys},
     )
     if len(file_descriptors) == 0:
-        raise GeneLabFileException(
+        raise GeneFabFileException(
             NO_FILES_ERROR, accession, assay_name, datatype=datatype,
         )
     elif len(file_descriptors) > 1:
-        raise GeneLabFileException(
+        raise GeneFabFileException(
             AMBIGUOUS_FILES_ERROR, accession, assay_name, datatype=datatype,
         )
     else:
@@ -44,13 +44,13 @@ def infer_target_file_locator(raw_annotation, datatype):
             locator = TECHNOLOGY_FILE_LOCATORS[technology][datatype]
             target_file_locators.add(locator)
         except (KeyError, TypeError, IndexError):
-            raise GeneLabFileException(
+            raise GeneFabFileException(
                 NO_FILES_ERROR, technology=technology, datatype=datatype,
             )
     if len(target_file_locators) == 0:
-        raise GeneLabFileException(NO_FILES_ERROR, datatype=datatype)
+        raise GeneFabFileException(NO_FILES_ERROR, datatype=datatype)
     elif len(target_file_locators) > 1:
-        raise GeneLabMetadataException(
+        raise GeneFabMetadataException(
             MULTIPLE_TECHNOLOGIES_ERROR, technologies=technologies,
         )
     else:

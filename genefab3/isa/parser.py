@@ -1,5 +1,5 @@
 from logging import getLogger, CRITICAL
-from genefab3.common.exceptions import GeneLabISAException
+from genefab3.common.exceptions import GeneFabISAException
 from re import search, sub
 from collections import defaultdict
 from numpy import nan
@@ -37,7 +37,7 @@ class Investigation(dict):
                         else:
                             super().__setitem__(real_name, json[target])
                     except (TypeError, IndexError, KeyError):
-                        raise GeneLabISAException(
+                        raise GeneFabISAException(
                             "Unexpected structure of field", field=real_name,
                         )
                 elif target and pattern:
@@ -47,7 +47,7 @@ class Investigation(dict):
                             for entry in json
                         })
                     except (TypeError, AttributeError, IndexError, KeyError):
-                        raise GeneLabISAException(
+                        raise GeneFabISAException(
                             "Could not break up field by name", field=real_name,
                         )
                 else:
@@ -112,7 +112,7 @@ class StudyEntries(list):
             for _, row in raw_tab.iterrows():
                 if "Sample Name" not in row:
                     error = "Table entry must have 'Sample Name'"
-                    raise GeneLabISAException(error)
+                    raise GeneFabISAException(error)
                 else:
                     sample_name = row["Sample Name"]
                 json = self._row_to_json(row, name, logger_info)
@@ -121,7 +121,7 @@ class StudyEntries(list):
                     if sample_name in self._by_sample_name:
                         error_mask = "Duplicate Sample Name '{}' in studies"
                         error = error_mask.format(sample_name)
-                        raise GeneLabISAException(
+                        raise GeneFabISAException(
                             "Duplicate Sample Name in studies",
                             sample_name=sample_name,
                         )
@@ -131,7 +131,7 @@ class StudyEntries(list):
     def _abort_lookup(self):
         """Prevents ambiguous lookup through `self._by_sample_name` in inherited classes"""
         error_mask = "Unique look up by sample name within {} not allowed"
-        raise GeneLabISAException(error_mask.format(type(self).__name__))
+        raise GeneFabISAException(error_mask.format(type(self).__name__))
  
     def _row_to_json(self, row, name, logger_info):
         """Convert single row of table to nested JSON"""
@@ -152,7 +152,7 @@ class StudyEntries(list):
                     )
             else: # qualify entry at pointer with second-level field
                 if qualifiable is None:
-                    raise GeneLabISAException("Qualifier before main field")
+                    raise GeneFabISAException("Qualifier before main field")
                 else:
                     self._INPLACE_qualify(
                         qualifiable, field, subfield, value,
@@ -193,7 +193,7 @@ class StudyEntries(list):
             json[field] = {}
         if subfield in json[field]:
             error = "Duplicate '{}[{}]'".format(field, subfield)
-            raise GeneLabISAException(error)
+            raise GeneFabISAException(error)
         else: # make {"Characteristics": {"Age": {"": "36"}}}
             json[field][subfield] = {"": value}
             qualifiable = json[field][subfield]
@@ -254,7 +254,7 @@ class IsaZip:
                             raw.assays[name] = reader(handle, logger_info)
         for tab, value in raw.__dict__.items():
             if not value:
-                raise GeneLabISAException(
+                raise GeneFabISAException(
                     "Missing ISA tab", tab=tab, **logger_info,
                 )
         return raw
