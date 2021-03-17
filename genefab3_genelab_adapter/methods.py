@@ -98,18 +98,29 @@ def format_file_entry(row):
 def get_dataset_files(accession):
     """Get dictionary of files for dataset available through genelab.nasa.gov/genelabAPIs"""
     try:
-        glds_json = read_json(COLD_GLDS_MASK.format(accession))
+        url = COLD_GLDS_MASK.format(accession)
+        glds_json = read_json(url)
         assert len(glds_json) == 1
         _id = glds_json[0]["_id"]
     except (AssertionError, IndexError, KeyError, TypeError):
-        raise GeneFabJSONException("Malformed GLDS JSON", accession)
+        raise GeneFabJSONException(
+            "Malformed GLDS JSON", accession,
+            url=url, object_type=type(glds_json).__name__,
+            length=getattr(glds_json, "__len__", lambda: None)(),
+            target="[0]['_id']",
+        )
     try:
-        filelisting_entries = read_json(COLD_FILELISTINGS_MASK.format(_id))
-        assert isinstance(filelisting_entries, list)
+        url = COLD_FILELISTINGS_MASK.format(_id)
+        filelisting_json = read_json(url)
+        assert isinstance(filelisting_json, list)
     except AssertionError:
-        raise GeneFabJSONException("Malformed 'filelistings' JSON", _id=_id)
+        raise GeneFabJSONException(
+            "Malformed 'filelistings' JSON", accession, _id=_id,
+            url=url, object_type=type(filelisting_json).__name__,
+            expected_type="list",
+        )
     else:
-        files = json_normalize(filelisting_entries)
+        files = json_normalize(filelisting_json)
     files["date_created"] = as_timestamp(files, "date_created")
     files["date_modified"] = as_timestamp(files, "date_modified")
     files["timestamp"] = files[["date_created", "date_modified"]].max(axis=1)
