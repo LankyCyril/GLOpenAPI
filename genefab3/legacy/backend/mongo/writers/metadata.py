@@ -55,7 +55,7 @@ def recache_metadata(mongo_db, logger, units_format=UNITS_FORMAT):
             to_check=(available - fresh), updated=set(), failed=set(),
         )
     except Exception as e:
-        logger.error(f"CacherThread/metadata: {repr(e)}")
+        logger.error(f"CacherThread/metadata: {repr(e)}") # TODO: use genefab3.common.exceptions.insert_log_entry w/ extra args
         return None, False
     for accession in accessions.to_check:
         try:
