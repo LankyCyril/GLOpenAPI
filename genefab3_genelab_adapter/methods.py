@@ -73,24 +73,24 @@ def as_timestamp(dataframe, column, default=-1):
 
 def format_file_entry(row):
     """Format filelisting dataframe row to include URLs, timestamp, datatype, rules"""
-    file_name = row["file_name"]
+    filename = row["file_name"]
     version_info = "?version={}".format(row["version"])
     entry = {
         "urls": [
             GENELAB_ROOT + quote(row["remote_url"]) + version_info,
-            GENELAB_ROOT + ALT_FILEPATH + quote(file_name) + version_info,
+            GENELAB_ROOT + ALT_FILEPATH + quote(filename) + version_info,
         ],
         "timestamp": row["timestamp"],
     }
     matched_patterns = set()
     for pattern, metadata in SPECIAL_FILE_TYPES.items():
-        if search(pattern, file_name):
+        if search(pattern, filename):
             entry.update(metadata)
             matched_patterns.add(pattern)
     if len(matched_patterns) > 1:
         raise GeneFabConfigurationException(
             "File name matches more than one predefined pattern",
-            file_name=file_name, patterns=sorted(matched_patterns),
+            filename=filename, patterns=sorted(matched_patterns),
         )
     return entry
 
