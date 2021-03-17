@@ -2,6 +2,7 @@ from urllib.request import urlopen
 from json import loads
 from natsort import natsorted
 from genefab3.common.exceptions import GeneFabJSONException
+from genefab3.common.exceptions import GeneFabConfigurationException
 from pandas import json_normalize, Timestamp
 from urllib.parse import quote
 from re import search
@@ -15,32 +16,37 @@ COLD_FILELISTINGS_MASK = COLD_API_ROOT + "/data/study/filelistings/{}"
 ALT_FILEPATH = "/genelab/static/media/dataset/"
 
 
-FILE_TYPES = {
+SPECIAL_FILE_TYPES = {
     r'.*_metadata_.*[_-]ISA\.zip$': {
+        "cached": True,
         "datatype": "isa",
     },
     r'rna_seq_Unnormalized_Counts\.csv$': {
+        "cached": True,
         "type": "table",
         "datatype": "unnormalized counts",
         "joinable": True,
-        "index": "ENSEMBL",
+        "index_name": "ENSEMBL",
         "column_subset": "sample name",
     },
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression\.csv$': {
+        "cached": True,
         "type": "table",
         "datatype": "differential expression",
-        "index": "ENSEMBL",
+        "index_name": "ENSEMBL",
     },
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table\.csv$': {
+        "cached": True,
         "type": "table",
         "datatype": "visualization table",
-        "index": "ENSEMBL",
+        "index_name": "ENSEMBL",
         "unconditional": True,
     },
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$': {
+        "cached": True,
         "type": "table",
         "datatype": "pca",
-        "index": "sample name",
+        "index_name": "sample name",
         "unconditional": True,
     },
 }
@@ -76,9 +82,16 @@ def format_file_entry(row):
         ],
         "timestamp": row["timestamp"],
     }
-    for pattern, metadata in FILE_TYPES.items():
+    matched_patterns = set()
+    for pattern, metadata in SPECIAL_FILE_TYPES.items():
         if search(pattern, file_name):
             entry.update(metadata)
+            matched_patterns.add(pattern)
+    if len(matched_patterns) > 1:
+        raise GeneFabConfigurationException(
+            "File name matches more than one predefined pattern",
+            file_name=file_name, patterns=sorted(matched_patterns),
+        )
     return entry
 
 

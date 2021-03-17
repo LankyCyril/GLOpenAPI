@@ -3,9 +3,10 @@ from requests import head as request_head
 from urllib.request import urlopen
 from urllib.error import URLError
 from os import path
-from re import sub, escape
+from re import sub, escape, split
 from copy import deepcopy
 from pandas import DataFrame, Series
+from genefab3.common.exceptions import GeneFabConfigurationException
 
 
 @contextmanager
@@ -85,8 +86,9 @@ def get_attribute(dataframe, a):
 def iterate_terminal_leaves(d, step_tracker=1, max_steps=256):
     """Descend into branches breadth-first and iterate terminal leaves"""
     if step_tracker >= max_steps:
-        raise ValueError(
-            "Dictionary exceeded nestedness threshold", max_steps,
+        raise GeneFabConfigurationException(
+            "Document branch exceeds nestedness threshold",
+            max_steps=max_steps,
         )
     else:
         if isinstance(d, dict):
@@ -94,3 +96,10 @@ def iterate_terminal_leaves(d, step_tracker=1, max_steps=256):
                 yield from iterate_terminal_leaves(branch, step_tracker+i)
         else:
             yield d
+
+
+def iterate_terminal_leaf_elements(d, sep=r'\s*,\s'):
+    """Get terminal leaf of document and iterate filenames stored in leaf"""
+    for value in iterate_terminal_leaves(d):
+        if isinstance(value, str):
+            yield from split(sep, value)

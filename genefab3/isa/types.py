@@ -2,7 +2,7 @@ from genefab3.common.exceptions import GeneFabFileException, GeneFabISAException
 from genefab3.common.utils import pick_reachable_url
 from genefab3.db.sql.file import CachedBinaryFile
 from genefab3.isa.parser import IsaZip
-from genefab3.common.utils import copy_and_drop
+from genefab3.common.utils import copy_and_drop, iterate_terminal_leaf_elements
 
 
 class Dataset():
@@ -70,7 +70,7 @@ class Sample(dict):
         # associate with assay and study metadata:
         self._INPLACE_extend_with_assay_metadata(assay_entry)
         self._INPLACE_extend_with_study_metadata()
-        # associate with files # TODO
+        self._INPLACE_extend_with_dataset_files()
  
     def _INPLACE_extend_with_assay_metadata(self, assay_entry):
         """Populate with Assay tab annotation, Investigation Study Assays entry"""
@@ -96,6 +96,20 @@ class Sample(dict):
             self["Investigation"]["Study"] = (
                 self.dataset.isa.investigation["Study"].get(self.study_name, {})
             )
+ 
+    def _INPLACE_extend_with_dataset_files(self):
+        """Populate with Files annotation for files that match records for the sample"""
+        isa_elements = set(iterate_terminal_leaf_elements(self))
+        dataset_files = set(self.dataset.files)
+        unconditional_dataset_files = {
+            fn for fn, fd in self.dataset.files.items()
+            if fd.get("unconditional") is True
+        }
+        filenames = (isa_elements & dataset_files) | unconditional_dataset_files
+        self["Files"] = [
+            {"": filename, **self.dataset.files[filename]}
+            for filename in filenames
+        ]
  
     def _get_subkey_value(self, entry, key, subkey):
         """Check existence of `key.subkey` in entry and return its value"""
