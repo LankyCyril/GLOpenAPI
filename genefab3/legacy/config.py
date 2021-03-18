@@ -1,11 +1,5 @@
 ## Flask config
 
-
-COMPRESSIBLE_MIMETYPES = [
-    "text/plain", "text/html", "text/css", "text/xml",
-    "application/json", "application/javascript"
-]
-
 DEFAULT_FORMATS = {
     "/assays/": "tsv", "/samples/": "tsv", "/data/": "tsv", "/files/": "tsv",
 }
@@ -13,15 +7,7 @@ DEFAULT_FORMATS = {
 
 ## Databases
 
-MONGO_CLIENT_PARAMETERS = dict(
-    serverSelectionTimeoutMS=2000,
-)
-MONGO_DB_NAME = "genefab3_testing"
-MONGO_DB_LOCALE = "en_US"
-
 MAX_JSON_AGE = 10800 # 3 hours (in seconds)
-CACHER_THREAD_CHECK_INTERVAL = 1800 # 30 minutes (in seconds)
-CACHER_THREAD_RECHECK_DELAY = 300 # 5 minutes (in seconds)
 METADATA_INDEX_WAIT_DELAY = 60 # 1 minute (in seconds)
 METADATA_INDEX_WAIT_STEP = 5
 
@@ -36,10 +22,6 @@ COLLECTION_NAMES = SimpleNamespace(
     FILE_DESCRIPTORS="file_descriptors",
 )
 
-SQLITE_DB = "./.sqlite3/data_testing.db"
-
-RESPONSE_CACHE = "./.sqlite3/response-cache_testing.db"
-USE_RESPONSE_CACHE = True
 ZLIB_COMPRESS_RESPONSE_CACHE = True
 RESPONSE_CACHE_MAX_SIZE = 24*1024*1024*1024 # 24 GiB
 

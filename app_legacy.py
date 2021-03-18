@@ -1,48 +1,17 @@
 #!/usr/bin/env python
-from flask import Flask, request
-from genefab3.config import COMPRESSIBLE_MIMETYPES
-from flask_compress import Compress
-from pymongo import MongoClient
-from genefab3.config import MONGO_CLIENT_PARAMETERS, MONGO_DB_NAME
+from flask import request
 from genefab3.config import RESPONSE_CACHE, SQLITE_DB
-from pymongo.errors import ServerSelectionTimeoutError
-from genefab3.common.exceptions import GeneFabDatabaseException
-from genefab3.frontend.utils import is_flask_reloaded, is_debug
+from genefab3.frontend.utils import is_flask_reloaded
 from genefab3.backend.background import CacherThread
-from genefab3.common.exceptions import traceback_printer, exception_catcher
-from genefab3.common.exceptions import DBLogger
-from functools import partial
-from logging import getLogger
 from genefab3.frontend.renderer import render
 from collections import namedtuple
 
 
 # Backend initialization:
 
-app = Flask("genefab3")
-COMPRESS_MIMETYPES = COMPRESSIBLE_MIMETYPES
-Compress(app)
-
-mongo_client = MongoClient(**MONGO_CLIENT_PARAMETERS)
-try:
-    mongo_client.server_info()
-except ServerSelectionTimeoutError:
-    raise GeneFabDatabaseException("Could not connect (sensitive info hidden)")
-else:
-    mongo_db = getattr(mongo_client, MONGO_DB_NAME)
-
+mongo_db, app = None, None # lol
 if not is_flask_reloaded():
     CacherThread(mongo_db=mongo_db, response_cache=RESPONSE_CACHE).start()
-
-if is_debug():
-    traceback_printer = app.errorhandler(Exception)(
-        partial(traceback_printer, mongo_db=mongo_db),
-    )
-else:
-    exception_catcher = app.errorhandler(Exception)(
-        partial(exception_catcher, mongo_db=mongo_db),
-    )
-getLogger("genefab3").addHandler(DBLogger(mongo_db))
 
 
 # App routes:
