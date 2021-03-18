@@ -1,6 +1,5 @@
 ## Flask config
 
-DEBUG_MARKERS = {"development", "staging", "stage", "debug", "debugging"}
 
 COMPRESSIBLE_MIMETYPES = [
     "text/plain", "text/html", "text/css", "text/xml",

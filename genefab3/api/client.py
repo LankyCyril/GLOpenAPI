@@ -4,17 +4,23 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from types import SimpleNamespace
 from functools import partial
 from genefab3.api.routes import Routes
+from genefab3.common.logger import GeneFabLogger, MongoDBLogger
+from logging import StreamHandler
+from genefab3.api.utils import is_debug
+from genefab3.common.exceptions import traceback_printer, exception_catcher
 
 
 class GeneFabClient():
     """Controls caching of metadata, data, and responses"""
  
-    def __init__(self, *, adapter, mongo_params, sqlite_params, cacher_params, flask_params):
+    def __init__(self, *, adapter, mongo_params, sqlite_params, cacher_params, flask_params, logger_params=None):
         """Initialize metadata and response cachers, pass DatasetFactory and Dataset to them"""
         self.mongo_db = self._get_mongo_db_connection(mongo_params)
         self.locale = mongo_params.get("locale", "en_US")
         self.sqlite_dbs = self._get_validated_sqlite_dbs(sqlite_params)
         self._init_routes(flask_params)
+        self._init_warning_handlers(logger_params)
+        self._init_error_handlers(flask_params, logger_params)
  
     def _get_mongo_db_connection(self, mongo_params, test_timeout=10):
         """Check MongoDB server is running, connect to database mongo_params["db_name"]"""
@@ -61,6 +67,32 @@ class GeneFabClient():
         for endpoint, method in Routes().items():
             print("Routing", endpoint, "to", method)
             route(endpoint)(method)
+ 
+    def _init_warning_handlers(self, logger_params):
+        if isinstance(logger_params.get("mongo_collection"), str):
+            GeneFabLogger().addHandler(
+                MongoDBLogger(self.mongo_db[logger_params["mongo_collection"]]),
+            )
+        if logger_params.get("stderr", True):
+            GeneFabLogger().addHandler(StreamHandler())
+ 
+    def _init_error_handlers(self, flask_params, logger_params):
+        if "app" not in flask_params:
+            raise GeneFabConfigurationException("No Flask app specified")
+        else:
+            app = flask_params["app"]
+            if isinstance(logger_params.get("mongo_collection"), str):
+                collection = self.mongo_db[logger_params["mongo_collection"]]
+            else:
+                collection = None
+            if is_debug():
+                app.errorhandler(Exception)(partial(
+                    traceback_printer, collection=collection,
+                ))
+            else:
+                app.errorhandler(Exception)(partial(
+                    exception_catcher, collection=collection,
+                ))
  
     def loop(self):
         """Start background cacher thread"""

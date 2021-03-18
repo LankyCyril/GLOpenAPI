@@ -1,8 +1,6 @@
-from flask import request
-from datetime import datetime
 from sys import exc_info
 from traceback import format_tb
-from logging import Handler
+from genefab3.common.logger import log_to_mongo_collection
 
 
 class GeneFabException(Exception):
@@ -72,31 +70,19 @@ def interpret_exc_info(ei):
     return exc_type, exc_value, exc_tb, info
 
 
-def insert_log_entry(mongo_db, cname, et=None, ev=None, stack=None, is_exception=False, **kwargs):
-    try:
-        remote_addr, full_path = request.remote_addr, request.full_path
-    except RuntimeError:
-        remote_addr, full_path = None, None
-    getattr(mongo_db, cname).insert_one({
-        "is_exception": is_exception, "type": et, "value": ev, "stack": stack,
-        "remote_addr": remote_addr, "full_path": full_path,
-        "timestamp": int(datetime.now().timestamp()), **kwargs,
-    })
-
-
-def traceback_printer(e, mongo_db, cname):
+def traceback_printer(e, collection):
     exc_type, exc_value, exc_tb, info = interpret_exc_info(exc_info())
-    insert_log_entry(
-        mongo_db, cname, *info, is_exception=True,
-        args=getattr(e, "args", []),
-    )
+    if collection:
+        log_to_mongo_collection(
+            collection, *info, is_exception=True, args=getattr(e, "args", []),
+        )
     error_message = HTTP_DEBUG_ERROR_MASK.format(
         *info, exc_type.__name__, str(exc_value),
     )
     return error_message, 400
 
 
-def exception_catcher(e, mongo_db, cname):
+def exception_catcher(e, collection):
     if isinstance(e, FileNotFoundError):
         code, explanation = 404, "Not Found"
     elif isinstance(e, NotImplementedError):
@@ -108,10 +94,11 @@ def exception_catcher(e, mongo_db, cname):
     else:
         code, explanation = 400, "Bad Request"
     *_, info = interpret_exc_info(exc_info())
-    insert_log_entry(
-        mongo_db, cname, *info, is_exception=True,
-        args=getattr(e, "args", []), code=code,
-    )
+    if collection:
+        log_to_mongo_collection(
+            collection, *info, is_exception=True,
+            args=getattr(e, "args", []), code=code,
+        )
     error_message = HTTP_ERROR_MASK.format(
         code, explanation, type(e).__name__, (
             (HTML_LIST_SEP.join(e.args) if hasattr(e, "args") else str(e))
@@ -119,16 +106,3 @@ def exception_catcher(e, mongo_db, cname):
         ),
     )
     return error_message, code
-
-
-class DBLogger(Handler):
-    def __init__(self, mongo_db, cname):
-        self.mongo_db = mongo_db
-        self.cname = cname
-        super().__init__()
-    def emit(self, record):
-        insert_log_entry(
-            self.mongo_db, self.cname,
-            et=record.levelname, ev=record.getMessage(),
-            stack=record.stack_info, is_exception=False,
-        )

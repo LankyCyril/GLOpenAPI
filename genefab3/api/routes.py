@@ -1,4 +1,6 @@
 from functools import wraps
+from genefab3.common.exceptions import GeneFabJSONException
+from genefab3.common.logger import GeneFabLogger
 
 
 class Routes():
@@ -24,3 +26,12 @@ class Routes():
     @_as_endpoint
     def mayonnaise(self):
         return f"This is an instrument"
+ 
+    @_as_endpoint
+    def error(self):
+        raise GeneFabJSONException("Testing testing", "GLDS-1000", baba="booey")
+ 
+    @_as_endpoint
+    def warning(self):
+        GeneFabLogger().warning("Ye be warn'd again")
+        return "Check yo warnings yo"
