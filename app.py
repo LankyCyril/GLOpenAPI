@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from flask import Flask
 from flask_compress import Compress
-from genefab3.client import GeneFabClient
+from genefab3.api.client import GeneFabClient
 from genefab3_genelab_adapter import GeneLabAdapter
 from os import environ
 

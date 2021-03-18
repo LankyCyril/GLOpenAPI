@@ -2,6 +2,7 @@ from pymongo import MongoClient
 from socket import create_connection, error as SocketError
 from genefab3.common.exceptions import GeneFabConfigurationException
 from types import SimpleNamespace
+from functools import partial
 
 
 class GeneFabClient():
@@ -12,6 +13,7 @@ class GeneFabClient():
         self.mongo_db = self._get_mongo_db_connection(mongo_params)
         self.locale = mongo_params.get("locale", "en_US")
         self.sqlite_dbs = self._get_validated_sqlite_dbs(sqlite_params)
+        self._init_routes(flask_app)
  
     def _get_mongo_db_connection(self, mongo_params, test_timeout=10):
         mongo_client = MongoClient(**mongo_params.get("client_params", {}))
@@ -38,3 +40,15 @@ class GeneFabClient():
             raise GeneFabConfigurationException(msg)
         else:
             return SimpleNamespace(**sqlite_params)
+ 
+    def _test_route(self):
+        return "This is a test route"
+ 
+    def _init_routes(self, flask_app):
+        router = partial(flask_app.route, methods=["GET"])
+        router("/lambda/")(lambda: "Hello from lambda")
+        router("/test-route/")(self._test_route)
+        print(self._test_route.__name__)
+ 
+    def loop(self):
+        pass
