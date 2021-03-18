@@ -16,6 +16,7 @@ class GeneFabClient():
         self._init_routes(flask_app)
  
     def _get_mongo_db_connection(self, mongo_params, test_timeout=10):
+        """Check MongoDB server is running, connect to database mongo_params["db_name"]"""
         mongo_client = MongoClient(**mongo_params.get("client_params", {}))
         try:
             host_and_port = (mongo_client.HOST, mongo_client.PORT)
@@ -32,12 +33,21 @@ class GeneFabClient():
                 raise GeneFabConfigurationException(msg)
  
     def _get_validated_sqlite_dbs(self, sqlite_params):
+        """Check target SQLite3 files are specified correctly, convert to namespace for dot-syntax lookup"""
         if set(sqlite_params) != {"blobs", "tables", "cache"}:
             msg = "Incorrect spec of SQL databases"
             raise GeneFabConfigurationException(msg)
         elif len(set(sqlite_params.values())) != 3:
             msg = "SQL databases must all be distinct to avoid name conflicts"
             raise GeneFabConfigurationException(msg)
+        try:
+            assert isinstance(sqlite_params["blobs"], str)
+            assert isinstance(sqlite_params["tables"], str)
+            assert isinstance(sqlite_params["cache"] or "", str)
+        except AssertionError:
+            msg_a = "SQL databases `blobs` and `tables` must be file paths; "
+            msg_b = "SQL database `cache` must be a file path or None"
+            raise GeneFabConfigurationException(msg_a + msg_b)
         else:
             return SimpleNamespace(**sqlite_params)
  
@@ -45,10 +55,12 @@ class GeneFabClient():
         return "This is a test route"
  
     def _init_routes(self, flask_app):
+        """Route Response-generating functions to Flask endpoints"""
         router = partial(flask_app.route, methods=["GET"])
         router("/lambda/")(lambda: "Hello from lambda")
         router("/test-route/")(self._test_route)
         print(self._test_route.__name__)
  
     def loop(self):
+        """Start background cacher thread"""
         pass
