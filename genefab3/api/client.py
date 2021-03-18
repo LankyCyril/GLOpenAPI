@@ -11,10 +11,10 @@ from genefab3.common.exceptions import traceback_printer, exception_catcher
 
 
 class GeneFabClient():
-    """Controls caching of metadata, data, and responses"""
+    """Routes Response-generating methods, continuously caches metadata and responses"""
  
     def __init__(self, *, adapter, mongo_params, sqlite_params, cacher_params, flask_params, logger_params=None):
-        """Initialize metadata and response cachers, pass DatasetFactory and Dataset to them"""
+        """Initialize metadata cacher (with adapter), response cacher, routes"""
         self.mongo_db = self._get_mongo_db_connection(mongo_params)
         self.locale = mongo_params.get("locale", "en_US")
         self.sqlite_dbs = self._get_validated_sqlite_dbs(sqlite_params)
@@ -59,40 +59,35 @@ class GeneFabClient():
             return SimpleNamespace(**sqlite_params)
  
     def _init_routes(self, flask_params):
-        """Route Response-generating functions to Flask endpoints"""
+        """Route Response-generating methods to Flask endpoints"""
         if "app" in flask_params:
             route = partial(flask_params["app"].route, methods=["GET"])
         else:
             raise GeneFabConfigurationException("No Flask app specified")
         for endpoint, method in Routes().items():
-            print("Routing", endpoint, "to", method)
             route(endpoint)(method)
  
     def _init_warning_handlers(self, logger_params):
+        """Set up logger to write to MongoDB collection and/or to stderr"""
         if isinstance(logger_params.get("mongo_collection"), str):
             GeneFabLogger().addHandler(
                 MongoDBLogger(self.mongo_db[logger_params["mongo_collection"]]),
             )
-        if logger_params.get("stderr", True):
-            GeneFabLogger().addHandler(StreamHandler())
+            if logger_params.get("stderr", True):
+                GeneFabLogger().addHandler(StreamHandler())
  
     def _init_error_handlers(self, flask_params, logger_params):
-        if "app" not in flask_params:
-            raise GeneFabConfigurationException("No Flask app specified")
-        else:
-            app = flask_params["app"]
+        """Intercept all exceptions and deliver an HTTP error page with or without traceback depending on debug state"""
+        if "app" in flask_params:
             if isinstance(logger_params.get("mongo_collection"), str):
                 collection = self.mongo_db[logger_params["mongo_collection"]]
             else:
                 collection = None
-            if is_debug():
-                app.errorhandler(Exception)(partial(
-                    traceback_printer, collection=collection,
-                ))
-            else:
-                app.errorhandler(Exception)(partial(
-                    exception_catcher, collection=collection,
-                ))
+            app = flask_params["app"]
+            method = traceback_printer if is_debug() else exception_catcher
+            app.errorhandler(Exception)(partial(method, collection=collection))
+        else:
+            raise GeneFabConfigurationException("No Flask app specified")
  
     def loop(self):
         """Start background cacher thread"""
