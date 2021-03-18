@@ -1,40 +1,35 @@
 #!/usr/bin/env python
 from flask import Flask
-from genefab3.config import FLASK_APP_NAME, COMPRESSIBLE_MIMETYPES
 from flask_compress import Compress
-from pymongo import MongoClient
-from genefab3.config import MONGO_CLIENT_PARAMETERS, MONGO_DB_NAME
-from pymongo.errors import ServerSelectionTimeoutError
-from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.client import GeneFabClient
-from genefab3.config import LOCALE, SQLITE_BLOBS, SQLITE_TABLES, SQLITE_CACHE
-from genefab3_genelab_adapter import GeneLabAccessionEnumerator, GeneLabDataset
-from genefab3_genelab_adapter import TARGET_FILE_LOCATORS
+from genefab3_genelab_adapter import GeneLabAdapter
 from os import environ
 
-
-app = Flask(FLASK_APP_NAME)
-COMPRESS_MIMETYPES = COMPRESSIBLE_MIMETYPES
-Compress(app)
-
-
-mongo_client = MongoClient(**MONGO_CLIENT_PARAMETERS)
-try:
-    mongo_client.server_info()
-except ServerSelectionTimeoutError:
-    raise GeneFabDatabaseException("Could not connect (sensitive info hidden)")
-else:
-    mongo_db = getattr(mongo_client, MONGO_DB_NAME)
-
+flask_app = Flask("genefab3")
+COMPRESS_MIMETYPES = [
+    "text/plain", "text/html", "text/css", "text/xml",
+    "application/json", "application/javascript",
+]
+Compress(flask_app)
 
 genefab3_client = GeneFabClient(
-    locale=LOCALE,
-    mongo_db=mongo_db,
-    sqlite_blobs=SQLITE_BLOBS,
-    sqlite_tables=SQLITE_TABLES,
-    sqlite_cache=SQLITE_CACHE,
-    AccessionEnumerator=GeneLabAccessionEnumerator,
-    Dataset=GeneLabDataset,
-    target_file_locators=TARGET_FILE_LOCATORS,
-    cacher_start_condition=lambda: environ.get("WERKZEUG_RUN_MAIN") != "true",
+    adapter=GeneLabAdapter,
+    flask_app=flask_app,
+    mongo_params=dict(
+        db_name="genefab3_testing",
+        locale="en_US",
+        client_params={},
+    ),
+    sqlite_params=dict(
+        blobs="./.sqlite3/blobs.db",
+        tables="./.sqlite3/tables.db",
+        cache="./.sqlite3/response-cache.db",
+    ),
+    cacher_params=dict(
+        start_condition=lambda: environ.get("WERKZEUG_RUN_MAIN") != "true",
+        interval=1800,
+        recheck_delay=300,
+    ),
 )
+
+genefab3_client.loop()
