@@ -2,6 +2,7 @@ from pymongo import MongoClient
 from socket import create_connection, error as SocketError
 from genefab3.common.exceptions import GeneFabConfigurationException
 from types import SimpleNamespace
+from flask_compress import Compress
 from functools import partial
 from genefab3.api.routes import Routes
 from genefab3.common.logger import GeneFabLogger, MongoDBLogger
@@ -18,9 +19,24 @@ class GeneFabClient():
         self.mongo_db = self._get_mongo_db_connection(mongo_params)
         self.locale = mongo_params.get("locale", "en_US")
         self.sqlite_dbs = self._get_validated_sqlite_dbs(sqlite_params)
-        self._init_routes(flask_params)
+        self.flask_app = self._postprocess_flask_app(flask_params)
+        self._init_routes()
         self._init_warning_handlers(logger_params)
-        self._init_error_handlers(flask_params, logger_params)
+        self._init_error_handlers(logger_params)
+ 
+    def _postprocess_flask_app(self, flask_params):
+        """Modify Flask application, enable compression"""
+        if "app" in flask_params:
+            flask_app = flask_params["app"]
+            if "compress_params" in flask_params:
+                if not hasattr(flask_app, "config"):
+                    flask_app.config = {}
+                for param, value in flask_params["compress_params"].items():
+                    flask_app.config[param] = value
+                Compress(flask_app)
+            return flask_app
+        else:
+            raise GeneFabConfigurationException("No Flask app specified")
  
     def _get_mongo_db_connection(self, mongo_params, test_timeout=10):
         """Check MongoDB server is running, connect to database mongo_params["db_name"]"""
@@ -58,14 +74,10 @@ class GeneFabClient():
         else:
             return SimpleNamespace(**sqlite_params)
  
-    def _init_routes(self, flask_params):
+    def _init_routes(self):
         """Route Response-generating methods to Flask endpoints"""
-        if "app" in flask_params:
-            route = partial(flask_params["app"].route, methods=["GET"])
-        else:
-            raise GeneFabConfigurationException("No Flask app specified")
         for endpoint, method in Routes().items():
-            route(endpoint)(method)
+            self.flask_app.route(endpoint, methods=["GET"])(method)
  
     def _init_warning_handlers(self, logger_params):
         """Set up logger to write to MongoDB collection and/or to stderr"""
@@ -76,18 +88,15 @@ class GeneFabClient():
             if logger_params.get("stderr", True):
                 GeneFabLogger().addHandler(StreamHandler())
  
-    def _init_error_handlers(self, flask_params, logger_params):
+    def _init_error_handlers(self, logger_params):
         """Intercept all exceptions and deliver an HTTP error page with or without traceback depending on debug state"""
-        if "app" in flask_params:
-            if isinstance(logger_params.get("mongo_collection"), str):
-                collection = self.mongo_db[logger_params["mongo_collection"]]
-            else:
-                collection = None
-            app = flask_params["app"]
-            method = traceback_printer if is_debug() else exception_catcher
-            app.errorhandler(Exception)(partial(method, collection=collection))
+        if isinstance(logger_params.get("mongo_collection"), str):
+            collection = self.mongo_db[logger_params["mongo_collection"]]
         else:
-            raise GeneFabConfigurationException("No Flask app specified")
+            collection = None
+        app = self.flask_app
+        method = traceback_printer if is_debug() else exception_catcher
+        app.errorhandler(Exception)(partial(method, collection=collection))
  
     def loop(self):
         """Start background cacher thread"""

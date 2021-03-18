@@ -1,16 +1,10 @@
 #!/usr/bin/env python
 from flask import Flask
-from flask_compress import Compress
 from genefab3.api.client import GeneFabClient
 from genefab3_genelab_adapter import GeneLabAdapter
 from genefab3.api.utils import is_flask_reloaded
 
 flask_app = Flask("genefab3")
-COMPRESS_MIMETYPES = [
-    "text/plain", "text/html", "text/css", "text/xml",
-    "application/json", "application/javascript",
-]
-Compress(flask_app)
 
 genefab3_client = GeneFabClient(
     adapter=GeneLabAdapter,
@@ -31,6 +25,12 @@ genefab3_client = GeneFabClient(
     ),
     flask_params=dict(
         app=flask_app,
+        compress_params=dict(
+            COMPRESS_MIMETYPES=[
+                "text/plain", "text/html", "text/css", "text/xml",
+                "application/json", "application/javascript",
+            ],
+        ),
     ),
     logger_params=dict(
         mongo_collection="log",
