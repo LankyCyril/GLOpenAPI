@@ -3,17 +3,18 @@ from socket import create_connection, error as SocketError
 from genefab3.common.exceptions import GeneFabConfigurationException
 from types import SimpleNamespace
 from functools import partial
+from genefab3.api.routes import Routes
 
 
 class GeneFabClient():
     """Controls caching of metadata, data, and responses"""
  
-    def __init__(self, *, adapter, flask_app, mongo_params, sqlite_params, cacher_params):
+    def __init__(self, *, adapter, mongo_params, sqlite_params, cacher_params, flask_params):
         """Initialize metadata and response cachers, pass DatasetFactory and Dataset to them"""
         self.mongo_db = self._get_mongo_db_connection(mongo_params)
         self.locale = mongo_params.get("locale", "en_US")
         self.sqlite_dbs = self._get_validated_sqlite_dbs(sqlite_params)
-        self._init_routes(flask_app)
+        self._init_routes(flask_params)
  
     def _get_mongo_db_connection(self, mongo_params, test_timeout=10):
         """Check MongoDB server is running, connect to database mongo_params["db_name"]"""
@@ -51,15 +52,15 @@ class GeneFabClient():
         else:
             return SimpleNamespace(**sqlite_params)
  
-    def _test_route(self):
-        return "This is a test route"
- 
-    def _init_routes(self, flask_app):
+    def _init_routes(self, flask_params):
         """Route Response-generating functions to Flask endpoints"""
-        router = partial(flask_app.route, methods=["GET"])
-        router("/lambda/")(lambda: "Hello from lambda")
-        router("/test-route/")(self._test_route)
-        print(self._test_route.__name__)
+        if "app" in flask_params:
+            route = partial(flask_params["app"].route, methods=["GET"])
+        else:
+            raise GeneFabConfigurationException("No Flask app specified")
+        for endpoint, method in Routes().items():
+            print("Routing", endpoint, "to", method)
+            route(endpoint)(method)
  
     def loop(self):
         """Start background cacher thread"""

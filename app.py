@@ -14,7 +14,6 @@ Compress(flask_app)
 
 genefab3_client = GeneFabClient(
     adapter=GeneLabAdapter,
-    flask_app=flask_app,
     mongo_params=dict(
         db_name="genefab3_testing",
         locale="en_US",
@@ -29,6 +28,9 @@ genefab3_client = GeneFabClient(
         start_condition=lambda: environ.get("WERKZEUG_RUN_MAIN") != "true",
         interval=1800,
         recheck_delay=300,
+    ),
+    flask_params=dict(
+        app=flask_app,
     ),
 )
 
