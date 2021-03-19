@@ -2,12 +2,11 @@
 from flask import Flask
 from genefab3.client import GeneFabClient
 from genefab3_genelab_adapter import GeneLabAdapter
-from genefab3.api.utils import is_flask_reloaded
 
 flask_app = Flask("genefab3")
 
 genefab3_client = GeneFabClient(
-    adapter=GeneLabAdapter,
+    Adapter=GeneLabAdapter,
     mongo_params=dict(
         db_name="genefab3_testing",
         locale="en_US",
@@ -19,9 +18,8 @@ genefab3_client = GeneFabClient(
         cache="./.sqlite3/response-cache.db",
     ),
     cacher_params=dict(
-        start_condition=lambda: not is_flask_reloaded(),
-        interval=1800,
-        recheck_delay=300,
+        metadata_update_interval=1800,
+        metadata_retry_delay=300,
     ),
     flask_params=dict(
         app=flask_app,

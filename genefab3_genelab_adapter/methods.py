@@ -1,11 +1,12 @@
 from urllib.request import urlopen
 from json import loads
 from natsort import natsorted
+from genefab3.common.types import Adapter
 from genefab3.common.exceptions import GeneFabJSONException
 from genefab3.common.exceptions import GeneFabConfigurationException
 from pandas import json_normalize, Timestamp
 from urllib.parse import quote
-from re import search
+from re import search, sub
 
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
@@ -95,48 +96,59 @@ def format_file_entry(row):
     return entry
 
 
-def get_dataset_files(accession):
-    """Get dictionary of files for dataset available through genelab.nasa.gov/genelabAPIs"""
-    try:
-        url = COLD_GLDS_MASK.format(accession)
-        glds_json = read_json(url)
-        assert len(glds_json) == 1
-        _id = glds_json[0]["_id"]
-    except (AssertionError, IndexError, KeyError, TypeError):
-        raise GeneFabJSONException(
-            "Malformed GLDS JSON", accession,
-            url=url, object_type=type(glds_json).__name__,
-            length=getattr(glds_json, "__len__", lambda: None)(),
-            target="[0]['_id']",
-        )
-    try:
-        url = COLD_FILELISTINGS_MASK.format(_id)
-        filelisting_json = read_json(url)
-        assert isinstance(filelisting_json, list)
-    except AssertionError:
-        raise GeneFabJSONException(
-            "Malformed 'filelistings' JSON", accession, _id=_id,
-            url=url, object_type=type(filelisting_json).__name__,
-            expected_type="list",
-        )
-    else:
-        files = json_normalize(filelisting_json)
-    files["date_created"] = as_timestamp(files, "date_created")
-    files["date_modified"] = as_timestamp(files, "date_modified")
-    files["timestamp"] = files[["date_created", "date_modified"]].max(axis=1)
-    return {
-        row["file_name"]: format_file_entry(row)
-        for _, row in files.sort_values(by="timestamp").iterrows()
-    }
-
-
-def get_genelab_accessions():
-    """Return list of dataset accessions available through genelab.nasa.gov/genelabAPIs"""
-    try:
-        n_datasets = read_json(COLD_SEARCH_MASK.format(0))["hits"]["total"]
-        return natsorted(
-            entry["_id"] for entry in
-            read_json(COLD_SEARCH_MASK.format(n_datasets))["hits"]["hits"]
-        )
-    except (KeyError, TypeError):
-        raise GeneFabJSONException("Malformed GeneLab search JSON")
+class GeneLabAdapter(Adapter):
+ 
+    def get_accessions(self):
+        """Return list of dataset accessions available through genelab.nasa.gov/genelabAPIs"""
+        try:
+            n_datasets = read_json(COLD_SEARCH_MASK.format(0))["hits"]["total"]
+            return natsorted(
+                entry["_id"] for entry in
+                read_json(COLD_SEARCH_MASK.format(n_datasets))["hits"]["hits"]
+            )
+        except (KeyError, TypeError):
+            raise GeneFabJSONException("Malformed GeneLab search JSON")
+ 
+    def get_files_by_accession(self, accession):
+        """Get dictionary of files for dataset available through genelab.nasa.gov/genelabAPIs"""
+        try:
+            url = COLD_GLDS_MASK.format(accession)
+            glds_json = read_json(url)
+            assert len(glds_json) == 1
+            _id = glds_json[0]["_id"]
+        except (AssertionError, IndexError, KeyError, TypeError):
+            raise GeneFabJSONException(
+                "Malformed GLDS JSON", accession,
+                url=url, object_type=type(glds_json).__name__,
+                length=getattr(glds_json, "__len__", lambda: None)(),
+                target="[0]['_id']",
+            )
+        try:
+            url = COLD_FILELISTINGS_MASK.format(_id)
+            filelisting_json = read_json(url)
+            assert isinstance(filelisting_json, list)
+        except AssertionError:
+            raise GeneFabJSONException(
+                "Malformed 'filelistings' JSON", accession, _id=_id,
+                url=url, object_type=type(filelisting_json).__name__,
+                expected_type="list",
+            )
+        else:
+            files = json_normalize(filelisting_json)
+        files["date_created"] = as_timestamp(files, "date_created")
+        files["date_modified"] = as_timestamp(files, "date_modified")
+        files["timestamp"] = files[["date_created", "date_modified"]].max(axis=1)
+        return {
+            row["file_name"]: format_file_entry(row)
+            for _, row in files.sort_values(by="timestamp").iterrows()
+        }
+ 
+    def sample_names_match(self, a, b):
+        """Match ISA sample names to their variants in data files (R-like dot-separated, postfixed)"""
+        dotted = lambda s: sub(r'[._-]', ".", s)
+        if len(a) == len(b):
+            return dotted(a) == dotted(b)
+        elif len(a) > len(b):
+            return dotted(a).startswith(dotted(b))
+        else:
+            return dotted(b).startswith(dotted(a))

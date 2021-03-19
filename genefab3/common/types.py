@@ -3,6 +3,8 @@ from werkzeug.datastructures import ImmutableDict
 from numpy import nan
 from collections.abc import Hashable
 from itertools import zip_longest
+from collections.abc import Callable
+from genefab3.common.exceptions import GeneFabConfigurationException
 
 
 passthrough = lambda _:_
@@ -94,3 +96,20 @@ class HashableEnough():
     def __hash__(self):
         """Hash values of identity fields as a tuple"""
         return hash(tuple(self.__iter_identity_values__()))
+
+
+class Adapter():
+    """Base class for database adapters"""
+ 
+    def __init__(self):
+        """Validate subclassed Adapter"""
+        for method_name in "get_accessions", "get_files_by_accession":
+            if not isinstance(getattr(self, method_name, None), Callable):
+                raise GeneFabConfigurationException(
+                    "Adapter must define method",
+                    adapter=type(self).__name__, method=method_name,
+                )
+ 
+    def sample_names_match(self, a, b):
+        """Fallback sample name identity test"""
+        return a == b
