@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from flask import Flask
-from genefab3.api.client import GeneFabClient
+from genefab3.client import GeneFabClient
 from genefab3_genelab_adapter import GeneLabAdapter
 from genefab3.api.utils import is_flask_reloaded
 

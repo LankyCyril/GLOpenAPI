@@ -17,17 +17,23 @@ class GeneFabClient():
     def __init__(self, *, adapter, mongo_params, sqlite_params, cacher_params, flask_params, logger_params=None):
         """Initialize metadata cacher (with adapter), response cacher, routes"""
         try:
+            self.flask_app = self._configure_flask_app(**flask_params)
             self.mongo_db, self.locale = self._get_mongo_db_connection(
                 **mongo_params,
             )
             self.sqlite_dbs = self._get_validated_sqlite_dbs(**sqlite_params)
-            self.flask_app = self._configure_flask_app(**flask_params)
             self._init_routes()
             self._init_warning_handlers(**logger_params)
             self._init_error_handlers(**logger_params)
         except TypeError as e:
             msg = f"During GeneFabClient() initialization, {e}"
             raise GeneFabConfigurationException(msg)
+ 
+    def _configure_flask_app(self, *, app, compress_params=None):
+        """Modify Flask application, enable compression"""
+        app.config = {**getattr(app, "config", {}), **(compress_params or {})}
+        Compress(app)
+        return app
  
     def _get_mongo_db_connection(self, *, db_name, client_params, locale="en_US", test_timeout=10):
         """Check MongoDB server is running, connect to database `db_name`"""
@@ -55,12 +61,6 @@ class GeneFabClient():
             raise GeneFabConfigurationException(msg)
         else:
             return SimpleNamespace(blobs=blobs, tables=tables, cache=cache)
- 
-    def _configure_flask_app(self, *, app, compress_params=None):
-        """Modify Flask application, enable compression"""
-        app.config = {**getattr(app, "config", {}), **(compress_params or {})}
-        Compress(app)
-        return app
  
     def _init_routes(self):
         """Route Response-generating methods to Flask endpoints"""
