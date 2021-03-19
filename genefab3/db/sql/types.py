@@ -1,10 +1,19 @@
 from genefab3.common.utils import iterate_terminal_leaves
+from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.types import ImmutableTree, PlaceholderLogger
 from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
-from pandas import read_sql, DataFrame
+from pandas import read_sql, DataFrame, read_csv
 from pandas.io.sql import DatabaseError
+from genefab3.common.types import passthrough, HashableEnough
+from urllib.request import urlopen
+from tempfile import TemporaryDirectory
+from shutil import copyfileobj
+from os import path
+from csv import Error as CSVError, Sniffer
+from genefab3.common.exceptions import GeneFabFileException
+from pandas.errors import ParserError as PandasParserError
 
 
 def is_singular_spec(spec):
@@ -27,7 +36,7 @@ class SQLiteObject():
         """Parse the update/retrieve spec and the re-cache trigger condition; create tables if they do not exist"""
         self.__sqlite_db, self.__table_schemas = sqlite_db, table_schemas
         if len(signature) != 1:
-            raise GeneFabDatabaseException(
+            raise GeneFabConfigurationException(
                 "SQLiteObject(): Only one 'identifier' field can be specified",
                 signatures=signature,
             )
@@ -38,7 +47,7 @@ class SQLiteObject():
             try:
                 self.__signature = ImmutableTree(signature)
             except ValueError:
-                raise GeneFabDatabaseException(
+                raise GeneFabConfigurationException(
                     "SQLiteObject(): Bad signature", signature=signature,
                 )
         if sqlite_db is not None: # TODO: auto_vacuum
@@ -50,7 +59,7 @@ class SQLiteObject():
             self.__retrieve_spec = ImmutableTree(retrieve)
             self.__update_spec = ImmutableTree(update)
         except ValueError:
-            raise GeneFabDatabaseException(
+            raise GeneFabConfigurationException(
                 "SQLiteObject(): Bad spec",
                 trigger=trigger, update=update, retrieve=retrieve,
             )
@@ -176,7 +185,7 @@ class SQLiteObject():
     def __retrieve(self):
         """Retrieve target table or table field from database"""
         if not is_singular_spec(self.__retrieve_spec):
-            raise GeneFabDatabaseException(
+            raise GeneFabConfigurationException(
                 "SQLiteObject(): Only one 'retrieve' field can be specified",
                 signature=self.__signature,
             )
@@ -194,7 +203,7 @@ class SQLiteObject():
     def data(self):
         """Main interface: returns data associated with this SQLiteObject; will have auto-updated itself in the process if necessary"""
         if not is_singular_spec(self.__trigger_spec):
-            raise GeneFabDatabaseException(
+            raise GeneFabConfigurationException(
                 "SQLiteObject(): Only one 'trigger' field can be specified",
                 signature=self.__signature,
             )
@@ -225,3 +234,134 @@ class SQLiteObject():
         else:
             self.changed = False
         return self.__retrieve()
+
+
+class SQLiteBlob(SQLiteObject):
+    """Represents an SQLiteObject initialized with a spec suitable for a binary blob"""
+ 
+    def __init__(self, data_getter, sqlite_db, table, identifier, timestamp, compressor, decompressor):
+        SQLiteObject.__init__(
+            self, sqlite_db, signature={"identifier": identifier},
+            table_schemas={
+                table: {
+                    "identifier": "TEXT",
+                    "timestamp": "INTEGER",
+                    "blob": "BLOB",
+                },
+            },
+            trigger={
+                table: {
+                    "timestamp": lambda val: (val is None) or (timestamp > val),
+                },
+            },
+            update={
+                table: [{
+                    "identifier": lambda: identifier,
+                    "timestamp": lambda: timestamp,
+                    "blob": lambda: (compressor or passthrough)(data_getter()),
+                }],
+            },
+            retrieve={table: {"blob": decompressor or passthrough}},
+        )
+
+
+class SQLiteTable(SQLiteObject):
+    """Represents an SQLiteObject initialized with a spec suitable for a generic table"""
+ 
+    def __init__(self, data_getter, sqlite_db, table, timestamp_table, identifier, timestamp):
+        if table == timestamp_table:
+            raise GeneFabConfigurationException(
+                "Table name cannot be equal to a reserved table name",
+                table=table, identifier=identifier,
+            )
+        SQLiteObject.__init__(
+            self, sqlite_db, signature={"identifier": identifier},
+            table_schemas={
+                table: None,
+                timestamp_table: {"identifier": "TEXT", "timestamp": "INTEGER"},
+            },
+            trigger={
+                timestamp_table: {
+                    "timestamp": lambda val: (val is None) or (timestamp > val),
+                },
+            },
+            update={
+                table: [data_getter],
+                timestamp_table: [{
+                    "identifier": lambda: identifier,
+                    "timestamp": lambda: timestamp,
+                }],
+            },
+            retrieve={table: passthrough},
+        )
+
+
+class CachedBinaryFile(HashableEnough, SQLiteBlob):
+    """Represents an SQLiteObject that stores up-to-date file contents as a binary blob"""
+ 
+    def __init__(self, *, name, url, timestamp, sqlite_db, aux_table="blobs", compressor=None, decompressor=None):
+        """Interpret file descriptors; inherit functionality from SQLiteBlob; define equality (hashableness) of self"""
+        self.name, self.url, self.timestamp = name, url, timestamp
+        self.aux_table = aux_table
+        SQLiteBlob.__init__(
+            self, identifier=url, timestamp=timestamp,
+            data_getter=lambda: self.__download_as_blob(url),
+            sqlite_db=sqlite_db,
+            table=aux_table,
+            compressor=compressor, decompressor=decompressor,
+        )
+        HashableEnough.__init__(
+            self, ("name", "url", "timestamp", "sqlite_db", "aux_table"),
+        )
+ 
+    def __download_as_blob(self, url):
+        """Download data from URL as-is"""
+        with urlopen(url) as response:
+            return response.read()
+
+
+class CachedTableFile(HashableEnough, SQLiteTable):
+    """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
+ 
+    def __init__(self, *, name, url, timestamp, sqlite_db, aux_table="timestamp_table", **pandas_kws):
+        """Interpret file descriptors; inherit functionality from SQLiteTable; define equality (hashableness) of self"""
+        self.name, self.url, self.timestamp = name, url, timestamp
+        self.aux_table = aux_table
+        SQLiteTable.__init__(
+            self, identifier=url, timestamp=timestamp,
+            data_getter=lambda: self.__download_as_pandas_dataframe(
+                url, pandas_kws,
+            ),
+            sqlite_db=sqlite_db,
+            table=name, timestamp_table=aux_table,
+        )
+        HashableEnough.__init__(
+            self, ("name", "url", "timestamp", "sqlite_db", "aux_table"),
+        )
+ 
+    def __download_as_pandas_dataframe(self, url, pandas_kws):
+        """Download and parse data from URL as a table"""
+        with TemporaryDirectory() as tempdir:
+            tempfile = path.join(tempdir, self.name)
+            with urlopen(url) as response, open(tempfile, mode="wb") as handle:
+                copyfileobj(response, handle)
+            with open(tempfile, mode="rb") as handle:
+                magic = handle.read(3)
+            if magic == b"\x1f\x8b\x08":
+                compression = "gzip"
+                from gzip import open as _open
+            elif magic == b"\x42\x5a\x68":
+                compression = "bz2"
+                from bz2 import open as _open
+            else:
+                compression, _open = "infer", open
+            try:
+                with _open(tempfile, mode="rt", newline="") as handle:
+                    sep = Sniffer().sniff(handle.read(2**20)).delimiter
+                return read_csv(
+                    url, sep=sep, compression=compression, **pandas_kws,
+                )
+            except (IOError, UnicodeDecodeError, CSVError, PandasParserError):
+                raise GeneFabFileException(
+                    "Not recognized as a table file", name=self.name, url=url,
+                )

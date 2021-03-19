@@ -3,8 +3,8 @@ from pymongo import MongoClient
 from os import path
 from pickle import load, dump
 from json import dumps
-from genefab3.db.mongo.document import CachedDocumentByValue
-from genefab3_genelab_adapter.methods import get_dataset_files
+from genefab3.db.mongo.types import CachedDocumentByValue
+from genefab3_genelab_adapter import GeneLabAdapter
 from genefab3.isa.types import Dataset
 
 
@@ -24,7 +24,7 @@ else:
     files = CachedDocumentByValue(
         identifier=dict(kind="dataset files", accession="GLDS-48"),
         collection=db.records,
-        value=get_dataset_files("GLDS-48"),
+        value=GeneLabAdapter().get_files_by_accession("GLDS-48"),
     )
     with open(PKL, mode="wb") as pkl:
         dump(files, pkl)

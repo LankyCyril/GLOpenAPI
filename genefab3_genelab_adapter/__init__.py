@@ -1,1 +1,1 @@
-from .methods import GeneLabAdapter
+from .adapter import GeneLabAdapter

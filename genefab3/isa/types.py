@@ -1,6 +1,6 @@
 from genefab3.common.exceptions import GeneFabFileException, GeneFabISAException
 from genefab3.common.utils import pick_reachable_url
-from genefab3.db.sql.file import CachedBinaryFile
+from genefab3.db.sql.types import CachedBinaryFile
 from genefab3.isa.parser import IsaZip
 from genefab3.common.utils import copy_and_drop, iterate_terminal_leaf_elements
 
