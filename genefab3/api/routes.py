@@ -1,14 +1,16 @@
-from functools import wraps
+from functools import wraps, partial
 from genefab3.common.logger import GeneFabLogger
 
 
 class Routes():
  
-    def _as_endpoint(method):
+    def _as_endpoint(method, endpoint=None):
         @wraps(method)
         def wrapper(*args, **kwargs):
             return method(*args, **kwargs)
-        if hasattr(method, "__name__") and isinstance(method.__name__, str):
+        if endpoint:
+            wrapper.endpoint = endpoint
+        elif hasattr(method, "__name__") and isinstance(method.__name__, str):
             wrapper.endpoint = "/" + method.__name__ + "/"
         return wrapper
  
@@ -17,6 +19,10 @@ class Routes():
             method = getattr(self, name)
             if hasattr(method, "endpoint"):
                 yield method.endpoint, method
+ 
+    @partial(_as_endpoint, endpoint="/")
+    def root(self):
+        return "Hello space"
  
     @_as_endpoint
     def status(self):

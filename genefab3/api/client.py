@@ -3,8 +3,8 @@ from socket import create_connection, error as SocketError
 from genefab3.common.exceptions import GeneFabConfigurationException
 from types import SimpleNamespace
 from flask_compress import Compress
-from functools import partial
 from genefab3.api.routes import Routes
+from functools import partial
 from genefab3.common.logger import GeneFabLogger, MongoDBLogger
 from logging import StreamHandler
 from genefab3.api.utils import is_debug
