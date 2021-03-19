@@ -33,7 +33,7 @@ genefab3_client = GeneFabClient(
         ),
     ),
     logger_params=dict(
-        mongo_collection="log",
+        mongo_collection_name="log",
         stderr=True,
     ),
 )
