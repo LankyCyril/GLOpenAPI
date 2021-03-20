@@ -12,7 +12,7 @@ class Routes():
         if endpoint:
             wrapper.endpoint = endpoint
         elif hasattr(method, "__name__") and isinstance(method.__name__, str):
-            wrapper.endpoint = "/" + method.__name__.replace("_", "/") + "/"
+            wrapper.endpoint = "/" + method.__name__ + "/"
         return wrapper
  
     def items(self):
@@ -25,12 +25,12 @@ class Routes():
     def favicon(self, imgtype):
         return ""
  
-    @_as_endpoint
+    @partial(_as_endpoint, endpoint="/debug/warning/")
     def debug_warning(self):
         GeneFabLogger().warning("Generic warning test")
         return "OK (emitted warning)"
  
-    @_as_endpoint
+    @partial(_as_endpoint, endpoint="/debug/error/")
     def debug_error(self):
         raise GeneFabException("Generic error test")
         return "OK (raised exception)"

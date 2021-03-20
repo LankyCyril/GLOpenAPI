@@ -52,7 +52,7 @@ class GeneFabClient():
                 **mongo_params,
             )
             self.sqlite_dbs = self._get_validated_sqlite_dbs(**sqlite_params)
-            self._init_routes()
+            self._init_routes(Routes())
             self._init_warning_handlers(**logger_params)
             self._init_error_handlers(**logger_params)
         except TypeError as e:
@@ -94,9 +94,9 @@ class GeneFabClient():
         else:
             return SimpleNamespace(blobs=blobs, tables=tables, cache=cache)
  
-    def _init_routes(self):
+    def _init_routes(self, routes):
         """Route Response-generating methods to Flask endpoints"""
-        for endpoint, method in Routes().items():
+        for endpoint, method in routes.items():
             self.flask_app.route(endpoint, methods=["GET"])(method)
  
     def _init_warning_handlers(self, *, mongo_collection_name=None, stderr=False, level=DEBUG):

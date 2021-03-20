@@ -1,20 +1,10 @@
 #!/usr/bin/env python
 from flask import request
-from genefab3.config import RESPONSE_CACHE, SQLITE_DB
-from genefab3.frontend.utils import is_flask_reloaded
-from genefab3.backend.background import CacherThread
+from genefab3.config import SQLITE_DB
 from genefab3.frontend.renderer import render
 from collections import namedtuple
 
-
-# Backend initialization:
-
 mongo_db, app = None, None # lol
-if not is_flask_reloaded():
-    CacherThread(mongo_db=mongo_db, response_cache=RESPONSE_CACHE).start()
-
-
-# App routes:
 
 @app.route("/", methods=["GET"])
 def root(**kwargs):
@@ -51,7 +41,3 @@ def data(**kwargs):
 def status(**kwargs):
     from genefab3.frontend.getters.status import get_status as getter
     return render(mongo_db, getter, kwargs, request)
-
-@app.route("/favicon.<imgtype>")
-def favicon(**kwargs):
-    return ""
