@@ -1,4 +1,4 @@
-from sys import exc_info
+from sys import exc_info, stderr
 from traceback import format_tb
 from genefab3.common.logger import log_to_mongo_collection
 
@@ -70,19 +70,21 @@ def interpret_exc_info(ei):
     return exc_type, exc_value, exc_tb, info
 
 
-def traceback_printer(e, collection):
-    exc_type, exc_value, exc_tb, info = interpret_exc_info(exc_info())
+def traceback_printer(e, collection, print_to_stderr=False):
+    exc_type, exc_value, _, info = interpret_exc_info(exc_info())
     if collection:
         log_to_mongo_collection(
             collection, *info, is_exception=True, args=getattr(e, "args", []),
         )
+    if print_to_stderr:
+        print("Exception handled", *info, sep=". ", end="", file=stderr)
     error_message = HTTP_DEBUG_ERROR_MASK.format(
         *info, exc_type.__name__, str(exc_value),
     )
     return error_message, 400
 
 
-def exception_catcher(e, collection):
+def exception_catcher(e, collection, print_to_stderr=False):
     if isinstance(e, FileNotFoundError):
         code, explanation = 404, "Not Found"
     elif isinstance(e, NotImplementedError):
@@ -99,6 +101,8 @@ def exception_catcher(e, collection):
             collection, *info, is_exception=True,
             args=getattr(e, "args", []), code=code,
         )
+    if print_to_stderr:
+        print("Exception handled", *info, sep=". ", end="", file=stderr)
     error_message = HTTP_ERROR_MASK.format(
         code, explanation, type(e).__name__, (
             (HTML_LIST_SEP.join(e.args) if hasattr(e, "args") else str(e))

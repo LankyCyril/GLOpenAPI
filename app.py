@@ -2,6 +2,7 @@
 from flask import Flask
 from genefab3.client import GeneFabClient
 from genefab3_genelab_adapter import GeneLabAdapter
+from genefab3.api.utils import is_debug
 
 flask_app = Flask("genefab3")
 
@@ -32,7 +33,7 @@ genefab3_client = GeneFabClient(
     ),
     logger_params=dict(
         mongo_collection_name="log",
-        stderr=True,
+        stderr=is_debug(),
     ),
 )
 

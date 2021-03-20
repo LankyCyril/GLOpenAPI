@@ -101,26 +101,27 @@ class GeneFabClient():
  
     def _init_warning_handlers(self, *, mongo_collection_name=None, stderr=False, level=DEBUG):
         """Set up logger to write to MongoDB collection and/or to stderr"""
-        if not is_flask_reloaded(): # TODO test that it fires once
-            logger = GeneFabLogger()
-            logger.setLevel(level)
-            if mongo_collection_name is not None:
-                collection = self.mongo_db[mongo_collection_name]
-                logger.addHandler(MongoDBLogger(collection))
-                if stderr: # adding handler removes default behavior, add back
-                    logger.addHandler(StreamHandler())
-            elif stderr is False: # disable default behavior by forcing noop
-                logger.addHandler(NullHandler())
+        logger = GeneFabLogger()
+        logger.setLevel(level)
+        if mongo_collection_name is not None:
+            collection = self.mongo_db[mongo_collection_name]
+            logger.addHandler(MongoDBLogger(collection))
+            if stderr: # adding handler removes default behavior, add back
+                logger.addHandler(StreamHandler())
+        elif stderr is False: # disable default behavior by forcing noop
+            logger.addHandler(NullHandler())
  
-    def _init_error_handlers(self, *, mongo_collection_name=None, stderr="unconditional"):
+    def _init_error_handlers(self, *, mongo_collection_name=None, stderr=False):
         """Intercept all exceptions and deliver an HTTP error page with or without traceback depending on debug state"""
         if mongo_collection_name is not None:
             collection = self.mongo_db[mongo_collection_name]
         else:
             collection = None
         app = self.flask_app
-        method = traceback_printer if is_debug() else exception_catcher
-        app.errorhandler(Exception)(partial(method, collection=collection))
+        app.errorhandler(Exception)(partial(
+            traceback_printer if is_debug() else exception_catcher,
+            collection=collection, print_to_stderr=stderr,
+        ))
  
     def loop(self):
         """Start background cacher thread"""
