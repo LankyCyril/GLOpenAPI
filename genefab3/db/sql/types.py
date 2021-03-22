@@ -1,6 +1,7 @@
 from genefab3.common.utils import iterate_terminal_leaves
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabDatabaseException
+from genefab3.common.exceptions import GeneFabDataManagerException
 from genefab3.common.types import ImmutableTree, PlaceholderLogger
 from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
@@ -8,6 +9,7 @@ from pandas import read_sql, DataFrame, read_csv
 from pandas.io.sql import DatabaseError
 from genefab3.common.types import passthrough, HashableEnough
 from urllib.request import urlopen
+from urllib.error import URLError
 from tempfile import TemporaryDirectory
 from shutil import copyfileobj
 from os import path
@@ -316,8 +318,11 @@ class CachedBinaryFile(HashableEnough, SQLiteBlob):
  
     def __download_as_blob(self, url):
         """Download data from URL as-is"""
-        with urlopen(url) as response:
-            return response.read()
+        try:
+            with urlopen(url) as response:
+                return response.read()
+        except URLError:
+            raise GeneFabDataManagerException("Not found", url=url)
 
 
 class CachedTableFile(HashableEnough, SQLiteTable):
@@ -343,8 +348,12 @@ class CachedTableFile(HashableEnough, SQLiteTable):
         """Download and parse data from URL as a table"""
         with TemporaryDirectory() as tempdir:
             tempfile = path.join(tempdir, self.name)
-            with urlopen(url) as response, open(tempfile, mode="wb") as handle:
-                copyfileobj(response, handle)
+            with open(tempfile, mode="wb") as handle:
+                try:
+                    with urlopen(url) as response:
+                        copyfileobj(response, handle)
+                except URLError:
+                    raise GeneFabDataManagerException("Not found", url=url)
             with open(tempfile, mode="rb") as handle:
                 magic = handle.read(3)
             if magic == b"\x1f\x8b\x08":

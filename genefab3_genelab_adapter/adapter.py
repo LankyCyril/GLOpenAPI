@@ -1,9 +1,11 @@
 from urllib.request import urlopen
+from urllib.error import URLError
 from json import loads
 from natsort import natsorted
 from genefab3.common.types import Adapter
 from genefab3.common.exceptions import GeneFabJSONException
 from genefab3.common.exceptions import GeneFabConfigurationException
+from genefab3.common.exceptions import GeneFabDataManagerException
 from pandas import json_normalize, Timestamp
 from urllib.parse import quote
 from re import search, sub
@@ -57,8 +59,11 @@ SPECIAL_FILE_TYPES = {
 
 def read_json(url):
     """Get parsed JSON from URL"""
-    with urlopen(url) as response:
-        return loads(response.read().decode())
+    try:
+        with urlopen(url) as response:
+            return loads(response.read().decode())
+    except URLError:
+        raise GeneFabDataManagerException("Not found", url=url)
 
 
 def as_timestamp(dataframe, column, default=-1):
