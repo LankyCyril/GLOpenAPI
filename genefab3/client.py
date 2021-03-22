@@ -1,6 +1,7 @@
 from pymongo import MongoClient
 from socket import create_connection, error as SocketError
 from genefab3.common.exceptions import GeneFabConfigurationException
+from sqlite3 import connect, OperationalError
 from types import SimpleNamespace
 from flask_compress import Compress
 from genefab3.api.routes import Routes
@@ -63,7 +64,18 @@ class GeneFabClient():
             msg = "SQL database `cache` must be a file path or None"
             raise GeneFabConfigurationException(msg)
         else:
-            return SimpleNamespace(blobs=blobs, tables=tables, cache=cache)
+            sqlite_dbs = SimpleNamespace(
+                blobs=blobs, tables=tables, cache=cache,
+            )
+            for name, filename in sqlite_dbs.__dict__.items():
+                if filename:
+                    try:
+                        with connect(filename):
+                            pass
+                    except OperationalError:
+                        msg = f"SQL database `{name}` not reachable"
+                        raise GeneFabConfigurationException(msg)
+            return sqlite_dbs
  
     def _init_routes(self, routes):
         """Route Response-generating methods to Flask endpoints"""
