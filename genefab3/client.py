@@ -7,7 +7,7 @@ from flask_compress import Compress
 from genefab3.api.routes import Routes
 from functools import partial
 from genefab3.common.logger import GeneFabLogger, MongoDBLogger
-from logging import DEBUG, StreamHandler, NullHandler
+from logging import DEBUG
 from genefab3.api.utils import is_debug, is_flask_reloaded
 from genefab3.db.mongo.cacher import CacherThread
 from genefab3.common.exceptions import traceback_printer, exception_catcher
@@ -82,19 +82,15 @@ class GeneFabClient():
         for endpoint, method in routes.items():
             self.flask_app.route(endpoint, methods=["GET"])(method)
  
-    def _init_warning_handlers(self, *, mongo_collection_name=None, stderr=False, level=DEBUG):
+    def _init_warning_handlers(self, *, mongo_collection_name=None, print_handled_exceptions_to_stderr=False, level=DEBUG):
         """Set up logger to write to MongoDB collection and/or to stderr"""
         logger = GeneFabLogger()
         logger.setLevel(level)
         if mongo_collection_name is not None:
             collection = self.mongo_db[mongo_collection_name]
             logger.addHandler(MongoDBLogger(collection))
-            if stderr: # adding handler removes default behavior, add back
-                logger.addHandler(StreamHandler())
-        elif stderr is False: # disable default behavior by forcing noop
-            logger.addHandler(NullHandler())
  
-    def _init_error_handlers(self, *, mongo_collection_name=None, stderr=False):
+    def _init_error_handlers(self, *, mongo_collection_name=None, print_handled_exceptions_to_stderr=False, level=None):
         """Intercept all exceptions and deliver an HTTP error page with or without traceback depending on debug state"""
         if mongo_collection_name is not None:
             collection = self.mongo_db[mongo_collection_name]
@@ -102,7 +98,8 @@ class GeneFabClient():
             collection = None
         self.flask_app.errorhandler(Exception)(partial(
             traceback_printer if is_debug() else exception_catcher,
-            collection=collection, print_to_stderr=stderr,
+            collection=collection,
+            print_to_stderr=print_handled_exceptions_to_stderr,
         ))
  
     def loop(self):

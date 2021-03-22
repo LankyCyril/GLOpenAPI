@@ -34,7 +34,7 @@ genefab3_client = GeneFabClient(
     ),
     logger_params=dict(
         mongo_collection_name="log",
-        stderr=is_debug(),
+        print_handled_exceptions_to_stderr=is_debug(),
     ),
 )
 
