@@ -1,33 +1,14 @@
-from genefab3.config import COLLECTION_NAMES, COLD_SEARCH_MASK, MAX_JSON_AGE
+from genefab3.config import COLLECTION_NAMES
 from genefab3.coldstorage.dataset import ColdStorageDataset
 from genefab3.backend.mongo.writers.json import get_fresh_json
-from genefab3.backend.mongo.writers.json import drop_json_cache_by_accession
 from genefab3.backend.mongo.utils import run_mongo_transaction
 from genefab3.backend.mongo.utils import harmonize_document
 from datetime import datetime
 from functools import partial
-from genefab3.backend.mongo.assay import CachedAssay
-from pandas import Series
 
 
 WARN_NO_META = "%s, %s: no metadata entries"
 WARN_NO_STUDY = "%s, %s, %s: no Study entries"
-
-
-def drop_dataset_timestamps(mongo_db, accession, cname=COLLECTION_NAMES.DATASET_TIMESTAMPS):
-    """Remove all entries associated with dataset from db.dataset_timestamps"""
-    run_mongo_transaction(
-        action="delete_many", collection=getattr(mongo_db, cname),
-        query={"accession": accession},
-    )
-
-
-def drop_metadata_by_accession(mongo_db, accession, cname=COLLECTION_NAMES.METADATA):
-    """Remove all entries associated with dataset from db.metadata"""
-    run_mongo_transaction(
-        action="delete_many", collection=getattr(mongo_db, cname),
-        query={"info.accession": accession},
-    )
 
 
 class CachedDataset(ColdStorageDataset):
@@ -126,38 +107,7 @@ class CachedDataset(ColdStorageDataset):
                 warning="No metadata entries", status="warning",
             )
             self.logger.warning(WARN_NO_META, self.accession, assay.name)
- 
-    def drop_cache(self=None, mongo_db=None, accession=None):
-        """Remove all entries associated with dataset from database (dataset_timestamps, metadata, json_cache)"""
-        args = [mongo_db or self.mongo_db, accession or self.accession]
-        drop_dataset_timestamps(*args)
-        drop_metadata_by_accession(*args)
-        drop_json_cache_by_accession(*args)
-
-
-def list_available_accessions(mongo_db):
-    """List datasets in cold storage"""
-    url_n = COLD_SEARCH_MASK.format(0)
-    n_datasets = get_fresh_json(mongo_db, url_n)["hits"]["total"]
-    url_all = COLD_SEARCH_MASK.format(n_datasets)
-    raw_datasets_json = get_fresh_json(mongo_db, url_all)["hits"]["hits"]
-    return {raw_json["_id"] for raw_json in raw_datasets_json}
-
-
-def list_fresh_and_stale_accessions(mongo_db, max_age=MAX_JSON_AGE, cname=COLLECTION_NAMES.DATASET_TIMESTAMPS):
-    """Find accessions in no need / need of update in database"""
-    refresh_dates = Series({
-        entry["accession"]: entry["last_refreshed"]
-        for entry in getattr(mongo_db, cname).find()
-    })
-    current_timestamp = int(datetime.now().timestamp())
-    indexer = ((current_timestamp - refresh_dates) <= max_age)
-    return set(refresh_dates[indexer].index), set(refresh_dates[~indexer].index)
 
 
 class CachedAssayDispatcher(dict):
-    """Lazily exposes a dataset's assays sourced from MongoDB metadata, indexable by name"""
-    def __init__(self, dataset):
-        self.dataset = dataset
-    def __getitem__(self, assay_name):
-        return CachedAssay(self.dataset, assay_name)
+    pass

@@ -7,9 +7,9 @@ from genefab3.common.utils import copy_and_drop, iterate_terminal_leaf_elements
 
 class Dataset():
  
-    def __init__(self, accession, files, mongo_db, sqlite_blobs):
+    def __init__(self, accession, files, sqlite_blobs):
         self.accession, self.files = accession, files
-        self.mongo_db, self.sqlite_blobs = mongo_db, sqlite_blobs
+        self.sqlite_blobs = sqlite_blobs
         isa_files = {
             filename: descriptor for filename, descriptor in files.items()
             if descriptor.get("datatype") == "isa"

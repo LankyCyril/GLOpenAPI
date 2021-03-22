@@ -12,6 +12,7 @@ genefab3_client = GeneFabClient(
         db_name="genefab3_testing",
         locale="en_US",
         client_params={},
+        units_formatter="{value} {{{unit}}}".format,
     ),
     sqlite_params=dict(
         blobs="./.sqlite3/blobs.db",

@@ -19,8 +19,8 @@ class GeneFabClient():
         """Initialize metadata cacher (with adapter), response cacher, routes"""
         try:
             self.flask_app = self._configure_flask_app(**flask_params)
-            self.mongo_db, self.locale = self._get_mongo_db_connection(
-                **mongo_params,
+            self.mongo_db, self.locale, self.units_formatter = (
+                self._get_mongo_db_connection(**mongo_params)
             )
             self.sqlite_dbs = self._get_validated_sqlite_dbs(**sqlite_params)
             self._init_routes(Routes())
@@ -38,7 +38,7 @@ class GeneFabClient():
         Compress(app)
         return app
  
-    def _get_mongo_db_connection(self, *, db_name, client_params, locale="en_US", test_timeout=10):
+    def _get_mongo_db_connection(self, *, db_name, client_params, locale="en_US", units_formatter=None, test_timeout=10):
         """Check MongoDB server is running, connect to database `db_name`"""
         mongo_client = MongoClient(**client_params)
         try:
@@ -49,7 +49,7 @@ class GeneFabClient():
             msg = "Could not connect to internal MongoDB instance"
             raise GeneFabConfigurationException(msg, error=type(e).__name__)
         else:
-            return mongo_client[db_name], locale
+            return mongo_client[db_name], locale, units_formatter
  
     def _get_validated_sqlite_dbs(self, *, blobs, tables, cache=None):
         """Check target SQLite3 files are specified correctly, convert to namespace for dot-syntax lookup"""
@@ -99,7 +99,8 @@ class GeneFabClient():
             try:
                 cacher_thread_params = dict(
                     adapter=self.adapter, mongo_db=self.mongo_db,
-                    response_cache=self.sqlite_dbs.cache, **self.cacher_params,
+                    units_formatter=self.units_formatter,
+                    sqlite_dbs=self.sqlite_dbs, **self.cacher_params,
                 )
                 CacherThread(**cacher_thread_params).start()
             except TypeError as e:

@@ -43,45 +43,6 @@ def ensure_info_index(mongo_db, logger, category="info", keys=["accession", "ass
         )
 
 
-def recache_metadata(mongo_db, logger, units_format=UNITS_FORMAT):
-    """Instantiate each available dataset; if contents changed, dataset automatically updates db.metadata"""
-    logger.info("CacherThread/metadata: Checking metadata cache")
-    try:
-        available = list_available_accessions(mongo_db)
-        fresh, stale = list_fresh_and_stale_accessions(mongo_db)
-        accessions = SimpleNamespace(
-            available=available, fresh=fresh, stale=stale,
-            removed=((fresh | stale) - available),
-            to_check=(available - fresh), updated=set(), failed=set(),
-        )
-    except Exception as e:
-        logger.error(f"CacherThread/metadata: {repr(e)}") # TODO: use genefab3.common.exceptions.insert_log_entry w/ extra args
-        return None, False
-    for accession in accessions.to_check:
-        try:
-            glds = CachedDataset(
-                mongo_db, accession, logger, units_format=units_format,
-            )
-        except Exception as e:
-            logger.error(f"CacherThread/metadata/{accession}: {repr(e)}")
-            accessions.failed.add(accession)
-        else:
-            if any(glds.changed):
-                change_status = "changed"
-                accessions.updated.add(accession)
-            else:
-                change_status = "up to date"
-            logger.info(f"CacherThread/metadata/{accession}: {change_status}")
-    for accession in accessions.removed:
-        CachedDataset.drop_cache(mongo_db=mongo_db, accession=accession)
-    logger.info(
-        "CacherThread/metadata, datasets: " + ", ".join(
-            f"{k}={len(v)}" for k, v in accessions.__dict__.items()
-        ),
-    )
-    return accessions, True
-
-
 def INPLACE_update_metadata_value_lookup_keys(mongo_db, index, final_key_blacklist=FINAL_INDEX_KEY_BLACKLIST, cname=COLLECTION_NAMES.METADATA):
     """Populate JSON with all possible metadata keys, also for documentation section 'meta-existence'"""
     for isa_category in index:

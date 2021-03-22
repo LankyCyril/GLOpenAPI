@@ -29,7 +29,7 @@ else:
     with open(PKL, mode="wb") as pkl:
         dump(files, pkl)
 
-glds = Dataset("GLDS-48", files.value, None, "sandbox/testblobs.db")
+glds = Dataset("GLDS-48", files.value, "sandbox/testblobs.db")
 #print(files.base64value)
 print(files.changed, glds.isa.changed)
 sample = next(glds.samples)
