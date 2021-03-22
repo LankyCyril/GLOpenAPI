@@ -1,5 +1,3 @@
-from threading import Thread
-from time import sleep
 from pymongo import MongoClient
 from socket import create_connection, error as SocketError
 from genefab3.common.exceptions import GeneFabConfigurationException
@@ -10,41 +8,14 @@ from functools import partial
 from genefab3.common.logger import GeneFabLogger, MongoDBLogger
 from logging import DEBUG, StreamHandler, NullHandler
 from genefab3.api.utils import is_debug, is_flask_reloaded
+from genefab3.db.mongo.cacher import CacherThread
 from genefab3.common.exceptions import traceback_printer, exception_catcher
-
-
-class CacherThread(Thread):
-    """Lives in background and keeps local metadata cache, metadata index, and response cache up to date"""
- 
-    def __init__(self, *, adapter, mongo_db, response_cache, metadata_update_interval, metadata_retry_delay):
-        """Prepare background thread that iteratively watches for changes to datasets"""
-        self.adapter = adapter
-        self.mongo_db, self.response_cache = mongo_db, response_cache
-        self.metadata_update_interval = metadata_update_interval
-        self.metadata_retry_delay = metadata_retry_delay
-        super().__init__()
- 
-    def run(self):
-        """Continuously run MongoDB and SQLite3 cachers"""
-        logger = GeneFabLogger()
-        while True:
-            # ensure_info_index TODO
-            success = True # recache_metadata TODO
-            if success:
-                # update_metadata_value_lookup TODO
-                # drop_cached_responses TODO
-                # shrink_response_cache TODO
-                delay = self.metadata_update_interval
-            else:
-                delay = self.metadata_retry_delay
-            logger.info(f"CacherThread: Sleeping for {delay} seconds")
-            sleep(delay)
 
 
 class GeneFabClient():
     """Routes Response-generating methods, continuously caches metadata and responses"""
  
-    def __init__(self, *, Adapter, mongo_params, sqlite_params, cacher_params, flask_params, logger_params=None):
+    def __init__(self, *, AdapterClass, mongo_params, sqlite_params, cacher_params, flask_params, logger_params=None):
         """Initialize metadata cacher (with adapter), response cacher, routes"""
         try:
             self.flask_app = self._configure_flask_app(**flask_params)
@@ -59,7 +30,7 @@ class GeneFabClient():
             msg = f"During GeneFabClient() initialization, {e}"
             raise GeneFabConfigurationException(msg)
         else:
-            self.adapter, self.cacher_params = Adapter(), cacher_params
+            self.adapter, self.cacher_params = AdapterClass(), cacher_params
  
     def _configure_flask_app(self, *, app, compress_params=None):
         """Modify Flask application, enable compression"""
@@ -117,8 +88,7 @@ class GeneFabClient():
             collection = self.mongo_db[mongo_collection_name]
         else:
             collection = None
-        app = self.flask_app
-        app.errorhandler(Exception)(partial(
+        self.flask_app.errorhandler(Exception)(partial(
             traceback_printer if is_debug() else exception_catcher,
             collection=collection, print_to_stderr=stderr,
         ))
@@ -128,12 +98,10 @@ class GeneFabClient():
         if not is_flask_reloaded():
             try:
                 cacher_thread_params = dict(
-                    adapter=self.adapter,
-                    mongo_db=self.mongo_db,
-                    response_cache=self.sqlite_dbs.cache,
-                    **self.cacher_params,
+                    adapter=self.adapter, mongo_db=self.mongo_db,
+                    response_cache=self.sqlite_dbs.cache, **self.cacher_params,
                 )
                 CacherThread(**cacher_thread_params).start()
             except TypeError as e:
-                msg = f"Incorrect `cacher_params` for GeneLabAdapter(): {e}"
+                msg = f"Incorrect `cacher_params` for GeneFabClient(): {e}"
                 raise GeneFabConfigurationException(msg)

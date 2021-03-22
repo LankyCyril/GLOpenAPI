@@ -7,7 +7,7 @@ from genefab3.api.utils import is_debug
 flask_app = Flask("genefab3")
 
 genefab3_client = GeneFabClient(
-    Adapter=GeneLabAdapter,
+    AdapterClass=GeneLabAdapter,
     mongo_params=dict(
         db_name="genefab3_testing",
         locale="en_US",
