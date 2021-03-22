@@ -7,6 +7,8 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from pandas import json_normalize, Timestamp
 from urllib.parse import quote
 from re import search, sub
+from warnings import catch_warnings, filterwarnings
+from dateutil.parser import UnknownTimezoneWarning
 
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
@@ -135,8 +137,10 @@ class GeneLabAdapter(Adapter):
             )
         else:
             files = json_normalize(filelisting_json)
-        files["date_created"] = as_timestamp(files, "date_created")
-        files["date_modified"] = as_timestamp(files, "date_modified")
+        with catch_warnings():
+            filterwarnings("ignore", category=UnknownTimezoneWarning)
+            files["date_created"] = as_timestamp(files, "date_created")
+            files["date_modified"] = as_timestamp(files, "date_modified")
         files["timestamp"] = files[["date_created", "date_modified"]].max(axis=1)
         return {
             row["file_name"]: format_file_entry(row)
