@@ -1,7 +1,7 @@
 from genefab3.common.exceptions import GeneFabFileException, GeneFabISAException
 from genefab3.common.utils import pick_reachable_url
 from genefab3.db.sql.types import CachedBinaryFile
-from genefab3.isa.parser import IsaZip
+from genefab3.isa.parser import IsaFromZip
 from genefab3.common.utils import copy_and_drop, iterate_terminal_leaf_elements
 
 
@@ -26,7 +26,7 @@ class Dataset():
                     name=isa_name, sqlite_db=self.sqlite_blobs,
                     url=url, timestamp=isa_desc["timestamp"],
                 )
-            self.isa = IsaZip(
+            self.isa = IsaFromZip(
                 data=isa_file.data,
                 logger_info=dict(filename=isa_file.name, url=isa_file.url),
             )

@@ -1,3 +1,4 @@
+from genefab3.common.logger import GeneFabLogger
 from logging import getLogger, CRITICAL
 from genefab3.common.exceptions import GeneFabISAException
 from re import search, sub
@@ -214,7 +215,7 @@ class StudyEntries(list):
                     logger_info.get("isa_zip_url", "[URL]"), field,
                     self._self_identifier, logger_info["name"],
                 )
-                getLogger("genefab3").warning(warning)
+                GeneFabLogger().warning(warning)
             qualifiable[field] = value
 
 
@@ -223,7 +224,7 @@ class AssayEntries(StudyEntries):
     _self_identifier = "Assay"
 
 
-class IsaZip:
+class IsaFromZip():
     """Stores GLDS ISA information retrieved from ISA ZIP file stream"""
  
     def __init__(self, data, logger_info):
@@ -287,7 +288,7 @@ class IsaZip:
                 logger_info.get("isa_zip_url", "[URL]"), repr(e),
                 logger_info.get("filename", "file"),
             )
-            getLogger("genefab3").warning(warning)
+            GeneFabLogger().warning(warning)
         raw_tab.columns = raw_tab.iloc[0,:]
         raw_tab.columns.name = None
         return raw_tab.drop(index=[0]).drop_duplicates().reset_index(drop=True)
