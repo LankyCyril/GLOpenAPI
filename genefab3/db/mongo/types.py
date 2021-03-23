@@ -5,19 +5,19 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.db.mongo.utils import run_mongo_transaction
 
 
-class CachedDocumentByValue():
+class ValueCheckedRecord():
     """Universal wrapper for cached objects; defined by identifier and value; re-cached if value has changed"""
  
     def __init__(self, identifier, collection, value):
         """Match existing documents by base64-encoded `value`, update if changed, report state in self.changed"""
         if not isinstance(identifier, dict):
             raise GeneFabConfigurationException(
-                "CachedDocumentByValue(): `identifier` is not a dictionary",
+                "ValueCheckedRecord(): `identifier` is not a dictionary",
                 identifier=identifier,
             )
         elif "base64value" in identifier:
             raise GeneFabConfigurationException(
-                "CachedDocumentByValue(): `identifier` uses a reserved key",
+                "ValueCheckedRecord(): `identifier` uses a reserved key",
                 identifier=identifier, key="base64value",
             )
         else:
@@ -28,7 +28,7 @@ class CachedDocumentByValue():
                 )
             except TypeError as e:
                 raise GeneFabConfigurationException(
-                    "CachedDocumentByValue(): " + str(e),
+                    "ValueCheckedRecord(): " + str(e),
                     identifier=identifier, value=value,
                 )
             else:

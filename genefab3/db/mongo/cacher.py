@@ -3,7 +3,7 @@ from genefab3.common.logger import GeneFabLogger
 from types import SimpleNamespace
 from time import sleep
 from collections import OrderedDict
-from genefab3.db.mongo.types import CachedDocumentByValue
+from genefab3.db.mongo.types import ValueCheckedRecord
 from genefab3.isa.types import Dataset
 from genefab3.db.mongo.utils import run_mongo_transaction, harmonize_document
 from functools import partial
@@ -89,7 +89,7 @@ class CacherThread(Thread):
  
     def recache_single_dataset_metadata(self, accession):
         """Check if dataset changed, update metadata cached in `self.mongo_db.metadata`, report with result/errors"""
-        files = CachedDocumentByValue(
+        files = ValueCheckedRecord(
             identifier=dict(kind="dataset files", accession=accession),
             collection=self.collections.records,
             value=self.adapter.get_files_by_accession(accession),
