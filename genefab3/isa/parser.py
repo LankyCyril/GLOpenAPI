@@ -1,13 +1,13 @@
-from genefab3.db.mongo.status import update_status
-from logging import getLogger, CRITICAL
 from genefab3.common.exceptions import GeneFabISAException
 from re import search, sub
 from collections import defaultdict
 from numpy import nan
+from genefab3.db.mongo.status import update_status
 from types import SimpleNamespace
 from zipfile import ZipFile
 from io import BytesIO, StringIO
 from os import path
+from logging import getLogger, CRITICAL
 from isatools.isatab import load_investigation
 from pandas import read_csv
 from pandas.errors import ParserError
