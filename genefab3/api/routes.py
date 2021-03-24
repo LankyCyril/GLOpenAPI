@@ -50,7 +50,9 @@ class Routes():
         status_json = self.mongo_db.status.find(
             {}, {"_id": False, **{c: True for c in STATUS_COLUMNS}},
         )
-        status_df = json_normalize(list(status_json), max_level=0)
+        status_df = json_normalize(list(status_json), max_level=0).sort_values(
+            by=["kind", "report timestamp"], ascending=[True, False],
+        )
         status_df = status_df[[c for c in STATUS_COLUMNS if c in status_df]]
         status_df["report timestamp"] = status_df["report timestamp"].apply(
             lambda t: datetime.utcfromtimestamp(t).isoformat() + "Z"
@@ -61,6 +63,6 @@ class Routes():
         )
         return Response(
             "<style>table {table-layout: fixed; white-space: nowrap}</style>" +
-            status_twolevel_df.to_html(index=False, col_space="1in"),
+            status_twolevel_df.fillna("").to_html(index=False, col_space="1in"),
             mimetype="text/html",
         )
