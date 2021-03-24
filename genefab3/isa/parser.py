@@ -103,7 +103,7 @@ class StudyEntries(list):
     """Stores GLDS ISA Tab 'studies' records as a nested JSON"""
     _self_identifier = "Study"
  
-    def __init__(self, raw_tabs, status_params):
+    def __init__(self, raw_tabs, status_kwargs):
         """Convert tables to nested JSONs"""
         if self._self_identifier == "Study":
             self._by_sample_name = {}
@@ -116,7 +116,7 @@ class StudyEntries(list):
                     raise GeneFabISAException(error)
                 else:
                     sample_name = row["Sample Name"]
-                json = self._row_to_json(row, name, status_params)
+                json = self._row_to_json(row, name, status_kwargs)
                 super().append(json)
                 if self._self_identifier == "Study":
                     if sample_name in self._by_sample_name:
@@ -134,7 +134,7 @@ class StudyEntries(list):
         error_mask = "Unique look up by sample name within {} not allowed"
         raise GeneFabISAException(error_mask.format(type(self).__name__))
  
-    def _row_to_json(self, row, name, status_params):
+    def _row_to_json(self, row, name, status_kwargs):
         """Convert single row of table to nested JSON"""
         json = {"Info": {self._self_identifier: name}}
         protocol_ref, qualifiable = nan, None
@@ -157,12 +157,7 @@ class StudyEntries(list):
                 else:
                     self._INPLACE_qualify(
                         qualifiable, field, subfield, value,
-                        status_params={
-                            **status_params, "data": {
-                                **getattr(status_params, "data", {}),
-                                "name": name,
-                            },
-                        },
+                        status_kwargs={**status_kwargs, "name": name},
                     )
         return json
  
@@ -207,7 +202,7 @@ class StudyEntries(list):
                 qualifiable["Protocol REF"] = protocol_ref
             return qualifiable
  
-    def _INPLACE_qualify(self, qualifiable, field, subfield, value, status_params):
+    def _INPLACE_qualify(self, qualifiable, field, subfield, value, status_kwargs):
         """Add qualifier to field at pointer (qualifiable)"""
         if field == "Comment": # make {"Comment": {"mood": "cheerful"}}
             if "Comment" not in qualifiable:
@@ -216,11 +211,9 @@ class StudyEntries(list):
         else: # make {"Unit": "percent"}
             if subfield:
                 update_status(
-                    status_collection=status_params["status_collection"],
-                    log_collection=status_params["log_collection"],
+                    **status_kwargs, status="warning",
                     warning="Extra info past qualifier",
                     qualifier=field, tab=self._self_identifier,
-                    status="warning", **status_params["data"],
                 )
             qualifiable[field] = value
 
@@ -233,14 +226,14 @@ class AssayEntries(StudyEntries):
 class IsaFromZip():
     """Stores GLDS ISA information retrieved from ISA ZIP file stream"""
  
-    def __init__(self, data, status_params=None):
+    def __init__(self, data, status_kwargs=None):
         """Unpack ZIP from URL and delegate to sub-parsers"""
-        self.raw = self._ingest_raw_isa(data, status_params or {})
+        self.raw = self._ingest_raw_isa(data, status_kwargs or {})
         self.investigation = Investigation(self.raw.investigation)
-        self.studies = StudyEntries(self.raw.studies, status_params or {})
-        self.assays = AssayEntries(self.raw.assays, status_params or {})
+        self.studies = StudyEntries(self.raw.studies, status_kwargs or {})
+        self.assays = AssayEntries(self.raw.assays, status_kwargs or {})
  
-    def _ingest_raw_isa(self, data, status_params):
+    def _ingest_raw_isa(self, data, status_kwargs):
         """Unpack ZIP from URL and delegate to top-level parsers"""
         raw = SimpleNamespace(investigation=None, studies={}, assays={})
         with ZipFile(BytesIO(data)) as archive:
@@ -255,14 +248,14 @@ class IsaFromZip():
                             raw.investigation = reader(handle)
                         elif kind == "s":
                             reader = self._read_tab
-                            raw.studies[name] = reader(handle, status_params)
+                            raw.studies[name] = reader(handle, status_kwargs)
                         elif kind == "a":
                             reader = self._read_tab
-                            raw.assays[name] = reader(handle, status_params)
+                            raw.assays[name] = reader(handle, status_kwargs)
         for tab, value in raw.__dict__.items():
             if not value:
                 raise GeneFabISAException(
-                    "Missing ISA tab", tab=tab, **status_params,
+                    "Missing ISA tab", tab=tab, **status_kwargs,
                 )
         return raw
  
@@ -277,7 +270,7 @@ class IsaFromZip():
         getLogger("isatools").setLevel(CRITICAL+1)
         return load_investigation(safe_handle)
  
-    def _read_tab(self, handle, status_params):
+    def _read_tab(self, handle, status_kwargs):
         """Read TSV file, absorbing encoding errors, and allowing for duplicate column names"""
         byte_tee = BytesIO(handle.read())
         reader_kwargs = dict(
@@ -289,11 +282,9 @@ class IsaFromZip():
             byte_tee.seek(0)
             string_tee = StringIO(byte_tee.read().decode(errors="replace"))
             raw_tab = read_csv(string_tee, **reader_kwargs)
-            update_status( # TODO: this gets replaced later on success...
-                status_collection=status_params["status_collection"],
-                log_collection=status_params["log_collection"],
+            update_status(
+                **status_kwargs, status="warning", error=e,
                 warning="Absorbing exception when parsing file",
-                status="warning", error=e, **status_params["data"],
             )
         raw_tab.columns = raw_tab.iloc[0,:]
         raw_tab.columns.name = None

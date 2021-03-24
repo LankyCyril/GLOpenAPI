@@ -25,10 +25,9 @@ class CacherThread(Thread):
             status=self.mongo_db.status,
             log=self.mongo_db.log,
         )
-        self.status_params = dict(
+        self.status_kwargs = dict(
             status_collection=self.collections.status,
             log_collection=self.collections.log,
-            data={},
         )
         super().__init__()
  
@@ -67,7 +66,7 @@ class CacherThread(Thread):
         for accession, key, report, error in _iterate():
             accessions[key].add(accession)
             update_status(
-                **self.status_params, status=key, accession=accession,
+                **self.status_kwargs, status=key, accession=accession,
                 info=f"CacherThread: {accession} {report}", error=error,
             )
         GeneFabLogger().info(
@@ -96,7 +95,7 @@ class CacherThread(Thread):
             try:
                 dataset = Dataset(
                     accession, files.value, self.sqlite_dbs.blobs,
-                    status_params=self.status_params,
+                    status_kwargs=self.status_kwargs,
                 )
             except Exception as e:
                 return "failed", f"failed to update ({repr(e)}), kept stale", e
@@ -110,14 +109,14 @@ class CacherThread(Thread):
                     has_samples = True
                     if "Study" not in sample:
                         update_status(
-                            **self.status_params, status="warning",
+                            **self.status_kwargs, status="warning",
                             warning="Study entry missing",
                             accession=accession, assay_name=sample.assay_name,
                             sample_name=sample.name,
                         )
                 if not has_samples:
                     update_status(
-                        **self.status_params, status="warning",
+                        **self.status_kwargs, status="warning",
                         warning="No samples", accession=accession,
                     )
                 return "updated", "updated", None

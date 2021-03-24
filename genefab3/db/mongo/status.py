@@ -11,21 +11,18 @@ def update_status(status_collection, log_collection=None, accession=None, assay_
                 action="delete_many", collection=status_collection,
                 query=dict(accession=accession),
             )
-        replacement_query = {"kind": "dataset", "accession": accession}
-        if warning:
-            replacement_query["warning"] = warning
-    else:
-        replacement_query = {
-            "kind": "sample", "accession": accession, "sample name": sample_name,
-        }
+    replacement_query = {
+        "kind": "dataset" if sample_name is None else "sample",
+        "accession": accession, "sample name": sample_name,
+        "warning": warning,
+    }
     inserted_data = {
         "status": status, "info": info, "warning": warning,
         "error": None if (error is None) else type(error).__name__,
         "report timestamp": int(datetime.now().timestamp()),
-        "assay name": assay_name, "details": [],
+        "assay name": assay_name,
+        "args": getattr(error, "args", []), "kwargs": kwargs,
     }
-    if error is not None:
-        inserted_data["details"].extend(getattr(error, "args", []))
     run_mongo_transaction(
         action="replace", collection=status_collection,
         query=replacement_query, data=inserted_data,

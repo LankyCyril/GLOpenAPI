@@ -7,7 +7,7 @@ from genefab3.common.utils import copy_and_drop, iterate_terminal_leaf_elements
 
 class Dataset():
  
-    def __init__(self, accession, files, sqlite_blobs, status_params=None):
+    def __init__(self, accession, files, sqlite_blobs, status_kwargs=None):
         self.accession, self.files = accession, files
         self.sqlite_blobs = sqlite_blobs
         isa_files = {
@@ -28,12 +28,9 @@ class Dataset():
                 )
             self.isa = IsaFromZip(
                 data=isa_file.data,
-                status_params={
-                    **(status_params or {}), "data": {
-                        **getattr(status_params, "data", {}),
-                        "accession": accession, # FIXME: isn't propagated?
-                        "filename": isa_file.name, "url": isa_file.url,
-                    },
+                status_kwargs={
+                    **(status_kwargs or {}), "accession": accession, # FIXME: isn't propagated?
+                    "filename": isa_file.name, "url": isa_file.url,
                 },
             )
             self.isa.changed = isa_file.changed

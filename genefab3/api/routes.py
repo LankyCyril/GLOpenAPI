@@ -45,12 +45,13 @@ class Routes():
         from numpy import nan
         STATUS_COLUMNS = [
             "report timestamp", "kind", "accession", "assay name",
-            "sample name", "status", "warning", "error", "details",
+            "sample name", "status", "warning", "error", "args", "kwargs",
         ]
         status_json = self.mongo_db.status.find(
             {}, {"_id": False, **{c: True for c in STATUS_COLUMNS}},
         )
-        status_df = json_normalize(list(status_json))[STATUS_COLUMNS]
+        status_df = json_normalize(list(status_json), max_level=0)
+        status_df = status_df[[c for c in STATUS_COLUMNS if c in status_df]]
         status_df["report timestamp"] = status_df["report timestamp"].apply(
             lambda t: datetime.utcfromtimestamp(t).isoformat() + "Z"
         )
@@ -59,5 +60,7 @@ class Routes():
             axis=1,
         )
         return Response(
-            status_twolevel_df.to_string(index=False), mimetype="text/plain",
+            "<style>table {table-layout: fixed; white-space: nowrap}</style>" +
+            status_twolevel_df.to_html(index=False, col_space="1in"),
+            mimetype="text/html",
         )
