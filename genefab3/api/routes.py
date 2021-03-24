@@ -1,8 +1,12 @@
 from functools import wraps, partial
 from genefab3.common.exceptions import GeneFabException
+from flask import Response
 
 
 class Routes():
+ 
+    def __init__(self, mongo_db):
+        self.mongo_db = mongo_db
  
     def _as_endpoint(method, endpoint=None):
         @wraps(method)
@@ -17,7 +21,7 @@ class Routes():
     def items(self):
         for name in dir(self):
             method = getattr(self, name)
-            if hasattr(method, "endpoint"):
+            if isinstance(getattr(method, "endpoint", None), str):
                 yield method.endpoint, method
  
     @partial(_as_endpoint, endpoint="/favicon.<imgtype>")
@@ -35,4 +39,25 @@ class Routes():
  
     @_as_endpoint
     def status(self):
-        return "OK"
+        """Simple placeholder status report, will be superseded with renderable dataframe"""
+        from pandas import json_normalize, concat
+        from datetime import datetime
+        from numpy import nan
+        STATUS_COLUMNS = [
+            "report timestamp", "kind", "accession", "sample name",
+            "status", "warning", "error", "details",
+        ]
+        status_json = self.mongo_db.status.find(
+            {}, {"_id": False, **{c: True for c in STATUS_COLUMNS}},
+        )
+        status_df = json_normalize(list(status_json))[STATUS_COLUMNS]
+        status_df["report timestamp"] = status_df["report timestamp"].apply(
+            lambda t: datetime.utcfromtimestamp(t).isoformat() + "Z"
+        )
+        status_twolevel_df = concat(
+            {"database status": status_df.applymap(lambda v: v or nan)},
+            axis=1,
+        )
+        return Response(
+            status_twolevel_df.to_string(index=False), mimetype="text/plain",
+        )

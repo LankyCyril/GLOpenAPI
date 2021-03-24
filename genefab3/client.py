@@ -22,7 +22,7 @@ class GeneFabClient():
                 self._get_mongo_db_connection(**mongo_params)
             ) # TODO ingest CNAMEs
             self.sqlite_dbs = self._get_validated_sqlite_dbs(**sqlite_params)
-            self._init_routes(Routes())
+            self._init_routes(Routes(self.mongo_db))
             self._init_error_handlers()
         except TypeError as e:
             msg = f"During GeneFabClient() initialization, {e}"
@@ -88,7 +88,7 @@ class GeneFabClient():
  
     def loop(self):
         """Start background cacher thread"""
-        if not is_flask_reloaded():
+        if self.cacher_params.get("enabled", 1) and (not is_flask_reloaded()):
             try:
                 cacher_thread_params = dict(
                     adapter=self.adapter, mongo_db=self.mongo_db,
