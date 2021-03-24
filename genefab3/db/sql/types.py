@@ -2,7 +2,8 @@ from genefab3.common.utils import iterate_terminal_leaves
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.exceptions import GeneFabDataManagerException
-from genefab3.common.types import ImmutableTree, PlaceholderLogger
+from genefab3.common.logger import GeneFabLogger
+from genefab3.common.types import ImmutableTree
 from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
 from pandas import read_sql, DataFrame, read_csv
@@ -34,7 +35,7 @@ def is_singular_spec(spec):
 class SQLiteObject():
     """Universal wrapper for cached objects; defined by table schemas, the update/retrieve spec, and the re-cache trigger condition"""
  
-    def __init__(self, sqlite_db, signature, table_schemas, trigger, update, retrieve, logger=None):
+    def __init__(self, sqlite_db, signature, table_schemas, trigger, update, retrieve):
         """Parse the update/retrieve spec and the re-cache trigger condition; create tables if they do not exist"""
         self.__sqlite_db, self.__table_schemas = sqlite_db, table_schemas
         if len(signature) != 1:
@@ -65,7 +66,6 @@ class SQLiteObject():
                 "SQLiteObject(): Bad spec",
                 trigger=trigger, update=update, retrieve=retrieve,
             )
-        self.__logger = logger or PlaceholderLogger()
         self.changed = None
  
     def __ensure_table(self, table, schema):
@@ -100,7 +100,7 @@ class SQLiteObject():
                 connection.cursor().execute(delete_action)
                 connection.cursor().execute(insert_action, values)
             except OperationalError:
-                self.__logger.warning(
+                GeneFabLogger().warning(
                     "Could not update SQLiteObject (%s == %s)",
                     self.__identifier_field, self.__identifier_value,
                 )
@@ -145,7 +145,7 @@ class SQLiteObject():
                 {self.__identifier_field} = '{self.__identifier_value}'
             """)
         except OperationalError:
-            self.__logger.warning(
+            GeneFabLogger().warning(
                 "Could not drop multiple entries for same %s == %s",
                 self.__identifier_field, self.__identifier_value,
             )
@@ -224,7 +224,7 @@ class SQLiteObject():
             elif (len(ret) == 1) and (len(ret[0]) == 1):
                 trigger_value = ret[0][0]
             else:
-                self.__logger.warning(
+                GeneFabLogger().warning(
                     "Conflicting trigger values for SQLiteObject (%s == %s)",
                     self.__identifier_field, self.__identifier_value,
                 )

@@ -1,6 +1,5 @@
 from threading import Thread
 from genefab3.common.logger import GeneFabLogger
-from types import SimpleNamespace
 from time import sleep
 from collections import OrderedDict
 from genefab3.db.mongo.types import ValueCheckedRecord
@@ -12,22 +11,16 @@ from genefab3.db.mongo.status import update_status
 class CacherThread(Thread):
     """Lives in background and keeps local metadata cache, metadata index, and response cache up to date"""
  
-    def __init__(self, *, adapter, mongo_db, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter):
+    def __init__(self, *, adapter, mongo_collections, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter):
         """Prepare background thread that iteratively watches for changes to datasets"""
         self.adapter = adapter
-        self.mongo_db, self.sqlite_dbs = mongo_db, sqlite_dbs
+        self.mongo_collections, self.sqlite_dbs = mongo_collections, sqlite_dbs
         self.metadata_update_interval = metadata_update_interval
         self.metadata_retry_delay = metadata_retry_delay
         self.units_formatter = units_formatter
-        self.collections = SimpleNamespace( # TODO pass CNAMEs from Client
-            metadata=self.mongo_db.metadata,
-            records=self.mongo_db.records,
-            status=self.mongo_db.status,
-            log=self.mongo_db.log,
-        )
         self.status_kwargs = dict(
-            status_collection=self.collections.status,
-            log_collection=self.collections.log,
+            collection=self.mongo_collections.status,
+            logger=GeneFabLogger(),
         )
         super().__init__()
  
@@ -51,7 +44,9 @@ class CacherThread(Thread):
         GeneFabLogger().info("CacherThread: Checking metadata cache")
         try:
             accessions = OrderedDict(
-                cached=set(self.mongo_db.metadata.distinct("info.accession")),
+                cached=set(
+                    self.mongo_collections.metadata.distinct("info.accession"),
+                ),
                 live=set(self.adapter.get_accessions()),
                 fresh=set(), updated=set(), dropped=set(), failed=set(),
             )
@@ -77,18 +72,18 @@ class CacherThread(Thread):
         return accessions, True
  
     def drop_single_dataset_metadata(self, accession):
-        """Drop all metadata entries associated with `accession` from `self.mongo_db.metadata`"""
+        """Drop all metadata entries associated with `accession` from `self.mongo_collections.metadata`"""
         run_mongo_transaction(
-            "delete_many", self.collections.metadata,
+            "delete_many", self.mongo_collections.metadata,
             query={"info.accession": accession},
         )
         return "dropped", "removed from database", None
  
     def recache_single_dataset_metadata(self, accession):
-        """Check if dataset changed, update metadata cached in `self.mongo_db.metadata`, report with result/errors"""
+        """Check if dataset changed, update metadata cached in `self.mongo_collections.metadata`, report with result/errors"""
         files = ValueCheckedRecord(
             identifier=dict(kind="dataset files", accession=accession),
-            collection=self.collections.records,
+            collection=self.mongo_collections.records,
             value=self.adapter.get_files_by_accession(accession),
         )
         if files.changed:
@@ -103,7 +98,7 @@ class CacherThread(Thread):
                 self.drop_single_dataset_metadata(accession)
                 has_samples = False
                 for sample in dataset.samples:
-                    self.mongo_db.metadata.insert_one(
+                    self.mongo_collections.metadata.insert_one(
                         harmonize_document(sample, self.units_formatter),
                     )
                     has_samples = True

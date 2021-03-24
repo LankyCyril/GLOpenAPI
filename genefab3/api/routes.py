@@ -5,8 +5,8 @@ from flask import Response
 
 class Routes():
  
-    def __init__(self, mongo_db):
-        self.mongo_db = mongo_db
+    def __init__(self, mongo_collections):
+        self.mongo_collections = mongo_collections
  
     def _as_endpoint(method, endpoint=None):
         @wraps(method)
@@ -47,7 +47,7 @@ class Routes():
             "report timestamp", "kind", "accession", "assay name",
             "sample name", "status", "warning", "error", "args", "kwargs",
         ]
-        status_json = self.mongo_db.status.find(
+        status_json = self.mongo_collections.status.find(
             {}, {"_id": False, **{c: True for c in STATUS_COLUMNS}},
         )
         status_df = json_normalize(list(status_json), max_level=0).sort_values(

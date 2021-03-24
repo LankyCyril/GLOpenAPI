@@ -1,6 +1,6 @@
 from flask import request
 from datetime import datetime
-from logging import getLogger, DEBUG
+from logging import getLogger, DEBUG, Handler
 
 
 def log_to_mongo_collection(collection, et=None, ev=None, stack=None, is_exception=False, **kwargs):
@@ -19,3 +19,16 @@ def GeneFabLogger():
     logger = getLogger("genefab3")
     logger.setLevel(DEBUG)
     return logger
+
+
+class MongoDBLogger(Handler):
+    def __init__(self, collection):
+        self.collection = collection
+        super().__init__()
+    def emit(self, record):
+        if self.collection:
+            log_to_mongo_collection(
+                self.collection,
+                et=record.levelname, ev=record.getMessage(),
+                stack=record.stack_info, is_exception=False,
+            )

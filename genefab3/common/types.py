@@ -10,14 +10,6 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 passthrough = lambda _:_
 
 
-def PlaceholderLogger():
-    """Placeholder that masquerades as a logger but does not do anything"""
-    return SimpleNamespace(
-        info=lambda *args, **kwargs: None,
-        warning=lambda *args, **kwargs: None,
-    )
-
-
 class UniversalSet(set):
     """Naive universal set"""
     def __and__(self, x): return x
