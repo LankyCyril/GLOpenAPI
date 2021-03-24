@@ -44,8 +44,8 @@ class Routes():
         from datetime import datetime
         from numpy import nan
         STATUS_COLUMNS = [
-            "report timestamp", "kind", "accession", "sample name",
-            "status", "warning", "error", "details",
+            "report timestamp", "kind", "accession", "assay name",
+            "sample name", "status", "warning", "error", "details",
         ]
         status_json = self.mongo_db.status.find(
             {}, {"_id": False, **{c: True for c in STATUS_COLUMNS}},

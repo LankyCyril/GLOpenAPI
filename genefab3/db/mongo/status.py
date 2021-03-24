@@ -3,7 +3,7 @@ from datetime import datetime
 from genefab3.common.logger import GeneFabLogger, log_to_mongo_collection
 
 
-def update_status(status_collection, log_collection=None, accession=None, sample_name=None, status=None, info=None, warning=None, error=None, **kwargs):
+def update_status(status_collection, log_collection=None, accession=None, assay_name=None, sample_name=None, status=None, info=None, warning=None, error=None, **kwargs):
     """Update status of dataset (and, optionally, assay/sample) in `status_collection`, log with logger and to `log_collection`"""
     if sample_name is None:
         replacement_query = {"kind": "dataset", "accession": accession}
@@ -21,7 +21,7 @@ def update_status(status_collection, log_collection=None, accession=None, sample
         "status": status, "info": info, "warning": warning,
         "error": None if (error is None) else type(error).__name__,
         "report timestamp": int(datetime.now().timestamp()),
-        "details": [],
+        "assay name": assay_name, "details": [],
     }
     if error is not None:
         inserted_data["details"].extend(getattr(error, "args", []))

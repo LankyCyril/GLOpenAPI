@@ -31,7 +31,7 @@ class Dataset():
                 status_params={
                     **(status_params or {}), "data": {
                         **getattr(status_params, "data", {}),
-                        "accession": accession,
+                        "accession": accession, # FIXME: isn't propagated?
                         "filename": isa_file.name, "url": isa_file.url,
                     },
                 },
