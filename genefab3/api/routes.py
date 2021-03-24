@@ -1,5 +1,4 @@
 from functools import wraps, partial
-from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabException
 
 
@@ -24,11 +23,6 @@ class Routes():
     @partial(_as_endpoint, endpoint="/favicon.<imgtype>")
     def favicon(self, imgtype):
         return ""
- 
-    @partial(_as_endpoint, endpoint="/debug/warning/")
-    def debug_warning(self):
-        GeneFabLogger().warning("Generic warning test")
-        return "OK (emitted warning)"
  
     @partial(_as_endpoint, endpoint="/debug/error/")
     def debug_error(self):

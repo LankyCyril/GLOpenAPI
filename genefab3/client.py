@@ -6,8 +6,6 @@ from types import SimpleNamespace
 from flask_compress import Compress
 from genefab3.api.routes import Routes
 from functools import partial
-from genefab3.common.logger import GeneFabLogger, MongoDBLogger
-from logging import DEBUG
 from genefab3.api.utils import is_debug, is_flask_reloaded
 from genefab3.db.mongo.cacher import CacherThread
 from genefab3.common.exceptions import traceback_printer, exception_catcher
@@ -16,17 +14,16 @@ from genefab3.common.exceptions import traceback_printer, exception_catcher
 class GeneFabClient():
     """Routes Response-generating methods, continuously caches metadata and responses"""
  
-    def __init__(self, *, AdapterClass, mongo_params, sqlite_params, cacher_params, flask_params, logger_params=None):
+    def __init__(self, *, AdapterClass, mongo_params, sqlite_params, cacher_params, flask_params):
         """Initialize metadata cacher (with adapter), response cacher, routes"""
         try:
             self.flask_app = self._configure_flask_app(**flask_params)
             self.mongo_db, self.locale, self.units_formatter = (
                 self._get_mongo_db_connection(**mongo_params)
-            )
+            ) # TODO ingest CNAMEs
             self.sqlite_dbs = self._get_validated_sqlite_dbs(**sqlite_params)
             self._init_routes(Routes())
-            self._init_warning_handlers(**logger_params)
-            self._init_error_handlers(**logger_params)
+            self._init_error_handlers()
         except TypeError as e:
             msg = f"During GeneFabClient() initialization, {e}"
             raise GeneFabConfigurationException(msg)
@@ -82,24 +79,11 @@ class GeneFabClient():
         for endpoint, method in routes.items():
             self.flask_app.route(endpoint, methods=["GET"])(method)
  
-    def _init_warning_handlers(self, *, mongo_collection_name=None, print_handled_exceptions_to_stderr=False, level=DEBUG):
-        """Set up logger to write to MongoDB collection and/or to stderr"""
-        logger = GeneFabLogger()
-        logger.setLevel(level)
-        if mongo_collection_name is not None:
-            collection = self.mongo_db[mongo_collection_name]
-            logger.addHandler(MongoDBLogger(collection))
- 
-    def _init_error_handlers(self, *, mongo_collection_name=None, print_handled_exceptions_to_stderr=False, level=None):
+    def _init_error_handlers(self):
         """Intercept all exceptions and deliver an HTTP error page with or without traceback depending on debug state"""
-        if mongo_collection_name is not None:
-            collection = self.mongo_db[mongo_collection_name]
-        else:
-            collection = None
         self.flask_app.errorhandler(Exception)(partial(
             traceback_printer if is_debug() else exception_catcher,
-            collection=collection,
-            print_to_stderr=print_handled_exceptions_to_stderr,
+            collection=self.mongo_db.log, # TODO pass CNAME from Client
         ))
  
     def loop(self):

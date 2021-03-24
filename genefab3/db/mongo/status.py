@@ -1,14 +1,15 @@
 from genefab3.db.mongo.utils import run_mongo_transaction
 from datetime import datetime
+from genefab3.common.logger import GeneFabLogger, log_to_mongo_collection
 
 
-def update_status(collection, accession, sample_name=None, status="success", info=None, warning=None, error=None, details=(), **kwargs):
-    """Update status of dataset (and, optionally, assay/sample) in `collection`"""
+def update_status(status_collection, log_collection=None, accession=None, sample_name=None, status=None, info=None, warning=None, error=None, **kwargs):
+    """Update status of dataset (and, optionally, assay/sample) in `status_collection`, log with logger and to `log_collection`"""
     if sample_name is None:
         replacement_query = {"kind": "dataset", "accession": accession}
-        if status == "failure":
+        if status in {"failed", "dropped"}:
             run_mongo_transaction(
-                action="delete_many", collection=collection,
+                action="delete_many", collection=status_collection,
                 query={"accession": accession},
             )
     else:
@@ -19,12 +20,23 @@ def update_status(collection, accession, sample_name=None, status="success", inf
     inserted_data = {
         "status": status, "info": info, "warning": warning,
         "error": None if (error is None) else type(error).__name__,
-        "details": list(details),
         "report timestamp": int(datetime.now().timestamp()),
+        "details": [],
     }
     if error is not None:
         inserted_data["details"].extend(getattr(error, "args", []))
     run_mongo_transaction(
-        action="replace", collection=collection,
+        action="replace", collection=status_collection,
         query=replacement_query, data=inserted_data,
     )
+    _lookup = dict(failed="error", dropped="error", warning="warning")
+    log_kind = _lookup.get(status, "info")
+    message = (
+        "; ".join([str(_msg) for _msg in (info, warning, error) if _msg]) +
+        " (" + repr(replacement_query) + ")"
+    )
+    getattr(GeneFabLogger(), log_kind)(message)
+    if log_collection:
+        log_to_mongo_collection(
+            log_collection, is_exception=False, et=log_kind.upper(), ev=message,
+        )

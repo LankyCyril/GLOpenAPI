@@ -6,7 +6,6 @@ from collections import OrderedDict
 from genefab3.db.mongo.types import ValueCheckedRecord
 from genefab3.isa.types import Dataset
 from genefab3.db.mongo.utils import run_mongo_transaction, harmonize_document
-from functools import partial
 from genefab3.db.mongo.status import update_status
 
 
@@ -24,9 +23,12 @@ class CacherThread(Thread):
             metadata=self.mongo_db.metadata,
             records=self.mongo_db.records,
             status=self.mongo_db.status,
+            log=self.mongo_db.log,
         )
-        self._update_status = partial(
-            update_status, collection=self.collections.status,
+        self.status_params = dict(
+            status_collection=self.collections.status,
+            log_collection=self.collections.log,
+            data={},
         )
         super().__init__()
  
@@ -64,13 +66,9 @@ class CacherThread(Thread):
                 yield (acc, *self.recache_single_dataset_metadata(acc))
         for accession, key, report, error in _iterate():
             accessions[key].add(accession)
-            GeneFabLogger(
-                call=("error" if key == "failed" else "info"),
-                message=f"CacherThread: {accession} {report}",
-                with_side_effects={
-                    self._update_status: True, "status": key,
-                    "accession": accession, "error": error,
-                },
+            update_status(
+                **self.status_params, status=key, accession=accession,
+                info=f"CacherThread: {accession} {report}", error=error,
             )
         GeneFabLogger().info(
             "CacherThread, datasets: " + ", ".join(
@@ -98,7 +96,7 @@ class CacherThread(Thread):
             try:
                 dataset = Dataset(
                     accession, files.value, self.sqlite_dbs.blobs,
-                    logger_kwargs={self._update_status: True},
+                    status_params=self.status_params,
                 )
             except Exception as e:
                 return "failed", f"failed to update ({repr(e)}), kept stale", e
@@ -111,21 +109,16 @@ class CacherThread(Thread):
                     )
                     has_samples = True
                     if "Study" not in sample:
-                        GeneFabLogger(
-                            call="warning", message="Study entry missing",
-                            with_side_effects={
-                                self._update_status: True, "status": "warning",
-                                "accession": accession,
-                                "sample_name": sample.name,
-                            }
+                        update_status(
+                            **self.status_params, status="warning",
+                            warning="Study entry missing",
+                            accession=accession, assay_name=sample.assay_name,
+                            sample_name=sample.name,
                         )
                 if not has_samples:
-                    GeneFabLogger(
-                        call="warning", message="No samples",
-                        with_side_effects={
-                            self._update_status: True, "status": "warning",
-                            "accession": accession,
-                        }
+                    update_status(
+                        **self.status_params, status="warning",
+                        warning="No samples", accession=accession,
                     )
                 return "updated", "updated", None
         else:
