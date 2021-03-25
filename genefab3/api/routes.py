@@ -51,7 +51,7 @@ class Routes():
             {}, {"_id": False, **{c: True for c in STATUS_COLUMNS}},
         )
         status_df = json_normalize(list(status_json), max_level=0).sort_values(
-            by=["kind", "report timestamp"], ascending=[True, False],
+            by="report timestamp", ascending=False,
         )
         status_df = status_df[[c for c in STATUS_COLUMNS if c in status_df]]
         status_df["report timestamp"] = status_df["report timestamp"].apply(
