@@ -7,9 +7,10 @@ from genefab3.common.utils import copy_and_drop, iterate_terminal_leaf_elements
 
 class Dataset():
  
-    def __init__(self, accession, files, sqlite_blobs, status_kwargs=None):
+    def __init__(self, accession, files, sqlite_blobs, sample_name_matcher=lambda a,b:a==b, status_kwargs=None):
         self.accession, self.files = accession, files
         self.sqlite_blobs = sqlite_blobs
+        self.sample_name_matcher = sample_name_matcher
         isa_files = {
             filename: descriptor for filename, descriptor in files.items()
             if descriptor.get("datatype") == "isa"
@@ -29,7 +30,7 @@ class Dataset():
             self.isa = IsaFromZip(
                 data=isa_file.data,
                 status_kwargs={
-                    **(status_kwargs or {}), "accession": accession, # FIXME: isn't propagated?
+                    **(status_kwargs or {}), "accession": accession,
                     "filename": isa_file.name, "url": isa_file.url,
                 },
             )
@@ -90,14 +91,27 @@ class Sample(dict):
  
     def _INPLACE_extend_with_study_metadata(self):
         """Populate with Study tab annotation for entries matching current Sample Name"""
-        if self.name in self.dataset.isa.studies._by_sample_name:
-            study_entry = self.dataset.isa.studies._by_sample_name[self.name]
+        matching_study_sample_names = {
+            study_sample_name
+            for study_sample_name in self.dataset.isa.studies._by_sample_name
+            if self.dataset.sample_name_matcher(self.name, study_sample_name)
+        }
+        if len(matching_study_sample_names) == 1:
+            study_entry = self.dataset.isa.studies._by_sample_name[
+                matching_study_sample_names.pop()
+            ]
             self["Info"]["Study"] = self._get_subkey_value(
                 study_entry, "Info", "Study",
             )
             self["Study"] = copy_and_drop(study_entry, {"Info"})
             self["Investigation"]["Study"] = (
                 self.dataset.isa.investigation["Study"].get(self.study_name, {})
+            )
+        elif len(matching_study_sample_names) > 1:
+            raise GeneFabISAException(
+                "Multiple Study 'Sample Name' entries match Assay entry",
+                self.dataset, assay_sample_name=self.name,
+                matching_study_sample_names=matching_study_sample_names,
             )
  
     def _INPLACE_extend_with_dataset_files(self):

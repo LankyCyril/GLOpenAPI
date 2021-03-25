@@ -92,6 +92,7 @@ class MetadataCacherThread(Thread):
             try:
                 dataset = Dataset(
                     accession, files.value, self.sqlite_dbs.blobs,
+                    sample_name_matcher=self.adapter.sample_name_matcher,
                     status_kwargs=self.status_kwargs,
                 )
             except Exception as e:
@@ -100,9 +101,8 @@ class MetadataCacherThread(Thread):
                 self.drop_single_dataset_metadata(accession)
                 has_samples = False
                 for sample in dataset.samples:
-                    self.mongo_collections.metadata.insert_one(
-                        harmonize_document(sample, self.units_formatter),
-                    )
+                    document = harmonize_document(sample, self.units_formatter)
+                    self.mongo_collections.metadata.insert_one(document)
                     has_samples = True
                     if "Study" not in sample:
                         update_status(

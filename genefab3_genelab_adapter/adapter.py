@@ -152,7 +152,7 @@ class GeneLabAdapter(Adapter):
             for _, row in files.sort_values(by="timestamp").iterrows()
         }
  
-    def sample_names_match(self, a, b):
+    def sample_name_matcher(self, a, b):
         """Match ISA sample names to their variants in data files (R-like dot-separated, postfixed)"""
         dotted = lambda s: sub(r'[._-]', ".", s)
         if len(a) == len(b):
