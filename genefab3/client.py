@@ -5,11 +5,11 @@ from sqlite3 import connect, OperationalError
 from types import SimpleNamespace
 from flask_compress import Compress
 from genefab3.api.routes import Routes
-from functools import partial
 from genefab3.common.logger import GeneFabLogger, MongoDBLogger
+from functools import partial
+from genefab3.common.exceptions import traceback_printer, exception_catcher
 from genefab3.api.utils import is_debug, is_flask_reloaded
 from genefab3.db.cacher import CacherThread
-from genefab3.common.exceptions import traceback_printer, exception_catcher
 
 
 class GeneFabClient():
@@ -23,7 +23,7 @@ class GeneFabClient():
                 self._get_mongo_db_connection(**mongo_params)
             )
             self.sqlite_dbs = self._get_validated_sqlite_dbs(**sqlite_params)
-            self._init_routes(Routes(self.mongo_collections))
+            self._init_routes()
             self._init_warning_handlers()
             self._init_error_handlers()
         except TypeError as e:
@@ -91,8 +91,9 @@ class GeneFabClient():
                         raise GeneFabConfigurationException(msg)
             return sqlite_dbs
  
-    def _init_routes(self, routes):
+    def _init_routes(self):
         """Route Response-generating methods to Flask endpoints"""
+        routes = Routes(self.mongo_collections)
         for endpoint, method in routes.items():
             self.flask_app.route(endpoint, methods=["GET"])(method)
  
