@@ -1,10 +1,10 @@
 from re import search, sub, escape
 from argparse import Namespace
-from genefab3.config import ANNOTATION_CATEGORIES, DEFAULT_FORMATS
+from genefab3.api.config import ANNOTATION_CATEGORIES, DEFAULT_FORMATS
 from genefab3.common.types import UniversalSet
 from collections import defaultdict, OrderedDict
 from werkzeug.datastructures import MultiDict
-from genefab3.config import DISALLOWED_CONTEXTS
+from genefab3.api.config import DISALLOWED_CONTEXTS
 from genefab3.common.exceptions import GeneFabParserException
 from urllib.request import quote
 from json import dumps
