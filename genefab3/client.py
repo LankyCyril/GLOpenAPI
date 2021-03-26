@@ -8,7 +8,7 @@ from genefab3.api.routes import Routes
 from functools import partial
 from genefab3.common.logger import GeneFabLogger, MongoDBLogger
 from genefab3.api.utils import is_debug, is_flask_reloaded
-from genefab3.db.mongo.cacher import CacherThread
+from genefab3.db.cacher import CacherThread
 from genefab3.common.exceptions import traceback_printer, exception_catcher
 
 
