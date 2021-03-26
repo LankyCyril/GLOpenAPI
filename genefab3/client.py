@@ -4,6 +4,7 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from sqlite3 import connect, OperationalError
 from types import SimpleNamespace
 from flask_compress import Compress
+from genefab3.api.renderer import CacheableRenderer
 from genefab3.api.routes import Routes
 from genefab3.common.logger import GeneFabLogger, MongoDBLogger
 from functools import partial
@@ -93,9 +94,12 @@ class GeneFabClient():
  
     def _init_routes(self):
         """Route Response-generating methods to Flask endpoints"""
+        renderer = CacheableRenderer(self.sqlite_dbs)
         routes = Routes(self.mongo_collections)
         for endpoint, method in routes.items():
-            self.flask_app.route(endpoint, methods=["GET"])(method)
+            self.flask_app.route(endpoint, methods=["GET"])(
+                renderer(method),
+            )
  
     def _init_warning_handlers(self):
         """Set up logger to write to MongoDB collection if specified"""
