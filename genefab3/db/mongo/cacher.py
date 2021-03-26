@@ -87,7 +87,7 @@ class CacherThread(Thread):
         try:
             dataset = Dataset(
                 accession, files.value, self.sqlite_dbs.blobs,
-                sample_name_matcher=self.adapter.sample_name_matcher,
+                best_sample_name_matches=self.adapter.best_sample_name_matches,
                 status_kwargs=self.status_kwargs,
             )
         except Exception as e:

@@ -11,6 +11,7 @@ from urllib.parse import quote
 from re import search, sub
 from warnings import catch_warnings, filterwarnings
 from dateutil.parser import UnknownTimezoneWarning
+from functools import lru_cache
 
 
 GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
@@ -152,12 +153,19 @@ class GeneLabAdapter(Adapter):
             for _, row in files.sort_values(by="timestamp").iterrows()
         }
  
-    def sample_name_matcher(self, a, b):
+    def best_sample_name_matches(self, name, names):
         """Match ISA sample names to their variants in data files (R-like dot-separated, postfixed)"""
-        dotted = lambda s: sub(r'[._-]', ".", s)
-        if len(a) == len(b):
-            return dotted(a) == dotted(b)
-        elif len(a) > len(b):
-            return dotted(a).startswith(dotted(b))
+        dotted = lru_cache(maxsize=None)(lambda s: sub(r'[._-]', ".", s))
+        matches = [ns for ns in names if ns == name]
+        if matches:
+            return matches
         else:
-            return dotted(b).startswith(dotted(a))
+            matches = [ns for ns in names if dotted(ns) == dotted(name)]
+            if matches:
+                return matches
+            else:
+                return [
+                    ns for ns in names if
+                    dotted(ns).startswith(dotted(name)) or
+                    dotted(name).startswith(dotted(ns))
+                ]

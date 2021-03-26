@@ -102,6 +102,6 @@ class Adapter():
                     adapter=type(self).__name__, method=method_name,
                 )
  
-    def sample_name_matcher(self, a, b):
+    def best_sample_name_matches(self, name, names):
         """Fallback sample name identity test"""
-        return a == b
+        return [ns for ns in names if ns == name]

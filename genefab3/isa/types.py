@@ -1,3 +1,4 @@
+from genefab3.common.types import Adapter
 from genefab3.common.exceptions import GeneFabFileException, GeneFabISAException
 from genefab3.common.utils import pick_reachable_url
 from genefab3.db.sql.types import CachedBinaryFile
@@ -7,10 +8,13 @@ from genefab3.common.utils import copy_and_drop, iterate_terminal_leaf_elements
 
 class Dataset():
  
-    def __init__(self, accession, files, sqlite_blobs, sample_name_matcher=lambda a,b:a==b, status_kwargs=None):
+    def __init__(self, accession, files, sqlite_blobs, best_sample_name_matches=None, status_kwargs=None):
         self.accession, self.files = accession, files
         self.sqlite_blobs = sqlite_blobs
-        self.sample_name_matcher = sample_name_matcher
+        self.best_sample_name_matches = (
+            best_sample_name_matches or
+            (lambda n, N: Adapter.best_sample_name_matches(None, n, N))
+        )
         isa_files = {
             filename: descriptor for filename, descriptor in files.items()
             if descriptor.get("datatype") == "isa"
@@ -91,11 +95,11 @@ class Sample(dict):
  
     def _INPLACE_extend_with_study_metadata(self):
         """Populate with Study tab annotation for entries matching current Sample Name"""
-        matching_study_sample_names = {
-            study_sample_name
-            for study_sample_name in self.dataset.isa.studies._by_sample_name
-            if self.dataset.sample_name_matcher(self.name, study_sample_name)
-        }
+        matching_study_sample_names = set(
+            self.dataset.best_sample_name_matches(
+                self.name, self.dataset.isa.studies._by_sample_name,
+            )
+        )
         if len(matching_study_sample_names) == 1:
             study_entry = self.dataset.isa.studies._by_sample_name[
                 matching_study_sample_names.pop()
