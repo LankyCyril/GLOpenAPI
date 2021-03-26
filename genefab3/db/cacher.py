@@ -57,10 +57,11 @@ class CacherThread(Thread):
             GeneFabLogger().error(f"CacherThread: {repr(e)}")
             return None, False
         def _iterate():
-            for acc in accessions["cached"] - accessions["live"]:
-                yield (acc, *self.drop_single_dataset_metadata(acc))
-            for acc in accessions["live"]:
-                yield (acc, *self.recache_single_dataset_metadata(acc))
+            for a in accessions["cached"] - accessions["live"]:
+                yield (a, *self.drop_single_dataset_metadata(a))
+            for a in accessions["live"]:
+                has_cache = a in accessions["cached"]
+                yield (a, *self.recache_single_dataset_metadata(a, has_cache))
         for accession, key, report, error in _iterate():
             accessions[key].add(accession)
             update_status(
@@ -81,19 +82,6 @@ class CacherThread(Thread):
             query={"info.accession": accession},
         )
         return "dropped", "removed from database", None
- 
-    def stage_single_dataset(self, accession, files):
-        """Retrieve dataset by ISA, return dataset on success, exception on error"""
-        try:
-            dataset = Dataset(
-                accession, files.value, self.sqlite_dbs.blobs,
-                best_sample_name_matches=self.adapter.best_sample_name_matches,
-                status_kwargs=self.status_kwargs,
-            )
-        except Exception as e:
-            return None, e
-        else:
-            return dataset, None
  
     def recache_single_dataset_samples(self, dataset):
         """Insert per-sample documents into MongoDB, return exception on error"""
@@ -120,24 +108,38 @@ class CacherThread(Thread):
         else:
             return None
  
-    def recache_single_dataset_metadata(self, accession):
+    def recache_single_dataset_metadata(self, accession, has_cache):
         """Check if dataset changed, update metadata cached in `self.mongo_collections.metadata`, report with result/errors"""
-        files = ValueCheckedRecord(
-            identifier=dict(kind="dataset files", accession=accession),
-            collection=self.mongo_collections.records,
-            value=self.adapter.get_files_by_accession(accession),
-        )
-        if files.changed:
-            dataset, e = self.stage_single_dataset(accession, files)
-            if e is not None:
-                return "stale", f"failed to retrieve ({repr(e)}), kept stale", e
+        try:
+            files = ValueCheckedRecord(
+                identifier=dict(kind="dataset files", accession=accession),
+                collection=self.mongo_collections.records,
+                value=self.adapter.get_files_by_accession(accession),
+            )
+            if files.changed:
+                best_sample_name_matches=self.adapter.best_sample_name_matches
+                dataset = Dataset(
+                    accession, files.value, self.sqlite_dbs.blobs,
+                    best_sample_name_matches=best_sample_name_matches,
+                    status_kwargs=self.status_kwargs,
+                )
             else:
+                dataset = None
+        except Exception as e:
+            if has_cache:
+                status = "stale"
+                report = f"failed to retrieve ({repr(e)}), kept stale"
+            else:
+                status = "failed"
+                report = f"failed to retrieve ({repr(e)})"
+            return status, report, e
+        if dataset is not None:
+            self.drop_single_dataset_metadata(accession)
+            e = self.recache_single_dataset_samples(dataset)
+            if e is not None:
                 self.drop_single_dataset_metadata(accession)
-                e = self.recache_single_dataset_samples(dataset)
-                if e is not None:
-                    self.drop_single_dataset_metadata(accession)
-                    return "failed", f"failed to parse ({repr(e)})", e
-                else:
-                    return "updated", "updated", None
+                return "failed", f"failed to parse ({repr(e)})", e
+            else:
+                return "updated", "updated", None
         else:
             return "fresh", "no action (fresh)", None
