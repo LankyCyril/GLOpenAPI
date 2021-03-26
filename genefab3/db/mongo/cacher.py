@@ -49,7 +49,7 @@ class MetadataCacherThread(Thread):
                 cached=set(
                     self.mongo_collections.metadata.distinct("info.accession"),
                 ),
-                live=set(self.adapter.get_accessions()),
+                live={"GLDS-252", "GLDS-145", "GLDS-101"}, #set(self.adapter.get_accessions()), # XXX temporary
                 fresh=set(), updated=set(), dropped=set(), failed=set(),
             )
         except Exception as e:
