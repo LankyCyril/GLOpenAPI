@@ -5,7 +5,7 @@ from collections import OrderedDict
 from genefab3.db.mongo.types import ValueCheckedRecord
 from genefab3.isa.types import Dataset
 from genefab3.db.mongo.utils import run_mongo_transaction, harmonize_document
-from genefab3.db.mongo.status import update_status
+from genefab3.db.mongo.status import drop_status, update_status
 
 
 class CacherThread(Thread):
@@ -64,10 +64,13 @@ class CacherThread(Thread):
                 yield (a, *self.recache_single_dataset_metadata(a, has_cache))
         for accession, key, report, error in _iterate():
             accessions[key].add(accession)
-            update_status(
+            _kws = dict(
                 **self.status_kwargs, status=key, accession=accession,
                 info=f"CacherThread: {accession} {report}", error=error,
             )
+            if key in {"dropped", "failed"}:
+                drop_status(**_kws)
+            update_status(**_kws)
         GeneFabLogger().info(
             "CacherThread, datasets: " + ", ".join(
                 f"{k}={len(v)}" for k, v in accessions.items()
