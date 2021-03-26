@@ -8,7 +8,7 @@ from genefab3.db.mongo.utils import run_mongo_transaction, harmonize_document
 from genefab3.db.mongo.status import update_status
 
 
-class MetadataCacherThread(Thread):
+class CacherThread(Thread):
     """Lives in background and keeps local metadata cache, metadata index, and response cache up to date"""
  
     def __init__(self, *, adapter, mongo_collections, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter):
@@ -37,13 +37,13 @@ class MetadataCacherThread(Thread):
             else:
                 delay = self.metadata_retry_delay
             GeneFabLogger().info(
-                f"MetadataCacherThread: Sleeping for {delay} seconds",
+                f"CacherThread: Sleeping for {delay} seconds",
             )
             sleep(delay)
  
     def recache_metadata(self):
         """Instantiate each available dataset; if contents changed, dataset automatically updates db.metadata"""
-        GeneFabLogger().info("MetadataCacherThread: Checking metadata cache")
+        GeneFabLogger().info("CacherThread: Checking metadata cache")
         try:
             accessions = OrderedDict(
                 cached=set(
@@ -54,7 +54,7 @@ class MetadataCacherThread(Thread):
                 dropped=set(), failed=set(),
             )
         except Exception as e:
-            GeneFabLogger().error(f"MetadataCacherThread: {repr(e)}")
+            GeneFabLogger().error(f"CacherThread: {repr(e)}")
             return None, False
         def _iterate():
             for acc in accessions["cached"] - accessions["live"]:
@@ -65,10 +65,10 @@ class MetadataCacherThread(Thread):
             accessions[key].add(accession)
             update_status(
                 **self.status_kwargs, status=key, accession=accession,
-                info=f"MetadataCacherThread: {accession} {report}", error=error,
+                info=f"CacherThread: {accession} {report}", error=error,
             )
         GeneFabLogger().info(
-            "MetadataCacherThread, datasets: " + ", ".join(
+            "CacherThread, datasets: " + ", ".join(
                 f"{k}={len(v)}" for k, v in accessions.items()
             ),
         )
