@@ -50,7 +50,8 @@ class MetadataCacherThread(Thread):
                     self.mongo_collections.metadata.distinct("info.accession"),
                 ),
                 live={"GLDS-252", "GLDS-145", "GLDS-101"}, #set(self.adapter.get_accessions()), # XXX temporary
-                fresh=set(), updated=set(), dropped=set(), failed=set(),
+                fresh=set(), updated=set(), stale=set(),
+                dropped=set(), failed=set(),
             )
         except Exception as e:
             GeneFabLogger().error(f"MetadataCacherThread: {repr(e)}")
@@ -81,6 +82,44 @@ class MetadataCacherThread(Thread):
         )
         return "dropped", "removed from database", None
  
+    def stage_single_dataset(self, accession, files):
+        """Retrieve dataset by ISA, return dataset on success, exception on error"""
+        try:
+            dataset = Dataset(
+                accession, files.value, self.sqlite_dbs.blobs,
+                sample_name_matcher=self.adapter.sample_name_matcher,
+                status_kwargs=self.status_kwargs,
+            )
+        except Exception as e:
+            return None, e
+        else:
+            return dataset, None
+ 
+    def recache_single_dataset_samples(self, dataset):
+        """Insert per-sample documents into MongoDB, return exception on error"""
+        try:
+            has_samples = False
+            for sample in dataset.samples:
+                document = harmonize_document(sample, self.units_formatter)
+                self.mongo_collections.metadata.insert_one(document)
+                has_samples = True
+                if "Study" not in sample:
+                    update_status(
+                        **self.status_kwargs, status="warning",
+                        warning="Study entry missing",
+                        accession=dataset.accession, assay_name=sample.assay_name,
+                        sample_name=sample.name,
+                    )
+            if not has_samples:
+                update_status(
+                    **self.status_kwargs, status="warning",
+                    warning="No samples", accession=dataset.accession,
+                )
+        except Exception as e:
+            return e
+        else:
+            return None
+ 
     def recache_single_dataset_metadata(self, accession):
         """Check if dataset changed, update metadata cached in `self.mongo_collections.metadata`, report with result/errors"""
         files = ValueCheckedRecord(
@@ -89,33 +128,16 @@ class MetadataCacherThread(Thread):
             value=self.adapter.get_files_by_accession(accession),
         )
         if files.changed:
-            try:
-                dataset = Dataset(
-                    accession, files.value, self.sqlite_dbs.blobs,
-                    sample_name_matcher=self.adapter.sample_name_matcher,
-                    status_kwargs=self.status_kwargs,
-                )
-            except Exception as e:
-                return "failed", f"failed to update ({repr(e)}), kept stale", e
+            dataset, e = self.stage_single_dataset(accession, files)
+            if e is not None:
+                return "stale", f"failed to retrieve ({repr(e)}), kept stale", e
             else:
                 self.drop_single_dataset_metadata(accession)
-                has_samples = False
-                for sample in dataset.samples:
-                    document = harmonize_document(sample, self.units_formatter)
-                    self.mongo_collections.metadata.insert_one(document)
-                    has_samples = True
-                    if "Study" not in sample:
-                        update_status(
-                            **self.status_kwargs, status="warning",
-                            warning="Study entry missing",
-                            accession=accession, assay_name=sample.assay_name,
-                            sample_name=sample.name,
-                        )
-                if not has_samples:
-                    update_status(
-                        **self.status_kwargs, status="warning",
-                        warning="No samples", accession=accession,
-                    )
-                return "updated", "updated", None
+                e = self.recache_single_dataset_samples(dataset)
+                if e is not None:
+                    self.drop_single_dataset_metadata(accession)
+                    return "failed", f"failed to parse ({repr(e)})", e
+                else:
+                    return "updated", "updated", None
         else:
             return "fresh", "no action (fresh)", None
