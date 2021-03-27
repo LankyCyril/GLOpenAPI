@@ -1,6 +1,7 @@
-from flask import Response, request
+from flask import Response
 from functools import wraps
-from genefab3.api.parser import parse_request
+from genefab3.api.parser import Context
+from genefab3.common.exceptions import GeneFabException, GeneFabFormatException
 from pandas import DataFrame
 
 
@@ -28,16 +29,22 @@ class CacheableRenderer():
         """Placeholder methods so far""" # TODO
         @wraps(method)
         def wrapper(*args, **kwargs):
-            context = parse_request(request)
-            ...
-            from json import dumps
-            print(dumps(context.__dict__, indent=4))
-            ...
-            obj = method(*args, **kwargs)
-            if isinstance(obj, (list, dict)):
+            obj, _format = method(*args, **kwargs), Context().kwargs["format"]
+            if obj is None:
+                raise GeneFabException("No data")
+            elif _format == "raw":
+                return self.render_raw(obj) # TODO
+            elif _format == "cls":
+                return self.render_cls(obj) # TODO
+            elif _format == "gct":
+                return self.render_gct(obj) # TODO
+            elif isinstance(obj, (list, dict)):
                 return self.render_json(obj)
             elif isinstance(obj, DataFrame):
                 return self.render_dataframe(obj)
             else:
-                return Response(obj)
+                raise GeneFabFormatException(
+                    "Formatting of unsupported object type",
+                    type=type(obj).__name__, format=_format,
+                )
         return wrapper

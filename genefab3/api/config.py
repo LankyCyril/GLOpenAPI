@@ -1,8 +1,7 @@
 ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
 
-DEFAULT_FORMATS = {
-    "/assays/": "tsv", "/samples/": "tsv", "/data/": "tsv", "/files/": "tsv",
-}
+from collections import defaultdict
+DEFAULT_FORMATS = defaultdict(lambda: "tsv", {})
 
 from operator import eq, ne, gt, getitem, contains, length_hint
 not_in = lambda v, s: v not in s

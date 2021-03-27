@@ -6,6 +6,8 @@ from collections import defaultdict, OrderedDict
 from werkzeug.datastructures import MultiDict
 from genefab3.api.config import DISALLOWED_CONTEXTS
 from genefab3.common.exceptions import GeneFabParserException
+from functools import lru_cache
+from flask import request
 from urllib.request import quote
 from json import dumps
 
@@ -117,7 +119,7 @@ def INPLACE_update_context(context, rargs):
 def INPLACE_fill_context_defaults(context):
     """Fill default arguments based on view and other arguments"""
     if "format" not in context.kwargs:
-        context.kwargs["format"] = DEFAULT_FORMATS.get(context.view, "raw")
+        context.kwargs["format"] = DEFAULT_FORMATS[context.view]
     if "debug" not in context.kwargs:
         context.kwargs["debug"] = "0"
 
@@ -149,8 +151,10 @@ def validate_context(context):
         )
 
 
-def parse_request(request):
-    """Parse request components"""
+Context = lambda: _memoized_context(request)
+Context.__doc__ = """Parse and memoize request components"""
+@lru_cache(maxsize=None)
+def _memoized_context(request):
     url_root = escape(request.url_root.strip("/"))
     base_url = request.base_url.strip("/")
     context = Namespace(

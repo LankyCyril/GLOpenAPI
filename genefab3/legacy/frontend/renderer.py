@@ -16,25 +16,6 @@ from genefab3.backend.sql.writers.cache import cache_response
 from itertools import cycle
 
 
-def render_as_format(obj, context):
-    """Invoke renderer based on requested format"""
-    if obj is None:
-        raise GeneFabException("No data")
-    elif context.kwargs["format"] == "raw":
-        return render_raw(obj, context)
-    elif context.kwargs["format"] == "cls":
-        return render_cls(obj, context)
-    elif context.kwargs["format"] == "gct":
-        return render_gct(obj, context)
-    elif isinstance(obj, DataFrame):
-        return render_dataframe(obj, context)
-    else:
-        raise GeneFabFormatException(
-            "Formatting of unsupported object type",
-            object_type=type(obj).__name__, format=context.kwargs.get("format"),
-        )
-
-
 def get_accessions_used(obj, context):
     """Infer which accessions were involved in generating `obj`"""
     if isinstance(obj, DataFrame):
