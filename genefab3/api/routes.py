@@ -28,6 +28,10 @@ class Routes():
     def favicon(self, imgtype):
         return ""
  
+    @partial(_as_endpoint, endpoint="/debug/")
+    def debug(self):
+        return "OK"
+ 
     @partial(_as_endpoint, endpoint="/debug/error/")
     def debug_error(self):
         raise GeneFabException("Generic error test")
