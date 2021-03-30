@@ -12,9 +12,6 @@ from json import dumps
 
 KNOWN_KWARGS = {"datatype", "filename", "format", "debug"}
 ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
-DEFAULT_FORMATS = defaultdict(lambda: "tsv", {
-    "//": "html", "/favicon.ico/": "raw", "/file/": "raw",
-})
 
 leaf_count = lambda d: sum(len(v) for v in d.values())
 DISALLOWED_CONTEXTS = {
@@ -155,14 +152,6 @@ def INPLACE_update_context(context, rargs):
     INPLACE_update_context_projection(context, shown)
 
 
-def INPLACE_fill_context_defaults(context):
-    """Fill default arguments based on view and other arguments"""
-    if "format" not in context.kwargs:
-        context.kwargs["format"] = DEFAULT_FORMATS[context.view]
-    if "debug" not in context.kwargs:
-        context.kwargs["debug"] = "0"
-
-
 def validate_context(context):
     """Check that no arguments conflict"""
     for description, scenario in DISALLOWED_CONTEXTS.items():
@@ -189,7 +178,8 @@ def _memoized_context(request):
         kwargs=MultiDict(request.args),
     )
     INPLACE_update_context(context, request.args)
-    INPLACE_fill_context_defaults(context)
+    if "debug" not in context.kwargs:
+        context.kwargs["debug"] = "0"
     context.identity = quote(
         context.view + dumps(context.complete_args, sort_keys=True)
     )

@@ -8,7 +8,7 @@ class Routes():
     def __init__(self, mongo_collections):
         self.mongo_collections = mongo_collections
  
-    def _as_endpoint(method, endpoint=None):
+    def _as_endpoint(method, endpoint=None, fmt="tsv"):
         @wraps(method)
         def wrapper(*args, **kwargs):
             return method(*args, **kwargs)
@@ -16,6 +16,7 @@ class Routes():
             wrapper.endpoint = endpoint
         elif hasattr(method, "__name__") and isinstance(method.__name__, str):
             wrapper.endpoint = "/" + method.__name__ + "/"
+        wrapper.fmt = fmt
         return wrapper
  
     def items(self):
@@ -24,20 +25,20 @@ class Routes():
             if isinstance(getattr(method, "endpoint", None), str):
                 yield method.endpoint, method
  
-    @partial(_as_endpoint, endpoint="/favicon.<imgtype>")
+    @partial(_as_endpoint, endpoint="/favicon.<imgtype>", fmt="raw")
     def favicon(self, imgtype):
         return ""
  
-    @partial(_as_endpoint, endpoint="/debug/")
+    @partial(_as_endpoint, endpoint="/debug/", fmt="raw")
     def debug(self):
         return "OK"
  
-    @partial(_as_endpoint, endpoint="/debug/error/")
+    @partial(_as_endpoint, endpoint="/debug/error/", fmt="raw")
     def debug_error(self):
         raise GeneFabException("Generic error test")
         return "OK (raised exception)"
  
-    @partial(_as_endpoint, endpoint="/")
+    @partial(_as_endpoint, endpoint="/", fmt="html")
     def root(self):
         return "Hello space"
  

@@ -71,7 +71,7 @@ class CacheableRenderer():
         """Display record in plaintext dump format"""
         return Response(dumps(obj, indent=indent), mimetype="text/plain")
  
-    def render_dataframe(self, obj):
+    def render_dataframe(self, obj, fmt="tsv"):
         """Placeholder method""" # TODO
         return Response(
             f"<style>{self.TABLE_CSS}</style>" +
@@ -85,9 +85,11 @@ class CacheableRenderer():
         def wrapper(*args, **kwargs):
             obj, context = method(*args, **kwargs), Context()
             if context.kwargs["debug"] == "1":
-                obj, fmt, indent = context.__dict__, "json", 4
+                obj, indent, fmt = context.__dict__, 4, "json"
             else:
-                fmt, indent = context.kwargs["format"], None
+                indent, fmt = None, context.kwargs.get(
+                    "format", getattr(method, "fmt", "raw"),
+                )
             _is = lambda t: isinstance(obj, t)
             _nlevels = getattr(getattr(obj, "columns", None), "nlevels", None)
             if obj is None:
@@ -103,7 +105,7 @@ class CacheableRenderer():
             elif (fmt == "json") and _is((list, dict)):
                 return self.render_json(obj, indent=indent)
             elif _is(DataFrame):
-                return self.render_dataframe(obj)
+                return self.render_dataframe(obj, fmt=fmt)
             else:
                 raise GeneFabFormatException(
                     "Formatting of unsupported object type",
