@@ -10,14 +10,16 @@ from urllib.request import quote
 from json import dumps
 
 
-ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
-DEFAULT_FORMATS = defaultdict(lambda: "tsv", {"//": "html", "/file/": "raw"})
 KNOWN_KWARGS = {"datatype", "filename", "format", "debug"}
+ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
+DEFAULT_FORMATS = defaultdict(lambda: "tsv", {
+    "//": "html", "/favicon.ico/": "raw", "/file/": "raw",
+})
 
 leaf_count = lambda d: sum(len(v) for v in d.values())
 DISALLOWED_CONTEXTS = {
     "at least one dataset or annotation category must be specified": lambda c:
-        (c.view not in {"/status/", "/debug/", "//"}) and
+        (not search(r'^/(|status|debug|favicon\.\S*)/$', c.view)) and
         (len(c.projection) == 0) and (len(c.accessions_and_assays) == 0),
     "metadata queries are not valid for /status/": lambda c:
         (c.view == "/status/") and (leaf_count(c.query) > 0),
