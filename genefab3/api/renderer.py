@@ -60,9 +60,9 @@ class CacheableRenderer():
         )
         return Response(response, mimetype="text/plain")
  
-    def render_json(self, obj):
+    def render_json(self, obj, indent=None):
         """Display record in plaintext dump format"""
-        return Response(dumps(obj), mimetype="text/plain")
+        return Response(dumps(obj, indent=indent), mimetype="text/plain")
  
     def render_dataframe(self, obj):
         """Placeholder method""" # TODO
@@ -76,24 +76,28 @@ class CacheableRenderer():
         """Render object returned from `method`, put in LRU cache by `context.identity`"""
         @wraps(method)
         def wrapper(*args, **kwargs):
-            obj, _fmt = method(*args, **kwargs), Context().kwargs["format"]
+            obj, context = method(*args, **kwargs), Context()
+            if context.kwargs["debug"] == "1":
+                obj, fmt, indent = context.__dict__, "json", 4
+            else:
+                fmt, indent = context.kwargs["format"], None
             _is = lambda t: isinstance(obj, t)
             _nlevels = getattr(getattr(obj, "columns", None), "nlevels", None)
             if obj is None:
                 raise GeneFabException("No data")
-            elif (_fmt == "raw") and _is((str, bytes)):
+            elif (fmt == "raw") and _is((str, bytes)):
                 return self.render_raw(obj)
-            elif (_fmt == "cls") and _is(DataFrame) and (_nlevels == 2):
+            elif (fmt == "cls") and _is(DataFrame) and (_nlevels == 2):
                 return self.render_cls(obj)
-            elif (_fmt == "gct") and _is(DataFrame) and (_nlevels == 3):
+            elif (fmt == "gct") and _is(DataFrame) and (_nlevels == 3):
                 return self.render_gct(obj)
-            elif (_fmt == "json") and _is((list, dict)):
-                return self.render_json(obj)
+            elif (fmt == "json") and _is((list, dict)):
+                return self.render_json(obj, indent=indent)
             elif _is(DataFrame):
                 return self.render_dataframe(obj)
             else:
                 raise GeneFabFormatException(
                     "Formatting of unsupported object type",
-                    type=type(obj).__name__, nlevels=_nlevels, format=_fmt,
+                    type=type(obj).__name__, nlevels=_nlevels, format=fmt,
                 )
         return wrapper
