@@ -11,8 +11,6 @@ from urllib.request import quote
 from json import dumps
 
 
-KNOWN_KWARGS = {"datatype", "filename", "format", "debug"}
-
 leaf_count = lambda d: sum(len(v) for v in d.values())
 DISALLOWED_CONTEXTS = {
     "at least one dataset or annotation category must be specified": lambda c:
@@ -50,17 +48,15 @@ DISALLOWED_CONTEXTS = {
 
 def assay_pair_to_query(fields=None, value=""):
     """Interpret single key-value pair for dataset / assay constraint"""
-    query = {"$or": []}
-    accessions_and_assays = defaultdict(set)
+    query, accessions_and_assays = {"$or": []}, defaultdict(set)
     for expr in value.split("|"):
         if expr.count(".") == 0:
             query["$or"].append({"info.accession": expr})
             accessions_and_assays[expr] = set()
         else:
             accession, assay_name = expr.split(".", 1)
-            query["$or"].append({
-                "info.accession": accession, "info.assay": assay_name,
-            })
+            subquery = {"info.accession": accession, "info.assay": assay_name}
+            query["$or"].append(subquery)
             accessions_and_assays[accession].add(assay_name)
     yield query, None, accessions_and_assays
 
@@ -83,15 +79,12 @@ def isa_pair_to_query(category, fields, value, constrain_to=UniversalSet(), dot_
                 postfix = "." if (block_match.group()[-1] == ".") else ""
                 head = lookup_key[:block_match.start()]
                 targets = block_match.group().strip(".").split("|")
-                lookup_keys = {
-                    f"{head}.{target}{postfix}" for target in targets
-                }
-                query = {"$or": [
-                    {key: {"$exists": True}} for key in lookup_keys
-                ]}
+                lookup_keys = {f"{head}.{t}{postfix}" for t in targets}
+                query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
                 yield query, lookup_keys, {}
 
 
+pass_as_kwarg = lambda *a, **k: []
 KEY_PARSERS = {
     "from": assay_pair_to_query,
     "investigation": partial(
@@ -104,7 +97,11 @@ KEY_PARSERS = {
     "assay": partial(
         isa_pair_to_query, category="assay",
         constrain_to={"factor value", "parameter value", "characteristics"},
-    )
+    ),
+    "datatype": pass_as_kwarg,
+    "debug": pass_as_kwarg,
+    "filename": pass_as_kwarg,
+    "format": pass_as_kwarg,
 }
 
 
@@ -120,6 +117,9 @@ def INPLACE_update_context_queries(context, rargs):
                     for value in rargs.getlist(key):
                         if "$" not in value:
                             yield from parser(fields=fields, value=value)
+                else:
+                    msg = "Unrecognized argument"
+                    raise GeneFabParserException(msg, **{key: rargs[key]})
         for query, lookup_keys, accessions_and_assays in query_iterator():
             context.query["$and"].append(query)
             if lookup_keys:
@@ -151,17 +151,6 @@ def INPLACE_update_context(context, rargs):
     return processed
 
 
-def validate_context(context):
-    """Check that no arguments conflict"""
-    for description, scenario in DISALLOWED_CONTEXTS.items():
-        if scenario(context):
-            raise GeneFabParserException(description)
-    trailing_keys = set(context.kwargs) - KNOWN_KWARGS
-    if trailing_keys:
-        _kws = {k: context.kwargs[k] for k in trailing_keys}
-        raise GeneFabParserException("Unrecognized arguments", **_kws)
-
-
 Context = lambda: _memoized_context(request)
 Context.__doc__ = """Parse and memoize request components"""
 @lru_cache(maxsize=None)
@@ -172,16 +161,17 @@ def _memoized_context(request):
         full_path=request.full_path,
         view=sub(url_root, "", base_url).strip("/"),
         complete_args=request.args.to_dict(flat=False),
-        accessions_and_assays={},
-        query={"$and": []}, projection={},
-        kwargs=MultiDict(request.args),
+        accessions_and_assays={}, query={"$and": []}, projection={},
     )
     processed = INPLACE_update_context(context, request.args)
-    for key in processed:
-        context.kwargs.pop(key, None)
+    context.kwargs = MultiDict({
+        k: v for k, v in request.args.lists() if k not in processed
+    })
     context.kwargs["debug"] = context.kwargs.get("debug", "0")
     context.identity = quote(
         "/" + context.view + "?" + dumps(context.complete_args, sort_keys=True)
     )
-    validate_context(context)
+    for description, scenario in DISALLOWED_CONTEXTS.items():
+        if scenario(context):
+            raise GeneFabParserException(description)
     return context
