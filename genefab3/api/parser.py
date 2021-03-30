@@ -118,7 +118,7 @@ def request_pairs_to_queries(rargs, key):
 
 def INPLACE_update_context_queries(context, rargs):
     """Interpret all key-value pairs that give rise to database queries"""
-    shown = set()
+    shown, processed = set(), set()
     for key in rargs:
         query_iterator = request_pairs_to_queries(rargs, key)
         for query, lookup_keys, accessions_and_assays in query_iterator:
@@ -128,8 +128,8 @@ def INPLACE_update_context_queries(context, rargs):
             for accession, assay_names in accessions_and_assays.items():
                 context.accessions_and_assays[accession] = sorted(assay_names)
             if key in context.kwargs:
-                context.kwargs.pop(key)
-    return shown
+                processed.add(key)
+    return shown, processed
 
 
 def INPLACE_update_context_projection(context, shown):
@@ -148,8 +148,9 @@ def INPLACE_update_context_projection(context, shown):
 
 def INPLACE_update_context(context, rargs):
     """Update context using data in request arguments"""
-    shown = INPLACE_update_context_queries(context, MultiDict(rargs))
+    shown, processed = INPLACE_update_context_queries(context, MultiDict(rargs))
     INPLACE_update_context_projection(context, shown)
+    return processed
 
 
 def validate_context(context):
@@ -177,7 +178,9 @@ def _memoized_context(request):
         query={"$and": []}, projection={},
         kwargs=MultiDict(request.args),
     )
-    INPLACE_update_context(context, request.args)
+    processed = INPLACE_update_context(context, request.args)
+    for key in processed:
+        context.kwargs.pop(key)
     if "debug" not in context.kwargs:
         context.kwargs["debug"] = "0"
     context.identity = quote(
