@@ -2,6 +2,7 @@ from collections import defaultdict, OrderedDict
 from re import search, sub, escape
 from types import SimpleNamespace
 from genefab3.common.types import UniversalSet
+from functools import partial
 from werkzeug.datastructures import MultiDict
 from genefab3.common.exceptions import GeneFabParserException
 from functools import lru_cache
@@ -11,7 +12,6 @@ from json import dumps
 
 
 KNOWN_KWARGS = {"datatype", "filename", "format", "debug"}
-ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
 
 leaf_count = lambda d: sum(len(v) for v in d.values())
 DISALLOWED_CONTEXTS = {
@@ -48,7 +48,7 @@ DISALLOWED_CONTEXTS = {
 }
 
 
-def assay_pair_to_query(key, value):
+def assay_pair_to_query(fields=None, value=""):
     """Interpret single key-value pair for dataset / assay constraint"""
     query = {"$or": []}
     accessions_and_assays = defaultdict(set)
@@ -65,13 +65,13 @@ def assay_pair_to_query(key, value):
     yield query, None, accessions_and_assays
 
 
-def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_postfix=False):
+def isa_pair_to_query(category, fields, value, constrain_to=UniversalSet(), dot_postfix="auto"):
     """Interpret single key-value pair if it gives rise to database query"""
-    if fields[0] in constrain_to:
+    if fields and (fields[0] in constrain_to):
         if (len(fields) == 2) and (dot_postfix == "auto"):
-            lookup_key = ".".join([isa_category] + fields) + "."
+            lookup_key = ".".join([category] + fields) + "."
         else:
-            lookup_key = ".".join([isa_category] + fields)
+            lookup_key = ".".join([category] + fields)
         if value: # metadata field must equal value or one of values
             yield {lookup_key: {"$in": value.split("|")}}, {lookup_key}, {}
         else: # metadata field or one of metadata fields must exist
@@ -92,43 +92,41 @@ def pair_to_query(isa_category, fields, value, constrain_to=UniversalSet(), dot_
                 yield query, lookup_keys, {}
 
 
-def request_pairs_to_queries(rargs, key):
-    """Interpret key-value pairs under same key if they give rise to database queries"""
-    if key == "from":
-        for value in rargs.getlist(key):
-            if "$" not in value:
-                yield from assay_pair_to_query(key, value)
-    elif "$" not in key:
-        isa_category, *fields = key.split(".")
-        if fields:
-            for value in rargs.getlist(key):
-                if "$" not in value:
-                    if isa_category == "investigation":
-                        yield from pair_to_query(
-                            isa_category, fields, value,
-                            constrain_to=UniversalSet(), dot_postfix=False,
-                        )
-                    elif isa_category in {"study", "assay"}:
-                        yield from pair_to_query(
-                            isa_category, fields, value,
-                            constrain_to=ANNOTATION_CATEGORIES,
-                            dot_postfix="auto",
-                        )
+KEY_PARSERS = {
+    "from": assay_pair_to_query,
+    "investigation": partial(
+        isa_pair_to_query, category="investigation", dot_postfix=False,
+    ),
+    "study": partial(
+        isa_pair_to_query, category="study",
+        constrain_to={"factor value", "parameter value", "characteristics"},
+    ),
+    "assay": partial(
+        isa_pair_to_query, category="assay",
+        constrain_to={"factor value", "parameter value", "characteristics"},
+    )
+}
 
 
 def INPLACE_update_context_queries(context, rargs):
     """Interpret all key-value pairs that give rise to database queries"""
     shown, processed = set(), set()
     for key in rargs:
-        query_iterator = request_pairs_to_queries(rargs, key)
-        for query, lookup_keys, accessions_and_assays in query_iterator:
+        def query_iterator():
+            if "$" not in key:
+                category, *fields = key.split(".")
+                if category in KEY_PARSERS:
+                    parser = KEY_PARSERS[category]
+                    for value in rargs.getlist(key):
+                        if "$" not in value:
+                            yield from parser(fields=fields, value=value)
+        for query, lookup_keys, accessions_and_assays in query_iterator():
             context.query["$and"].append(query)
             if lookup_keys:
                 shown.update(lookup_keys)
             for accession, assay_names in accessions_and_assays.items():
                 context.accessions_and_assays[accession] = sorted(assay_names)
-            if key in context.kwargs:
-                processed.add(key)
+            processed.add(key)
     return shown, processed
 
 
@@ -180,9 +178,8 @@ def _memoized_context(request):
     )
     processed = INPLACE_update_context(context, request.args)
     for key in processed:
-        context.kwargs.pop(key)
-    if "debug" not in context.kwargs:
-        context.kwargs["debug"] = "0"
+        context.kwargs.pop(key, None)
+    context.kwargs["debug"] = context.kwargs.get("debug", "0")
     context.identity = quote(
         "/" + context.view + "?" + dumps(context.complete_args, sort_keys=True)
     )
