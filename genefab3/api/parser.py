@@ -16,33 +16,33 @@ ANNOTATION_CATEGORIES = {"factor value", "parameter value", "characteristics"}
 leaf_count = lambda d: sum(len(v) for v in d.values())
 DISALLOWED_CONTEXTS = {
     "at least one dataset or annotation category must be specified": lambda c:
-        (not search(r'^/(|status|debug|favicon\.\S*)/$', c.view)) and
+        (not search(r'^(|status|debug|favicon\.\S*)$', c.view)) and
         (len(c.projection) == 0) and (len(c.accessions_and_assays) == 0),
     "metadata queries are not valid for /status/": lambda c:
-        (c.view == "/status/") and (leaf_count(c.query) > 0),
+        (c.view == "status") and (leaf_count(c.query) > 0),
     "'format=cls' is only valid for /samples/": lambda c:
-        (c.view != "/samples/") and (c.kwargs.get("format") == "cls"),
+        (c.view != "samples") and (c.kwargs.get("format") == "cls"),
     "'format=gct' is only valid for /data/": lambda c:
-        (c.view != "/data/") and (c.kwargs.get("format") == "gct"),
+        (c.view != "data") and (c.kwargs.get("format") == "gct"),
     "/data/ requires a 'datatype=' argument": lambda c:
-        (c.view == "/data/") and ("datatype" not in c.kwargs),
+        (c.view == "data") and ("datatype" not in c.kwargs),
     "'format=gct' is not valid for the requested datatype": lambda c:
         (c.kwargs.get("format") == "gct") and
         (c.kwargs.get("datatype") != "unnormalized counts"),
     "/file/ only accepts 'format=raw'": lambda c:
-        (c.view == "/file/") and (c.kwargs.get("format") != "raw"),
+        (c.view == "file") and (c.kwargs.get("format") != "raw"),
     "/file/ requires at most one 'filename=' argument": lambda c:
-        (c.view == "/file/") and (len(c.kwargs.getlist("filename")) > 1),
+        (c.view == "file") and (len(c.kwargs.getlist("filename")) > 1),
     "/file/ requires exactly one dataset in the 'from=' argument": lambda c:
-        (c.view == "/file/") and (len(c.accessions_and_assays) != 1),
+        (c.view == "file") and (len(c.accessions_and_assays) != 1),
     "/file/ requires at most one assay in the 'from=' argument": lambda c:
-        (c.view == "/file/") and (leaf_count(c.accessions_and_assays) > 1),
+        (c.view == "file") and (leaf_count(c.accessions_and_assays) > 1),
     "/file/ metadata categories are only valid for lookups in assays": lambda c:
-        (c.view == "/file/") and
+        (c.view == "file") and
         (len(c.projection) > 0) and # projection present
         (leaf_count(c.accessions_and_assays) == 0), # but no assays specified
     "/file/ accepts at most one metadata category for lookups in assays": lambda c:
-        (c.view == "/file/") and
+        (c.view == "file") and
         (leaf_count(c.accessions_and_assays) == 1) and # no. of assays == 1
         (len(c.projection) > 1), # more than one field to look in
 }
@@ -171,7 +171,7 @@ def _memoized_context(request):
     base_url = request.base_url.strip("/")
     context = Namespace(
         full_path=request.full_path,
-        view="/"+sub(url_root, "", base_url).strip("/")+"/",
+        view=sub(url_root, "", base_url).strip("/"),
         complete_args=request.args.to_dict(flat=False),
         accessions_and_assays={},
         query={"$and": []}, projection={},
@@ -181,7 +181,7 @@ def _memoized_context(request):
     if "debug" not in context.kwargs:
         context.kwargs["debug"] = "0"
     context.identity = quote(
-        context.view + dumps(context.complete_args, sort_keys=True)
+        "/" + context.view + "?" + dumps(context.complete_args, sort_keys=True)
     )
     validate_context(context)
     return context
