@@ -15,6 +15,13 @@ class CacheableRenderer():
         """Initialize object renderer and LRU cacher"""
         self.sqlite_dbs = sqlite_dbs
  
+    def render_html(self, obj):
+        """Display HTML code"""
+        if isinstance(obj, str):
+            return Response(obj, mimetype="text/html")
+        else:
+            return Response(obj.decode(), mimetype="text/html")
+ 
     def render_raw(self, obj):
         """Display objects of various types in 'raw' format"""
         if isinstance(obj, str):
@@ -85,6 +92,8 @@ class CacheableRenderer():
             _nlevels = getattr(getattr(obj, "columns", None), "nlevels", None)
             if obj is None:
                 raise GeneFabException("No data")
+            elif (fmt == "html") and _is((str, bytes)):
+                return self.render_html(obj)
             elif (fmt == "raw") and _is((str, bytes)):
                 return self.render_raw(obj)
             elif (fmt == "cls") and _is(DataFrame) and (_nlevels == 2):
