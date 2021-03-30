@@ -1,6 +1,6 @@
 from collections import defaultdict, OrderedDict
 from re import search, sub, escape
-from argparse import Namespace
+from types import SimpleNamespace
 from genefab3.common.types import UniversalSet
 from werkzeug.datastructures import MultiDict
 from genefab3.common.exceptions import GeneFabParserException
@@ -169,7 +169,7 @@ Context.__doc__ = """Parse and memoize request components"""
 def _memoized_context(request):
     url_root = escape(request.url_root.strip("/"))
     base_url = request.base_url.strip("/")
-    context = Namespace(
+    context = SimpleNamespace(
         full_path=request.full_path,
         view=sub(url_root, "", base_url).strip("/"),
         complete_args=request.args.to_dict(flat=False),
