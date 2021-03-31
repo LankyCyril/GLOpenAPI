@@ -7,6 +7,7 @@ from memoized_property import memoized_property
 from genefab3.api.parser import Context
 from genefab3.common.exceptions import GeneFabException, GeneFabFormatException
 from genefab3.common.exceptions import GeneFabConfigurationException
+from genefab3.common.utils import JSONByteEncoder
 
 
 class CacheableRenderer():
@@ -23,26 +24,29 @@ class CacheableRenderer():
         return {
             (str, bytes): {
                 LevelCount(any): {
-                    "raw": self.render_raw, "html": self.render_html,
+                    "raw": self.render_raw,
+                    "html": self.render_html,
                 },
             },
             (list, dict): {
-                LevelCount(any): {"json": self.render_json},
+                LevelCount(any): {
+                    "json": self.render_json,
+                },
             },
             DataFrame: {
                 LevelCount(2): {
                     "cls": self.render_cls,
+                    "csv": partial(self.render_plaintext_dataframe, sep=","),
+                    "tsv": partial(self.render_plaintext_dataframe, sep="\t"),
+                    "json": partial(self.render_plaintext_dataframe, json=True),
                     "browser": self.render_browser_twolevel,
-                    "csv": partial(self.render_xsv, sep=","),
-                    "tsv": partial(self.render_xsv, sep="\t"),
-                    "json": partial(self.render_xsv, json=True),
                 },
                 LevelCount(3): {
                     "gct": self.render_gct,
+                    "csv": partial(self.render_plaintext_dataframe, sep=","),
+                    "tsv": partial(self.render_plaintext_dataframe, sep="\t"),
+                    "json": partial(self.render_plaintext_dataframe, json=True),
                     "browser": self.render_browser_threelevel,
-                    "csv": partial(self.render_xsv, sep=","),
-                    "tsv": partial(self.render_xsv, sep="\t"),
-                    "json": partial(self.render_xsv, json=True),
                 },
             },
         }
@@ -105,7 +109,7 @@ class CacheableRenderer():
  
     def render_json(self, obj, indent=None):
         """Display record in plaintext dump format"""
-        return Response(dumps(obj, indent=indent), mimetype="text/plain")
+        return Response(dumps(obj, indent=indent), mimetype="text/json")
  
     def render_cls(self, obj, continuous=None, space_sub=lambda s: sub(r'\s', "", s), indent=None):
         """Display presumed annotation/factor dataframe in plaintext CLS format"""
@@ -145,6 +149,23 @@ class CacheableRenderer():
         )
         return Response(response, mimetype="text/plain")
  
+    def render_plaintext_dataframe(self, obj, sep=",", json=False, indent=None):
+        """Display dataframe in plaintext `sep`-separated format or as JSON"""
+        if json:
+            raw_json = {
+                "columns": obj.columns.tolist(), "data": obj.values.tolist(),
+            }
+            return Response(
+                dumps(raw_json, indent=indent, cls=JSONByteEncoder),
+                mimetype="text/json",
+            )
+        else:
+            _kws = dict(sep=sep, index=False, header=False, na_rep="NA")
+            header = sub(r'^', "#", sub(r'\n(.)', r'\n#\1',
+                obj.columns.to_frame().T.to_csv(**_kws),
+            ))
+            return Response(header + obj.to_csv(**_kws), mimetype="text/plain")
+ 
     def render_browser_twolevel(self, obj, indent=None):
         """Placeholder method""" # TODO
         TABLE_CSS = "table {table-layout: fixed; white-space: nowrap}"
@@ -155,9 +176,5 @@ class CacheableRenderer():
         )
  
     def render_browser_threelevel(self, obj, indent=None):
-        """Placeholder method""" # TODO
-        return None
- 
-    def render_xsv(self, obj, sep=",", json=False, indent=None):
         """Placeholder method""" # TODO
         return None

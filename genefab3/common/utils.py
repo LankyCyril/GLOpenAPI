@@ -7,6 +7,7 @@ from re import sub, escape, split
 from copy import deepcopy
 from pandas import DataFrame, Series
 from genefab3.common.exceptions import GeneFabConfigurationException
+from json import JSONEncoder
 
 
 @contextmanager
@@ -103,3 +104,12 @@ def iterate_terminal_leaf_elements(d, sep=r'\s*,\s'):
     for value in iterate_terminal_leaves(d):
         if isinstance(value, str):
             yield from split(sep, value)
+
+
+class JSONByteEncoder(JSONEncoder):
+    """Allow dumps to convert sets to serializable lists"""
+    def default(self, entry):
+        if isinstance(entry, bytes):
+            return entry.decode(errors="replace")
+        else:
+            return JSONEncoder.default(self, entry)
