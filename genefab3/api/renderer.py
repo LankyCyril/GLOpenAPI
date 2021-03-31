@@ -24,29 +24,29 @@ class CacheableRenderer():
         return {
             (str, bytes): {
                 LevelCount(any): {
-                    "raw": self.render_raw,
-                    "html": self.render_html,
+                    "raw": SimpleRenderers.raw,
+                    "html": SimpleRenderers.html,
                 },
             },
             (list, dict): {
                 LevelCount(any): {
-                    "json": self.render_json,
+                    "json": SimpleRenderers.json,
                 },
             },
             DataFrame: {
                 LevelCount(2): {
-                    "cls": self.render_cls,
-                    "csv": partial(self.render_plaintext_dataframe, sep=","),
-                    "tsv": partial(self.render_plaintext_dataframe, sep="\t"),
-                    "json": partial(self.render_plaintext_dataframe, json=True),
-                    "browser": self.render_browser_twolevel,
+                    "cls": PlaintextDataFrameRenderers.cls,
+                    "csv": partial(PlaintextDataFrameRenderers.xsv, sep=","),
+                    "tsv": partial(PlaintextDataFrameRenderers.xsv, sep="\t"),
+                    "json": PlaintextDataFrameRenderers.json,
+                    "browser": BrowserDataFrameRenderers.twolevel,
                 },
                 LevelCount(3): {
-                    "gct": self.render_gct,
-                    "csv": partial(self.render_plaintext_dataframe, sep=","),
-                    "tsv": partial(self.render_plaintext_dataframe, sep="\t"),
-                    "json": partial(self.render_plaintext_dataframe, json=True),
-                    "browser": self.render_browser_threelevel,
+                    "gct": PlaintextDataFrameRenderers.gct,
+                    "csv": partial(PlaintextDataFrameRenderers.xsv, sep=","),
+                    "tsv": partial(PlaintextDataFrameRenderers.xsv, sep="\t"),
+                    "json": PlaintextDataFrameRenderers.json,
+                    "browser": BrowserDataFrameRenderers.threelevel,
                 },
             },
         }
@@ -65,7 +65,10 @@ class CacheableRenderer():
         elif len(renderer_groups) == 1:
             renderer = renderer_groups[0].get(nlevels, {}).get(fmt, None)
         else:
-            raise GeneFabConfigurationException("TODO") # TODO
+            raise GeneFabConfigurationException(
+                "Multiple TYPE_RENDERERS match object type",
+                type=type(obj).__name__, nlevels=nlevels, format=fmt,
+            )
         if renderer is None:
             raise GeneFabFormatException(
                 "Formatting of unsupported object type",
@@ -92,26 +95,34 @@ class CacheableRenderer():
             # TODO cache
             return response
         return wrapper
+
+
+class SimpleRenderers():
+    """Renderers that do not require object manipulation"""
  
-    def render_raw(self, obj, indent=None):
+    def raw(obj, indent=None):
         """Display objects of various types in 'raw' format"""
         if isinstance(obj, str):
             return Response(obj, mimetype="text/plain")
         else:
             return Response(obj, mimetype="application")
  
-    def render_html(self, obj, indent=None):
+    def html(obj, indent=None):
         """Display HTML code"""
         if isinstance(obj, str):
             return Response(obj, mimetype="text/html")
         else:
             return Response(obj.decode(), mimetype="text/html")
  
-    def render_json(self, obj, indent=None):
+    def json(obj, indent=None):
         """Display record in plaintext dump format"""
         return Response(dumps(obj, indent=indent), mimetype="text/json")
+
+
+class PlaintextDataFrameRenderers():
+    """Renderers that require minimal DataFrame manipulation and generate non-HTML, non-interactive output"""
  
-    def render_cls(self, obj, continuous=None, space_sub=lambda s: sub(r'\s', "", s), indent=None):
+    def cls(obj, continuous=None, space_sub=lambda s: sub(r'\s', "", s), indent=None):
         """Display presumed annotation/factor dataframe in plaintext CLS format"""
         columns = [(l0, l1) for (l0, l1) in obj.columns if l0 != "info"]
         if len(columns) != 1:
@@ -138,7 +149,7 @@ class CacheableRenderer():
         response = "\n".join(["\t".join([str(f) for f in fs]) for fs in _data])
         return Response(response, mimetype="text/plain")
  
-    def render_gct(obj, indent=None):
+    def gct(obj, indent=None):
         """Display presumed data dataframe in plaintext GCT format"""
         text = obj.to_csv(sep="\t", index=False, header=False)
         response = (
@@ -149,24 +160,29 @@ class CacheableRenderer():
         )
         return Response(response, mimetype="text/plain")
  
-    def render_plaintext_dataframe(self, obj, sep=",", json=False, indent=None):
-        """Display dataframe in plaintext `sep`-separated format or as JSON"""
-        if json:
-            raw_json = {
-                "columns": obj.columns.tolist(), "data": obj.values.tolist(),
-            }
-            return Response(
-                dumps(raw_json, indent=indent, cls=JSONByteEncoder),
-                mimetype="text/json",
-            )
-        else:
-            _kws = dict(sep=sep, index=False, header=False, na_rep="NA")
-            header = sub(r'^', "#", sub(r'\n(.)', r'\n#\1',
-                obj.columns.to_frame().T.to_csv(**_kws),
-            ))
-            return Response(header + obj.to_csv(**_kws), mimetype="text/plain")
+    def xsv(obj, sep=",", indent=None):
+        """Display dataframe in plaintext `sep`-separated format"""
+        _kws = dict(sep=sep, index=False, header=False, na_rep="NaN")
+        header = sub(r'^', "#", sub(r'\n(.)', r'\n#\1',
+            obj.columns.to_frame().T.to_csv(**_kws),
+        ))
+        return Response(header + obj.to_csv(**_kws), mimetype="text/plain")
  
-    def render_browser_twolevel(self, obj, indent=None):
+    def json(obj, indent=None):
+        """Display dataframe as JSON"""
+        raw_json = {
+            "columns": obj.columns.tolist(), "data": obj.values.tolist(),
+        }
+        return Response(
+            dumps(raw_json, indent=indent, cls=JSONByteEncoder),
+            mimetype="text/json",
+        )
+
+
+class BrowserDataFrameRenderers():
+    """Renderers that generate interactive HTML versions of DataFrame objects"""
+ 
+    def twolevel(obj, indent=None):
         """Placeholder method""" # TODO
         TABLE_CSS = "table {table-layout: fixed; white-space: nowrap}"
         return Response(
@@ -175,6 +191,6 @@ class CacheableRenderer():
             mimetype="text/html",
         )
  
-    def render_browser_threelevel(self, obj, indent=None):
+    def threelevel(obj, indent=None):
         """Placeholder method""" # TODO
         return None
