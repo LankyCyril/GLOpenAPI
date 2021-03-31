@@ -79,36 +79,45 @@ class CacheableRenderer():
             mimetype="text/html",
         )
  
+    def dispatch_renderer(self, obj, indent, fmt):
+        """Render `obj` according to its type and passed kwargs"""
+        _is = lambda t: isinstance(obj, t)
+        _nlevels = getattr(getattr(obj, "columns", None), "nlevels", None)
+        if obj is None:
+            raise GeneFabException("No data")
+        elif (fmt == "html") and _is((str, bytes)):
+            return self.render_html(obj)
+        elif (fmt == "raw") and _is((str, bytes)):
+            return self.render_raw(obj)
+        elif (fmt == "cls") and _is(DataFrame) and (_nlevels == 2):
+            return self.render_cls(obj)
+        elif (fmt == "gct") and _is(DataFrame) and (_nlevels == 3):
+            return self.render_gct(obj)
+        elif (fmt == "json") and _is((list, dict)):
+            return self.render_json(obj, indent=indent)
+        elif (fmt in {"tsv", "csv", "json", "browser"}) and _is(DataFrame):
+            return self.render_dataframe(obj, fmt=fmt)
+        else:
+            raise GeneFabFormatException(
+                "Formatting of unsupported object type",
+                type=type(obj).__name__, nlevels=_nlevels, format=fmt,
+            )
+ 
     def __call__(self, method):
         """Render object returned from `method`, put in LRU cache by `context.identity`"""
         @wraps(method)
         def wrapper(*args, **kwargs):
-            obj, context = method(*args, **kwargs), Context()
+            # TODO check cache
+            context = Context()
             if context.kwargs["debug"] == "1":
-                obj, indent, fmt = context.__dict__, 4, "json"
+                obj = context.__dict__
+                indent, fmt = 4, "json"
             else:
+                obj = method(*args, **kwargs)
                 indent, fmt = None, context.kwargs.get(
                     "format", getattr(method, "fmt", "raw"),
                 )
-            _is = lambda t: isinstance(obj, t)
-            _nlevels = getattr(getattr(obj, "columns", None), "nlevels", None)
-            if obj is None:
-                raise GeneFabException("No data")
-            elif (fmt == "html") and _is((str, bytes)):
-                return self.render_html(obj)
-            elif (fmt == "raw") and _is((str, bytes)):
-                return self.render_raw(obj)
-            elif (fmt == "cls") and _is(DataFrame) and (_nlevels == 2):
-                return self.render_cls(obj)
-            elif (fmt == "gct") and _is(DataFrame) and (_nlevels == 3):
-                return self.render_gct(obj)
-            elif (fmt == "json") and _is((list, dict)):
-                return self.render_json(obj, indent=indent)
-            elif _is(DataFrame):
-                return self.render_dataframe(obj, fmt=fmt)
-            else:
-                raise GeneFabFormatException(
-                    "Formatting of unsupported object type",
-                    type=type(obj).__name__, nlevels=_nlevels, format=fmt,
-                )
+            response = self.dispatch_renderer(obj, indent, fmt)
+            # TODO cache
+            return response
         return wrapper
