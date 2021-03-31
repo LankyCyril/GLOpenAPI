@@ -1,4 +1,3 @@
-from re import sub
 from genefab3.common.utils import walk_up
 from os import path
 from collections.abc import Iterable
@@ -6,21 +5,6 @@ from pandas import isnull
 from genefab3.frontend.renderers.formatters import get_browser_formatters
 from genefab3.frontend.renderers.formatters import build_url
 from genefab3.common.utils import map_replace
-from flask import Response
-from genefab3.common.exceptions import GeneFabFormatException
-
-
-DF_KWS = dict(index=False, header=False, na_rep="NA")
-
-
-def annotate_cols(dataframe, sep):
-    """Format (multi)-columns of dataframe with '#' prepended"""
-    return sub(
-        r'^', "#", sub(
-            r'\n(.)', r'\n#\1',
-            dataframe.columns.to_frame().T.to_csv(sep=sep, **DF_KWS),
-        ),
-    )
 
 
 def get_browser_html(): # TODO in prod: make HTML template static / preload on app start
@@ -104,21 +88,3 @@ def get_browser_dataframe(df, context):
         raise NotImplementedError("Dataframe with {} column levels".format(
             df.columns.nlevels,
         ))
-
-
-def render_dataframe(df, context):
-    """Display dataframe with specified format"""
-    if context.kwargs["format"] == "tsv":
-        content = annotate_cols(df, sep="\t") + df.to_csv(sep="\t", **DF_KWS)
-        mimetype = "text/plain"
-    elif context.kwargs["format"] == "csv":
-        content = annotate_cols(df, sep=",") + df.to_csv(sep=",", **DF_KWS)
-        mimetype = "text/plain"
-    elif context.kwargs["format"] in {"interactive", "browser"}:
-        content = get_browser_dataframe(df, context)
-        mimetype = "text/html"
-    else:
-        raise GeneFabFormatException(
-            "Unknown format", format=context.kwargs["format"],
-        )
-    return Response(content, mimetype=mimetype)

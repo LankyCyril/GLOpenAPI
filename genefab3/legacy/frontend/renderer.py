@@ -1,9 +1,4 @@
-from genefab3.common.exceptions import GeneFabException, GeneFabFormatException
-from genefab3.frontend.renderers.raw import render_raw
-from genefab3.frontend.renderers.cls import render_cls
-from genefab3.frontend.renderers.gct import render_gct
 from pandas import DataFrame, MultiIndex
-from genefab3.frontend.renderers.dataframe import render_dataframe
 from genefab3.common.utils import get_attribute
 from genefab3.frontend.parser import parse_request
 from genefab3.common.exceptions import GeneFabParserException
