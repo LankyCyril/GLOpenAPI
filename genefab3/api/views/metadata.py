@@ -2,6 +2,7 @@ from pymongo import ASCENDING
 from pandas import json_normalize, MultiIndex, isnull
 from genefab3.common.exceptions import GeneFabDatabaseException
 from re import findall
+from genefab3.api.renderers import Placeholders
 
 
 def get_raw_metadata_dataframe(mongo_collections, *, locale, query, projection, include):
@@ -83,7 +84,7 @@ def get(mongo_collections, *, locale, context, include=(), modify=keep_projectio
             for fields in map(lambda s: s.split("."), dataframe.columns)
         )
     except TypeError: # no data retrieved; TODO: handle more gracefully
-        return None # Placeholders.metadata_dataframe(include=include) # TODO
+        return Placeholders.metadata_dataframe(include=include)
     else:
         if aggregate: # coerce to boolean "existence" if requested
             info_cols = list(dataframe[["info"]].columns)

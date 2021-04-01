@@ -1,4 +1,3 @@
-from pandas import DataFrame, MultiIndex
 from genefab3.common.utils import get_attribute
 from genefab3.frontend.parser import parse_request
 from genefab3.common.exceptions import GeneFabParserException
@@ -8,7 +7,6 @@ from json import dumps
 from genefab3.config import USE_RESPONSE_CACHE, RESPONSE_CACHE, ROW_TYPES
 from genefab3.backend.sql.readers.cache import retrieve_cached_response
 from genefab3.backend.sql.writers.cache import cache_response
-from itertools import cycle
 
 
 def get_accessions_used(obj, context):
@@ -60,28 +58,3 @@ def render(db, getter, kwargs, request):
                     response_cache=RESPONSE_CACHE,
                 )
             return response
-
-
-class Placeholders:
-    """Defines placeholder objects for situations where empty results need to be displayed"""
- 
-    def dataframe(*level_values):
-        """Return an empty dataframe with specificed column names"""
-        maxlen = max(map(len, level_values))
-        cyclers = [
-            cycle(values) if (len(values) < maxlen) else iter(values)
-            for values in level_values
-        ]
-        return DataFrame(columns=MultiIndex.from_tuples(zip(*cyclers)))
- 
-    def metadata_dataframe(include=set()):
-        """Return an empty dataframe that matches metadata format"""
-        return Placeholders.dataframe(
-            ["info"], ["accession", "assay", *(c.strip(".") for c in include)],
-        )
- 
-    def data_dataframe():
-        """Return an empty dataframe that matches data format"""
-        return Placeholders.dataframe(
-            ["info"], ["info"], [ROW_TYPES.default_factory()],
-        )
