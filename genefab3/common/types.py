@@ -5,6 +5,7 @@ from collections.abc import Hashable
 from itertools import zip_longest
 from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
+from functools import wraps
 
 
 passthrough = lambda _:_
@@ -105,3 +106,28 @@ class Adapter():
     def best_sample_name_matches(self, name, names):
         """Fallback sample name identity test"""
         return [ns for ns in names if ns == name]
+
+
+class Routes():
+    """Base class for registered routes"""
+ 
+    def register_endpoint(*, endpoint=None, fmt="tsv"):
+        """Decorator that adds `endpoint` and `fmt` attributes to class method"""
+        def outer(method):
+            @wraps(method)
+            def inner(*args, **kwargs):
+                return method(*args, **kwargs)
+            if endpoint:
+                inner.endpoint = endpoint
+            elif hasattr(method, "__name__"):
+                if isinstance(method.__name__, str):
+                    inner.endpoint = "/" + method.__name__ + "/"
+            inner.fmt = fmt
+            return inner
+        return outer
+ 
+    def items(self):
+        for name in dir(self):
+            method = getattr(self, name)
+            if isinstance(getattr(method, "endpoint", None), str):
+                yield method.endpoint, method

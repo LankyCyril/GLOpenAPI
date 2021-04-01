@@ -2,11 +2,13 @@
 from flask import Flask
 from genefab3.client import GeneFabClient
 from genefab3_genelab_adapter import GeneLabAdapter
+from genefab3.api.routes import DefaultRoutes
 
 flask_app = Flask("genefab3")
 
 genefab3_client = GeneFabClient(
     AdapterClass=GeneLabAdapter,
+    RoutesClass=DefaultRoutes,
     mongo_params=dict(
         db_name="genefab3_testing",
         locale="en_US",

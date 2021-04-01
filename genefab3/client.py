@@ -5,7 +5,6 @@ from sqlite3 import connect, OperationalError
 from types import SimpleNamespace
 from flask_compress import Compress
 from genefab3.api.renderer import CacheableRenderer
-from genefab3.api.routes import Routes
 from genefab3.common.logger import GeneFabLogger, MongoDBLogger
 from functools import partial
 from genefab3.common.exceptions import traceback_printer, exception_catcher
@@ -16,7 +15,7 @@ from genefab3.db.cacher import CacherThread
 class GeneFabClient():
     """Routes Response-generating methods, continuously caches metadata and responses"""
  
-    def __init__(self, *, AdapterClass, mongo_params, sqlite_params, cacher_params, flask_params):
+    def __init__(self, *, AdapterClass, RoutesClass, mongo_params, sqlite_params, cacher_params, flask_params):
         """Initialize metadata cacher (with adapter), response cacher, routes"""
         try:
             self.flask_app = self._configure_flask_app(**flask_params)
@@ -24,14 +23,16 @@ class GeneFabClient():
                 self._get_mongo_db_connection(**mongo_params)
             )
             self.sqlite_dbs = self._get_validated_sqlite_dbs(**sqlite_params)
-            self._init_routes()
-            self._init_warning_handlers()
-            self._init_error_handlers()
         except TypeError as e:
             msg = f"During GeneFabClient() initialization, {e}"
             raise GeneFabConfigurationException(msg)
         else:
-            self.adapter, self.cacher_params = AdapterClass(), cacher_params
+            self.adapter = AdapterClass()
+            self.routes = RoutesClass(self.mongo_collections)
+            self.cacher_params = cacher_params
+            self._init_routes()
+            self._init_warning_handlers()
+            self._init_error_handlers()
  
     def _configure_flask_app(self, *, app, compress_params=None):
         """Modify Flask application, enable compression"""
@@ -95,11 +96,8 @@ class GeneFabClient():
     def _init_routes(self):
         """Route Response-generating methods to Flask endpoints"""
         renderer = CacheableRenderer(self.sqlite_dbs)
-        routes = Routes(self.mongo_collections)
-        for endpoint, method in routes.items():
-            self.flask_app.route(endpoint, methods=["GET"])(
-                renderer(method),
-            )
+        for endpoint, method in self.routes.items():
+            self.flask_app.route(endpoint, methods=["GET"])(renderer(method))
  
     def _init_warning_handlers(self):
         """Set up logger to write to MongoDB collection if specified"""
