@@ -24,11 +24,11 @@ TYPE_RENDERERS = {
         },
     },
     (str, bytes): {
-        "raw": {LevelCount(any): SimpleRenderers.raw},
-        "html": {LevelCount(any): SimpleRenderers.html},
+        "raw": {LevelCount(None): SimpleRenderers.raw},
+        "html": {LevelCount(None): SimpleRenderers.html},
     },
     (list, dict): {
-        "json": {LevelCount(any): SimpleRenderers.json},
+        "json": {LevelCount(None): SimpleRenderers.json},
     },
 }
 
@@ -44,7 +44,7 @@ class CacheableRenderer():
         """Render `obj` according to its type and passed kwargs"""
         if obj is None:
             raise GeneFabConfigurationException("Route returned no data")
-        nlevels = getattr(getattr(obj, "columns", None), "nlevels", any)
+        nlevels = getattr(getattr(obj, "columns", None), "nlevels", None)
         matchers = (isinstance, obj), (eq, fmt), (lambda a, b: a in b, nlevels)
         _error_kws = dict(type=type(obj).__name__, nlevels=nlevels, format=fmt)
         try:
