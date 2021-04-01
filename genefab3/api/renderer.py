@@ -2,9 +2,11 @@ from genefab3.api.renderers import SimpleRenderers, PlaintextDataFrameRenderers
 from genefab3.api.renderers import BrowserDataFrameRenderers
 from pandas import DataFrame
 from functools import partial, wraps
-from genefab3.api.parser import Context
-from genefab3.common.exceptions import GeneFabException, GeneFabFormatException
+from genefab3.common.utils import match_mapping
+from operator import eq
 from genefab3.common.exceptions import GeneFabConfigurationException
+from genefab3.common.exceptions import GeneFabFormatException
+from genefab3.api.parser import Context
 
 
 LevelCount = lambda x:x
@@ -49,26 +51,19 @@ class CacheableRenderer():
     def dispatch_renderer(self, obj, indent, fmt):
         """Render `obj` according to its type and passed kwargs"""
         if obj is None:
-            raise GeneFabException("No data")
+            raise GeneFabConfigurationException("Route returned no data")
         else:
             nlevels = getattr(getattr(obj, "columns", None), "nlevels", any)
-        renderer_groups = [
-            g for t, g in TYPE_RENDERERS.items() if isinstance(obj, t)
-        ]
-        if len(renderer_groups) == 0:
-            renderer = None
-        elif len(renderer_groups) == 1:
-            renderer = renderer_groups[0].get(nlevels, {}).get(fmt, None)
-        else:
-            raise GeneFabConfigurationException(
-                "Multiple TYPE_RENDERERS match object type",
-                type=type(obj).__name__, nlevels=nlevels, format=fmt,
-            )
-        if renderer is None:
-            raise GeneFabFormatException(
-                "Formatting of unsupported object type",
-                type=type(obj).__name__, nlevels=nlevels, format=fmt,
-            )
+            _e_kws = dict(type=type(obj).__name__, nlevels=nlevels, format=fmt)
+        try:
+            matchers = (isinstance, obj), (eq, nlevels), (eq, fmt)
+            renderer = match_mapping(TYPE_RENDERERS, matchers)
+        except KeyError:
+            msg = "Formatting of unsupported object type"
+            raise GeneFabFormatException(msg, **_e_kws)
+        except ValueError:
+            msg = "Multiple TYPE_RENDERERS match object type"
+            raise GeneFabConfigurationException(msg, **_e_kws)
         else:
             return renderer(obj, indent=indent)
  
@@ -76,17 +71,15 @@ class CacheableRenderer():
         """Render object returned from `method`, put in LRU cache by `context.identity`"""
         @wraps(method)
         def wrapper(*args, **kwargs):
-            # TODO check cache
             context = Context()
+            # TODO check cache based on context.identity
             if context.kwargs["debug"] == "1":
-                obj = context.__dict__
-                indent, fmt = 4, "json"
+                response = self.dispatch_renderer(context.__dict__, 4, "json")
             else:
-                obj = method(*args, **kwargs)
-                indent, fmt = None, context.kwargs.get(
-                    "format", getattr(method, "fmt", "raw"),
+                response = self.dispatch_renderer(
+                    method(*args, **kwargs), None,
+                    context.kwargs.get("format", getattr(method, "fmt", "raw")),
                 )
-            response = self.dispatch_renderer(obj, indent, fmt)
             # TODO cache
             return response
         return wrapper
