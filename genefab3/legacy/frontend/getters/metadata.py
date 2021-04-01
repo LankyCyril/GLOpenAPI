@@ -1,19 +1,10 @@
 from genefab3.config import RAW_FILE_REGEX
 from pandas import concat, merge
-from re import findall, search, IGNORECASE, escape, split
+from re import search, IGNORECASE, escape, split
 from genefab3.frontend.renderer import Placeholders
 from numpy import nan
 from genefab3.backend.mongo.readers.metadata import get_annotation_by_metadata
 from genefab3.common.utils import INPLACE_set_attributes
-
-
-def keep_projection(dataframe, full_projection):
-    """Drop qualifier fields from single-level dataframe, unless explicitly requested"""
-    subkeys_to_drop = {
-        c for c in dataframe.columns
-        if (len(findall(r'\..', c)) >= 3) and (c not in full_projection)
-    }
-    return dataframe.drop(columns=subkeys_to_drop)
 
 
 def unwind_file_entry(cell):
@@ -64,30 +55,6 @@ def filter_filenames(dataframe, mask, startloc):
             ],
             axis=1,
         )
-
-
-def get_assays(mongo_db, context):
-    """Select assays based on annotation filters"""
-    dataframe = get_annotation_by_metadata(
-        mongo_db, context, modify=keep_projection, aggregate=True,
-    )
-    if dataframe is None:
-        return Placeholders.metadata_dataframe()
-    else:
-        INPLACE_set_attributes(dataframe, genefab_type="annotation")
-        return dataframe
-
-
-def get_samples(mongo_db, context):
-    """Select samples based on annotation filters"""
-    dataframe = get_annotation_by_metadata(
-        mongo_db, context, include={"info.sample name"}, modify=keep_projection,
-    )
-    if dataframe is None:
-        return Placeholders.metadata_dataframe(include={"info.sample name"})
-    else:
-        INPLACE_set_attributes(dataframe, genefab_type="annotation")
-        return dataframe
 
 
 def get_files(mongo_db, context):
