@@ -2,6 +2,7 @@ from re import sub, MULTILINE
 from genefab3.common.exceptions import GeneFabFormatException
 from pandas import Series
 from flask import Response
+from functools import partial
 from json import dumps
 from genefab3.common.utils import JSONByteEncoder
 
@@ -46,13 +47,17 @@ def gct(obj, indent=None):
     return Response(response, mimetype="text/plain")
 
 
-def xsv(obj, sep=",", indent=None):
+def xsv(obj, sep, indent=None):
     """Display dataframe in plaintext `sep`-separated format"""
     _kws = dict(sep=sep, index=False, header=False, na_rep="NaN")
     header = sub(r'^', "#", sub(r'\n(.)', r'\n#\1',
         obj.columns.to_frame().T.to_csv(**_kws),
     ))
     return Response(header + obj.to_csv(**_kws), mimetype="text/plain")
+
+
+csv = partial(xsv, sep=",")
+tsv = partial(xsv, sep="\t")
 
 
 def json(obj, indent=None):
