@@ -16,7 +16,7 @@ class DefaultRoutes(Routes):
     def debug(self): return "OK"
  
     @Routes.register_endpoint(endpoint="/debug/error/", fmt="raw")
-    def debug_error(self): raise GeneFabException("Generic error", debug=True)
+    def debug_error(self): raise GeneFabException("Generic error", test=None)
  
     @Routes.register_endpoint(endpoint="/", fmt="html")
     def root(self): return "Hello space"
