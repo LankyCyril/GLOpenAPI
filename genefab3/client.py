@@ -52,9 +52,9 @@ class GeneFabClient():
             raise GeneFabConfigurationException(msg, error=type(e).__name__)
         parsed_cnames = {
             kind: (collection_names or {}).get(kind, kind)
-            for kind in ("metadata", "records", "status", "log")
+            for kind in ("metadata", "metadata_aux", "records", "status", "log")
         }
-        for kind in ("metadata", "records", "status"):
+        for kind in ("metadata", "metadata_aux", "records", "status"):
             if parsed_cnames[kind] is None:
                 msg = "Collection name cannot be None"
                 raise GeneFabConfigurationException(msg, collection=kind)

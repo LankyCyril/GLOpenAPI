@@ -1,6 +1,7 @@
 from threading import Thread
 from genefab3.common.logger import GeneFabLogger
 from genefab3.db.mongo.index import ensure_info_index
+from genefab3.db.mongo.index import update_metadata_value_lookup
 from time import sleep
 from collections import OrderedDict
 from genefab3.db.mongo.types import ValueCheckedRecord
@@ -32,7 +33,7 @@ class CacherThread(Thread):
             ensure_info_index(self.mongo_collections, self.locale)
             accessions, success = self.recache_metadata()
             if success:
-                # update_metadata_value_lookup TODO
+                update_metadata_value_lookup(self.mongo_collections)
                 # drop_cached_responses TODO
                 # shrink_response_cache TODO
                 delay = self.metadata_update_interval
