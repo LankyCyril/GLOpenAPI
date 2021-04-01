@@ -3,6 +3,7 @@ from pandas import json_normalize, MultiIndex, isnull
 from genefab3.common.exceptions import GeneFabDatabaseException
 from re import findall
 from genefab3.api.renderers import Placeholders
+from genefab3.common.utils import set_attributes
 
 
 def get_raw_metadata_dataframe(mongo_collections, *, locale, query, projection, include):
@@ -84,7 +85,9 @@ def get(mongo_collections, *, locale, context, include=(), modify=keep_projectio
             for fields in map(lambda s: s.split("."), dataframe.columns)
         )
     except TypeError: # no data retrieved; TODO: handle more gracefully
-        return Placeholders.metadata_dataframe(include=include)
+        return Placeholders.metadata_dataframe(
+            include=include, genefab_type="annotation",
+        )
     else:
         if aggregate: # coerce to boolean "existence" if requested
             info_cols = list(dataframe[["info"]].columns)
@@ -94,5 +97,5 @@ def get(mongo_collections, *, locale, context, include=(), modify=keep_projectio
                 gby = dataframe.groupby(info_cols, as_index=False, sort=False)
                 return gby.agg(lambda a: ~isnull(a).all())
         else:
+            set_attributes(dataframe, genefab_type="annotation")
             return dataframe
-    # INPLACE_set_attributes(dataframe, genefab_type="annotation") # TODO

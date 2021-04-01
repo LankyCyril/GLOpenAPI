@@ -73,23 +73,24 @@ def match_mapping(mapping, matchers):
     return dispatcher
 
 
-def INPLACE_set_attributes(dataframe, **kwargs):
+def set_attributes(dataframe, **kwargs):
     """Add custom attributes to dataframe"""
     if not isinstance(dataframe, DataFrame):
-        raise TypeError("Not a DataFrame")
+        raise GeneFabConfigurationException("set_attributes(): not a DataFrame")
     else:
         for a, v in kwargs.items():
             try:
                 dataframe._metadata.append(a)
                 setattr(dataframe, a, v)
             except AttributeError:
-                raise AttributeError(f"Cannot set attribute {a} of DataFrame")
+                msg = f"Cannot set attribute {a} of DataFrame"
+                raise GeneFabConfigurationException(msg)
 
 
 def get_attribute(dataframe, a):
     """Retrieve custom attribute of dataframe"""
     if not isinstance(dataframe, DataFrame):
-        raise TypeError("Not a DataFrame")
+        raise GeneFabConfigurationException("get_attribute(): not a DataFrame")
     else:
         value = getattr(dataframe, a, None)
         if isinstance(value, (Series, DataFrame)):
