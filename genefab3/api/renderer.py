@@ -9,33 +9,29 @@ from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.api.parser import Context
 
 
-LevelCount = lambda x:x
+LevelCount = lambda *a:a
 
 TYPE_RENDERERS = {
     (str, bytes): {
-        LevelCount(any): {
-            "raw": SimpleRenderers.raw, "html": SimpleRenderers.html,
-        },
+        "raw": {LevelCount(any): SimpleRenderers.raw},
+        "html": {LevelCount(any): SimpleRenderers.html},
     },
     (list, dict): {
-        LevelCount(any): {
-            "json": SimpleRenderers.json,
-        },
+        "json": {LevelCount(any): SimpleRenderers.json},
     },
     DataFrame: {
-        LevelCount(2): {
-            "cls": PlaintextDataFrameRenderers.cls,
-            "csv": partial(PlaintextDataFrameRenderers.xsv, sep=","),
-            "tsv": partial(PlaintextDataFrameRenderers.xsv, sep="\t"),
-            "json": PlaintextDataFrameRenderers.json,
-            "browser": BrowserDataFrameRenderers.twolevel,
+        "cls": {LevelCount(2): PlaintextDataFrameRenderers.cls},
+        "gct": {LevelCount(3): PlaintextDataFrameRenderers.gct},
+        "json": {LevelCount(2,3): PlaintextDataFrameRenderers.json},
+        "csv": {
+            LevelCount(2,3): partial(PlaintextDataFrameRenderers.xsv, sep=","),
         },
-        LevelCount(3): {
-            "gct": PlaintextDataFrameRenderers.gct,
-            "csv": partial(PlaintextDataFrameRenderers.xsv, sep=","),
-            "tsv": partial(PlaintextDataFrameRenderers.xsv, sep="\t"),
-            "json": PlaintextDataFrameRenderers.json,
-            "browser": BrowserDataFrameRenderers.threelevel,
+        "tsv": {
+            LevelCount(2,3): partial(PlaintextDataFrameRenderers.xsv, sep="\t"),
+        },
+        "browser": {
+            LevelCount(2): BrowserDataFrameRenderers.twolevel,
+            LevelCount(3): BrowserDataFrameRenderers.threelevel,
         },
     },
 }
@@ -56,7 +52,7 @@ class CacheableRenderer():
             nlevels = getattr(getattr(obj, "columns", None), "nlevels", any)
             _e_kws = dict(type=type(obj).__name__, nlevels=nlevels, format=fmt)
         try:
-            matchers = (isinstance, obj), (eq, nlevels), (eq, fmt)
+            matchers = (isinstance, obj), (eq, fmt), (lambda a,b:a in b, nlevels)
             renderer = match_mapping(TYPE_RENDERERS, matchers)
         except KeyError:
             msg = "Formatting of unsupported object type"
