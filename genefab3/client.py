@@ -28,7 +28,7 @@ class GeneFabClient():
             raise GeneFabConfigurationException(msg)
         else:
             self.adapter = AdapterClass()
-            self.routes = RoutesClass(self.mongo_collections)
+            self.routes = RoutesClass(self.mongo_collections, self.locale)
             self.cacher_params = cacher_params
             self._init_routes()
             self._init_warning_handlers()
