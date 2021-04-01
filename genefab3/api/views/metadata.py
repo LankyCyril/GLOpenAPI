@@ -38,32 +38,25 @@ def keep_projection(dataframe, full_projection):
 
 def isa_sort_dataframe(dataframe):
     """Sort single-level dataframe in order info-investigation-study-assay"""
-    column_order = dict(
-        info=set(), investigation=set(), study=set(), assay=set(), other=set(),
-    )
+    prefix_order = ["info", "investigation", "study", "assay", "other"]
+    column_order = {prefix: set() for prefix in prefix_order}
     for column in dataframe.columns:
-        if column.startswith("info"):
-            column_order["info"].add(column)
-        elif column.startswith("investigation"):
-            column_order["investigation"].add(column)
-        elif column.startswith("study"):
-            column_order["study"].add(column)
-        elif column.startswith("assay"):
-            column_order["assay"].add(column)
+        for prefix in column_order:
+            if column.startswith(prefix):
+                column_order[prefix].add(column)
+                break
         else:
             column_order["other"].add(column)
-    return dataframe[(
-        sorted(column_order["info"]) + sorted(column_order["investigation"]) +
-        sorted(column_order["study"]) + sorted(column_order["assay"]) +
-        sorted(column_order["other"])
-    )]
+    return dataframe[
+        sum((sorted(column_order[prefix]) for prefix in prefix_order), [])
+    ]
 
 
 def get(mongo_collections, *, locale, context, include=(), modify=keep_projection, aggregate=False):
     """Select assays/samples based on annotation filters"""
     full_projection = {
-        "info.accession": True, "info.assay": True, **context.projection,
-        **{field: True for field in include},
+        "info.accession": True, "info.assay": True,
+        **context.projection, **{field: True for field in include},
     }
     try:
         dataframe = get_raw_metadata_dataframe( # single-level
