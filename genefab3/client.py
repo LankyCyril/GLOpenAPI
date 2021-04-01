@@ -117,6 +117,7 @@ class GeneFabClient():
                 cacher_thread_params = dict(
                     adapter=self.adapter,
                     mongo_collections=self.mongo_collections,
+                    locale=self.locale,
                     units_formatter=self.units_formatter,
                     sqlite_dbs=self.sqlite_dbs,
                     **self.cacher_params,

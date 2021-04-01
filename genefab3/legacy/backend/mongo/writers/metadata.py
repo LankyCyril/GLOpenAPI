@@ -1,10 +1,4 @@
-from genefab3.config import COLLECTION_NAMES, MONGO_DB_LOCALE
-from pymongo import ASCENDING
-from types import SimpleNamespace
-from genefab3.backend.mongo.dataset import list_available_accessions
-from genefab3.backend.mongo.dataset import list_fresh_and_stale_accessions
-from genefab3.backend.mongo.dataset import CachedDataset
-from genefab3.config import UNITS_FORMAT
+from genefab3.config import COLLECTION_NAMES
 from copy import deepcopy
 from genefab3.backend.mongo.utils import run_mongo_transaction
 
@@ -28,19 +22,6 @@ INDEX_TEMPLATE = {
 }
 
 FINAL_INDEX_KEY_BLACKLIST = {"comment"}
-
-
-def ensure_info_index(mongo_db, logger, category="info", keys=["accession", "assay", "sample name"], cname=COLLECTION_NAMES.METADATA):
-    """Index `info.*` for sorting"""
-    if category not in getattr(mongo_db, cname).index_information():
-        logger.info(
-            f"Creating index for collection '{cname}', key(s) '{category}'",
-        )
-        getattr(mongo_db, cname).create_index(
-            name=category,
-            keys=[(f"{category}.{key}", ASCENDING) for key in keys],
-            collation={"locale": MONGO_DB_LOCALE, "numericOrdering": True},
-        )
 
 
 def INPLACE_update_metadata_value_lookup_keys(mongo_db, index, final_key_blacklist=FINAL_INDEX_KEY_BLACKLIST, cname=COLLECTION_NAMES.METADATA):

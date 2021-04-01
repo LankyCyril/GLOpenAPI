@@ -1,5 +1,6 @@
 from threading import Thread
 from genefab3.common.logger import GeneFabLogger
+from genefab3.db.mongo.index import ensure_info_index
 from time import sleep
 from collections import OrderedDict
 from genefab3.db.mongo.types import ValueCheckedRecord
@@ -11,10 +12,11 @@ from genefab3.db.mongo.status import drop_status, update_status
 class CacherThread(Thread):
     """Lives in background and keeps local metadata cache, metadata index, and response cache up to date"""
  
-    def __init__(self, *, adapter, mongo_collections, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter):
+    def __init__(self, *, adapter, mongo_collections, locale, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter):
         """Prepare background thread that iteratively watches for changes to datasets"""
         self.adapter = adapter
-        self.mongo_collections, self.sqlite_dbs = mongo_collections, sqlite_dbs
+        self.mongo_collections, self.locale = mongo_collections, locale
+        self.sqlite_dbs = sqlite_dbs
         self.metadata_update_interval = metadata_update_interval
         self.metadata_retry_delay = metadata_retry_delay
         self.units_formatter = units_formatter
@@ -27,7 +29,7 @@ class CacherThread(Thread):
     def run(self):
         """Continuously run MongoDB and SQLite3 cachers"""
         while True:
-            # ensure_info_index TODO
+            ensure_info_index(self.mongo_collections, self.locale)
             accessions, success = self.recache_metadata()
             if success:
                 # update_metadata_value_lookup TODO
