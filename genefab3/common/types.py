@@ -109,7 +109,7 @@ class Adapter():
 
 
 class Routes():
-    """Base class for registered routes"""
+    """Base class for registered endpoints"""
  
     def register_endpoint(*, endpoint=None, fmt="tsv"):
         """Decorator that adds `endpoint` and `fmt` attributes to class method"""
@@ -127,6 +127,7 @@ class Routes():
         return outer
  
     def items(self):
+        """Iterate over methods of `Routes` object that have `endpoint` attribute"""
         for name in dir(self):
             method = getattr(self, name)
             if isinstance(getattr(method, "endpoint", None), str):

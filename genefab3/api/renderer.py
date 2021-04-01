@@ -40,7 +40,7 @@ class CacheableRenderer():
         """Initialize object renderer and LRU cacher"""
         self.sqlite_dbs = sqlite_dbs
  
-    def dispatch_renderer(self, obj, indent, fmt):
+    def dispatch_renderer(self, obj, indent=None, fmt="raw"):
         """Render `obj` according to its type and passed kwargs"""
         if obj is None:
             raise GeneFabConfigurationException("Route returned no data")
@@ -63,14 +63,13 @@ class CacheableRenderer():
         @wraps(method)
         def wrapper(*args, **kwargs):
             context = Context()
-            # TODO check cache based on context.identity
+            fmt = context.kwargs.get("format", getattr(method, "fmt", "raw"))
             if context.kwargs["debug"] == "1":
                 response = self.dispatch_renderer(context.__dict__, 4, "json")
             else:
-                response = self.dispatch_renderer(
-                    method(*args, **kwargs), None,
-                    context.kwargs.get("format", getattr(method, "fmt", "raw")),
-                )
-            # TODO cache
+                # TODO check cache based on context.identity
+                obj = method(*args, **kwargs)
+                response = self.dispatch_renderer(obj, fmt=fmt)
+                # TODO cache
             return response
         return wrapper
