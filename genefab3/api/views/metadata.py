@@ -1,5 +1,6 @@
 from pymongo import ASCENDING
 from pandas import json_normalize, MultiIndex, isnull
+from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException
 from re import findall
 from genefab3.api.renderers import Placeholders
@@ -8,26 +9,22 @@ from genefab3.common.utils import set_attributes
 
 def get_raw_metadata_dataframe(mongo_collections, *, locale, query, projection, include):
     """Get target metadata as a single-level dataframe, numerically sorted by info fields"""
-    #if False:
-    ## TODO see genefab3/legacy/backend/mongo/readers/metadata.py
-    #    for _ in range(0, METADATA_INDEX_WAIT_DELAY, METADATA_INDEX_WAIT_STEP):
-    #        if "info" in metadata_collection.index_information():
-    #            break
-    #        else:
-    #            sleep(METADATA_INDEX_WAIT_STEP)
-    #    else:
-    #        raise GeneFabDatabaseException(
-    #            "Could not retrieve sorted metadata (no index found)",
-    #        )
-    #sort = [(f, ASCENDING) for f in ["info.accession", "info.assay", *include]]
+    sort = [(f, ASCENDING) for f in ["info.accession", "info.assay", *include]]
     entries = mongo_collections.metadata.find(
-        query, projection, #sort=sort,
-        #collation={"locale": locale, "numericOrdering": True},
+        query, projection, sort=sort,
+        collation={"locale": locale, "numericOrdering": True},
     )
     try:
         return json_normalize(list(entries))
-    except Exception as e:
-        msg = "Could not retrieve sorted metadata"
+    except MongoOperationError as e:
+        has_index = ("info" in mongo_collections.metadata.index_information())
+        index_reason = (
+            "index" in getattr(e, "details", {}).get("errmsg", "").lower()
+        )
+        if index_reason and (not has_index):
+            msg = "Metadata is not indexed yet; this is a temporary error"
+        else:
+            msg = "Could not retrieve sorted metadata"
         raise GeneFabDatabaseException(msg, locale=locale, reason=str(e))
 
 
