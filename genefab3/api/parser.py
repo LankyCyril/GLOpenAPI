@@ -91,6 +91,8 @@ def isa_pair_to_query(category, fields, value, constrain_to=UniversalSet(), dot_
 
 def datatype_pair_to_query(fields=None, value=""):
     query, lookup_keys = {"$or": []}, set()
+    if "|" in value:
+        raise NotImplementedError("Multi-datatype lookup not implemented")
     for expr in value.split("|"):
         query["$or"].append({"files.datatype": expr})
         lookup_keys.add(ElemMatchKey("files", datatype=expr))
