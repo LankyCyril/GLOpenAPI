@@ -156,9 +156,10 @@ def INPLACE_update_context_projection(context, shown):
                     context.projection[_target + "."] = True
                 else:
                     context.projection[_target] = True
-                for potential_child in ordered_shown:
-                    if potential_child.startswith(_target):
-                        ordered_shown[potential_child] = False
+                # TODO: temporarily skipping -- may not need it
+                #for potential_child in ordered_shown:
+                #    if potential_child.startswith(_target):
+                #        ordered_shown[potential_child] = False
             elif isinstance(target, ElemMatchKey):
                 context.projection.update(_target)
 
