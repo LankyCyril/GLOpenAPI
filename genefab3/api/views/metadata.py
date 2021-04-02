@@ -7,6 +7,15 @@ from genefab3.api.renderers import Placeholders
 from genefab3.common.utils import set_attributes
 
 
+def unwind_filename(value):
+    # TODO; also, unwind ALL fields like these
+    if isinstance(value, list):
+        if (len(value) == 1) and isinstance(value[0], dict):
+            if (len(value[0]) == 1) and ("" in value[0]):
+                return value[0][""]
+    return value
+
+
 def get_raw_metadata_dataframe(mongo_collections, *, locale, query, projection, include):
     """Get target metadata as a single-level dataframe, numerically sorted by info fields"""
     sort = [(f, ASCENDING) for f in ["info.accession", "info.assay", *include]]
@@ -63,6 +72,8 @@ def get(mongo_collections, *, locale, context, include=(), modify=keep_projectio
             mongo_collections, locale=locale, query=context.query,
             projection={**full_projection, "_id": False}, include=include,
         )
+        # if "files" in dataframe: # TODO; possible to have meaningful multilevel name?
+        #     dataframe["files"] = dataframe["files"].apply(unwind_filename)
         # modify with injected function:
         dataframe = modify(dataframe, full_projection)
         # remove trailing dots and hide columns that are explicitly hidden:
@@ -75,9 +86,8 @@ def get(mongo_collections, *, locale, context, include=(), modify=keep_projectio
             for fields in map(lambda s: s.split("."), dataframe.columns)
         )
     except TypeError: # no data retrieved; TODO: handle more gracefully
-        return Placeholders.metadata_dataframe(
-            include=include, genefab_type="annotation",
-        )
+        _kw = dict(include=include, genefab_type="annotation")
+        return Placeholders.metadata_dataframe(**_kw)
     else:
         if aggregate: # coerce to boolean "existence" if requested
             info_cols = list(dataframe[["info"]].columns)
