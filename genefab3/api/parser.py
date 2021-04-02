@@ -146,9 +146,8 @@ def INPLACE_update_context_queries(context, rargs):
 def INPLACE_update_context_projection(context, shown):
     """Infer query projection using values in `shown`"""
     ordered_shown = OrderedDict((e, True) for e in sorted(shown))
-    print(ordered_shown)
     for target, usable in ordered_shown.items():
-        if usable:
+        if usable: # TODO this block can be refactored
             _target = target.format()
             if isinstance(target, StringKey):
                 if _target[-1] == ".":
@@ -159,7 +158,7 @@ def INPLACE_update_context_projection(context, shown):
                     if potential_child.startswith(_target):
                         ordered_shown[potential_child] = False
             elif isinstance(target, ElemMatchKey):
-                context.file_projection.update(_target)
+                context.projection.update(_target)
 
 
 def INPLACE_update_context(context, rargs):
@@ -179,8 +178,7 @@ def _memoized_context(request):
         full_path=request.full_path,
         view=sub(url_root, "", base_url).strip("/"),
         complete_kwargs=request.args.to_dict(flat=False),
-        query={"$and": []}, accessions_and_assays={},
-        projection={}, file_projection={}, # TODO: rename `projection`; inject {"_id": False} here for both
+        query={"$and": []}, projection={}, accessions_and_assays={},
     )
     processed = INPLACE_update_context(context, request.args)
     context.kwargs = MultiDict({

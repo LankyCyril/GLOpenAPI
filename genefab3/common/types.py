@@ -34,7 +34,10 @@ class ElemMatchKey(tuple):
     def startswith(self, prefix):
         return self[0].startswith(prefix)
     def format(self):
-        return {self[0]: {"$elemMatch": {self[1]: self[2]}}}
+        return {
+            self[0]: {"$elemMatch": {self[1]: self[2]}},
+            self[0] + "..": True,
+        }
 
 
 class StringKey(str):
