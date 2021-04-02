@@ -1,7 +1,7 @@
 from collections import defaultdict, OrderedDict
 from re import search, sub, escape
 from types import SimpleNamespace
-from genefab3.common.types import UniversalSet
+from genefab3.common.types import UniversalSet, StringKey, ElemMatchKey
 from functools import partial
 from werkzeug.datastructures import MultiDict
 from genefab3.common.exceptions import GeneFabParserException
@@ -29,7 +29,7 @@ DISALLOWED_CONTEXTS = {
         (c.kwargs.get("datatype") != "unnormalized counts"),
     "/file/ only accepts 'format=raw'": lambda c:
         (c.view == "file") and (c.kwargs.get("format") != "raw"),
-    "/file/ requires at most one 'filename=' argument": lambda c:
+    "/file/ requires at most one 'filename=' argument": lambda c: # TODO: guard datatype similarly
         (c.view == "file") and (len(c.kwargs.getlist("filename")) > 1),
     "/file/ requires exactly one dataset in the 'from=' argument": lambda c:
         (c.view == "file") and (len(c.accessions_and_assays) != 1),
@@ -65,9 +65,9 @@ def isa_pair_to_query(category, fields, value, constrain_to=UniversalSet(), dot_
     """Interpret single key-value pair if it gives rise to database query"""
     if fields and (fields[0] in constrain_to):
         if (len(fields) == 2) and (dot_postfix == "auto"):
-            lookup_key = ".".join([category] + fields) + "."
+            lookup_key = StringKey(".".join([category] + fields) + ".")
         else:
-            lookup_key = ".".join([category] + fields)
+            lookup_key = StringKey(".".join([category] + fields))
         if value: # metadata field must equal value or one of values
             yield {lookup_key: {"$in": value.split("|")}}, {lookup_key}, {}
         else: # metadata field or one of metadata fields must exist
@@ -79,9 +79,19 @@ def isa_pair_to_query(category, fields, value, constrain_to=UniversalSet(), dot_
                 postfix = "." if (block_match.group()[-1] == ".") else ""
                 head = lookup_key[:block_match.start()]
                 targets = block_match.group().strip(".").split("|")
-                lookup_keys = {f"{head}.{t}{postfix}" for t in targets}
+                lookup_keys = {
+                    StringKey(f"{head}.{t}{postfix}") for t in targets
+                }
                 query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
                 yield query, lookup_keys, {}
+
+
+def datatype_pair_to_query(fields=None, value=""):
+    query, lookup_keys = {"$or": []}, set()
+    for expr in value.split("|"):
+        query["$or"].append({"files.datatype": expr})
+        lookup_keys.add(ElemMatchKey("files", datatype=expr))
+    yield query, lookup_keys, {}
 
 
 pass_as_kwarg = lambda *a, **k: []
@@ -98,7 +108,7 @@ KEY_PARSERS = {
         isa_pair_to_query, category="assay",
         constrain_to={"factor value", "parameter value", "characteristics"},
     ),
-    "datatype": pass_as_kwarg,
+    "datatype": datatype_pair_to_query,
     "debug": pass_as_kwarg,
     "filename": pass_as_kwarg,
     "format": pass_as_kwarg,
@@ -133,15 +143,20 @@ def INPLACE_update_context_queries(context, rargs):
 def INPLACE_update_context_projection(context, shown):
     """Infer query projection using values in `shown`"""
     ordered_shown = OrderedDict((e, True) for e in sorted(shown))
+    print(ordered_shown)
     for target, usable in ordered_shown.items():
         if usable:
-            if target[-1] == ".":
-                context.projection[target + "."] = True
-            else:
-                context.projection[target] = True
-            for potential_child in ordered_shown:
-                if potential_child.startswith(target):
-                    ordered_shown[potential_child] = False
+            _target = target.format()
+            if isinstance(target, StringKey):
+                if _target[-1] == ".":
+                    context.projection[_target + "."] = True
+                else:
+                    context.projection[_target] = True
+                for potential_child in ordered_shown:
+                    if potential_child.startswith(_target):
+                        ordered_shown[potential_child] = False
+            elif isinstance(target, ElemMatchKey):
+                context.file_projection.update(_target)
 
 
 def INPLACE_update_context(context, rargs):
@@ -161,7 +176,8 @@ def _memoized_context(request):
         full_path=request.full_path,
         view=sub(url_root, "", base_url).strip("/"),
         complete_args=request.args.to_dict(flat=False),
-        accessions_and_assays={}, query={"$and": []}, projection={},
+        query={"$and": []}, accessions_and_assays={},
+        projection={}, file_projection={}, # TODO: rename `projection`; inject {"_id": False} here for both
     )
     processed = INPLACE_update_context(context, request.args)
     context.kwargs = MultiDict({

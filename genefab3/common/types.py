@@ -22,6 +22,29 @@ class UniversalSet(set):
     def __contains__(self, x): return True
 
 
+class ElemMatchKey(tuple):
+    def __new__(cls, key, **kwarg):
+        if len(kwarg) != 1:
+            raise TypeError("ElemMatchKey accepts exactly one keyword argument")
+        else:
+            t = key, *next(iter(kwarg.items()))
+            return super(ElemMatchKey, cls).__new__(cls, t)
+    def __lt__(self, other):
+        return True
+    def startswith(self, prefix):
+        return self[0].startswith(prefix)
+    def format(self):
+        return {self[0]: {"$elemMatch": {self[1]: self[2]}}}
+
+
+class StringKey(str):
+    def __lt__(self, other):
+        if isinstance(other, str):
+            return self < other
+        elif isinstance(other, ElemMatchKey):
+            return True
+
+
 class DatasetBaseClass():
     """Placeholder for identifying classes representing datasets"""
     pass
