@@ -1,6 +1,6 @@
 from genefab3.common.types import Adapter
 from genefab3.common.exceptions import GeneFabFileException, GeneFabISAException
-from genefab3.common.utils import pick_reachable_url
+from genefab3.common.utils import pick_reachable_url, urn
 from genefab3.db.sql.types import CachedBinaryFile
 from genefab3.isa.parser import IsaFromZip
 from genefab3.common.utils import copy_and_drop, iterate_terminal_leaf_elements
@@ -119,7 +119,7 @@ class Sample(dict):
             )
  
     def _INPLACE_extend_with_dataset_files(self):
-        """Populate with Files annotation for files that match records for the sample"""
+        """Populate with File annotation for files that match records for the sample"""
         isa_elements = set(iterate_terminal_leaf_elements(self))
         dataset_files = set(self.dataset.files)
         unconditional_dataset_files = {
@@ -127,10 +127,15 @@ class Sample(dict):
             if fd.get("unconditional") is True
         }
         filenames = (isa_elements & dataset_files) | unconditional_dataset_files
-        self["Files"] = [
-            {"": filename, **self.dataset.files[filename]}
-            for filename in filenames
-        ]
+        self["File"] = {
+            "datatype": {
+                self.dataset.files[filename].get("datatype", urn(filename)): {
+                    "": filename,
+                    **copy_and_drop(self.dataset.files[filename], {"datatype"}),
+                }
+                for filename in filenames
+            }
+        }
  
     def _get_subkey_value(self, entry, key, subkey):
         """Check existence of `key.subkey` in entry and return its value"""

@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from requests import head as request_head
 from urllib.request import urlopen
 from urllib.error import URLError
+from uuid import uuid3, uuid4
 from os import path
 from re import sub, escape, split
 from copy import deepcopy
@@ -34,6 +35,11 @@ def pick_reachable_url(urls, desc=None):
     yield _pick()
 
 
+def urn(s):
+    """Generate uuid3 URN for `s`"""
+    return uuid3(uuid4(), s).urn
+
+
 def walk_up(from_path, n_steps):
     """Get path of directory `n_steps` above `from_path`"""
     if n_steps >= 1:
@@ -55,7 +61,8 @@ def copy_and_drop(d, keys):
     """Deepcopy dictionary `d`, delete `d[key] for key in keys`"""
     d_copy = deepcopy(d)
     for key in keys:
-        del d_copy[key]
+        if key in d_copy:
+            del d_copy[key]
     return d_copy
 
 
