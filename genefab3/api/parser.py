@@ -23,14 +23,14 @@ DISALLOWED_CONTEXTS = {
     "'format=gct' is only valid for /data/": lambda c:
         (c.view != "data") and (c.kwargs.get("format") == "gct"),
     "'filename=' can only be specified once": lambda c:
-        (len(c.complete_args.get("filename", [])) > 1),
+        (len(c.complete_kwargs.get("filename", [])) > 1),
     "'datatype=' can only be specified once": lambda c:
-        (len(c.complete_args.get("datatype", [])) > 1),
+        (len(c.complete_kwargs.get("datatype", [])) > 1),
     "/data/ requires a 'datatype=' argument": lambda c:
-        (c.view == "data") and ("datatype" not in c.complete_args),
+        (c.view == "data") and ("datatype" not in c.complete_kwargs),
     "'format=gct' is not valid for the requested datatype": lambda c:
         (c.kwargs.get("format") == "gct") and
-        (c.complete_args.get("datatype", []) != "unnormalized counts"),
+        (c.complete_kwargs.get("datatype", []) != "unnormalized counts"),
     "/file/ only accepts 'format=raw'": lambda c:
         (c.view == "file") and (c.kwargs.get("format") != "raw"),
     # TODO: the following ones may not be needed with the new logic:
@@ -178,7 +178,7 @@ def _memoized_context(request):
     context = SimpleNamespace(
         full_path=request.full_path,
         view=sub(url_root, "", base_url).strip("/"),
-        complete_args=request.args.to_dict(flat=False),
+        complete_kwargs=request.args.to_dict(flat=False),
         query={"$and": []}, accessions_and_assays={},
         projection={}, file_projection={}, # TODO: rename `projection`; inject {"_id": False} here for both
     )
@@ -187,9 +187,9 @@ def _memoized_context(request):
         k: v for k, v in request.args.lists() if k not in processed
     })
     context.kwargs["debug"] = context.kwargs.get("debug", "0")
-    context.identity = quote(
-        "/" + context.view + "?" + dumps(context.complete_args, sort_keys=True)
-    )
+    context.identity = quote("?".join([
+        context.view, dumps(context.complete_kwargs, sort_keys=True),
+    ]))
     for description, scenario in DISALLOWED_CONTEXTS.items():
         if scenario(context):
             raise GeneFabParserException(description)
