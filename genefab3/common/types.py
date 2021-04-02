@@ -43,7 +43,7 @@ class ElemMatchKey(tuple):
 class StringKey(str):
     def __lt__(self, other):
         if isinstance(other, str):
-            return self < other
+            return super().__lt__(other)
         elif isinstance(other, ElemMatchKey):
             return True
 
