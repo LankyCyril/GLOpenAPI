@@ -33,7 +33,7 @@ class ElemMatchKey(tuple):
         return True
     def startswith(self, prefix):
         return self[0].startswith(prefix)
-    def format(self):
+    def projection(self):
         return {
             self[0]: {"$elemMatch": {self[1]: self[2]}},
             self[0] + "..": True,
@@ -46,6 +46,11 @@ class StringKey(str):
             return super().__lt__(other)
         elif isinstance(other, ElemMatchKey):
             return True
+    def projection(self):
+        if self[-1] == ".":
+            return f"{self}."
+        else:
+            return self
 
 
 class DatasetBaseClass():

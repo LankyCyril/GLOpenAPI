@@ -1,4 +1,4 @@
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 from re import search, sub, escape
 from types import SimpleNamespace
 from genefab3.common.types import UniversalSet, StringKey, ElemMatchKey
@@ -61,7 +61,7 @@ def assay_pair_to_query(fields=None, value=""):
             subquery = {"info.accession": accession, "info.assay": assay_name}
             query["$or"].append(subquery)
             accessions_and_assays[accession].add(assay_name)
-    yield query, None, accessions_and_assays
+    yield query, (), accessions_and_assays
 
 
 def isa_pair_to_query(category, fields, value, constrain_to=UniversalSet(), dot_postfix="auto"):
@@ -89,16 +89,6 @@ def isa_pair_to_query(category, fields, value, constrain_to=UniversalSet(), dot_
                 yield query, lookup_keys, {}
 
 
-def datatype_pair_to_query(fields=None, value=""):
-    query, lookup_keys = {"$or": []}, set()
-    if "|" in value:
-        raise NotImplementedError("Multi-datatype lookup not implemented")
-    for expr in value.split("|"):
-        query["$or"].append({"files.datatype": expr})
-        lookup_keys.add(ElemMatchKey("files", datatype=expr))
-    yield query, lookup_keys, {}
-
-
 pass_as_kwarg = lambda *a, **k: []
 KEY_PARSERS = {
     "from": assay_pair_to_query,
@@ -113,16 +103,15 @@ KEY_PARSERS = {
         isa_pair_to_query, category="assay",
         constrain_to={"factor value", "parameter value", "characteristics"},
     ),
-    "datatype": datatype_pair_to_query,
+    "datatype": pass_as_kwarg,
     "debug": pass_as_kwarg,
     "filename": pass_as_kwarg,
     "format": pass_as_kwarg,
 }
 
 
-def INPLACE_update_context_queries(context, rargs):
+def INPLACE_update_context(context, rargs):
     """Interpret all key-value pairs that give rise to database queries"""
-    shown, processed = set(), set()
     for key in rargs:
         def query_iterator():
             if "$" not in key:
@@ -137,38 +126,14 @@ def INPLACE_update_context_queries(context, rargs):
                     raise GeneFabParserException(msg, **{key: rargs[key]})
         for query, lookup_keys, accessions_and_assays in query_iterator():
             context.query["$and"].append(query)
-            if lookup_keys:
-                shown.update(lookup_keys)
+            for lookup_key in lookup_keys:
+                if isinstance(lookup_key, StringKey):
+                    context.projection[lookup_key.projection()] = True
+                elif isinstance(lookup_key, ElemMatchKey):
+                    pass # TODO
             for accession, assay_names in accessions_and_assays.items():
                 context.accessions_and_assays[accession] = sorted(assay_names)
-            processed.add(key)
-    return shown, processed
-
-
-def INPLACE_update_context_projection(context, shown):
-    """Infer query projection using values in `shown`"""
-    ordered_shown = OrderedDict((e, True) for e in sorted(shown))
-    for target, usable in ordered_shown.items():
-        if usable: # TODO this block can be refactored
-            _target = target.format()
-            if isinstance(target, StringKey):
-                if _target[-1] == ".":
-                    context.projection[_target + "."] = True
-                else:
-                    context.projection[_target] = True
-                # TODO: temporarily skipping -- may not need it
-                #for potential_child in ordered_shown:
-                #    if potential_child.startswith(_target):
-                #        ordered_shown[potential_child] = False
-            elif isinstance(target, ElemMatchKey):
-                context.projection.update(_target)
-
-
-def INPLACE_update_context(context, rargs):
-    """Update context using data in request arguments"""
-    shown, processed = INPLACE_update_context_queries(context, MultiDict(rargs))
-    INPLACE_update_context_projection(context, shown)
-    return processed
+            yield key
 
 
 Context = lambda: _memoized_context(request)
@@ -183,9 +148,9 @@ def _memoized_context(request):
         complete_kwargs=request.args.to_dict(flat=False),
         query={"$and": []}, projection={}, accessions_and_assays={},
     )
-    processed = INPLACE_update_context(context, request.args)
+    processed_keys = set(INPLACE_update_context(context, request.args))
     context.kwargs = MultiDict({
-        k: v for k, v in request.args.lists() if k not in processed
+        k: v for k, v in request.args.lists() if k not in processed_keys
     })
     context.kwargs["debug"] = context.kwargs.get("debug", "0")
     context.identity = quote("?".join([
