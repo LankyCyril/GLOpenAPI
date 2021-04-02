@@ -22,27 +22,30 @@ DISALLOWED_CONTEXTS = {
         (c.view != "samples") and (c.kwargs.get("format") == "cls"),
     "'format=gct' is only valid for /data/": lambda c:
         (c.view != "data") and (c.kwargs.get("format") == "gct"),
+    "'filename=' can only be specified once": lambda c:
+        (len(c.complete_args.get("filename", [])) > 1),
+    "'datatype=' can only be specified once": lambda c:
+        (len(c.complete_args.get("datatype", [])) > 1),
     "/data/ requires a 'datatype=' argument": lambda c:
-        (c.view == "data") and ("datatype" not in c.kwargs),
+        (c.view == "data") and ("datatype" not in c.complete_args),
     "'format=gct' is not valid for the requested datatype": lambda c:
         (c.kwargs.get("format") == "gct") and
-        (c.kwargs.get("datatype") != "unnormalized counts"),
+        (c.complete_args.get("datatype", []) != "unnormalized counts"),
     "/file/ only accepts 'format=raw'": lambda c:
         (c.view == "file") and (c.kwargs.get("format") != "raw"),
-    "/file/ requires at most one 'filename=' argument": lambda c: # TODO: guard datatype similarly
-        (c.view == "file") and (len(c.kwargs.getlist("filename")) > 1),
-    "/file/ requires exactly one dataset in the 'from=' argument": lambda c:
-        (c.view == "file") and (len(c.accessions_and_assays) != 1),
-    "/file/ requires at most one assay in the 'from=' argument": lambda c:
-        (c.view == "file") and (leaf_count(c.accessions_and_assays) > 1),
-    "/file/ metadata categories are only valid for lookups in assays": lambda c:
-        (c.view == "file") and
-        (len(c.projection) > 0) and # projection present
-        (leaf_count(c.accessions_and_assays) == 0), # but no assays specified
-    "/file/ accepts at most one metadata category for lookups in assays": lambda c:
-        (c.view == "file") and
-        (leaf_count(c.accessions_and_assays) == 1) and # no. of assays == 1
-        (len(c.projection) > 1), # more than one field to look in
+    # TODO: the following ones may not be needed with the new logic:
+        "/file/ requires exactly one dataset in the 'from=' argument": lambda c:
+            (c.view == "file") and (len(c.accessions_and_assays) != 1),
+        "/file/ requires at most one assay in the 'from=' argument": lambda c:
+            (c.view == "file") and (leaf_count(c.accessions_and_assays) > 1),
+        "/file/ metadata categories are only valid for lookups in assays": lambda c:
+            (c.view == "file") and
+            (len(c.projection) > 0) and # projection present
+            (leaf_count(c.accessions_and_assays) == 0), # but no assays specified
+        "/file/ accepts at most one metadata category for lookups in assays": lambda c:
+            (c.view == "file") and
+            (leaf_count(c.accessions_and_assays) == 1) and # no. of assays == 1
+            (len(c.projection) > 1), # more than one field to look in
 }
 
 
