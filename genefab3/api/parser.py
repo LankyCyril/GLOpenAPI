@@ -59,19 +59,6 @@ DISALLOWED_CONTEXTS = {
         (c.complete_kwargs.get("file.datatype", []) != ["unnormalized counts"]),
     "/file/ only accepts 'format=raw'": lambda c:
         (c.view == "file") and (c.kwargs.get("format") != "raw"),
-    # TODO: the following ones may not be needed with the new logic:
-        "/file/ requires exactly one dataset in the 'from=' argument": lambda c:
-            (c.view == "file") and (len(c.accessions_and_assays) != 1),
-        "/file/ requires at most one assay in the 'from=' argument": lambda c:
-            (c.view == "file") and (leaf_count(c.accessions_and_assays) > 1),
-        "/file/ metadata categories are only valid for lookups in assays": lambda c:
-            (c.view == "file") and
-            (len(c.projection) > 0) and # projection present
-            (leaf_count(c.accessions_and_assays) == 0), # but no assays specified
-        "/file/ accepts at most one metadata category for lookups in assays": lambda c:
-            (c.view == "file") and
-            (leaf_count(c.accessions_and_assays) == 1) and # no. of assays == 1
-            (len(c.projection) > 1), # more than one field to look in
 }
 
 
