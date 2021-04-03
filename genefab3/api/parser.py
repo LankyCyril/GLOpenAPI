@@ -1,7 +1,7 @@
 from collections import defaultdict
 from re import search, sub, escape
 from types import SimpleNamespace
-from genefab3.common.types import UniversalSet, StringKey, ElemMatchKey
+from genefab3.common.types import UniversalSet
 from functools import partial
 from genefab3.common.utils import sanitized
 from werkzeug.datastructures import MultiDict
@@ -70,25 +70,25 @@ def generic_keyvalue_to_query(category, fields, value, constrain_to=UniversalSet
     """Interpret single key-value pair if it gives rise to database query"""
     if fields and (fields[0] in constrain_to):
         if (len(fields) == 2) and (dot_postfix == "auto"):
-            lookup_key = StringKey(".".join([category] + fields) + ".")
+            lookup_key = ".".join([category] + fields) + "."
+            projection_key = lookup_key + "."
         else:
-            lookup_key = StringKey(".".join([category] + fields))
+            projection_key = lookup_key = ".".join([category] + fields)
         if value: # metadata field must equal value or one of values
-            yield {lookup_key: {"$in": value.split("|")}}, {lookup_key}, {}
+            yield {lookup_key: {"$in": value.split("|")}}, {projection_key}, {}
         else: # metadata field or one of metadata fields must exist
-            block_match = search(r'\.[^\.]+\.?$', lookup_key)
+            block_match = search(r'\.[^\.]+\.*$', lookup_key)
             if (not block_match) or (block_match.group().count("|") == 0):
                 # single field must exist (no OR condition):
-                yield {lookup_key: {"$exists": True}}, {lookup_key}, {}
+                yield {lookup_key: {"$exists": True}}, {projection_key}, {}
             else: # either of the fields must exist (OR condition)
-                postfix = "." if (block_match.group()[-1] == ".") else ""
+                pstfx = "." if (block_match.group()[-1] == ".") else ""
                 head = lookup_key[:block_match.start()]
                 targets = block_match.group().strip(".").split("|")
-                lookup_keys = {
-                    StringKey(f"{head}.{t}{postfix}") for t in targets
-                }
+                lookup_keys = {f"{head}.{t}{pstfx}" for t in targets}
+                projection_keys = {f"{head}.{t}{pstfx}{pstfx}" for t in targets}
                 query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
-                yield query, lookup_keys, {}
+                yield query, projection_keys, {}
     else:
         msg = "Unrecognized argument"
         raise GeneFabParserException(msg, arg=".".join([category, *fields]))
@@ -104,7 +104,7 @@ SPECIAL_ARGUMENT_PARSERS = {
 KEYVALUE_PARSERS = {
     "from": assay_keyvalue_to_query,
     "investigation": partial(
-        generic_keyvalue_to_query, category="investigation", dot_postfix=False,
+        generic_keyvalue_to_query, category="investigation", dot_postfix=None,
     ),
     "study": partial(
         generic_keyvalue_to_query, category="study",
@@ -141,13 +141,9 @@ def INPLACE_update_context(context, rargs):
                     # assay.characteristics.age=5
                     # from=GLDS-1.assay
                     yield from parser(fields=fields, value=value)
-        for query, lookup_keys, accessions_and_assays in query_iterator():
+        for query, projection_keys, accessions_and_assays in query_iterator():
             context.query["$and"].append(query)
-            for lookup_key in lookup_keys:
-                if isinstance(lookup_key, StringKey):
-                    context.projection[lookup_key.projection()] = True
-                elif isinstance(lookup_key, ElemMatchKey):
-                    pass # TODO
+            context.projection.update({k: True for k in projection_keys})
             for accession, assay_names in accessions_and_assays.items():
                 context.accessions_and_assays[accession] = sorted(assay_names)
             yield arg
