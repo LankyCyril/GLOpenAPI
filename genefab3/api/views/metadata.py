@@ -7,15 +7,6 @@ from genefab3.api.renderers import Placeholders
 from genefab3.common.utils import set_attributes
 
 
-def unwind_filename(value):
-    # TODO; also, unwind ALL fields like these
-    if isinstance(value, list):
-        if (len(value) == 1) and isinstance(value[0], dict):
-            if (len(value[0]) == 1) and ("" in value[0]):
-                return value[0][""]
-    return value
-
-
 def get_raw_metadata_dataframe(mongo_collections, *, locale, query, projection, include):
     """Get target metadata as a single-level dataframe, numerically sorted by info fields"""
     sort = [(f, ASCENDING) for f in ["info.accession", "info.assay", *include]]
@@ -37,17 +28,17 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, query, projection, 
         raise GeneFabDatabaseException(msg, locale=locale, reason=str(e))
 
 
-def keep_projection(dataframe, full_projection):
-    """Drop qualifier fields from single-level dataframe, unless explicitly requested"""
-    return dataframe.drop(columns={
-        c for c in dataframe.columns
+def INPLACE_drop_non_projected_columns(dataframe, full_projection):
+    """Drop qualifier fields from single-level dataframe, unless explicitly requested in projection"""
+    dataframe.drop(inplace=True, columns={
+        c for c in list(dataframe.columns)
         if (len(findall(r'\..', c)) >= 3) and (c not in full_projection)
     })
 
 
-def isa_sort_dataframe(dataframe):
-    """Sort single-level dataframe in order info-investigation-study-assay"""
-    prefix_order = ["info", "investigation", "study", "assay", "other"]
+def iisaf_sort_dataframe(dataframe):
+    """Sort single-level dataframe in order info-investigation-study-assay-file"""
+    prefix_order = ["info", "investigation", "study", "assay", "file", "other"]
     column_order = {prefix: set() for prefix in prefix_order}
     for column in dataframe.columns:
         for prefix in column_order:
@@ -61,7 +52,7 @@ def isa_sort_dataframe(dataframe):
     ]
 
 
-def get(mongo_collections, *, locale, context, include=(), modify=keep_projection, aggregate=False):
+def get(mongo_collections, *, locale, context, include=(), aggregate=False):
     """Select assays/samples based on annotation filters"""
     full_projection = {
         "info.accession": True, "info.assay": True,
@@ -72,14 +63,12 @@ def get(mongo_collections, *, locale, context, include=(), modify=keep_projectio
             mongo_collections, locale=locale, query=context.query,
             projection={**full_projection, "_id": False}, include=include,
         )
-        # if "files" in dataframe: # TODO; possible to have meaningful multilevel name?
-        #     dataframe["files"] = dataframe["files"].apply(unwind_filename)
-        # modify with injected function:
-        dataframe = modify(dataframe, full_projection)
+        # drop trailing qualifier fields not requested in projection:
+        INPLACE_drop_non_projected_columns(dataframe, full_projection)
         # remove trailing dots and hide columns that are explicitly hidden:
         dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
         # sort (ISA-aware) and convert to two-level dataframe:
-        dataframe = isa_sort_dataframe(dataframe)
+        dataframe = iisaf_sort_dataframe(dataframe)
         dataframe.columns = MultiIndex.from_tuples(
             (fields[0], ".".join(fields[1:])) if fields[0] == "info"
             else (".".join(fields[:2]), ".".join(fields[2:]))
