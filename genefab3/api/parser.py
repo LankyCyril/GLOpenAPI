@@ -52,7 +52,7 @@ def assay_keyvalue_to_query(fields=None, value=""):
     """Interpret single key-value pair for dataset / assay constraint"""
     if (fields) or (not value):
         msg = "Unrecognized argument"
-        raise GeneFabParserException(msg, key=f"from.{fields[0]}")
+        raise GeneFabParserException(msg, arg=f"from.{fields[0]}")
     else:
         query, accessions_and_assays = {"$or": []}, defaultdict(set)
     for expr in value.split("|"):
@@ -90,8 +90,18 @@ def generic_keyvalue_to_query(category, fields, value, constrain_to=UniversalSet
                 }
                 query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
                 yield query, lookup_keys, {}
+    else:
+        msg = "Unrecognized argument"
+        raise GeneFabParserException(msg, arg=".".join([category, *fields]))
 
 
+fail = lambda *a, **k: [5/0]
+pass_as_kwarg = lambda *a, **k: []
+SPECIAL_ARGUMENT_PARSERS = {
+    "file.filename": fail,
+    "debug": pass_as_kwarg,
+    "format": pass_as_kwarg,
+}
 KEYVALUE_PARSERS = {
     "from": assay_keyvalue_to_query,
     "investigation": partial(
@@ -106,17 +116,8 @@ KEYVALUE_PARSERS = {
         constrain_to={"factor value", "parameter value", "characteristics"},
     ),
     "file": partial(
-        generic_keyvalue_to_query, category="file",
-        constrain_to={"datatype"},
+        generic_keyvalue_to_query, category="file", constrain_to={"datatype"},
     ),
-}
-
-fail = lambda *a, **k: [5/0]
-pass_as_kwarg = lambda *a, **k: []
-SPECIAL_ARGUMENT_PARSERS = {
-    "file.filename": fail,
-    "debug": pass_as_kwarg,
-    "format": pass_as_kwarg,
 }
 
 
