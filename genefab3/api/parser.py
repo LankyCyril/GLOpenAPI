@@ -24,11 +24,14 @@ DISALLOWED_CONTEXTS = {
         (c.view != "data") and (c.kwargs.get("format") == "gct"),
     "'file.filename=' can only be specified once": lambda c:
         (len(c.complete_kwargs.get("file.filename", [])) > 1),
+    "only one of 'file.filename=', 'file.datatype=' can be specified": lambda c:
+        (len(c.complete_kwargs.get("file.filename", [])) > 1) and
+        (len(c.complete_kwargs.get("file.datatype", [])) > 1),
     "/data/ requires a 'file.datatype=' argument": lambda c:
         (c.view == "data") and ("file.datatype" not in c.complete_kwargs),
     "'format=gct' is not valid for the requested datatype": lambda c:
         (c.kwargs.get("format") == "gct") and
-        ("unnormalized counts" not in c.complete_kwargs.get("file.datatype", [])),
+        (c.complete_kwargs.get("file.datatype", []) != ["unnormalized counts"]),
     "/file/ only accepts 'format=raw'": lambda c:
         (c.view == "file") and (c.kwargs.get("format") != "raw"),
     # TODO: the following ones may not be needed with the new logic:
