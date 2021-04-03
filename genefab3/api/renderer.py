@@ -68,7 +68,7 @@ class CacheableRenderer():
                 response = self.dispatch_renderer(context.__dict__, 4, "json")
             else:
                 # TODO check cache based on context.identity
-                obj = method(*args, **kwargs)
+                obj = method(*args, context=context, **kwargs)
                 response = self.dispatch_renderer(obj, fmt=fmt)
                 # TODO cache
             return response

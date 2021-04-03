@@ -6,7 +6,6 @@ from functools import partial
 from genefab3.common.utils import sanitized
 from werkzeug.datastructures import MultiDict
 from genefab3.common.exceptions import GeneFabParserException
-from functools import lru_cache
 from flask import request
 from urllib.request import quote
 from json import dumps
@@ -154,10 +153,8 @@ def INPLACE_update_context(context, rargs):
             yield arg
 
 
-Context = lambda: _memoized_context(request)
-Context.__doc__ = """Parse and memoize request components"""
-@lru_cache(maxsize=None)
-def _memoized_context(request):
+def Context():
+    """Parse request components"""
     url_root = escape(request.url_root.strip("/"))
     base_url = request.base_url.strip("/")
     context = SimpleNamespace(
