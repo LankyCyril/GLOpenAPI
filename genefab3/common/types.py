@@ -1,4 +1,3 @@
-from types import SimpleNamespace
 from werkzeug.datastructures import ImmutableDict
 from numpy import nan
 from collections.abc import Hashable
@@ -20,12 +19,6 @@ class UniversalSet(set):
     def __ior__(self, x): return self
     def __ror__(self, x): return self
     def __contains__(self, x): return True
-
-
-class IterableNamespace(SimpleNamespace):
-    """SimpleNamespace that iterates its values (can be used for tests with all(), any(), etc)"""
-    def __iter__(self):
-        yield from self.__dict__.values()
 
 
 def ImmutableTree(d, step_tracker=1, max_steps=256):
