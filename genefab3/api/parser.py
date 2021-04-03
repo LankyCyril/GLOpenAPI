@@ -23,8 +23,8 @@ DISALLOWED_CONTEXTS = {
         (c.view != "samples") and (c.kwargs.get("format") == "cls"),
     "'format=gct' is only valid for /data/": lambda c:
         (c.view != "data") and (c.kwargs.get("format") == "gct"),
-    "'filename=' can only be specified once": lambda c:
-        (len(c.complete_kwargs.get("filename", [])) > 1),
+    "'file.filename=' can only be specified once": lambda c:
+        (len(c.complete_kwargs.get("file.filename", [])) > 1),
     "/data/ requires a 'file.datatype=' argument": lambda c:
         (c.view == "data") and ("file.datatype" not in c.complete_kwargs),
     "'format=gct' is not valid for the requested datatype": lambda c:
@@ -92,8 +92,7 @@ def generic_keyvalue_to_query(category, fields, value, constrain_to=UniversalSet
                 yield query, lookup_keys, {}
 
 
-pass_as_kwarg = lambda *a, **k: []
-KEY_PARSERS = {
+KEYVALUE_PARSERS = {
     "from": assay_keyvalue_to_query,
     "investigation": partial(
         generic_keyvalue_to_query, category="investigation", dot_postfix=False,
@@ -108,33 +107,40 @@ KEY_PARSERS = {
     ),
     "file": partial(
         generic_keyvalue_to_query, category="file",
-        constrain_to={"datatype", "filename"},
+        constrain_to={"datatype"},
     ),
+}
+
+fail = lambda *a, **k: [5/0]
+pass_as_kwarg = lambda *a, **k: []
+SPECIAL_ARGUMENT_PARSERS = {
+    "file.filename": fail,
     "debug": pass_as_kwarg,
-    "filename": pass_as_kwarg,
     "format": pass_as_kwarg,
 }
 
 
 def INPLACE_update_context(context, rargs):
     """Interpret all key-value pairs that give rise to database queries"""
-    for key in sanitized(rargs):
+    for arg in sanitized(rargs):
         def query_iterator():
-            category, *fields = key.split(".")
-            if category in KEY_PARSERS:
-                parser = KEY_PARSERS[category]
-                for value in sanitized(rargs.getlist(key)):
-                    if (value) and (len(fields) == 1):
-                        # assay.characteristics=age -> assay.characteristics.age
-                        yield from parser(fields=[*fields, value], value="")
-                    else:
-                        # assay.characteristics.age
-                        # assay.characteristics.age=5
-                        # from=GLDS-1.assay
-                        yield from parser(fields=fields, value=value)
+            category, *fields = arg.split(".")
+            if arg in SPECIAL_ARGUMENT_PARSERS:
+                parser = SPECIAL_ARGUMENT_PARSERS[arg]
+            elif category in KEYVALUE_PARSERS:
+                parser = KEYVALUE_PARSERS[category]
             else:
                 msg = "Unrecognized argument"
-                raise GeneFabParserException(msg, **{key: rargs[key]})
+                raise GeneFabParserException(msg, **{arg: rargs[arg]})
+            for value in sanitized(rargs.getlist(arg)):
+                if (value) and (len(fields) == 1):
+                    # assay.characteristics=age -> assay.characteristics.age
+                    yield from parser(fields=[*fields, value], value="")
+                else:
+                    # assay.characteristics.age
+                    # assay.characteristics.age=5
+                    # from=GLDS-1.assay
+                    yield from parser(fields=fields, value=value)
         for query, lookup_keys, accessions_and_assays in query_iterator():
             context.query["$and"].append(query)
             for lookup_key in lookup_keys:
@@ -144,7 +150,7 @@ def INPLACE_update_context(context, rargs):
                     pass # TODO
             for accession, assay_names in accessions_and_assays.items():
                 context.accessions_and_assays[accession] = sorted(assay_names)
-            yield key
+            yield arg
 
 
 Context = lambda: _memoized_context(request)
@@ -159,9 +165,9 @@ def _memoized_context(request):
         complete_kwargs=request.args.to_dict(flat=False),
         query={"$and": []}, projection={}, accessions_and_assays={},
     )
-    processed_keys = set(INPLACE_update_context(context, request.args))
+    processed_args = set(INPLACE_update_context(context, request.args))
     context.kwargs = MultiDict({
-        k: v for k, v in request.args.lists() if k not in processed_keys
+        k: v for k, v in request.args.lists() if k not in processed_args
     })
     context.kwargs["debug"] = context.kwargs.get("debug", "0")
     context.identity = quote("?".join([
