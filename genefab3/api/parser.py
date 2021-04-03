@@ -1,10 +1,10 @@
+from functools import lru_cache, partial
 from genefab3.common.utils import leaf_count, as_is, empty_iterator
 from genefab3.common.exceptions import GeneFabConfigurationException
 from collections import defaultdict
 from re import search, sub, escape
 from types import SimpleNamespace
 from genefab3.common.types import UniversalSet
-from functools import partial
 from genefab3.db.mongo.utils import is_safe_token
 from werkzeug.datastructures import MultiDict
 from genefab3.common.exceptions import GeneFabParserException
@@ -12,6 +12,30 @@ from flask import request
 from urllib.request import quote
 from json import dumps
 
+
+SPECIAL_ARGUMENT_PARSER_DISPATCHER = lru_cache(1)(lambda: {
+    "file.filename": KeyValueParsers.kvp_filename,
+    "debug": empty_iterator, # pass as kwarg
+    "format": empty_iterator, # pass as kwarg
+})
+
+KEYVALUE_PARSER_DISPATCHER = lru_cache(1)(lambda: {
+    "from": KeyValueParsers.kvp_assay,
+    "investigation": partial(
+        KeyValueParsers.kvp_generic, category="investigation", dot_postfix=None,
+    ),
+    "study": partial(
+        KeyValueParsers.kvp_generic, category="study",
+        constrain_to={"factor value", "parameter value", "characteristics"},
+    ),
+    "assay": partial(
+        KeyValueParsers.kvp_generic, category="assay",
+        constrain_to={"factor value", "parameter value", "characteristics"},
+    ),
+    "file": partial(
+        KeyValueParsers.kvp_generic, category="file", constrain_to={"datatype"},
+    ),
+})
 
 DISALLOWED_CONTEXTS = {
     "at least one dataset or annotation category must be specified": lambda c:
@@ -71,89 +95,65 @@ def INPLACE_unwind_target_filenames(dataframe, filename):
     dataframe.drop(columns=[("file.filename", "")], inplace=True)
 
 
-def filename_keyvalue_to_query(fields=None, value=""):
-    """Interpret single key-value pair for filename constraint"""
-    if (len(fields) != 2) or (fields[0] != "filename") or value:
-        msg = "Unrecognized argument"
-        raise GeneFabParserException(msg, **{f"file.{fields[0]}": value})
-    else:
-        name = fields[1]
-        query = {"file.filename": {"$elemMatch": {"": name}}}
-        projection_keys = {"file.filename.."}
-        postproc_fn = partial(INPLACE_unwind_target_filenames, filename=name)
-    yield query, projection_keys, {}, postproc_fn
-
-
-def assay_keyvalue_to_query(fields=None, value=""):
-    """Interpret single key-value pair for dataset / assay constraint"""
-    if (fields) or (not value):
-        msg = "Unrecognized argument"
-        raise GeneFabParserException(msg, arg=f"from.{fields[0]}")
-    else:
-        query, accessions_and_assays = {"$or": []}, defaultdict(set)
-    for expr in value.split("|"):
-        if expr.count(".") == 0:
-            query["$or"].append({"info.accession": expr})
-            accessions_and_assays[expr] = set()
+class KeyValueParsers():
+ 
+    def kvp_filename(fields=None, value=""):
+        """Interpret single key-value pair for filename constraint"""
+        if (len(fields) != 2) or (fields[0] != "filename") or value:
+            msg = "Unrecognized argument"
+            raise GeneFabParserException(msg, **{f"file.{fields[0]}": value})
         else:
-            accession, assay_name = expr.split(".", 1)
-            subquery = {"info.accession": accession, "info.assay": assay_name}
-            query["$or"].append(subquery)
-            accessions_and_assays[accession].add(assay_name)
-    yield query, (), accessions_and_assays, as_is
-
-
-def generic_keyvalue_to_query(category, fields, value, constrain_to=UniversalSet(), dot_postfix="auto"):
-    """Interpret single key-value pair if it gives rise to database query"""
-    if (not fields) or (fields[0] not in constrain_to):
-        msg = "Unrecognized argument"
-        raise GeneFabParserException(msg, arg=".".join([category, *fields]))
-    elif (len(fields) == 2) and (dot_postfix == "auto"):
-        lookup_key = ".".join([category] + fields) + "."
-        projection_key = lookup_key + "."
-    else:
-        projection_key = lookup_key = ".".join([category] + fields)
-    if value: # metadata field must equal value or one of values
-        query = {lookup_key: {"$in": value.split("|")}}
-        projection_keys = {projection_key}
-    else: # metadata field or one of metadata fields must exist
-        block_match = search(r'\.[^\.]+\.*$', lookup_key)
-        if (not block_match) or (block_match.group().count("|") == 0):
-            # single field must exist (no OR condition):
-            query = {lookup_key: {"$exists": True}}
+            filename = fields[1]
+            query = {"file.filename": {"$elemMatch": {"": filename}}}
+            projection_keys = {"file.filename.."}
+            pp_fn = partial(INPLACE_unwind_target_filenames, filename=filename)
+        yield query, projection_keys, {}, pp_fn
+ 
+    def kvp_assay(fields=None, value=""):
+        """Interpret single key-value pair for dataset / assay constraint"""
+        if (fields) or (not value):
+            msg = "Unrecognized argument"
+            raise GeneFabParserException(msg, arg=f"from.{fields[0]}")
+        else:
+            query, accessions_and_assays = {"$or": []}, defaultdict(set)
+        for expr in value.split("|"):
+            if expr.count(".") == 0:
+                query["$or"].append({"info.accession": expr})
+                accessions_and_assays[expr] = set()
+            else:
+                accession, assay_name = expr.split(".", 1)
+                subqry = {"info.accession": accession, "info.assay": assay_name}
+                query["$or"].append(subqry)
+                accessions_and_assays[accession].add(assay_name)
+        yield query, (), accessions_and_assays, as_is
+ 
+    def kvp_generic(category, fields, value, constrain_to=UniversalSet(), dot_postfix="auto"):
+        """Interpret single key-value pair if it gives rise to database query"""
+        if (not fields) or (fields[0] not in constrain_to):
+            msg = "Unrecognized argument"
+            raise GeneFabParserException(msg, arg=".".join([category, *fields]))
+        elif (len(fields) == 2) and (dot_postfix == "auto"):
+            lookup_key = ".".join([category] + fields) + "."
+            projection_key = lookup_key + "."
+        else:
+            projection_key = lookup_key = ".".join([category] + fields)
+        if value: # metadata field must equal value or one of values
+            query = {lookup_key: {"$in": value.split("|")}}
             projection_keys = {projection_key}
-        else: # either of the fields must exist (OR condition)
-            postfix = "." if (block_match.group()[-1] == ".") else ""
-            head = lookup_key[:block_match.start()]
-            targets = block_match.group().strip(".").split("|")
-            lookup_keys = {f"{head}.{t}{postfix}" for t in targets}
-            query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
-            projection_keys = {f"{head}.{t}{postfix}{postfix}" for t in targets}
-    yield query, projection_keys, {}, as_is
-
-
-SPECIAL_ARGUMENT_PARSERS = {
-    "file.filename": filename_keyvalue_to_query,
-    "debug": empty_iterator, # pass as kwarg
-    "format": empty_iterator, # pass as kwarg
-}
-KEYVALUE_PARSERS = {
-    "from": assay_keyvalue_to_query,
-    "investigation": partial(
-        generic_keyvalue_to_query, category="investigation", dot_postfix=None,
-    ),
-    "study": partial(
-        generic_keyvalue_to_query, category="study",
-        constrain_to={"factor value", "parameter value", "characteristics"},
-    ),
-    "assay": partial(
-        generic_keyvalue_to_query, category="assay",
-        constrain_to={"factor value", "parameter value", "characteristics"},
-    ),
-    "file": partial(
-        generic_keyvalue_to_query, category="file", constrain_to={"datatype"},
-    ),
-}
+        else: # metadata field or one of metadata fields must exist
+            block_match = search(r'\.[^\.]+\.*$', lookup_key)
+            if (not block_match) or (block_match.group().count("|") == 0):
+                # single field must exist (no OR condition):
+                query = {lookup_key: {"$exists": True}}
+                projection_keys = {projection_key}
+            else: # either of the fields must exist (OR condition)
+                _pfx = "." if (block_match.group()[-1] == ".") else ""
+                head = lookup_key[:block_match.start()]
+                targets = block_match.group().strip(".").split("|")
+                lookup_keys = {f"{head}.{t}{_pfx}" for t in targets}
+                query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
+                projection_keys = {f"{head}.{t}{_pfx}{_pfx}" for t in targets}
+        yield query, projection_keys, {}, as_is
 
 
 def INPLACE_update_context(context, rargs):
@@ -163,10 +163,10 @@ def INPLACE_update_context(context, rargs):
             category, *fields = arg.split(".")
             if not is_safe_token(arg):
                 raise GeneFabParserException("Forbidden argument", arg=arg)
-            elif arg in SPECIAL_ARGUMENT_PARSERS:
-                parser = SPECIAL_ARGUMENT_PARSERS[arg]
-            elif category in KEYVALUE_PARSERS:
-                parser = KEYVALUE_PARSERS[category]
+            elif arg in SPECIAL_ARGUMENT_PARSER_DISPATCHER():
+                parser = SPECIAL_ARGUMENT_PARSER_DISPATCHER()[arg]
+            elif category in KEYVALUE_PARSER_DISPATCHER():
+                parser = KEYVALUE_PARSER_DISPATCHER()[category]
             else:
                 msg = "Unrecognized argument"
                 raise GeneFabParserException(msg, **{arg: rargs[arg]})
