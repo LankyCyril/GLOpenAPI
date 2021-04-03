@@ -129,12 +129,12 @@ class Sample(dict):
         filenames = (isa_elements & dataset_files) | unconditional_dataset_files
         self["File"] = {
             "datatype": {
-                self.dataset.files[filename].get("datatype", urn(filename)): {
-                    "": filename,
-                    **copy_and_drop(self.dataset.files[filename], {"datatype"}),
+                self.dataset.files[f].get("datatype", urn(f)): {
+                    "": f, **self.dataset.files[f],
                 }
-                for filename in filenames
-            }
+                for f in filenames
+            },
+            "filename": [{"": f, **self.dataset.files[f]} for f in filenames],
         }
  
     def _get_subkey_value(self, entry, key, subkey):

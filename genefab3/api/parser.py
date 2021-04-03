@@ -50,6 +50,17 @@ DISALLOWED_CONTEXTS = {
 }
 
 
+def filename_keyvalue_to_query(fields=None, value=""):
+    """Interpret single key-value pair for filename constraint"""
+    if (len(fields) != 2) or (fields[0] != "filename") or value:
+        msg = "Unrecognized argument"
+        raise GeneFabParserException(msg, **{f"file.{fields[0]}": value})
+    else:
+        query = {"file.filename": {"$elemMatch": {"": fields[1]}}}
+        projection_keys = {"file.filename.."}
+    yield query, projection_keys, {}
+
+
 def assay_keyvalue_to_query(fields=None, value=""):
     """Interpret single key-value pair for dataset / assay constraint"""
     if (fields) or (not value):
@@ -98,7 +109,7 @@ def generic_keyvalue_to_query(category, fields, value, constrain_to=UniversalSet
 
 
 SPECIAL_ARGUMENT_PARSERS = {
-    "file.filename": lambda *a, **k: [5/0], # TODO: temporary, just fails
+    "file.filename": filename_keyvalue_to_query,
     "debug": empty_iterator, # pass as kwarg
     "format": empty_iterator, # pass as kwarg
 }
