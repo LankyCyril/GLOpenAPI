@@ -7,9 +7,6 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
 
 
-passthrough = lambda _:_
-
-
 class UniversalSet(set):
     """Naive universal set"""
     def __and__(self, x): return x

@@ -1,9 +1,10 @@
+from genefab3.common.utils import leaf_count, pass_as_kwarg
 from collections import defaultdict
 from re import search, sub, escape
 from types import SimpleNamespace
 from genefab3.common.types import UniversalSet
 from functools import partial
-from genefab3.common.utils import sanitized
+from genefab3.db.mongo.utils import is_safe_token
 from werkzeug.datastructures import MultiDict
 from genefab3.common.exceptions import GeneFabParserException
 from flask import request
@@ -11,7 +12,6 @@ from urllib.request import quote
 from json import dumps
 
 
-leaf_count = lambda d: sum(len(v) for v in d.values())
 DISALLOWED_CONTEXTS = {
     "at least one dataset or annotation category must be specified": lambda c:
         (not search(r'^(|status|debug.*|favicon\.\S*)$', c.view)) and
@@ -95,7 +95,6 @@ def generic_keyvalue_to_query(category, fields, value, constrain_to=UniversalSet
 
 
 fail = lambda *a, **k: [5/0]
-pass_as_kwarg = lambda *a, **k: []
 SPECIAL_ARGUMENT_PARSERS = {
     "file.filename": fail,
     "debug": pass_as_kwarg,
@@ -122,17 +121,21 @@ KEYVALUE_PARSERS = {
 
 def INPLACE_update_context(context, rargs):
     """Interpret all key-value pairs that give rise to database queries"""
-    for arg in sanitized(rargs):
+    for arg in rargs:
         def query_iterator():
             category, *fields = arg.split(".")
-            if arg in SPECIAL_ARGUMENT_PARSERS:
+            if not is_safe_token(arg):
+                raise GeneFabParserException("Forbidden argument", arg=arg)
+            elif arg in SPECIAL_ARGUMENT_PARSERS:
                 parser = SPECIAL_ARGUMENT_PARSERS[arg]
             elif category in KEYVALUE_PARSERS:
                 parser = KEYVALUE_PARSERS[category]
             else:
                 msg = "Unrecognized argument"
                 raise GeneFabParserException(msg, **{arg: rargs[arg]})
-            for value in sanitized(rargs.getlist(arg)):
+            for value in rargs.getlist(arg):
+                if not is_safe_token(value):
+                    raise GeneFabParserException("Forbidden value", arg=value)
                 if (value) and (len(fields) == 1):
                     # assay.characteristics=age -> assay.characteristics.age
                     yield from parser(fields=[*fields, value], value="")

@@ -1,14 +1,13 @@
-from genefab3.common.utils import iterate_terminal_leaves
+from genefab3.common.utils import iterate_terminal_leaves, passthrough
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.exceptions import GeneFabDataManagerException
 from genefab3.common.logger import GeneFabLogger
-from genefab3.common.types import ImmutableTree
+from genefab3.common.types import ImmutableTree, HashableEnough
 from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
 from pandas import read_sql, DataFrame, read_csv
 from pandas.io.sql import DatabaseError
-from genefab3.common.types import passthrough, HashableEnough
 from urllib.request import urlopen
 from urllib.error import URLError
 from tempfile import TemporaryDirectory

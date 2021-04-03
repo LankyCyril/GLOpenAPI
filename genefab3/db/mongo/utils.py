@@ -11,6 +11,11 @@ def isempty(v):
     return isnull(v) or (v == "")
 
 
+def is_safe_token(v):
+    """Check if value is safe for PyMongo queries"""
+    return "$" not in v
+
+
 def is_unit_formattable(entry, unit_key):
     """Check if entry contains keys "" and unit_key and that entry[unit_key] is not empty"""
     return (

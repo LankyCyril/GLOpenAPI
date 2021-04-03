@@ -11,6 +11,11 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from json import JSONEncoder
 
 
+leaf_count = lambda d: sum(len(v) for v in d.values())
+passthrough = lambda _:_
+pass_as_kwarg = lambda *a, **k: []
+
+
 @contextmanager
 def pick_reachable_url(urls, desc=None):
     """Iterate `urls` and get the first reachable URL"""
@@ -38,9 +43,6 @@ def pick_reachable_url(urls, desc=None):
 def urn(s):
     """Generate uuid3 URN for `s`"""
     return uuid3(uuid4(), s).urn
-
-
-sanitized = lambda A: (a for a in A if "$" not in a)
 
 
 def walk_up(from_path, n_steps):
