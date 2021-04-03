@@ -1,4 +1,5 @@
-from genefab3.common.utils import leaf_count, empty_iterator
+from genefab3.common.utils import leaf_count, as_is, empty_iterator
+from genefab3.common.exceptions import GeneFabConfigurationException
 from collections import defaultdict
 from re import search, sub, escape
 from types import SimpleNamespace
@@ -50,15 +51,37 @@ DISALLOWED_CONTEXTS = {
 }
 
 
+def INPLACE_unwind_target_filenames(dataframe, filename):
+    """Remove unneeded entries and flatten target entry, as projection {"file.filename..": True} returns too much"""
+    def _unwind(value):
+        if isinstance(value, list):
+            _it = value
+        elif isinstance(value, dict):
+            _it = [value]
+        else:
+            return value
+        for entry in _it:
+            if isinstance(entry, dict) and (entry.get("") == filename):
+                return entry[""]
+        else:
+            msg = "Non-unwindable value returned"
+            raise GeneFabConfigurationException(msg, value=value)
+    raw_group = dataframe[[("file.filename", "")]]
+    dataframe[("file.filename", filename)] = raw_group.applymap(_unwind)
+    dataframe.drop(columns=[("file.filename", "")], inplace=True)
+
+
 def filename_keyvalue_to_query(fields=None, value=""):
     """Interpret single key-value pair for filename constraint"""
     if (len(fields) != 2) or (fields[0] != "filename") or value:
         msg = "Unrecognized argument"
         raise GeneFabParserException(msg, **{f"file.{fields[0]}": value})
     else:
-        query = {"file.filename": {"$elemMatch": {"": fields[1]}}}
+        name = fields[1]
+        query = {"file.filename": {"$elemMatch": {"": name}}}
         projection_keys = {"file.filename.."}
-    yield query, projection_keys, {}, empty_iterator
+        postproc_fn = partial(INPLACE_unwind_target_filenames, filename=name)
+    yield query, projection_keys, {}, postproc_fn
 
 
 def assay_keyvalue_to_query(fields=None, value=""):
@@ -77,7 +100,7 @@ def assay_keyvalue_to_query(fields=None, value=""):
             subquery = {"info.accession": accession, "info.assay": assay_name}
             query["$or"].append(subquery)
             accessions_and_assays[accession].add(assay_name)
-    yield query, (), accessions_and_assays, None
+    yield query, (), accessions_and_assays, as_is
 
 
 def generic_keyvalue_to_query(category, fields, value, constrain_to=UniversalSet(), dot_postfix="auto"):
@@ -106,7 +129,7 @@ def generic_keyvalue_to_query(category, fields, value, constrain_to=UniversalSet
             lookup_keys = {f"{head}.{t}{postfix}" for t in targets}
             query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
             projection_keys = {f"{head}.{t}{postfix}{postfix}" for t in targets}
-    yield query, projection_keys, {}, None
+    yield query, projection_keys, {}, as_is
 
 
 SPECIAL_ARGUMENT_PARSERS = {
@@ -163,7 +186,7 @@ def INPLACE_update_context(context, rargs):
             context.projection.update({k: True for k in projection_keys})
             for accession, assay_names in accessions_and_assays.items():
                 context.accessions_and_assays[accession] = sorted(assay_names)
-            context.postprocess_functions.append(postproc_fn)
+            context.INPLACE_postprocess_functions.append(postproc_fn)
             yield arg
 
 
@@ -176,7 +199,7 @@ def Context():
         view=sub(url_root, "", base_url).strip("/"),
         complete_kwargs=request.args.to_dict(flat=False),
         query={"$and": []}, projection={}, accessions_and_assays={},
-        postprocess_functions=[],
+        INPLACE_postprocess_functions=[],
     )
     processed_args = set(INPLACE_update_context(context, request.args))
     context.kwargs = MultiDict({

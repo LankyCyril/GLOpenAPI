@@ -85,6 +85,8 @@ def get(mongo_collections, *, locale, context, include=(), modify=keep_projectio
             else (".".join(fields[:2]), ".".join(fields[2:]))
             for fields in map(lambda s: s.split("."), dataframe.columns)
         )
+        for INPLACE_postprocess_fn in context.INPLACE_postprocess_functions:
+            INPLACE_postprocess_fn(dataframe)
     except TypeError: # no data retrieved; TODO: handle more gracefully
         _kw = dict(include=include, genefab_type="annotation")
         return Placeholders.metadata_dataframe(**_kw)
