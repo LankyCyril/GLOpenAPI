@@ -58,7 +58,7 @@ def filename_keyvalue_to_query(fields=None, value=""):
     else:
         query = {"file.filename": {"$elemMatch": {"": fields[1]}}}
         projection_keys = {"file.filename.."}
-    yield query, projection_keys, {}
+    yield query, projection_keys, {}, empty_iterator
 
 
 def assay_keyvalue_to_query(fields=None, value=""):
@@ -77,35 +77,36 @@ def assay_keyvalue_to_query(fields=None, value=""):
             subquery = {"info.accession": accession, "info.assay": assay_name}
             query["$or"].append(subquery)
             accessions_and_assays[accession].add(assay_name)
-    yield query, (), accessions_and_assays
+    yield query, (), accessions_and_assays, None
 
 
 def generic_keyvalue_to_query(category, fields, value, constrain_to=UniversalSet(), dot_postfix="auto"):
     """Interpret single key-value pair if it gives rise to database query"""
-    if fields and (fields[0] in constrain_to):
-        if (len(fields) == 2) and (dot_postfix == "auto"):
-            lookup_key = ".".join([category] + fields) + "."
-            projection_key = lookup_key + "."
-        else:
-            projection_key = lookup_key = ".".join([category] + fields)
-        if value: # metadata field must equal value or one of values
-            yield {lookup_key: {"$in": value.split("|")}}, {projection_key}, {}
-        else: # metadata field or one of metadata fields must exist
-            block_match = search(r'\.[^\.]+\.*$', lookup_key)
-            if (not block_match) or (block_match.group().count("|") == 0):
-                # single field must exist (no OR condition):
-                yield {lookup_key: {"$exists": True}}, {projection_key}, {}
-            else: # either of the fields must exist (OR condition)
-                pstfx = "." if (block_match.group()[-1] == ".") else ""
-                head = lookup_key[:block_match.start()]
-                targets = block_match.group().strip(".").split("|")
-                lookup_keys = {f"{head}.{t}{pstfx}" for t in targets}
-                projection_keys = {f"{head}.{t}{pstfx}{pstfx}" for t in targets}
-                query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
-                yield query, projection_keys, {}
-    else:
+    if (not fields) or (fields[0] not in constrain_to):
         msg = "Unrecognized argument"
         raise GeneFabParserException(msg, arg=".".join([category, *fields]))
+    elif (len(fields) == 2) and (dot_postfix == "auto"):
+        lookup_key = ".".join([category] + fields) + "."
+        projection_key = lookup_key + "."
+    else:
+        projection_key = lookup_key = ".".join([category] + fields)
+    if value: # metadata field must equal value or one of values
+        query = {lookup_key: {"$in": value.split("|")}}
+        projection_keys = {projection_key}
+    else: # metadata field or one of metadata fields must exist
+        block_match = search(r'\.[^\.]+\.*$', lookup_key)
+        if (not block_match) or (block_match.group().count("|") == 0):
+            # single field must exist (no OR condition):
+            query = {lookup_key: {"$exists": True}}
+            projection_keys = {projection_key}
+        else: # either of the fields must exist (OR condition)
+            postfix = "." if (block_match.group()[-1] == ".") else ""
+            head = lookup_key[:block_match.start()]
+            targets = block_match.group().strip(".").split("|")
+            lookup_keys = {f"{head}.{t}{postfix}" for t in targets}
+            query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
+            projection_keys = {f"{head}.{t}{postfix}{postfix}" for t in targets}
+    yield query, projection_keys, {}, None
 
 
 SPECIAL_ARGUMENT_PARSERS = {
@@ -135,7 +136,7 @@ KEYVALUE_PARSERS = {
 def INPLACE_update_context(context, rargs):
     """Interpret all key-value pairs that give rise to database queries"""
     for arg in rargs:
-        def query_iterator():
+        def _it():
             category, *fields = arg.split(".")
             if not is_safe_token(arg):
                 raise GeneFabParserException("Forbidden argument", arg=arg)
@@ -157,11 +158,12 @@ def INPLACE_update_context(context, rargs):
                     # assay.characteristics.age=5
                     # from=GLDS-1.assay
                     yield from parser(fields=fields, value=value)
-        for query, projection_keys, accessions_and_assays in query_iterator():
+        for query, projection_keys, accessions_and_assays, postproc_fn in _it():
             context.query["$and"].append(query)
             context.projection.update({k: True for k in projection_keys})
             for accession, assay_names in accessions_and_assays.items():
                 context.accessions_and_assays[accession] = sorted(assay_names)
+            context.postprocess_functions.append(postproc_fn)
             yield arg
 
 
@@ -174,6 +176,7 @@ def Context():
         view=sub(url_root, "", base_url).strip("/"),
         complete_kwargs=request.args.to_dict(flat=False),
         query={"$and": []}, projection={}, accessions_and_assays={},
+        postprocess_functions=[],
     )
     processed_args = set(INPLACE_update_context(context, request.args))
     context.kwargs = MultiDict({
