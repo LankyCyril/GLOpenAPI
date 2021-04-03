@@ -1,4 +1,4 @@
-from genefab3.common.utils import leaf_count, pass_as_kwarg
+from genefab3.common.utils import leaf_count, empty_iterator
 from collections import defaultdict
 from re import search, sub, escape
 from types import SimpleNamespace
@@ -94,11 +94,10 @@ def generic_keyvalue_to_query(category, fields, value, constrain_to=UniversalSet
         raise GeneFabParserException(msg, arg=".".join([category, *fields]))
 
 
-fail = lambda *a, **k: [5/0]
 SPECIAL_ARGUMENT_PARSERS = {
-    "file.filename": fail,
-    "debug": pass_as_kwarg,
-    "format": pass_as_kwarg,
+    "file.filename": lambda *a, **k: [5/0], # TODO: temporary, just fails
+    "debug": empty_iterator, # pass as kwarg
+    "format": empty_iterator, # pass as kwarg
 }
 KEYVALUE_PARSERS = {
     "from": assay_keyvalue_to_query,

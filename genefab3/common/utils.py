@@ -13,7 +13,7 @@ from json import JSONEncoder
 
 leaf_count = lambda d: sum(len(v) for v in d.values())
 passthrough = lambda _:_
-pass_as_kwarg = lambda *a, **k: []
+empty_iterator = lambda *a, **k: []
 
 
 @contextmanager
