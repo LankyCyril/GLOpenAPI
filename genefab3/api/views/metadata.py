@@ -58,13 +58,16 @@ def get(mongo_collections, *, locale, context, include=(), aggregate=False):
         "info.accession": True, "info.assay": True,
         **context.projection, **{field: True for field in include},
     }
-    try:
-        dataframe = get_raw_metadata_dataframe( # single-level
-            mongo_collections, locale=locale, query=context.query,
-            projection={**full_projection, "_id": False}, include=include,
-        )
-        # drop trailing qualifier fields not requested in projection:
-        INPLACE_drop_non_projected_columns(dataframe, full_projection)
+    dataframe = get_raw_metadata_dataframe( # single-level
+        mongo_collections, locale=locale, query=context.query,
+        projection={**full_projection, "_id": False}, include=include,
+    )
+    # drop trailing qualifier fields not requested in projection:
+    INPLACE_drop_non_projected_columns(dataframe, full_projection)
+    if not (dataframe.shape[0] * dataframe.shape[1]): # empty
+        _kw = dict(include=include, genefab_type="annotation")
+        return Placeholders.metadata_dataframe(**_kw)
+    else:
         # remove trailing dots and hide columns that are explicitly hidden:
         dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
         # sort (ISA-aware) and convert to two-level dataframe:
@@ -76,10 +79,6 @@ def get(mongo_collections, *, locale, context, include=(), aggregate=False):
         )
         for INPLACE_postprocess_fn in context.INPLACE_postprocess_functions:
             INPLACE_postprocess_fn(dataframe)
-    except TypeError: # no data retrieved; TODO: handle more gracefully
-        _kw = dict(include=include, genefab_type="annotation")
-        return Placeholders.metadata_dataframe(**_kw)
-    else:
         if aggregate: # coerce to boolean "existence" if requested
             info_cols = list(dataframe[["info"]].columns)
             if len(info_cols) == dataframe.shape[1]: # only 'info' cols present
