@@ -24,11 +24,11 @@ ALT_FILEPATH = "/genelab/static/media/dataset/"
 
 SPECIAL_FILE_TYPES = {
     r'.*_metadata_.*[_-]ISA\.zip$': {
-        "cached": True,
+        "cacheable": True,
         "datatype": "isa",
     },
     r'rna_seq_Unnormalized_Counts\.csv$': {
-        "cached": True,
+        "cacheable": True,
         "type": "table",
         "datatype": "unnormalized counts",
         "joinable": True,
@@ -36,20 +36,20 @@ SPECIAL_FILE_TYPES = {
         "column_subset": "sample name",
     },
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression\.csv$': {
-        "cached": True,
+        "cacheable": True,
         "type": "table",
         "datatype": "differential expression",
         "index_name": "ENSEMBL",
     },
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table\.csv$': {
-        "cached": True,
+        "cacheable": True,
         "type": "table",
         "datatype": "visualization table",
         "index_name": "ENSEMBL",
         "unconditional": True,
     },
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$': {
-        "cached": True,
+        "cacheable": True,
         "type": "table",
         "datatype": "pca",
         "index_name": "sample name",
