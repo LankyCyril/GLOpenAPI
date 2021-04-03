@@ -31,28 +31,27 @@ def cls(obj, continuous=None, space_sub=lambda s: sub(r'\s', "", s), indent=None
             ["# "+_sub(classes[0])] + [_sub(c) for c in classes[1:]],
             [class2id[v] for v in obj[target]]
         ]
-    response = "\n".join(["\t".join([str(f) for f in fs]) for fs in _data])
-    return Response(response, mimetype="text/plain")
+    content = "\n".join(["\t".join([str(f) for f in fs]) for fs in _data])
+    return Response(content, mimetype="text/plain")
 
 
 def gct(obj, indent=None):
     """Display presumed data dataframe in plaintext GCT format"""
     text = obj.to_csv(sep="\t", index=False, header=False)
-    response = (
+    content = (
         "#1.2\n{}\t{}\n".format(obj.shape[0], obj.shape[1]-1) +
         "Name\tDescription\t" +
         "\t".join("/".join(levels) for levels in obj.columns[1:]) +
         "\n" + sub(r'^(.+?\t)', r'\1\1', text, flags=MULTILINE)
     )
-    return Response(response, mimetype="text/plain")
+    return Response(content, mimetype="text/plain")
 
 
 def xsv(obj, sep, indent=None):
     """Display dataframe in plaintext `sep`-separated format"""
     _kws = dict(sep=sep, index=False, header=False, na_rep="NaN")
-    header = sub(r'^', "#", sub(r'\n(.)', r'\n#\1',
-        obj.columns.to_frame().T.to_csv(**_kws),
-    ))
+    raw_header = obj.columns.to_frame().T.to_csv(**_kws)
+    header = sub(r'^', "#", sub(r'\n(.)', r'\n#\1', raw_header))
     return Response(header + obj.to_csv(**_kws), mimetype="text/plain")
 
 
@@ -62,10 +61,6 @@ tsv = partial(xsv, sep="\t")
 
 def json(obj, indent=None):
     """Display dataframe as JSON"""
-    raw_json = {
-        "columns": obj.columns.tolist(), "data": obj.values.tolist(),
-    }
-    return Response(
-        dumps(raw_json, indent=indent, cls=JSONByteEncoder),
-        mimetype="text/json",
-    )
+    raw_json = {"columns": obj.columns.tolist(), "data": obj.values.tolist()}
+    content = dumps(raw_json, indent=indent, cls=JSONByteEncoder)
+    return Response(content, mimetype="text/json")

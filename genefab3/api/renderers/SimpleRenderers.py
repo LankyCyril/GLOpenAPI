@@ -20,4 +20,5 @@ def html(obj, indent=None):
 
 def json(obj, indent=None):
     """Display record in plaintext dump format"""
-    return Response(dumps(obj, indent=indent), mimetype="text/json")
+    content = dumps(obj, indent=indent, default=lambda o: str(type(o)))
+    return Response(content, mimetype="text/json")
