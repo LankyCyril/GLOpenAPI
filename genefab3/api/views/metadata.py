@@ -9,18 +9,17 @@ from genefab3.common.utils import set_attributes
 
 def get_raw_metadata_dataframe(mongo_collections, *, locale, query, projection, include):
     """Get target metadata as a single-level dataframe, numerically sorted by info fields"""
-    sort = [(f, ASCENDING) for f in ["info.accession", "info.assay", *include]]
+    sortby = ["info.accession", "info.assay", *include]
     entries = mongo_collections.metadata.find(
-        query, projection, sort=sort,
+        query, projection, sort=[(f, ASCENDING) for f in sortby],
         collation={"locale": locale, "numericOrdering": True},
     )
     try:
         return json_normalize(list(entries))
     except MongoOperationError as e:
+        errmsg = getattr(e, "details", {}).get("errmsg", "").lower()
         has_index = ("info" in mongo_collections.metadata.index_information())
-        index_reason = (
-            "index" in getattr(e, "details", {}).get("errmsg", "").lower()
-        )
+        index_reason = ("index" in errmsg)
         if index_reason and (not has_index):
             msg = "Metadata is not indexed yet; this is a temporary error"
         else:
@@ -28,28 +27,22 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, query, projection, 
         raise GeneFabDatabaseException(msg, locale=locale, reason=str(e))
 
 
-def INPLACE_drop_non_projected_columns(dataframe, full_projection):
+def INPLACE_drop_non_projected_trailing_qualifiers(df, fp):
     """Drop qualifier fields from single-level dataframe, unless explicitly requested in projection"""
-    dataframe.drop(inplace=True, columns={
-        c for c in list(dataframe.columns)
-        if (len(findall(r'\..', c)) >= 3) and (c not in full_projection)
-    })
+    is_trailing = lambda c: (len(findall(r'\..', c)) >= 3) and (c not in fp)
+    df.drop(inplace=True, columns={c for c in df.columns if is_trailing(c)})
 
 
 def iisaf_sort_dataframe(dataframe):
     """Sort single-level dataframe in order info-investigation-study-assay-file"""
-    prefix_order = ["info", "investigation", "study", "assay", "file", "other"]
-    column_order = {prefix: set() for prefix in prefix_order}
+    prefix_order = ["info", "investigation", "study", "assay", "file", ""]
+    column_order = {p: set() for p in prefix_order}
     for column in dataframe.columns:
-        for prefix in column_order:
+        for prefix in prefix_order:
             if column.startswith(prefix):
                 column_order[prefix].add(column)
                 break
-        else:
-            column_order["other"].add(column)
-    return dataframe[
-        sum((sorted(column_order[prefix]) for prefix in prefix_order), [])
-    ]
+    return dataframe[sum((sorted(column_order[p]) for p in prefix_order), [])]
 
 
 def get(mongo_collections, *, locale, context, include=(), aggregate=False):
@@ -62,15 +55,12 @@ def get(mongo_collections, *, locale, context, include=(), aggregate=False):
         mongo_collections, locale=locale, query=context.query,
         projection={**full_projection, "_id": False}, include=include,
     )
-    # drop trailing qualifier fields not requested in projection:
-    INPLACE_drop_non_projected_columns(dataframe, full_projection)
-    if not (dataframe.shape[0] * dataframe.shape[1]): # empty
+    INPLACE_drop_non_projected_trailing_qualifiers(dataframe, full_projection)
+    if dataframe.empty:
         _kw = dict(include=include, genefab_type="annotation")
         return Placeholders.metadata_dataframe(**_kw)
     else:
-        # remove trailing dots and hide columns that are explicitly hidden:
         dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
-        # sort (ISA-aware) and convert to two-level dataframe:
         dataframe = iisaf_sort_dataframe(dataframe)
         dataframe.columns = MultiIndex.from_tuples(
             (fields[0], ".".join(fields[1:])) if fields[0] == "info"
