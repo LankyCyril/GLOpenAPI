@@ -25,13 +25,11 @@ DISALLOWED_CONTEXTS = {
         (c.view != "data") and (c.kwargs.get("format") == "gct"),
     "'filename=' can only be specified once": lambda c:
         (len(c.complete_kwargs.get("filename", [])) > 1),
-    "'datatype=' can only be specified once": lambda c:
-        (len(c.complete_kwargs.get("datatype", [])) > 1),
-    "/data/ requires a 'datatype=' argument": lambda c:
-        (c.view == "data") and ("datatype" not in c.complete_kwargs),
+    "/data/ requires a 'file.datatype=' argument": lambda c:
+        (c.view == "data") and ("file.datatype" not in c.complete_kwargs),
     "'format=gct' is not valid for the requested datatype": lambda c:
         (c.kwargs.get("format") == "gct") and
-        (c.complete_kwargs.get("datatype", []) != "unnormalized counts"),
+        ("unnormalized counts" not in c.complete_kwargs.get("file.datatype", [])),
     "/file/ only accepts 'format=raw'": lambda c:
         (c.view == "file") and (c.kwargs.get("format") != "raw"),
     # TODO: the following ones may not be needed with the new logic:
@@ -108,7 +106,10 @@ KEY_PARSERS = {
         generic_keyvalue_to_query, category="assay",
         constrain_to={"factor value", "parameter value", "characteristics"},
     ),
-    "datatype": pass_as_kwarg,
+    "file": partial(
+        generic_keyvalue_to_query, category="file",
+        constrain_to={"datatype", "filename"},
+    ),
     "debug": pass_as_kwarg,
     "filename": pass_as_kwarg,
     "format": pass_as_kwarg,
