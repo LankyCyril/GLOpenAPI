@@ -22,16 +22,6 @@ class UniversalSet(set):
     def __contains__(self, x): return True
 
 
-class DatasetBaseClass():
-    """Placeholder for identifying classes representing datasets"""
-    pass
-
-
-class AssayBaseClass():
-    """Placeholder for identifying classes representing assays"""
-    pass
-
-
 class IterableNamespace(SimpleNamespace):
     """SimpleNamespace that iterates its values (can be used for tests with all(), any(), etc)"""
     def __iter__(self):

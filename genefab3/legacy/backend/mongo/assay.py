@@ -1,4 +1,3 @@
-from genefab3.common.types import AssayBaseClass
 from genefab3.config import COLLECTION_NAMES
 from genefab3.common.exceptions import GeneFabDatabaseException
 from re import escape
@@ -6,7 +5,7 @@ from genefab3.common.types import UniversalSet
 from genefab3.backend.mongo.utils import iterate_terminal_leaf_filenames
 
 
-class CachedAssay(AssayBaseClass):
+class CachedAssay():
     """Exposes individual assay information and metadata"""
  
     def __init__(self, dataset, assay_name):
