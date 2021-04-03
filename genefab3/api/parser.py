@@ -3,6 +3,7 @@ from re import search, sub, escape
 from types import SimpleNamespace
 from genefab3.common.types import UniversalSet, StringKey, ElemMatchKey
 from functools import partial
+from genefab3.common.utils import sanitized
 from werkzeug.datastructures import MultiDict
 from genefab3.common.exceptions import GeneFabParserException
 from functools import lru_cache
@@ -49,9 +50,13 @@ DISALLOWED_CONTEXTS = {
 }
 
 
-def assay_pair_to_query(fields=None, value=""):
+def assay_keyvalue_to_query(fields=None, value=""):
     """Interpret single key-value pair for dataset / assay constraint"""
-    query, accessions_and_assays = {"$or": []}, defaultdict(set)
+    if (fields) or (not value):
+        msg = "Unrecognized argument"
+        raise GeneFabParserException(msg, key=f"from.{fields[0]}")
+    else:
+        query, accessions_and_assays = {"$or": []}, defaultdict(set)
     for expr in value.split("|"):
         if expr.count(".") == 0:
             query["$or"].append({"info.accession": expr})
@@ -64,7 +69,7 @@ def assay_pair_to_query(fields=None, value=""):
     yield query, (), accessions_and_assays
 
 
-def isa_pair_to_query(category, fields, value, constrain_to=UniversalSet(), dot_postfix="auto"):
+def generic_keyvalue_to_query(category, fields, value, constrain_to=UniversalSet(), dot_postfix="auto"):
     """Interpret single key-value pair if it gives rise to database query"""
     if fields and (fields[0] in constrain_to):
         if (len(fields) == 2) and (dot_postfix == "auto"):
@@ -91,16 +96,16 @@ def isa_pair_to_query(category, fields, value, constrain_to=UniversalSet(), dot_
 
 pass_as_kwarg = lambda *a, **k: []
 KEY_PARSERS = {
-    "from": assay_pair_to_query,
+    "from": assay_keyvalue_to_query,
     "investigation": partial(
-        isa_pair_to_query, category="investigation", dot_postfix=False,
+        generic_keyvalue_to_query, category="investigation", dot_postfix=False,
     ),
     "study": partial(
-        isa_pair_to_query, category="study",
+        generic_keyvalue_to_query, category="study",
         constrain_to={"factor value", "parameter value", "characteristics"},
     ),
     "assay": partial(
-        isa_pair_to_query, category="assay",
+        generic_keyvalue_to_query, category="assay",
         constrain_to={"factor value", "parameter value", "characteristics"},
     ),
     "datatype": pass_as_kwarg,
@@ -112,18 +117,23 @@ KEY_PARSERS = {
 
 def INPLACE_update_context(context, rargs):
     """Interpret all key-value pairs that give rise to database queries"""
-    for key in rargs:
+    for key in sanitized(rargs):
         def query_iterator():
-            if "$" not in key:
-                category, *fields = key.split(".")
-                if category in KEY_PARSERS:
-                    parser = KEY_PARSERS[category]
-                    for value in rargs.getlist(key):
-                        if "$" not in value:
-                            yield from parser(fields=fields, value=value)
-                else:
-                    msg = "Unrecognized argument"
-                    raise GeneFabParserException(msg, **{key: rargs[key]})
+            category, *fields = key.split(".")
+            if category in KEY_PARSERS:
+                parser = KEY_PARSERS[category]
+                for value in sanitized(rargs.getlist(key)):
+                    if (value) and (len(fields) == 1):
+                        # assay.characteristics=age -> assay.characteristics.age
+                        yield from parser(fields=[*fields, value], value="")
+                    else:
+                        # assay.characteristics.age
+                        # assay.characteristics.age=5
+                        # from=GLDS-1.assay
+                        yield from parser(fields=fields, value=value)
+            else:
+                msg = "Unrecognized argument"
+                raise GeneFabParserException(msg, **{key: rargs[key]})
         for query, lookup_keys, accessions_and_assays in query_iterator():
             context.query["$and"].append(query)
             for lookup_key in lookup_keys:

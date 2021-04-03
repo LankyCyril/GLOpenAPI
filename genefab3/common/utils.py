@@ -40,6 +40,9 @@ def urn(s):
     return uuid3(uuid4(), s).urn
 
 
+sanitized = lambda A: (a for a in A if "$" not in a)
+
+
 def walk_up(from_path, n_steps):
     """Get path of directory `n_steps` above `from_path`"""
     if n_steps >= 1:
