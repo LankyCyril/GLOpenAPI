@@ -1,4 +1,4 @@
-from genefab3.common.utils import iterate_terminal_leaves, passthrough
+from genefab3.common.utils import iterate_terminal_leaves, as_is
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.exceptions import GeneFabDataManagerException
@@ -259,10 +259,10 @@ class SQLiteBlob(SQLiteObject):
                 table: [{
                     "identifier": lambda: identifier,
                     "timestamp": lambda: timestamp,
-                    "blob": lambda: (compressor or passthrough)(data_getter()),
+                    "blob": lambda: (compressor or as_is)(data_getter()),
                 }],
             },
-            retrieve={table: {"blob": decompressor or passthrough}},
+            retrieve={table: {"blob": decompressor or as_is}},
         )
 
 
@@ -293,7 +293,7 @@ class SQLiteTable(SQLiteObject):
                     "timestamp": lambda: timestamp,
                 }],
             },
-            retrieve={table: passthrough},
+            retrieve={table: as_is},
         )
 
 
