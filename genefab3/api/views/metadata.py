@@ -42,7 +42,7 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
         raise GeneFabDatabaseException(msg, locale=locale, reason=str(e))
 
 
-def INPLACE_drop_non_projected_trailing_qualifiers(dataframe, full_projection):
+def INPLACE_drop_trailing_fields(dataframe, full_projection):
     """Drop qualifier fields from single-level dataframe, unless explicitly requested in projection"""
     is_trailing = lambda c:(
         (c not in full_projection) and
@@ -63,12 +63,13 @@ def iisaf_sort_dataframe(dataframe):
     return dataframe[sum((sorted(column_order[p]) for p in prefix_order), [])]
 
 
-def get(mongo_collections, *, locale, context, include=(), aggregate=False):
+def get(mongo_collections, *, locale, context, include=(), drop_trailing_fields=True, aggregate=False):
     """Select assays/samples based on annotation filters"""
     dataframe, full_projection = get_raw_metadata_dataframe( # single-level
         mongo_collections, locale=locale, context=context, include=include,
     )
-    INPLACE_drop_non_projected_trailing_qualifiers(dataframe, full_projection)
+    if drop_trailing_fields:
+        INPLACE_drop_trailing_fields(dataframe, full_projection)
     if dataframe.empty:
         _kw = dict(include=include, genefab_type="annotation")
         return Placeholders.metadata_dataframe(**_kw)
