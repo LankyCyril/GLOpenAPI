@@ -124,8 +124,8 @@ class KeyValueParsers():
             msg = "Unrecognized argument"
             raise GeneFabParserException(msg, arg=".".join([category, *fields]))
         elif (len(fields) == 2) and (dot_postfix == "auto"):
-            lookup_key = ".".join([category] + fields) + "."
-            projection_key = lookup_key + "."
+            projection_key = ".".join([category] + fields)
+            lookup_key = projection_key + "."
         else:
             projection_key = lookup_key = ".".join([category] + fields)
         if value: # metadata field must equal value or one of values
@@ -138,12 +138,14 @@ class KeyValueParsers():
                 query = {lookup_key: {"$exists": True}}
                 projection_keys = {projection_key}
             else: # either of the fields must exist (OR condition)
-                _pfx = "." if (block_match.group()[-1] == ".") else ""
                 head = lookup_key[:block_match.start()]
                 targets = block_match.group().strip(".").split("|")
-                lookup_keys = {f"{head}.{t}{_pfx}" for t in targets}
+                projection_keys = {f"{head}.{target}" for target in targets}
+                if block_match.group()[-1] == ".":
+                    lookup_keys = {k+"." for k in projection_keys}
+                else:
+                    lookup_keys = projection_keys
                 query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
-                projection_keys = {f"{head}.{t}{_pfx}{_pfx}" for t in targets}
         yield query, projection_keys, {}, as_is
 
 
