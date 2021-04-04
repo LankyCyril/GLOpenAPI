@@ -1,6 +1,5 @@
 from functools import lru_cache, partial
-from genefab3.common.utils import empty_iterator, leaf_count, as_is
-from genefab3.common.exceptions import GeneFabConfigurationException
+from genefab3.common.utils import empty_iterator, leaf_count
 from collections import defaultdict
 from re import search, sub, escape
 from types import SimpleNamespace
@@ -57,33 +56,10 @@ DISALLOWED_CONTEXTS = {
     "'format=gct' is not valid for the requested datatype": lambda c:
         (c.kwargs.get("format") == "gct") and
         (c.complete_kwargs.get("file.datatype", []) != ["unnormalized counts"]),
-    "/file/ only accepts 'format=raw' or 'format=json'": lambda c:
-        (c.view == "file") and
-        (c.kwargs.get("format", "raw") not in {"raw", "json"}),
+    #"/file/ only accepts 'format=raw' or 'format=json'": lambda c:
+    #    (c.view == "file") and
+    #    (c.kwargs.get("format", "raw") not in {"raw", "json"}),
 }
-
-
-def INPLACE_unwind_target_filenames(dataframe, filename):
-    """Remove unneeded entries and flatten target entry, as projection {"file.filename..": True} returns too much"""
-    def _unwind(value):
-        if isinstance(value, list):
-            _it = value
-        elif isinstance(value, dict):
-            _it = [value]
-        else:
-            return value
-        for entry in _it:
-            if isinstance(entry, dict) and (entry.get("") == filename):
-                if len(entry) == 1: # only the target field present
-                    return entry[""]
-                else: # other keys present
-                    return [entry] # formatted for internal URL resolution
-        else:
-            msg = "Non-unwindable value returned"
-            raise GeneFabConfigurationException(msg, value=value)
-    raw_group = dataframe[[("file.filename", "")]]
-    dataframe[("file.filename", filename)] = raw_group.applymap(_unwind)
-    dataframe.drop(columns=[("file.filename", "")], inplace=True)
 
 
 class KeyValueParsers():
@@ -94,11 +70,10 @@ class KeyValueParsers():
             msg = "Unrecognized argument"
             raise GeneFabParserException(msg, **{f"file.{fields[0]}": value})
         else:
-            filename = fields[1]
-            query = {"file.filename": {"$elemMatch": {"": filename}}}
-            projection_keys = {"file.filename.."}
-            pp_fn = partial(INPLACE_unwind_target_filenames, filename=filename)
-        yield query, projection_keys, {}, pp_fn
+            unwind = {"$unwind": "$file.filename"}
+            query = {"file.filename.": fields[1]}
+            projection_keys = {"file.filename"}
+        yield unwind, query, projection_keys, {}
  
     def kvp_assay(fields=None, value=""):
         """Interpret single key-value pair for dataset / assay constraint"""
@@ -106,6 +81,7 @@ class KeyValueParsers():
             msg = "Unrecognized argument"
             raise GeneFabParserException(msg, arg=f"from.{fields[0]}")
         else:
+            unwind = None
             query, accessions_and_assays = {"$or": []}, defaultdict(set)
         for expr in value.split("|"):
             if expr.count(".") == 0:
@@ -116,7 +92,7 @@ class KeyValueParsers():
                 subqry = {"info.accession": accession, "info.assay": assay_name}
                 query["$or"].append(subqry)
                 accessions_and_assays[accession].add(assay_name)
-        yield query, (), accessions_and_assays, as_is
+        yield unwind, query, (), accessions_and_assays
  
     def kvp_generic(category, fields, value, constrain_to=UniversalSet(), dot_postfix="auto"):
         """Interpret single key-value pair if it gives rise to database query"""
@@ -146,7 +122,8 @@ class KeyValueParsers():
                 else:
                     lookup_keys = projection_keys
                 query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
-        yield query, projection_keys, {}, as_is
+        unwind = None
+        yield unwind, query, projection_keys, {}
 
 
 def INPLACE_update_context(context, rargs):
@@ -174,12 +151,13 @@ def INPLACE_update_context(context, rargs):
                     # assay.characteristics.age=5
                     # from=GLDS-1.assay
                     yield from parser(fields=fields, value=value)
-        for query, projection_keys, accessions_and_assays, postproc_fn in _it():
+        for unwind, query, projection_keys, accessions_and_assays in _it():
+            if unwind:
+                context.unwind.append(unwind)
             context.query["$and"].append(query)
             context.projection.update({k: True for k in projection_keys})
             for accession, assay_names in accessions_and_assays.items():
                 context.accessions_and_assays[accession] = sorted(assay_names)
-            context.INPLACE_postprocess_functions.append(postproc_fn)
             yield arg
 
 
@@ -191,8 +169,7 @@ def Context():
         full_path=request.full_path,
         view=sub(url_root, "", base_url).strip("/"),
         complete_kwargs=request.args.to_dict(flat=False),
-        query={"$and": []}, projection={}, accessions_and_assays={},
-        INPLACE_postprocess_functions=[],
+        unwind=[], query={"$and": []}, projection={}, accessions_and_assays={},
     )
     processed_args = set(INPLACE_update_context(context, request.args))
     context.kwargs = MultiDict({
