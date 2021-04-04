@@ -42,10 +42,13 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
         raise GeneFabDatabaseException(msg, locale=locale, reason=str(e))
 
 
-def INPLACE_drop_non_projected_trailing_qualifiers(df, fp):
+def INPLACE_drop_non_projected_trailing_qualifiers(dataframe, full_projection):
     """Drop qualifier fields from single-level dataframe, unless explicitly requested in projection"""
-    is_trailing = lambda c: (len(findall(r'\..', c)) >= 3) and (c not in fp)
-    df.drop(inplace=True, columns={c for c in df.columns if is_trailing(c)})
+    is_trailing = lambda c:(
+        (c not in full_projection) and
+        (len(findall(r'\..', c)) + c.startswith("file.filename") >= 3)
+    )
+    dataframe.drop(inplace=True, columns=filter(is_trailing, dataframe.columns))
 
 
 def iisaf_sort_dataframe(dataframe):
