@@ -1,5 +1,5 @@
 from functools import lru_cache, partial
-from genefab3.common.utils import leaf_count, as_is, empty_iterator
+from genefab3.common.utils import empty_iterator, leaf_count, as_is
 from genefab3.common.exceptions import GeneFabConfigurationException
 from collections import defaultdict
 from re import search, sub, escape
@@ -57,8 +57,9 @@ DISALLOWED_CONTEXTS = {
     "'format=gct' is not valid for the requested datatype": lambda c:
         (c.kwargs.get("format") == "gct") and
         (c.complete_kwargs.get("file.datatype", []) != ["unnormalized counts"]),
-    "/file/ only accepts 'format=raw'": lambda c:
-        (c.view == "file") and (c.kwargs.get("format") != "raw"),
+    "/file/ only accepts 'format=raw' or 'format=json'": lambda c:
+        (c.view == "file") and
+        (c.kwargs.get("format", "raw") not in {"raw", "json"}),
 }
 
 
@@ -73,7 +74,10 @@ def INPLACE_unwind_target_filenames(dataframe, filename):
             return value
         for entry in _it:
             if isinstance(entry, dict) and (entry.get("") == filename):
-                return entry[""]
+                if len(entry) == 1: # only the target field present
+                    return entry[""]
+                else: # other keys present
+                    return [entry] # formatted for internal URL resolution
         else:
             msg = "Non-unwindable value returned"
             raise GeneFabConfigurationException(msg, value=value)

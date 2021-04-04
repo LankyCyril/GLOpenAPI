@@ -42,3 +42,9 @@ class DefaultRoutes(Routes):
             self.mongo_collections, locale=self.locale, context=context,
             include={"info.sample name"}, aggregate=False,
         )
+ 
+    @Routes.register_endpoint(fmt="raw")
+    def file(self, context):
+        return views.file.get(
+            self.mongo_collections, locale=self.locale, context=context,
+        )
