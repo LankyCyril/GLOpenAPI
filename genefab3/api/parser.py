@@ -77,7 +77,7 @@ class Context():
         self.full_path = request.full_path
         self.view = sub(url_root, "", base_url).strip("/")
         self.complete_kwargs = request.args.to_dict(flat=False)
-        self.unwind = []
+        self.pipeline = []
         self.query = {"$and": []}
         self.projection = {}
         self.accessions_and_assays = {}
@@ -96,7 +96,7 @@ class Context():
             if scenario(self):
                 raise GeneFabParserException(description)
  
-    def update(self, arg, values):
+    def update(self, arg, values=("",)):
         """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections, pipelines"""
         def _it():
             category, *fields = arg.split(".")
@@ -121,10 +121,11 @@ class Context():
                     # from=GLDS-1.assay
                     yield from parser(fields=fields, value=value)
         is_converted_to_query = None
-        for unwind, query, projection_keys, accessions_and_assays in _it():
-            if unwind:
-                self.unwind.append(unwind)
-            self.query["$and"].append(query)
+        for pipestep, query, projection_keys, accessions_and_assays in _it():
+            if pipestep:
+                self.pipeline.append(pipestep)
+            if query:
+                self.query["$and"].append(query)
             self.projection.update({k: True for k in projection_keys})
             for accession, assay_names in accessions_and_assays.items():
                 self.accessions_and_assays[accession] = sorted(assay_names)
@@ -134,16 +135,21 @@ class Context():
 
 class KeyValueParsers():
  
-    def kvp_filename(fields=None, value=""):
+    def kvp_filename(fields=(), value=""):
         """Interpret single key-value pair for filename constraint"""
-        if (len(fields) != 2) or (fields[0] != "filename") or value:
-            msg = "Unrecognized argument"
-            raise GeneFabParserException(msg, **{f"file.{fields[0]}": value})
+        if (len(fields) == 2) and (fields[0] == "filename") and (not value):
+            query = {"file.filename.": fields[1]} # passed as 'file.filename.??'
+        elif (len(fields) == 1) and (fields[0] == "filename") and value:
+            query = {"file.filename.": value} # passed as 'file.filename=??'
+        elif (len(fields) == 1) and (fields[0] == "filename") and (not value):
+            query = None # passed as 'file.filename', i.e. catch-all
         else:
-            unwind = {"$unwind": "$file.filename"}
-            query = {"file.filename.": fields[1]}
-            projection_keys = {"file.filename"}
-        yield unwind, query, projection_keys, {}
+            msg, arg = "Unrecognized argument", ".".join("file", *fields)
+            raise GeneFabParserException(msg, **{arg: value})
+        pipestep = {"$unwind": "$file.filename"}
+        projection_keys = {"file.filename"}
+        accessions_and_assays = {}
+        yield pipestep, query, projection_keys, accessions_and_assays
  
     def kvp_assay(fields=None, value=""):
         """Interpret single key-value pair for dataset / assay constraint"""
@@ -151,8 +157,8 @@ class KeyValueParsers():
             msg = "Unrecognized argument"
             raise GeneFabParserException(msg, arg=f"from.{fields[0]}")
         else:
-            unwind = None
-            query, accessions_and_assays = {"$or": []}, defaultdict(set)
+            pipestep, query = None, {"$or": []}
+            projection_keys, accessions_and_assays = (), defaultdict(set)
         for expr in value.split("|"):
             if expr.count(".") == 0:
                 query["$or"].append({"info.accession": expr})
@@ -162,7 +168,7 @@ class KeyValueParsers():
                 subqry = {"info.accession": accession, "info.assay": assay_name}
                 query["$or"].append(subqry)
                 accessions_and_assays[accession].add(assay_name)
-        yield unwind, query, (), accessions_and_assays
+        yield pipestep, query, projection_keys, accessions_and_assays
  
     def kvp_generic(category, fields, value, constrain_to=UniversalSet(), dot_postfix="auto"):
         """Interpret single key-value pair if it gives rise to database query"""
@@ -192,5 +198,5 @@ class KeyValueParsers():
                 else:
                     lookup_keys = projection_keys
                 query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
-        unwind = None
-        yield unwind, query, projection_keys, {}
+        pipestep, accessions_and_assays = None, {}
+        yield pipestep, query, projection_keys, accessions_and_assays

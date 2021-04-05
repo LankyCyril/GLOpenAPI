@@ -14,11 +14,11 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
         "info.accession": True, "info.assay": True,
         **context.projection, **{field: True for field in include},
     }
-    if context.unwind:
+    if context.pipeline:
         cursor = mongo_collections.metadata.aggregate(
             pipeline=[
                 {"$sort": {f: ASCENDING for f in sortby}},
-                *context.unwind, {"$match": context.query},
+                *context.pipeline, {"$match": context.query},
                 {"$project": {**full_projection, "_id": False}},
             ],
             collation={"locale": locale, "numericOrdering": True},
