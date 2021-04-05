@@ -7,7 +7,7 @@ from json import dumps
 from genefab3.common.utils import JSONByteEncoder
 
 
-def cls(obj, continuous=None, space_sub=lambda s: sub(r'\s', "", s), context=None, indent=None):
+def cls(obj, context=None, continuous=None, space_sub=lambda s: sub(r'\s', "", s), indent=None):
     """Display presumed annotation/factor dataframe in plaintext CLS format"""
     columns = [(l0, l1) for (l0, l1) in obj.columns if l0 != "info"]
     if len(columns) != 1:
@@ -47,7 +47,7 @@ def gct(obj, context=None, indent=None):
     return Response(content, mimetype="text/plain")
 
 
-def xsv(obj, sep, context=None, indent=None):
+def xsv(obj, context=None, sep=None, indent=None):
     """Display dataframe in plaintext `sep`-separated format"""
     _kws = dict(sep=sep, index=False, header=False, na_rep="NaN")
     raw_header = obj.columns.to_frame().T.to_csv(**_kws)

@@ -79,7 +79,7 @@ def get_browser_meta_formatter(context, i, category, subkey, target):
     return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
 
 
-def iter_browser_formatters(obj, context, shortnames):
+def iter_formatters(obj, context, shortnames):
     """Get SlickGrid formatters for columns"""
     if obj.columns[0] == ("info", "accession"):
         yield get_browser_glds_formatter(context)
@@ -91,7 +91,13 @@ def iter_browser_formatters(obj, context, shortnames):
             yield get_browser_meta_formatter(context, i, cat, fields[0], target)
 
 
-def twolevel(obj, context, indent=None, frozen=0):
+SHRUNK_HEADER_CSS = """
+.slick-preheader-panel .slick-header-column {font-size: 9pt; line-height: .8}
+.slick-preheader-panel .slick-column-name {position: relative; top: -1pt}
+"""
+
+
+def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, shrink_preheader=False):
     """Display dataframe with two-level columns using SlickGrid"""
     _assert_type(obj, nlevels=2)
     shortnames = []
@@ -111,21 +117,23 @@ def twolevel(obj, context, indent=None, frozen=0):
         f"{{id:'{n}',field:'{n}',columnGroup:'{a}',name:'{b}'}},"
         for (a, b), n in zip(obj.columns, shortnames)
     )
-    formatters = "\n".join(iter_browser_formatters(obj, context, shortnames))
-    content = map_replace(
-        _get_browser_html(), {
-            "// FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
-            "// FORMATTERS": formatters,
-            "HTMLINK": build_url(context, drop={"format"}) + "format=html",
-            "CSVLINK": build_url(context, drop={"format"}) + "format=csv",
-            "TSVLINK": build_url(context, drop={"format"}) + "format=tsv",
-            "JSONLINK": build_url(context, drop={"format"}) + "format=json",
-            "ASSAYSVIEW": build_url(context, "assays"),
-            "SAMPLESVIEW": build_url(context, "samples"),
-            "DATAVIEW": build_url(context, "data"),
-            "// COLUMNDATA": columndata, "// ROWDATA": rowdata,
-        }
-    )
+    if use_formatters:
+        formatters = "\n".join(iter_formatters(obj, context, shortnames))
+    else:
+        formatters = ""
+    content = map_replace(_get_browser_html(), {
+        "// FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
+        "/* SHRINKPREHEADER */": SHRUNK_HEADER_CSS if shrink_preheader else "",
+        "// FORMATTERS": formatters,
+        "HTMLINK": build_url(context, drop={"format"}) + "format=html",
+        "CSVLINK": build_url(context, drop={"format"}) + "format=csv",
+        "TSVLINK": build_url(context, drop={"format"}) + "format=tsv",
+        "JSONLINK": build_url(context, drop={"format"}) + "format=json",
+        "ASSAYSVIEW": build_url(context, "assays"),
+        "SAMPLESVIEW": build_url(context, "samples"),
+        "DATAVIEW": build_url(context, "data"),
+        "// COLUMNDATA": columndata, "// ROWDATA": rowdata,
+    })
     return Response(content, mimetype="text/html")
 
 
@@ -134,11 +142,11 @@ def threelevel(obj, context, indent=None):
     _assert_type(obj, nlevels=3)
     def renamer_generator(): # TODO can be refactored as inline
         for l0, l1, _ in obj.columns:
-            yield f"{l0}\n{l1}"
+            yield f"{l0}<br>{l1}"
     renamer = renamer_generator()
     def renamer_wrapper(*args):
         return next(renamer)
     return twolevel(
         obj.droplevel(0, axis=1).rename(renamer_wrapper, axis=1, level=0),
-        context=context,
+        context=context, use_formatters=False, shrink_preheader=True,
     )
