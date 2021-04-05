@@ -40,7 +40,7 @@ class CacheableRenderer():
         """Initialize object renderer and LRU cacher"""
         self.sqlite_dbs = sqlite_dbs
  
-    def dispatch_renderer(self, obj, indent=None, fmt="raw"):
+    def dispatch_renderer(self, obj, context, indent=None, fmt="raw"):
         """Render `obj` according to its type and passed kwargs"""
         if obj is None:
             raise GeneFabConfigurationException("Route returned no data")
@@ -56,7 +56,7 @@ class CacheableRenderer():
             msg = "Multiple TYPE_RENDERERS match object type"
             raise GeneFabConfigurationException(msg, **_error_kws)
         else:
-            return renderer(obj, indent=indent)
+            return renderer(obj, context, indent=indent)
  
     def __call__(self, method):
         """Render object returned from `method`, put in LRU cache by `context.identity`"""
@@ -69,7 +69,7 @@ class CacheableRenderer():
             else:
                 # TODO check cache based on context.identity
                 obj = method(*args, context=context, **kwargs)
-                response = self.dispatch_renderer(obj, fmt=fmt)
+                response = self.dispatch_renderer(obj, context, fmt=fmt)
                 # TODO cache
             return response
         return wrapper

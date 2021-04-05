@@ -7,7 +7,7 @@ from json import dumps
 from genefab3.common.utils import JSONByteEncoder
 
 
-def cls(obj, continuous=None, space_sub=lambda s: sub(r'\s', "", s), indent=None):
+def cls(obj, continuous=None, space_sub=lambda s: sub(r'\s', "", s), context=None, indent=None):
     """Display presumed annotation/factor dataframe in plaintext CLS format"""
     columns = [(l0, l1) for (l0, l1) in obj.columns if l0 != "info"]
     if len(columns) != 1:
@@ -35,7 +35,7 @@ def cls(obj, continuous=None, space_sub=lambda s: sub(r'\s', "", s), indent=None
     return Response(content, mimetype="text/plain")
 
 
-def gct(obj, indent=None):
+def gct(obj, context=None, indent=None):
     """Display presumed data dataframe in plaintext GCT format"""
     text = obj.to_csv(sep="\t", index=False, header=False)
     content = (
@@ -47,7 +47,7 @@ def gct(obj, indent=None):
     return Response(content, mimetype="text/plain")
 
 
-def xsv(obj, sep, indent=None):
+def xsv(obj, sep, context=None, indent=None):
     """Display dataframe in plaintext `sep`-separated format"""
     _kws = dict(sep=sep, index=False, header=False, na_rep="NaN")
     raw_header = obj.columns.to_frame().T.to_csv(**_kws)
@@ -59,7 +59,7 @@ csv = partial(xsv, sep=",")
 tsv = partial(xsv, sep="\t")
 
 
-def json(obj, indent=None):
+def json(obj, context=None, indent=None):
     """Display dataframe as JSON"""
     raw_json = {"columns": obj.columns.tolist(), "data": obj.values.tolist()}
     content = dumps(raw_json, indent=indent, cls=JSONByteEncoder)
