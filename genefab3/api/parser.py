@@ -2,7 +2,6 @@ from functools import lru_cache, partial
 from genefab3.common.utils import empty_iterator, leaf_count
 from collections import defaultdict
 from re import search, sub, escape
-from types import SimpleNamespace
 from genefab3.common.types import UniversalSet
 from genefab3.db.mongo.utils import is_safe_token
 from werkzeug.datastructures import MultiDict
@@ -60,6 +59,77 @@ DISALLOWED_CONTEXTS = {
     #    (c.view == "file") and
     #    (c.kwargs.get("format", "raw") not in {"raw", "json"}),
 }
+
+
+class Context():
+    """Stores request components parsed into MongoDB queries, projections, pipelines"""
+ 
+    SPECIAL_ARGUMENT_PARSER_DISPATCHER = lru_cache(1)(lambda: {
+        "file.filename": KeyValueParsers.kvp_filename,
+        "debug": empty_iterator, # pass as kwarg
+        "format": empty_iterator, # pass as kwarg
+    })
+ 
+    def __init__(self):
+        """Parse request components"""
+        url_root = escape(request.url_root.strip("/"))
+        base_url = request.base_url.strip("/")
+        self.full_path = request.full_path
+        self.view = sub(url_root, "", base_url).strip("/")
+        self.complete_kwargs = request.args.to_dict(flat=False)
+        self.unwind = []
+        self.query = {"$and": []}
+        self.projection = {}
+        self.accessions_and_assays = {}
+        processed_args = set(
+            arg for arg, values in request.args.lists()
+            if self.update(arg, values)
+        )
+        self.kwargs = MultiDict({
+            k: v for k, v in request.args.lists() if k not in processed_args
+        })
+        self.kwargs["debug"] = self.kwargs.get("debug", "0")
+        self.identity = quote("?".join([
+            self.view, dumps(self.complete_kwargs, sort_keys=True),
+        ]))
+        for description, scenario in DISALLOWED_CONTEXTS.items():
+            if scenario(self):
+                raise GeneFabParserException(description)
+ 
+    def update(self, arg, values):
+        """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections, pipelines"""
+        def _it():
+            category, *fields = arg.split(".")
+            if not is_safe_token(arg):
+                raise GeneFabParserException("Forbidden argument", arg=arg)
+            elif arg in SPECIAL_ARGUMENT_PARSER_DISPATCHER():
+                parser = SPECIAL_ARGUMENT_PARSER_DISPATCHER()[arg]
+            elif category in KEYVALUE_PARSER_DISPATCHER():
+                parser = KEYVALUE_PARSER_DISPATCHER()[category]
+            else:
+                msg = "Unrecognized argument"
+                raise GeneFabParserException(msg, **{arg: values})
+            for value in values:
+                if not is_safe_token(value):
+                    raise GeneFabParserException("Forbidden value", arg=value)
+                if (value) and (len(fields) == 1):
+                    # assay.characteristics=age -> assay.characteristics.age
+                    yield from parser(fields=[*fields, value], value="")
+                else:
+                    # assay.characteristics.age
+                    # assay.characteristics.age=5
+                    # from=GLDS-1.assay
+                    yield from parser(fields=fields, value=value)
+        is_converted_to_query = None
+        for unwind, query, projection_keys, accessions_and_assays in _it():
+            if unwind:
+                self.unwind.append(unwind)
+            self.query["$and"].append(query)
+            self.projection.update({k: True for k in projection_keys})
+            for accession, assay_names in accessions_and_assays.items():
+                self.accessions_and_assays[accession] = sorted(assay_names)
+            is_converted_to_query = True
+        return is_converted_to_query
 
 
 class KeyValueParsers():
@@ -124,62 +194,3 @@ class KeyValueParsers():
                 query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
         unwind = None
         yield unwind, query, projection_keys, {}
-
-
-def INPLACE_update_context(context, rargs):
-    """Interpret all key-value pairs that give rise to database queries"""
-    for arg in rargs:
-        def _it():
-            category, *fields = arg.split(".")
-            if not is_safe_token(arg):
-                raise GeneFabParserException("Forbidden argument", arg=arg)
-            elif arg in SPECIAL_ARGUMENT_PARSER_DISPATCHER():
-                parser = SPECIAL_ARGUMENT_PARSER_DISPATCHER()[arg]
-            elif category in KEYVALUE_PARSER_DISPATCHER():
-                parser = KEYVALUE_PARSER_DISPATCHER()[category]
-            else:
-                msg = "Unrecognized argument"
-                raise GeneFabParserException(msg, **{arg: rargs[arg]})
-            for value in rargs.getlist(arg):
-                if not is_safe_token(value):
-                    raise GeneFabParserException("Forbidden value", arg=value)
-                if (value) and (len(fields) == 1):
-                    # assay.characteristics=age -> assay.characteristics.age
-                    yield from parser(fields=[*fields, value], value="")
-                else:
-                    # assay.characteristics.age
-                    # assay.characteristics.age=5
-                    # from=GLDS-1.assay
-                    yield from parser(fields=fields, value=value)
-        for unwind, query, projection_keys, accessions_and_assays in _it():
-            if unwind:
-                context.unwind.append(unwind)
-            context.query["$and"].append(query)
-            context.projection.update({k: True for k in projection_keys})
-            for accession, assay_names in accessions_and_assays.items():
-                context.accessions_and_assays[accession] = sorted(assay_names)
-            yield arg
-
-
-def Context():
-    """Parse request components"""
-    url_root = escape(request.url_root.strip("/"))
-    base_url = request.base_url.strip("/")
-    context = SimpleNamespace(
-        full_path=request.full_path,
-        view=sub(url_root, "", base_url).strip("/"),
-        complete_kwargs=request.args.to_dict(flat=False),
-        unwind=[], query={"$and": []}, projection={}, accessions_and_assays={},
-    )
-    processed_args = set(INPLACE_update_context(context, request.args))
-    context.kwargs = MultiDict({
-        k: v for k, v in request.args.lists() if k not in processed_args
-    })
-    context.kwargs["debug"] = context.kwargs.get("debug", "0")
-    context.identity = quote("?".join([
-        context.view, dumps(context.complete_kwargs, sort_keys=True),
-    ]))
-    for description, scenario in DISALLOWED_CONTEXTS.items():
-        if scenario(context):
-            raise GeneFabParserException(description)
-    return context
