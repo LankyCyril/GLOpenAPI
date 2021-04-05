@@ -4,7 +4,7 @@ from collections import defaultdict
 from re import search, sub, escape
 from genefab3.common.types import UniversalSet
 from genefab3.db.mongo.utils import is_safe_token
-from werkzeug.datastructures import MultiDict
+from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabParserException
 from flask import request
 from urllib.request import quote
@@ -42,9 +42,9 @@ DISALLOWED_CONTEXTS = {
     "metadata queries are not valid for /status/": lambda c:
         (c.view == "status") and (leaf_count(c.query) > 0),
     "'format=cls' is only valid for /samples/": lambda c:
-        (c.view != "samples") and (c.kwargs.get("format") == "cls"),
+        (c.view != "samples") and (c.format == "cls"),
     "'format=gct' is only valid for /data/": lambda c:
-        (c.view != "data") and (c.kwargs.get("format") == "gct"),
+        (c.view != "data") and (c.format == "gct"),
     "'file.filename=' can only be specified once": lambda c:
         (len(c.complete_kwargs.get("file.filename", [])) > 1),
     "only one of 'file.filename=', 'file.datatype=' can be specified": lambda c:
@@ -53,11 +53,11 @@ DISALLOWED_CONTEXTS = {
     "/data/ requires a 'file.datatype=' argument": lambda c:
         (c.view == "data") and ("file.datatype" not in c.complete_kwargs),
     "'format=gct' is not valid for the requested datatype": lambda c:
-        (c.kwargs.get("format") == "gct") and
+        (c.format == "gct") and
         (c.complete_kwargs.get("file.datatype", []) != ["unnormalized counts"]),
     "/file/ only accepts 'format=raw' or 'format=json'": lambda c:
         (c.view == "file") and
-        (c.kwargs.get("format", "raw") not in {"raw", "json"}),
+        ((c.format or "raw") not in {"raw", "json"}),
 }
 
 
@@ -85,13 +85,18 @@ class Context():
             arg for arg, values in request.args.lists()
             if self.update(arg, values)
         )
-        self.kwargs = MultiDict({
-            k: v for k, v in request.args.lists() if k not in processed_args
-        })
-        self.kwargs["debug"] = self.kwargs.get("debug", "0")
         self.identity = quote("?".join([
             self.view, dumps(self.complete_kwargs, sort_keys=True),
         ]))
+        for k, v in request.args.items():
+            if k not in processed_args:
+                if not hasattr(self, k):
+                    setattr(self, k, v)
+                else:
+                    msg = "Cannot set context"
+                    raise GeneFabConfigurationException(msg, **{k: v})
+        self.format = getattr(self, "format", None)
+        self.debug = getattr(self, "debug", "0")
         for description, scenario in DISALLOWED_CONTEXTS.items():
             if scenario(self):
                 raise GeneFabParserException(description)

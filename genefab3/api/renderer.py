@@ -63,8 +63,8 @@ class CacheableRenderer():
         @wraps(method)
         def wrapper(*args, **kwargs):
             context = Context()
-            fmt = context.kwargs.get("format", getattr(method, "fmt", "raw"))
-            if context.kwargs["debug"] == "1":
+            fmt = context.format or getattr(method, "fmt", "raw")
+            if context.debug == "1":
                 response = self.dispatch_renderer(context.__dict__, 4, "json")
             else:
                 # TODO check cache based on context.identity

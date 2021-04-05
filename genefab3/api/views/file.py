@@ -38,7 +38,7 @@ def get_descriptor(mongo_collections, locale, context):
 def get(mongo_collections, *, locale, context):
     """Return file if annotation filters constrain search to unique file entity"""
     descriptor = get_descriptor(mongo_collections, locale, context)
-    if context.kwargs.get("format") == "json":
+    if context.format == "json":
         return descriptor
     else:
         raise NotImplementedError(f"Redirect to file {descriptor}")
