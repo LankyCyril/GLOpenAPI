@@ -78,7 +78,7 @@ def get(mongo_collections, *, locale, context, include=(), drop_trailing_fields=
         dataframe = iisaf_sort_dataframe(dataframe)
         dataframe.columns = MultiIndex.from_tuples(
             (fields[0], ".".join(fields[1:])) if fields[0] == "info"
-            else (".".join(fields[:2]), ".".join(fields[2:]) or "_")
+            else (".".join(fields[:2]), ".".join(fields[2:]) or "*")
             for fields in map(lambda s: s.split("."), dataframe.columns)
         )
         if aggregate: # coerce to boolean "existence" if requested

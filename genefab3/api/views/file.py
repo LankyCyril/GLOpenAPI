@@ -8,7 +8,7 @@ from genefab3.common.exceptions import GeneFabFileException
 def get_descriptor(mongo_collections, locale, context):
     """Return file descriptor if annotation filters constrain search to unique file entity"""
     context.update("file.filename")
-    ff_ = ("file.filename", "_")
+    ff_ = ("file.filename", "*")
     annotation = metadata.get(
         mongo_collections, locale=locale, context=context,
         drop_trailing_fields=False, aggregate=False,
