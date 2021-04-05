@@ -1,4 +1,5 @@
 from flask import Response
+from numpy import generic as NumpyGenericType
 from json import dumps
 
 
@@ -18,7 +19,15 @@ def html(obj, indent=None):
         return Response(obj.decode(), mimetype="text/html")
 
 
+def _json_default(o):
+    """Serialize numpy entries as native types, other unserializable entries as their type names"""
+    if isinstance(o, NumpyGenericType):
+        return o.item()
+    else:
+        return str(type(o))
+
+
 def json(obj, indent=None):
     """Display record in plaintext dump format"""
-    content = dumps(obj, indent=indent, default=lambda o: str(type(o)))
+    content = dumps(obj, indent=indent, default=_json_default)
     return Response(content, mimetype="text/json")
