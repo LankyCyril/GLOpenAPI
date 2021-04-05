@@ -55,9 +55,9 @@ DISALLOWED_CONTEXTS = {
     "'format=gct' is not valid for the requested datatype": lambda c:
         (c.kwargs.get("format") == "gct") and
         (c.complete_kwargs.get("file.datatype", []) != ["unnormalized counts"]),
-    #"/file/ only accepts 'format=raw' or 'format=json'": lambda c:
-    #    (c.view == "file") and
-    #    (c.kwargs.get("format", "raw") not in {"raw", "json"}),
+    "/file/ only accepts 'format=raw' or 'format=json'": lambda c:
+        (c.view == "file") and
+        (c.kwargs.get("format", "raw") not in {"raw", "json"}),
 }
 
 
