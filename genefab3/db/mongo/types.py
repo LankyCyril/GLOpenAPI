@@ -3,8 +3,6 @@ from base64 import encodebytes
 from zlib import compress
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.db.mongo.utils import run_mongo_transaction
-from genefab3.common.types import HashableEnough
-from copy import deepcopy
 
 
 class ValueCheckedRecord():
@@ -45,19 +43,3 @@ class ValueCheckedRecord():
                         "replace", collection, query=identifier,
                         data={"base64value": self.base64value},
                     )
-
-
-class HashableDocument(HashableEnough):
-    """Hashable, sortable representation of MongoDB document"""
- 
-    def __init__(self, entry):
-        self.name = entry.get("")
-        self.as_dict = deepcopy(entry)
-        self.identity = dumps(entry, sort_keys=True)
-        HashableEnough.__init__(self, ("identity",))
- 
-    def __lt__(self, other):
-        if isinstance(other, HashableDocument):
-            return self.identity < other.identity
-        else:
-            return self < other
