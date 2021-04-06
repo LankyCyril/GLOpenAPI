@@ -81,6 +81,7 @@ class Context():
         self.query = {"$and": []}
         self.projection = {}
         self.accessions_and_assays = {}
+        self.parser_errors = []
         processed_args = set(
             arg for arg, values in request.args.lists()
             if self.update(arg, values)
@@ -99,7 +100,10 @@ class Context():
         self.debug = getattr(self, "debug", "0")
         for description, scenario in DISALLOWED_CONTEXTS.items():
             if scenario(self):
-                raise GeneFabParserException(description)
+                if self.debug == "0":
+                    raise GeneFabParserException(description)
+                else:
+                    self.parser_errors.append(description)
  
     def update(self, arg, values=("",)):
         """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections, pipelines"""
