@@ -40,23 +40,31 @@ def build_url(context, target_view=None, drop=set()):
     return "".join(parts)
 
 
-def get_browser_glds_formatter(context):
+def get_browser_glds_formatter(context, i):
     """Get SlickGrid formatter for column 'accession'"""
     url = build_url(context, drop={"from"})
-    _fr = f"""columns[0].formatter=function(r,c,v,d,x){{return "<a "+
-    "class='filter' href='{url}from="+escape(v)+"'>"+v+"</a>";}};"""
-    return f"columns[0].formatter={_fr}; columns[0].defaultFormatter={_fr};"
+    _fr = f"""function(r,c,v,d,x){{return "<a class='filter' "+
+        "href='{url}from="+escape(v)+"'>"+v+"</a>";}};"""
+    return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
 
 
-def get_browser_assay_formatter(context, shortnames):
+def get_browser_assay_formatter(context, i, shortnames):
     """Get SlickGrid formatter for column 'assay name'"""
     url, s = build_url(context, "samples", drop={"from"}), shortnames[0]
     _fr = f"""function(r,c,v,d,x){{return "<a class='filter' "+
         "href='{url}from="+data[r]["{s}"]+"."+escape(v)+"'>"+v+"</a>";}};"""
-    return f"columns[1].formatter={_fr}; columns[1].defaultFormatter={_fr};"
+    return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
 
 
-def get_browser_meta_formatter(context, i, category, subkey, target):
+def get_browser_file_formatter(context, i):
+    """Get SlickGrid formatter for file column"""
+    url = build_url(context, "file", drop={"format"})
+    _fr = f"""function(r,c,v,d,x){{return "<a class='file' "+
+        "href='{url}file.filename="+escape(v)+"&format=json'>"+v+"</a>";}};"""
+    return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
+
+
+def get_browser_meta_formatter(context, i, category, field, target):
     """Get SlickGrid formatter for meta column"""
     url = build_url(context)
     if context.view == "assays":
@@ -65,14 +73,14 @@ def get_browser_meta_formatter(context, i, category, subkey, target):
             ? "<i style='color:#BBB'>"+v+"</i>"
             : ((v == "False")
             ? "<font style='color:#FAA'>"+v+"</font>"
-            : "<a href='{url}"+escape("{category}.{subkey}.{target}")+
+            : "<a href='{url}"+escape("{category}.{field}.{target}")+
                 "' style='color:green' class='filter'>"+v+"</a>");
         }};"""
     else:
         _fr = f"""function(r,c,v,d,x){{
             return (v == "NA")
             ? "<i style='color:#BBB'>"+v+"</i>"
-            : "<a href='{url}"+escape("{category}.{subkey}.{target}")+
+            : "<a href='{url}"+escape("{category}.{field}.{target}")+
                 "="+escape(v)+"' class='filter'>"+v+"</a>";
         }};"""
     return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
@@ -80,14 +88,18 @@ def get_browser_meta_formatter(context, i, category, subkey, target):
 
 def iter_formatters(obj, context, shortnames):
     """Get SlickGrid formatters for columns"""
-    if obj.columns[0] == ("info", "accession"):
-        yield get_browser_glds_formatter(context)
-    if (len(obj.columns) > 1) and (obj.columns[1] == ("info", "assay")):
-        yield get_browser_assay_formatter(context, shortnames)
     for i, (key, target) in enumerate(obj.columns):
-        cat, *fields = key.split(".")
-        if (len(fields) == 1) and (cat not in {"info", "file"}):
-            yield get_browser_meta_formatter(context, i, cat, fields[0], target)
+        if (key == "info") and (target == "accession"):
+            yield get_browser_glds_formatter(context, i)
+        elif (key == "info") and (target == "assay"):
+            yield get_browser_assay_formatter(context, i, shortnames)
+        elif key in {"file.datatype", "file.filename"}:
+            yield get_browser_file_formatter(context, i)
+        else:
+            cat, *fields = key.split(".")
+            if len(fields) == 1:
+                field = fields[0]
+                yield get_browser_meta_formatter(context, i, cat, field, target)
 
 
 SQUASHED_PREHEADER_CSS = """
