@@ -14,7 +14,7 @@ def get(mongo_collections):
         {}, {"_id": False, **{c: True for c in STATUS_COLUMNS}},
     )
     status_df = json_normalize(list(status_json), max_level=0).sort_values(
-        by="report timestamp", ascending=False,
+        by=["report timestamp", "report type"], ascending=[False, True],
     )
     status_df = status_df[[c for c in STATUS_COLUMNS if c in status_df]]
     status_df["report timestamp"] = status_df["report timestamp"].apply(
