@@ -1,7 +1,6 @@
-from pandas import DataFrame
+from pandas import DataFrame, isnull
 from genefab3.common.exceptions import GeneFabConfigurationException
 from collections.abc import Iterable
-from pandas import isnull
 from functools import lru_cache
 from pathlib import Path
 from genefab3.common.utils import map_replace
@@ -58,7 +57,7 @@ def get_browser_assay_formatter(context, i, shortnames):
 
 def get_browser_file_formatter(context, i):
     """Get SlickGrid formatter for file column"""
-    url = build_url(context, "file", drop={"format"})
+    url = build_url(context, "file", drop={"format", "file.filename"})
     _fr = f"""function(r,c,v,d,x){{return "<a class='file' "+
         "href='{url}file.filename="+escape(v)+"&format=json'>"+v+"</a>";}};"""
     return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
@@ -133,7 +132,6 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_pr
         "// FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
         "/*SQUASH_PREHDR*/": SQUASHED_PREHEADER_CSS if squash_preheader else "",
         "// FORMATTERS": "\n".join(formatters) if use_formatters else "",
-        "HTMLINK": build_url(context, drop={"format"}) + "format=html",
         "CSVLINK": build_url(context, drop={"format"}) + "format=csv",
         "TSVLINK": build_url(context, drop={"format"}) + "format=tsv",
         "JSONLINK": build_url(context, drop={"format"}) + "format=json",
