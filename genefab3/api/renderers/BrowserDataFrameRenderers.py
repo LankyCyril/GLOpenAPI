@@ -90,13 +90,13 @@ def iter_formatters(obj, context, shortnames):
             yield get_browser_meta_formatter(context, i, cat, fields[0], target)
 
 
-SHRUNK_HEADER_CSS = """
+SQUASHED_PREHEADER_CSS = """
 .slick-preheader-panel .slick-header-column {font-size: 9pt; line-height: .8}
 .slick-preheader-panel .slick-column-name {position: relative; top: -1pt}
 """
 
 
-def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, shrink_preheader=False):
+def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_preheader=False):
     """Display dataframe with two-level columns using SlickGrid"""
     _assert_type(obj, nlevels=2)
     shortnames = []
@@ -116,14 +116,11 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, shrink_pr
         f"{{id:'{n}',field:'{n}',columnGroup:'{a}',name:'{b}'}},"
         for (a, b), n in zip(obj.columns, shortnames)
     )
-    if use_formatters:
-        formatters = "\n".join(iter_formatters(obj, context, shortnames))
-    else:
-        formatters = ""
+    formatters = iter_formatters(obj, context, shortnames)
     content = map_replace(_get_browser_html(), {
         "// FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
-        "/* SHRINKPREHEADER */": SHRUNK_HEADER_CSS if shrink_preheader else "",
-        "// FORMATTERS": formatters,
+        "/*SQUASH_PREHDR*/": SQUASHED_PREHEADER_CSS if squash_preheader else "",
+        "// FORMATTERS": "\n".join(formatters) if use_formatters else "",
         "HTMLINK": build_url(context, drop={"format"}) + "format=html",
         "CSVLINK": build_url(context, drop={"format"}) + "format=csv",
         "TSVLINK": build_url(context, drop={"format"}) + "format=tsv",
@@ -139,13 +136,9 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, shrink_pr
 def threelevel(obj, context, indent=None):
     """Squash two top levels of dataframe columns and display as two-level"""
     _assert_type(obj, nlevels=3)
-    def renamer_generator(): # TODO can be refactored as inline
-        for l0, l1, _ in obj.columns:
-            yield f"{l0}<br>{l1}"
-    renamer = renamer_generator()
-    def renamer_wrapper(*args):
-        return next(renamer)
+    squashed_names = (f"{l0}<br>{l1}" for l0, l1, _ in obj.columns)
+    renamer = lambda *a: next(squashed_names)
     return twolevel(
-        obj.droplevel(0, axis=1).rename(renamer_wrapper, axis=1, level=0),
-        context=context, use_formatters=False, shrink_preheader=True,
+        obj.droplevel(0, axis=1).rename(renamer, axis=1, level=0),
+        context=context, use_formatters=False, squash_preheader=True,
     )
