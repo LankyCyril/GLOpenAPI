@@ -43,17 +43,16 @@ def build_url(context, target_view=None, drop=set()):
 def get_browser_glds_formatter(context):
     """Get SlickGrid formatter for column 'accession'"""
     url = build_url(context, drop={"from"})
-    _fr = f"""columns[0].formatter=function(r,c,v,d,x){{
-        return "<a href='{url}from="+escape(v)+"'>"+v+"</a>";}};"""
+    _fr = f"""columns[0].formatter=function(r,c,v,d,x){{return "<a "+
+    "class='filter' href='{url}from="+escape(v)+"'>"+v+"</a>";}};"""
     return f"columns[0].formatter={_fr}; columns[0].defaultFormatter={_fr};"
 
 
 def get_browser_assay_formatter(context, shortnames):
     """Get SlickGrid formatter for column 'assay name'"""
     url, s = build_url(context, "samples", drop={"from"}), shortnames[0]
-    _fr = f"""function(r,c,v,d,x){{
-        return "<a href='{url}from="+data[r]["{s}"]+"."+escape(v)+"'>"+v+"</a>";
-    }};"""
+    _fr = f"""function(r,c,v,d,x){{return "<a class='filter' "+
+        "href='{url}from="+data[r]["{s}"]+"."+escape(v)+"'>"+v+"</a>";}};"""
     return f"columns[1].formatter={_fr}; columns[1].defaultFormatter={_fr};"
 
 
@@ -67,14 +66,14 @@ def get_browser_meta_formatter(context, i, category, subkey, target):
             : ((v == "False")
             ? "<font style='color:#FAA'>"+v+"</font>"
             : "<a href='{url}"+escape("{category}.{subkey}.{target}")+
-                "' style='color:green'>"+v+"</a>");
+                "' style='color:green' class='filter'>"+v+"</a>");
         }};"""
     else:
         _fr = f"""function(r,c,v,d,x){{
             return (v == "NA")
             ? "<i style='color:#BBB'>"+v+"</i>"
             : "<a href='{url}"+escape("{category}.{subkey}.{target}")+
-                "="+escape(v)+"'>"+v+"</a>";
+                "="+escape(v)+"' class='filter'>"+v+"</a>";
         }};"""
     return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
 
