@@ -48,3 +48,9 @@ class DefaultRoutes(Routes):
         return views.file.get(
             self.mongo_collections, locale=self.locale, context=context,
         )
+ 
+    @Routes.register_endpoint()
+    def data(self, context):
+        return views.data.get(
+            self.mongo_collections, locale=self.locale, context=context,
+        )

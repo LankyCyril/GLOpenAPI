@@ -17,4 +17,3 @@ RESPONSE_CACHE_SCHEMAS = ImmutableDict({
 
 ## (Meta)data parameters
 
-ISA_TECH_TYPE_LOCATOR = "investigation.study assays.study assay technology type"

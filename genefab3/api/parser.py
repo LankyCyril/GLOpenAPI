@@ -50,8 +50,6 @@ DISALLOWED_CONTEXTS = {
     "only one of 'file.filename=', 'file.datatype=' can be specified": lambda c:
         (len(c.complete_kwargs.get("file.filename", [])) > 1) and
         (len(c.complete_kwargs.get("file.datatype", [])) > 1),
-    "/data/ requires a 'file.datatype=' argument": lambda c:
-        (c.view == "data") and ("file.datatype" not in c.complete_kwargs),
     "'format=gct' is not valid for the requested datatype": lambda c:
         (c.format == "gct") and
         (c.complete_kwargs.get("file.datatype", []) != ["unnormalized counts"]),
