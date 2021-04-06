@@ -5,7 +5,7 @@ from collections.abc import ValuesView
 from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.types import NestedDefaultDict
-from operator import getitem
+from operator import getitem as gi_
 from pymongo import ASCENDING
 
 
@@ -108,11 +108,17 @@ def run_mongo_transaction(action, collection, *, query=None, data=None, document
         )
 
 
-def reduce_projection(fp):
-    """Drop shorter paths if they conflict with longer paths"""
+def reduce_projection(fp, longest=False):
+    """Drop longer OR shorter paths if they conflict with longer paths"""
     d = NestedDefaultDict()
-    [reduce(getitem, k.split("."), d) for k in fp]
-    return {k: v for k, v in fp.items() if not reduce(getitem, k.split("."), d)}
+    [reduce(gi_, k.split("."), d) for k in fp]
+    if longest:
+        return {k: v for k, v in fp.items() if not reduce(gi_, k.split("."), d)}
+    else:
+        for k in sorted(fp, reverse=True):
+            v = reduce(gi_, k.split("."), d)
+            v[True] = [v.clear() if v else None]
+        return {k: v for k, v in fp.items() if reduce(gi_, k.split("."), d)}
 
 
 def retrieve_by_context(collection, pipeline, query, full_projection, sortby, locale):
