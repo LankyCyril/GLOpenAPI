@@ -1,8 +1,8 @@
+from collections import defaultdict
 from werkzeug.datastructures import ImmutableDict
 from numpy import nan
-from collections.abc import Hashable
+from collections.abc import Hashable, Callable
 from itertools import zip_longest
-from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
 
@@ -16,6 +16,9 @@ class UniversalSet(set):
     def __ior__(self, x): return self
     def __ror__(self, x): return self
     def __contains__(self, x): return True
+
+
+NestedDefaultDict = lambda: defaultdict(NestedDefaultDict)
 
 
 def ImmutableTree(d, step_tracker=1, max_steps=256):

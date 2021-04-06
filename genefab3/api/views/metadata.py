@@ -1,4 +1,4 @@
-from pymongo import ASCENDING
+from genefab3.db.mongo.utils import retrieve_by_context
 from pandas import json_normalize, MultiIndex, isnull
 from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -14,21 +14,10 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
         "info.accession": True, "info.assay": True,
         **context.projection, **{field: True for field in include},
     }
-    if context.pipeline:
-        cursor = mongo_collections.metadata.aggregate(
-            pipeline=[
-                {"$sort": {f: ASCENDING for f in sortby}},
-                *context.pipeline, {"$match": context.query},
-                {"$project": {**full_projection, "_id": False}},
-            ],
-            collation={"locale": locale, "numericOrdering": True},
-        )
-    else:
-        cursor = mongo_collections.metadata.find(
-            context.query, {**full_projection, "_id": False},
-            sort=[(f, ASCENDING) for f in sortby],
-            collation={"locale": locale, "numericOrdering": True},
-        )
+    cursor = retrieve_by_context(
+        mongo_collections.metadata, context.pipeline, context.query,
+        full_projection, sortby, locale,
+    )
     try:
         return json_normalize(list(cursor)), full_projection
     except MongoOperationError as e:

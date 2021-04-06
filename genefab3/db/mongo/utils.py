@@ -1,9 +1,12 @@
 from pandas import isnull
-from functools import partial
+from functools import partial, reduce
 from bson.errors import InvalidDocument as InvalidDocumentError
 from collections.abc import ValuesView
 from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabDatabaseException
+from genefab3.common.types import NestedDefaultDict
+from operator import getitem
+from pymongo import ASCENDING
 
 
 def isempty(v):
@@ -102,4 +105,31 @@ def run_mongo_transaction(action, collection, *, query=None, data=None, document
         raise GeneFabDatabaseException(
             error_message, action=action, collection=collection,
             query=query, data=data, documents=documents,
+        )
+
+
+def reduce_projection(fp):
+    """Drop shorter paths if they conflict with longer paths"""
+    d = NestedDefaultDict()
+    [reduce(getitem, k.split("."), d) for k in fp]
+    return {k: v for k, v in fp.items() if not reduce(getitem, k.split("."), d)}
+
+
+def retrieve_by_context(collection, pipeline, query, full_projection, sortby, locale):
+    """Run .find() or .aggregate() based on query, projection, pipeline steps"""
+    if pipeline:
+        reduced_projection = reduce_projection(full_projection)
+        return collection.aggregate(
+            pipeline=[
+                {"$sort": {f: ASCENDING for f in sortby}},
+                *pipeline, {"$match": query},
+                {"$project": {**reduced_projection, "_id": False}},
+            ],
+            collation={"locale": locale, "numericOrdering": True},
+        )
+    else:
+        return collection.find(
+            query, {**full_projection, "_id": False},
+            sort=[(f, ASCENDING) for f in sortby],
+            collation={"locale": locale, "numericOrdering": True},
         )
