@@ -6,7 +6,7 @@ from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.utils import copy_and_drop
 
 
-def get_descriptor_dataframe(mongo_collections, locale, context, include=()):
+def get_descriptor_dataframe(mongo_collections, *, locale, context, include=()):
     """Return DataFrame of file descriptors that match user query"""
     _cols = [*{k[0] for k in include if k != "file.filename"}, "file.filename"]
     for key in ["file.filename", *map(".".join, include)]:
@@ -36,16 +36,18 @@ def get_descriptor_dataframe(mongo_collections, locale, context, include=()):
 
 def get(mongo_collections, *, locale, context):
     """Return file if annotation filters constrain search to unique file entity"""
-    descriptors = get_descriptor_dataframe(mongo_collections, locale, context)
-    if descriptors.empty:
+    descriptor_dataframe = get_descriptor_dataframe(
+        mongo_collections, locale=locale, context=context,
+    )
+    if descriptor_dataframe.empty:
         raise FileNotFoundError("No file found matching specified constraints")
-    elif len(descriptors) > 1:
+    elif len(descriptor_dataframe) > 1:
         raise GeneFabFileException(
             "Multiple files match search criteria",
-            filenames=descriptors[("file.filename", "*")].tolist(),
+            filenames=descriptor_dataframe[("file.filename", "*")].tolist(),
         )
     else:
-        descriptor = descriptors["file.filename"].iloc[0].to_dict()
+        descriptor = descriptor_dataframe["file.filename"].iloc[0].to_dict()
     if context.format == "json":
         return {"filename": descriptor["*"], **copy_and_drop(descriptor, {"*"})}
     else:
