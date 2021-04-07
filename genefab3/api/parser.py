@@ -85,6 +85,8 @@ class Context():
             arg for arg, values in request.args.lists()
             if self.update(arg, values)
         )
+        if not self.query["$and"]:
+            self.query = {}
         self.identity = quote("?".join([
             self.view, dumps(self.complete_kwargs, sort_keys=True),
         ]))
