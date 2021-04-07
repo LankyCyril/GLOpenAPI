@@ -1,14 +1,14 @@
 from urllib.request import urlopen
-from urllib.error import URLError
 from json import loads
-from natsort import natsorted
-from genefab3.common.types import Adapter
-from genefab3.common.exceptions import GeneFabJSONException
-from genefab3.common.exceptions import GeneFabConfigurationException
+from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabDataManagerException
-from pandas import json_normalize, Timestamp
+from pandas import Timestamp, json_normalize
 from urllib.parse import quote
 from re import search, sub
+from genefab3.common.exceptions import GeneFabConfigurationException
+from genefab3.common.types import Adapter
+from natsort import natsorted
+from genefab3.common.exceptions import GeneFabJSONException
 from warnings import catch_warnings, filterwarnings
 from dateutil.parser import UnknownTimezoneWarning
 from functools import lru_cache
@@ -46,14 +46,20 @@ SPECIAL_FILE_TYPES = {
         "type": "table",
         "datatype": "visualization table",
         "index_name": "ENSEMBL",
-        "conditional": False,
+        "condition": lambda sample: "rna sequencing (rna-seq)" == (sample
+            .get("Investigation", {}).get("Study Assays", {})
+            .get("Study Assay Technology Type", "").lower()
+        ),
     },
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$': {
         "cacheable": True,
         "type": "table",
         "datatype": "pca",
         "index_name": "sample name",
-        "conditional": False,
+        "condition": lambda sample: "rna sequencing (rna-seq)" == (sample
+            .get("Investigation", {}).get("Study Assays", {})
+            .get("Study Assay Technology Type", "").lower()
+        ),
     },
 }
 

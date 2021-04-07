@@ -121,20 +121,17 @@ class Sample(dict):
     def _INPLACE_extend_with_dataset_files(self):
         """Populate with File annotation for files that match records for the sample"""
         isa_elements = set(iterate_terminal_leaf_elements(self))
-        dataset_files = set(self.dataset.files)
-        unconditional_dataset_files = {
+        filenames = {
             fn for fn, fd in self.dataset.files.items()
-            if fd.get("conditional") is False
+            if fd.get("condition", lambda _: fn in isa_elements)(self)
         }
-        filenames = (isa_elements & dataset_files) | unconditional_dataset_files
+        _get_datatype = lambda f: self.dataset.files[f].get("datatype", urn(f))
+        _make_entry = lambda f: {
+            "": f, **copy_and_drop(self.dataset.files[f], {"condition"}),
+        }
         self["File"] = {
-            "datatype": {
-                self.dataset.files[f].get("datatype", urn(f)): {
-                    "": f, **self.dataset.files[f],
-                }
-                for f in filenames
-            },
-            "filename": [{"": f, **self.dataset.files[f]} for f in filenames],
+            "datatype": {_get_datatype(f): _make_entry(f) for f in filenames},
+            "filename": [_make_entry(f) for f in filenames],
         }
  
     def _get_subkey_value(self, entry, key, subkey):
