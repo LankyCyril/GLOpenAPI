@@ -33,9 +33,9 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
 
 def INPLACE_drop_trailing_fields(dataframe, full_projection):
     """Drop qualifier fields from single-level dataframe, unless explicitly requested in projection"""
-    is_trailing = lambda c:(
-        (c not in full_projection) and
-        (len(findall(r'\..', c)) + c.startswith("file.filename") >= 3)
+    is_trailing = lambda c: (
+        (c not in full_projection) and (c.startswith("file.datatype.urn:uuid:")
+        or (len(findall(r'\..', c)) + c.startswith("file.filename") >= 3))
     )
     dataframe.drop(inplace=True, columns=filter(is_trailing, dataframe.columns))
 
