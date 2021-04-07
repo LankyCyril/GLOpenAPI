@@ -3,7 +3,8 @@ from genefab3.common.exceptions import GeneFabFileException, GeneFabISAException
 from genefab3.common.utils import pick_reachable_url, urn
 from genefab3.db.sql.types import CachedBinaryFile
 from genefab3.isa.parser import IsaFromZip
-from genefab3.common.utils import copy_and_drop, iterate_terminal_leaf_elements
+from genefab3.common.utils import deepcopy_and_drop, copy_and_drop
+from genefab3.common.utils import iterate_terminal_leaf_elements
 
 
 class Dataset():
@@ -82,7 +83,7 @@ class Sample(dict):
  
     def _INPLACE_extend_with_assay_metadata(self, assay_entry):
         """Populate with Assay tab annotation, Investigation Study Assays entry"""
-        self["Assay"] = copy_and_drop(assay_entry, {"Info"})
+        self["Assay"] = deepcopy_and_drop(assay_entry, {"Info"})
         self["Investigation"] = {
             k: v for k, v in self.dataset.isa.investigation.items()
             if (isinstance(v, list) or k == "Investigation")
@@ -107,7 +108,7 @@ class Sample(dict):
             self["Info"]["Study"] = self._get_subkey_value(
                 study_entry, "Info", "Study",
             )
-            self["Study"] = copy_and_drop(study_entry, {"Info"})
+            self["Study"] = deepcopy_and_drop(study_entry, {"Info"})
             self["Investigation"]["Study"] = (
                 self.dataset.isa.investigation["Study"].get(self.study_name, {})
             )

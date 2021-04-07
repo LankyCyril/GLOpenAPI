@@ -62,10 +62,15 @@ def map_replace(string, mappings):
     )
 
 
-def copy_and_drop(d, keys):
-    """Deepcopy dictionary `d`, delete `d[key] for key in keys`"""
+def copy_and_drop(d, drop):
+    """Shallowcopy dictionary `d`, delete `d[key] for key in drop`"""
+    return {k: v for k, v in d.items() if k not in drop}
+
+
+def deepcopy_and_drop(d, drop):
+    """Deepcopy dictionary `d`, delete `d[key] for key in drop`"""
     d_copy = deepcopy(d)
-    for key in keys:
+    for key in drop:
         if key in d_copy:
             del d_copy[key]
     return d_copy
