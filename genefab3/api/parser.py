@@ -72,6 +72,7 @@ class Context():
         """Parse request components"""
         url_root = escape(request.url_root.strip("/"))
         base_url = request.base_url.strip("/")
+        self.url_root = request.url_root
         self.full_path = request.full_path
         self.view = sub(url_root, "", base_url).strip("/")
         self.complete_kwargs = request.args.to_dict(flat=False)

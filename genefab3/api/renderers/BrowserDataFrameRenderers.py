@@ -32,11 +32,11 @@ def _get_browser_html():
 
 def build_url(context, target_view=None, drop=set()):
     """Rebuild URL from request, alter based on `replace` and `drop`"""
-    parts = ["/" + (target_view or context.view) + "/?"]
-    for arg, values in context.complete_kwargs.items():
-        if arg not in drop:
-            parts.extend([f"{arg}={v}&" if v else f"{arg}&" for v in values])
-    return "".join(parts)
+    return "".join(sum((
+        [f"{arg}={v}&" if v else f"{arg}&" for v in values]
+        for arg, values in context.complete_kwargs.items() if arg not in drop),
+        [context.url_root.rstrip("/")+"/", (target_view or context.view), "/?"],
+    ))
 
 
 def get_browser_glds_formatter(context, i):
