@@ -21,6 +21,10 @@ COLD_GLDS_MASK = COLD_API_ROOT + "/data/study/data/{}/"
 COLD_FILELISTINGS_MASK = COLD_API_ROOT + "/data/study/filelistings/{}"
 ALT_FILEPATH = "/genelab/static/media/dataset/"
 
+get_sample_tech_type = lambda sample: (sample
+    .get("Investigation", {}).get("Study Assays", {})
+    .get("Study Assay Technology Type", "").lower()
+)
 
 SPECIAL_FILE_TYPES = {
     r'.*_metadata_.*[_-]ISA\.zip$': {
@@ -46,20 +50,18 @@ SPECIAL_FILE_TYPES = {
         "type": "table",
         "datatype": "visualization table",
         "index_name": "ENSEMBL",
-        "condition": lambda sample: "rna sequencing (rna-seq)" == (sample
-            .get("Investigation", {}).get("Study Assays", {})
-            .get("Study Assay Technology Type", "").lower()
-        ),
+        "condition": lambda sample: get_sample_tech_type(sample) in {
+            "rna sequencing (rna-seq)", "microarray", "dna microarray",
+        },
     },
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$': {
         "cacheable": True,
         "type": "table",
         "datatype": "pca",
         "index_name": "sample name",
-        "condition": lambda sample: "rna sequencing (rna-seq)" == (sample
-            .get("Investigation", {}).get("Study Assays", {})
-            .get("Study Assay Technology Type", "").lower()
-        ),
+        "condition": lambda sample: get_sample_tech_type(sample) in {
+            "rna sequencing (rna-seq)", "microarray", "dna microarray",
+        },
     },
 }
 
