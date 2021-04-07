@@ -124,7 +124,7 @@ class Sample(dict):
         dataset_files = set(self.dataset.files)
         unconditional_dataset_files = {
             fn for fn, fd in self.dataset.files.items()
-            if fd.get("unconditional") is True
+            if fd.get("conditional") is False
         }
         filenames = (isa_elements & dataset_files) | unconditional_dataset_files
         self["File"] = {

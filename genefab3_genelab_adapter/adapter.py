@@ -46,14 +46,14 @@ SPECIAL_FILE_TYPES = {
         "type": "table",
         "datatype": "visualization table",
         "index_name": "ENSEMBL",
-        "unconditional": True,
+        "conditional": False,
     },
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$': {
         "cacheable": True,
         "type": "table",
         "datatype": "pca",
         "index_name": "sample name",
-        "unconditional": True,
+        "conditional": False,
     },
 }
 
