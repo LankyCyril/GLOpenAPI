@@ -122,9 +122,12 @@ class Sample(dict):
     def _INPLACE_extend_with_dataset_files(self):
         """Populate with File annotation for files that match records for the sample"""
         isa_elements = set(iterate_terminal_leaf_elements(self))
+        _no_condition = lambda *_: True
         filenames = {
-            fn for fn, fd in self.dataset.files.items()
-            if fd.get("condition", lambda _: fn in isa_elements)(self)
+            filename for filename, filedata in self.dataset.files.items() if (
+                (filedata.get("internal") or (filename in isa_elements)) and
+                filedata.get("condition", _no_condition)(self, filename)
+            )
         }
         _get_datatype = lambda f: self.dataset.files[f].get("datatype", urn(f))
         _make_entry = lambda f: {

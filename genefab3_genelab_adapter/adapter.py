@@ -21,57 +21,55 @@ COLD_GLDS_MASK = COLD_API_ROOT + "/data/study/data/{}/"
 COLD_FILELISTINGS_MASK = COLD_API_ROOT + "/data/study/filelistings/{}"
 ALT_FILEPATH = "/genelab/static/media/dataset/"
 
-get_sample_tech_type = lambda sample: (sample
+datatype = lambda t, **kwargs: dict(datatype=t, **kwargs)
+CACHEABLE_TABLE = dict(cacheable=True, type="table")
+
+sample_name_matches = lambda sample, filename: (
+    sample.name and (sample.name in filename)
+)
+get_tech_type = lambda sample: (sample
     .get("Investigation", {}).get("Study Assays", {})
     .get("Study Assay Technology Type", "").lower()
 )
-is_expression_profiling = lambda sample: get_sample_tech_type(sample) in {
+is_expression_profiling = lambda sample, filename: get_tech_type(sample) in {
     "rna sequencing (rna-seq)", "microarray", "dna microarray",
 }
 
-CACHEABLE_TABLE = dict(cacheable=True, type="table")
-
-SPECIAL_FILE_TYPES = {
-    r'.*_metadata_.*[_-]ISA\.zip$': {
-        "datatype": "isa", "cacheable": True,
-    },
-    r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.txt$': {
-        "datatype": "processed microarray data", **CACHEABLE_TABLE,
-    },
-    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_raw_multiqc_data\.zip$': {
-        "datatype": "raw multiqc data",
-    },
-    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_raw_multiqc_report\.htm(l)?$': {
-        "datatype": "raw multiqc report",
-    },
-    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_trimmed_multiqc_data\.zip$': {
-        "datatype": "trimmed multiqc data",
-    },
-    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_trimmed_multiqc_report\.htm(l)?$': {
-        "datatype": "trimmed multiqc report",
-    },
-    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Normalized_Counts\.csv$': {
-        "datatype": "normalized counts", **CACHEABLE_TABLE,
-        "column_subset": "sample name",
-    },
-    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Unnormalized_Counts\.csv$': {
-        "datatype": "unnormalized counts", **CACHEABLE_TABLE, "joinable": True,
-        "column_subset": "sample name",
-    },
-    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression\.csv$': {
-        "datatype": "differential expression", **CACHEABLE_TABLE,
-    },
-    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_contrasts\.csv$': {
-        "datatype": "differential expression contrasts",
-    },
-    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table\.csv$': {
-        "datatype": "visualization table", **CACHEABLE_TABLE,
-        "condition": is_expression_profiling,
-    },
-    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table\.csv$': {
-        "datatype": "pca", **CACHEABLE_TABLE, "index_name": "sample name",
-        "condition": is_expression_profiling,
-    },
+KNOWN_DATATYPES = {
+    r'.*_metadata_.*[_-]ISA\.zip$':
+        datatype("isa", internal=True),
+    r'^GLDS-[0-9]+_rna_seq_.+_Aligned\.sortedByCoord\.out\.bam$':
+        datatype("sorted aligned rna-seq reads",
+            condition=sample_name_matches),
+    r'^GLDS-[0-9]+_rna_seq_.+_Aligned\.toTranscriptome\.out\.bam$':
+        datatype("rna-seq reads aligned to transcriptome",
+            condition=sample_name_matches),
+    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_raw_multiqc_data\.zip$':
+        datatype("raw multiqc data"),
+    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_raw_multiqc_report\.htm(l)?$':
+        datatype("raw multiqc report"),
+    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_trimmed_multiqc_data\.zip$':
+        datatype("trimmed multiqc data"),
+    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_trimmed_multiqc_report\.htm(l)?$':
+        datatype("trimmed multiqc report"),
+    r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.txt$':
+        datatype("processed microarray data", **CACHEABLE_TABLE),
+    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Normalized_Counts\.csv$':
+        datatype("normalized counts", **CACHEABLE_TABLE,
+            column_subset="sample name"),
+    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Unnormalized_Counts\.csv$':
+        datatype("unnormalized counts", **CACHEABLE_TABLE,
+            joinable=True, column_subset="sample name"),
+    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression\.csv$':
+        datatype("differential expression", **CACHEABLE_TABLE),
+    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_contrasts\.csv$':
+        datatype("differential expression contrasts"),
+    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table\.csv$':
+        datatype("visualization table", **CACHEABLE_TABLE,
+            internal=True, condition=is_expression_profiling),
+    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table\.csv$':
+        datatype("pca", **CACHEABLE_TABLE, index_name="sample name",
+            internal=True, condition=is_expression_profiling),
 }
 
 
@@ -109,7 +107,7 @@ def format_file_entry(row):
         "timestamp": row["timestamp"],
     }
     matched_patterns = set()
-    for pattern, metadata in SPECIAL_FILE_TYPES.items():
+    for pattern, metadata in KNOWN_DATATYPES.items():
         if search(pattern, filename):
             entry.update(metadata)
             matched_patterns.add(pattern)
