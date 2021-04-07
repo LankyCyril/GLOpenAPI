@@ -3,6 +3,7 @@ from re import sub
 from functools import reduce
 from operator import or_
 from genefab3.common.exceptions import GeneFabFileException
+from genefab3.common.utils import copy_and_drop
 
 
 def get_descriptor_dataframe(mongo_collections, locale, context, include=()):
@@ -45,7 +46,7 @@ def get(mongo_collections, *, locale, context):
         )
     else:
         descriptor = descriptors["file.filename"].iloc[0].to_dict()
-        if context.format == "json":
-            return descriptor
-        else:
-            raise NotImplementedError(f"Redirect to file {descriptor}")
+    if context.format == "json":
+        return {"filename": descriptor["*"], **copy_and_drop(descriptor, {"*"})}
+    else:
+        raise NotImplementedError(f"Redirect to file {descriptor}")
