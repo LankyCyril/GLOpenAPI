@@ -124,12 +124,11 @@ def reduce_projection(fp, longest=False):
 def retrieve_by_context(collection, pipeline, query, full_projection, sortby, locale):
     """Run .find() or .aggregate() based on query, projection, pipeline steps"""
     if pipeline:
-        reduced_projection = reduce_projection(full_projection)
         return collection.aggregate(
             pipeline=[
                 {"$sort": {f: ASCENDING for f in sortby}},
                 *pipeline, {"$match": query},
-                {"$project": {**reduced_projection, "_id": False}},
+                {"$project": {**full_projection, "_id": False}},
             ],
             collation={"locale": locale, "numericOrdering": True},
         )

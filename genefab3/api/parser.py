@@ -1,20 +1,20 @@
 from functools import lru_cache, partial
 from genefab3.common.utils import empty_iterator, leaf_count
-from collections import defaultdict
 from re import search, sub, escape
-from genefab3.common.types import UniversalSet
-from genefab3.db.mongo.utils import is_safe_token
-from genefab3.common.exceptions import GeneFabConfigurationException
-from genefab3.common.exceptions import GeneFabParserException
 from flask import request
 from urllib.request import quote
 from json import dumps
+from genefab3.common.exceptions import GeneFabConfigurationException
+from genefab3.common.exceptions import GeneFabParserException
+from genefab3.db.mongo.utils import is_safe_token, reduce_projection
+from collections import defaultdict
+from genefab3.common.types import UniversalSet
 
 
 SPECIAL_ARGUMENT_PARSER_DISPATCHER = lru_cache(1)(lambda: {
     "file.filename": KeyValueParsers.kvp_filename,
-    "debug": empty_iterator, # pass as kwarg
-    "format": empty_iterator, # pass as kwarg
+    "debug": empty_iterator, # pass as attribute
+    "format": empty_iterator, # pass as attribute
 })
 
 KEYVALUE_PARSER_DISPATCHER = lru_cache(1)(lambda: {
@@ -83,8 +83,9 @@ class Context():
         self.parser_errors = []
         processed_args = set(
             arg for arg, values in request.args.lists()
-            if self.update(arg, values)
+            if self.update(arg, values, auto_reduce=False)
         )
+        self.projection = reduce_projection(self.projection)
         if not self.query["$and"]:
             self.query = {}
         self.identity = quote("?".join([
@@ -106,7 +107,7 @@ class Context():
                 else:
                     self.parser_errors.append(description)
  
-    def update(self, arg, values=("",)):
+    def update(self, arg, values=("",), auto_reduce=True):
         """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections, pipelines"""
         def _it():
             category, *fields = arg.split(".")
@@ -140,6 +141,8 @@ class Context():
             for accession, assay_names in accessions_and_assays.items():
                 self.accessions_and_assays[accession] = sorted(assay_names)
             is_converted_to_query = True
+        if auto_reduce:
+            self.projection = reduce_projection(self.projection)
         return is_converted_to_query
 
 
