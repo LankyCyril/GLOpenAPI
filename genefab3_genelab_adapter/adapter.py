@@ -25,43 +25,52 @@ get_sample_tech_type = lambda sample: (sample
     .get("Investigation", {}).get("Study Assays", {})
     .get("Study Assay Technology Type", "").lower()
 )
+is_expression_profiling = lambda sample: get_sample_tech_type(sample) in {
+    "rna sequencing (rna-seq)", "microarray", "dna microarray",
+}
+
+CACHEABLE_TABLE = dict(cacheable=True, type="table")
 
 SPECIAL_FILE_TYPES = {
     r'.*_metadata_.*[_-]ISA\.zip$': {
-        "cacheable": True,
-        "datatype": "isa",
+        "datatype": "isa", "cacheable": True,
     },
-    r'rna_seq_Unnormalized_Counts\.csv$': {
-        "cacheable": True,
-        "type": "table",
-        "datatype": "unnormalized counts",
-        "joinable": True,
-        "index_name": "ENSEMBL",
+    r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.txt$': {
+        "datatype": "processed microarray data", **CACHEABLE_TABLE,
+    },
+    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_raw_multiqc_data\.zip$': {
+        "datatype": "raw multiqc data",
+    },
+    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_raw_multiqc_report\.htm(l)?$': {
+        "datatype": "raw multiqc report",
+    },
+    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_trimmed_multiqc_data\.zip$': {
+        "datatype": "trimmed multiqc data",
+    },
+    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_trimmed_multiqc_report\.htm(l)?$': {
+        "datatype": "trimmed multiqc report",
+    },
+    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Normalized_Counts\.csv$': {
+        "datatype": "normalized counts", **CACHEABLE_TABLE,
+        "column_subset": "sample name",
+    },
+    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Unnormalized_Counts\.csv$': {
+        "datatype": "unnormalized counts", **CACHEABLE_TABLE, "joinable": True,
         "column_subset": "sample name",
     },
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression\.csv$': {
-        "cacheable": True,
-        "type": "table",
-        "datatype": "differential expression",
-        "index_name": "ENSEMBL",
+        "datatype": "differential expression", **CACHEABLE_TABLE,
+    },
+    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_contrasts\.csv$': {
+        "datatype": "differential expression contrasts",
     },
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table\.csv$': {
-        "cacheable": True,
-        "type": "table",
-        "datatype": "visualization table",
-        "index_name": "ENSEMBL",
-        "condition": lambda sample: get_sample_tech_type(sample) in {
-            "rna sequencing (rna-seq)", "microarray", "dna microarray",
-        },
+        "datatype": "visualization table", **CACHEABLE_TABLE,
+        "condition": is_expression_profiling,
     },
-    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table.csv$': {
-        "cacheable": True,
-        "type": "table",
-        "datatype": "pca",
-        "index_name": "sample name",
-        "condition": lambda sample: get_sample_tech_type(sample) in {
-            "rna sequencing (rna-seq)", "microarray", "dna microarray",
-        },
+    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table\.csv$': {
+        "datatype": "pca", **CACHEABLE_TABLE, "index_name": "sample name",
+        "condition": is_expression_profiling,
     },
 }
 
