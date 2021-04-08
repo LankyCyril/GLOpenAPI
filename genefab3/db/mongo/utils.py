@@ -36,7 +36,7 @@ def format_units(entry, unit_key, units_formatter):
     }
 
 
-def harmonize_document(query, lowercase=True, dropna=True, units_formatter=None, depth_tracker=0, *, max_depth=32):
+def harmonize_document(query, units_formatter=None, lowercase=True, dropna=True, depth_tracker=0, *, max_depth=32):
     """Modify dangerous keys in nested dictionaries ('_id', keys containing '$' and '.'), normalize case, format units, drop terminal NaNs"""
     unit_key = "unit" if lowercase else "Unit"
     harmonizer_function = partial(
