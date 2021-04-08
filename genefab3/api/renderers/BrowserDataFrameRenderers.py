@@ -65,7 +65,7 @@ def get_browser_file_formatter(context, i):
     return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
 
 
-def get_browser_meta_formatter(context, i, category, field, target):
+def get_browser_meta_formatter(context, i, head, target):
     """Get SlickGrid formatter for meta column"""
     url = build_url(context)
     if context.view == "assays":
@@ -74,14 +74,14 @@ def get_browser_meta_formatter(context, i, category, field, target):
             ? "<i style='color:#BBB'>"+v+"</i>"
             : ((v == "False")
             ? "<font style='color:#FAA'>"+v+"</font>"
-            : "<a href='{url}"+escape("{category}.{field}.{target}")+
+            : "<a href='{url}"+escape("{head}.{target}")+
                 "' style='color:green' class='filter'>"+v+"</a>");
         }};"""
     else:
         _fr = f"""function(r,c,v,d,x){{
             return (v == "NA")
             ? "<i style='color:#BBB'>"+v+"</i>"
-            : "<a href='{url}"+escape("{category}.{field}.{target}")+
+            : "<a href='{url}"+escape("{head}.{target}")+
                 "="+escape(v)+"' class='filter'>"+v+"</a>";
         }};"""
     return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
@@ -90,17 +90,17 @@ def get_browser_meta_formatter(context, i, category, field, target):
 def iter_formatters(obj, context, shortnames):
     """Get SlickGrid formatters for columns"""
     for i, (key, target) in enumerate(obj.columns):
-        if (key == "info") and (target == "accession"):
-            yield get_browser_glds_formatter(context, i)
-        elif (key == "info") and (target == "assay"):
-            yield get_browser_assay_formatter(context, i, shortnames)
-        elif (key == "file") and (target == "filename"):
+        if key == "info":
+            if target == "accession":
+                yield get_browser_glds_formatter(context, i)
+            elif target == "assay":
+                yield get_browser_assay_formatter(context, i, shortnames)
+        elif (key, target, context.view) == ("file", "filename", "samples"):
             yield get_browser_file_formatter(context, i)
         else:
-            cat, *fields = key.split(".")
-            if len(fields) == 1:
-                field = fields[0]
-                yield get_browser_meta_formatter(context, i, cat, field, target)
+            category, *fields = key.split(".")
+            head = f"{category}.{fields[0]}" if fields else category
+            yield get_browser_meta_formatter(context, i, head, target)
 
 
 SQUASHED_PREHEADER_CSS = """
