@@ -49,6 +49,16 @@ def get_metadata_assays(mongo_collections):
     }
 
 
+def get_metadata_datatypes(mongo_collections):
+    """Generate JSON for documentation section 'meta-file-datatype'"""
+    # TODO: should be cached at index stage
+    cursor = mongo_collections.metadata.aggregate([
+        {"$unwind": "$file"},
+        {"$project": {"k": "$file.datatype", "_id": False}},
+    ])
+    return {e["k"]: True for e in cursor if "k" in e}
+
+
 @lru_cache(maxsize=None)
 def _get_root_html():
     """Return text of HTML template"""
@@ -61,13 +71,15 @@ def get(mongo_collections, context):
     existence_json = get_metadata_existence_json(equals_json)
     wildcards = get_metadata_wildcards(existence_json)
     metadata_assays = get_metadata_assays(mongo_collections)
+    metadata_datatypes = get_metadata_datatypes(mongo_collections)
     return map_replace(
         _get_root_html(), {
-            "%URL_ROOT%": f"{context.url_root}/",
+            "%URL_ROOT%": context.url_root,
             "/* METADATA_WILDCARDS */": dumps(wildcards),
             "/* METADATA_EXISTENCE */": dumps(existence_json),
             "/* METADATA_EQUALS */": dumps(equals_json),
             "/* METADATA_ASSAYS */": dumps(metadata_assays),
+            "/* METADATA_DATATYPES */": dumps(metadata_datatypes),
             "<!--DEBUG ": "" if is_debug() else "<!--",
             " DEBUG-->": "" if is_debug() else "-->",
         },

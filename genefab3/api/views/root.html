@@ -67,6 +67,7 @@ var metadata = {
     "existence": /* METADATA_EXISTENCE */,
     "equals": /* METADATA_EQUALS */,
     "assay": /* METADATA_ASSAYS */,
+    "file-datatype": /* METADATA_DATATYPES */,
 };
 
 function trimmed_option(key) {
@@ -130,7 +131,9 @@ function refresh_dropdown_section(initiator, key, level) {
                     section.append(option);
                     section.val(section_key);
                 }
-                if ((section_data !== true) && (section_key in section_data)) {
+                if ((section_data !== undefined)
+                 && (section_data !== true)
+                 && (section_key in section_data)) {
                     section_data = section_data[section_key];
                 }
                 else {
@@ -165,9 +168,6 @@ function refresh_dropdowns(initiator) {
     }
 }
 
-var TARGETS_A = ["wildcard", "existence", "equals", "assay"];
-var TARGETS_B = ["format", "debug"];
-
 function housekeeping(initiator) {
     if ($("#view").val() === "")
         $("#view").val("samples");
@@ -177,17 +177,6 @@ function housekeeping(initiator) {
     );
     first_assay_remover.removeClass("pipe-remover").html("&amp;");
     refresh_dropdowns(initiator);
-    if ($("#view").val() !== "data") {
-        $(".for-data").css("opacity", ".3");
-        $(".for-data input").prop("disabled", true);
-        return Array.prototype.concat(TARGETS_A, TARGETS_B);
-    }
-    else {
-        $(".for-data").css("opacity", "1");
-        $(".for-data input").prop("disabled", false);
-        $("input.always-disabled").prop("disabled", true);
-        return Array.prototype.concat(TARGETS_A, ["datatype"], TARGETS_B);
-    }
 }
 
 function strip_special(s) {
@@ -245,13 +234,19 @@ function decorate_url(url) {
     return decorated;
 }
 
+var TARGETS = [
+    "wildcard", "existence", "equals", "assay",
+    "file-filename-pseudo", "file-datatype-pseudo", "file-datatype",
+    "format", "debug",
+];
+
 function generate_url() {
-    var targets = housekeeping(initiator=this);
+    housekeeping(initiator=this);
     var url = url_root + "/" + escape($("#view").val()) + "/?";
-    for (var i = 0, l = targets.length; i < l; i++) {
-        var prefix = $(".meta-"+targets[i]+":first-child .included-key").text();
+    for (var i = 0, l = TARGETS.length; i < l; i++) {
+        var prefix = $(".meta-"+TARGETS[i]+":first-child .included-key").text();
         url += prefix;
-        $(".meta-" + targets[i]).each(function () {
+        $(".meta-" + TARGETS[i]).each(function () {
             if ($(this).children("input[type=checkbox]").prop("checked")) {
                 $(this).find(".key-level").each(function () {
                     url += escape($(this).val()) + ".";
@@ -263,7 +258,7 @@ function generate_url() {
                     });
                     url = url.replace(/\|$/g, "&");
                 }
-                else if (targets[i] == "assay")
+                else if (TARGETS[i] == "assay")
                     url = url.replace(/\.+$/g, "|");
                 else
                     url = url.replace(/\.+$/g, "&");
@@ -362,6 +357,8 @@ function refresh_event_handlers() {
     $("a.del").click(remove_last_query_option);
     $("a.or").click(clone_query_or);
     $("input[type=checkbox], select").click(generate_url);
+    $("input[type=text]").on("change", generate_url);
+    $("input[type=text]").on("input", generate_url);
 }
 
 function prefill_example() {
@@ -430,6 +427,7 @@ $(document).ready(function() {
                         <option value='assays'>/assays/</option>
                         <option value='samples'>/samples/</option>
                         <option value='data'>/data/</option>
+                        <option value='file'>/file/</option>
                     </select>
                 </div>
             </div>
@@ -518,17 +516,40 @@ $(document).ready(function() {
                     </div>
                 </div>
             </div>
-            <div class='for-data'>
-                <div><b>Data <strong>type</strong> to retrieve:</b></div><br>
+            <div>
+                <div><b><strong>Files or data</strong> to retrieve (UPD):</b></div><br>
                 <div>
-                    <div id='meta-datatype-list' class='list'>
-                        <div class='meta-datatype list-item'>
-                            <input type='checkbox' class='always-disabled' checked disabled>
+                    <div id='meta-file-filename-pseudo-list' class='list'>
+                        <div class='meta-file-filename-pseudo list-item'>
+                            <input type='checkbox'>
                             <em class='key'>&amp;</em>
-                            <em class='key included-key'>datatype=</em>
-                            <select class='value-level level-0'>
-                                <option value='unnormalized counts' selected>unnormalized counts</option>
+                            <em class='key included-key'>file.filename=</em>
+                            <input class='value-level level-0' value="*" type="text"></input>
+                        </div>
+                    </div>
+                </div>
+                <div style='display: block; margin-top: 0'>
+                    <div id='meta-file-datatype-pseudo-list' class='list'>
+                        <div class='meta-file-datatype-pseudo list-item'>
+                            <input type='checkbox'>
+                            <em class='key'>&amp;</em>
+                            <em class='key included-key'>file.datatype</em>
+                            <select class='key-level level-0' style='visibility: hidden'>
+                                <option value='' selected></option>
                             </select>
+                        </div>
+                    </div>
+                </div>
+                <div style='display: block; margin-top: 0'>
+                    <div id='meta-file-datatype-list' class='list'>
+                        <div class='meta-file-datatype list-item'>
+                            <input type='checkbox'>
+                            <em class='key'>&amp;</em>
+                            <em class='key included-key'>file.datatype=</em>
+                            <div class='or-selects'>
+                                <select class='value-level level-0'></select>
+                            </div>
+                            <a class='meta-datatype or'>OR</a>
                         </div>
                     </div>
                 </div>
