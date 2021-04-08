@@ -1,5 +1,5 @@
 from genefab3.db.mongo.utils import retrieve_by_context
-from pandas import json_normalize, MultiIndex, isnull
+from pandas import MultiIndex, isnull
 from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException
 from re import findall
@@ -14,12 +14,11 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
         "info.accession": True, "info.assay": True,
         **context.projection, **{field: True for field in include},
     }
-    cursor = retrieve_by_context(
-        mongo_collections.metadata, context.pipeline, context.query,
-        full_projection, sortby, locale,
-    )
     try:
-        return json_normalize(list(cursor)), full_projection
+        dataframe = retrieve_by_context(
+            mongo_collections.metadata, context.pipeline, context.query,
+            full_projection, sortby, locale,
+        )
     except MongoOperationError as e:
         errmsg = getattr(e, "details", {}).get("errmsg", "").lower()
         has_index = ("info" in mongo_collections.metadata.index_information())
@@ -29,6 +28,8 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
         else:
             msg = "Could not retrieve sorted metadata"
         raise GeneFabDatabaseException(msg, locale=locale, reason=str(e))
+    else:
+        return dataframe, full_projection
 
 
 def INPLACE_drop_trailing_fields(dataframe, full_projection):

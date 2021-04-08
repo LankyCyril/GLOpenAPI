@@ -1,11 +1,13 @@
-from pandas import isnull
-from functools import partial, reduce
+from pandas import isnull, DataFrame
+from functools import partial, reduce, wraps
 from bson.errors import InvalidDocument as InvalidDocumentError
 from collections.abc import ValuesView
 from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.types import NestedDefaultDict
 from operator import getitem as gi_
+from collections import OrderedDict
+from marshal import dumps as marshals
 from pymongo import ASCENDING
 
 
@@ -121,20 +123,48 @@ def reduce_projection(fp, longest=False):
         return {k: v for k, v in fp.items() if reduce(gi_, k.split("."), d)}
 
 
+def _iter_blackjack_items_cache(f):
+    cache = OrderedDict()
+    @wraps(f)
+    def wrapper(e, head=()):
+        k = marshals(e, 4), head
+        if len(cache) > 4096:
+            cache.popitem(last=False)
+        if k not in cache:
+            cache[k] = list(f(e, head))
+        return cache[k]
+    return wrapper
+
+
+@_iter_blackjack_items_cache
+def iter_blackjack_items(e, head=()):
+    """Quickly iterate flattened dictionary key-value pairs in pure Python"""
+    if isinstance(e, dict):
+        for k, v in e.items():
+            yield from iter_blackjack_items(v, head=head+(k,))
+    else:
+        yield ".".join(head), e
+
+
+def blackjack_normalize(cursor):
+    """Quickly flatten iterable of dictionaries in pure Python"""
+    return DataFrame(dict(iter_blackjack_items(e)) for e in cursor)
+
+
 def retrieve_by_context(collection, pipeline, query, full_projection, sortby, locale):
     """Run .find() or .aggregate() based on query, projection, pipeline steps"""
     if pipeline:
-        return collection.aggregate(
+        return blackjack_normalize(collection.aggregate(
             pipeline=[
                 {"$sort": {f: ASCENDING for f in sortby}},
                 *pipeline, {"$match": query},
                 {"$project": {**full_projection, "_id": False}},
             ],
             collation={"locale": locale, "numericOrdering": True},
-        )
+        ))
     else:
-        return collection.find(
+        return blackjack_normalize(collection.find(
             query, {**full_projection, "_id": False},
             sort=[(f, ASCENDING) for f in sortby],
             collation={"locale": locale, "numericOrdering": True},
-        )
+        ))
