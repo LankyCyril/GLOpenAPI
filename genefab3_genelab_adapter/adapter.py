@@ -36,14 +36,14 @@ is_expression_profiling = lambda sample, filename: get_tech_type(sample) in {
 }
 
 KNOWN_DATATYPES = {
-    r'.*_metadata_.*[_-]ISA\.zip$':
-        datatype("isa", internal=True),
-    r'^GLDS-[0-9]+_rna_seq_.+_Aligned\.sortedByCoord\.out\.bam$':
-        datatype("sorted aligned rna-seq reads",
-            condition=sample_name_matches),
-    r'^GLDS-[0-9]+_rna_seq_.+_Aligned\.toTranscriptome\.out\.bam$':
-        datatype("rna-seq reads aligned to transcriptome",
-            condition=sample_name_matches),
+    r'.*_metadata_.*[_-]ISA\.zip$': datatype("isa", internal=True),
+    r'^GLDS-[0-9]+_.*annotReport\.txt$': datatype("annotation report"),
+    r'^GLDS-[0-9]+_.*_raw\.fastq(\.gz)?$':
+        datatype("raw reads", condition=sample_name_matches),
+    r'^GLDS-[0-9]+_.*_trimmed\.fastq(\.gz)?$':
+        datatype("trimmed reads", condition=sample_name_matches),
+    r'^GLDS-[0-9]+_.*\.bam$':
+        datatype("alignment", condition=sample_name_matches),
     r'^GLDS-[0-9]+_rna_seq(_all-samples)?_raw_multiqc_data\.zip$':
         datatype("raw multiqc data"),
     r'^GLDS-[0-9]+_rna_seq(_all-samples)?_raw_multiqc_report\.htm(l)?$':
@@ -52,6 +52,8 @@ KNOWN_DATATYPES = {
         datatype("trimmed multiqc data"),
     r'^GLDS-[0-9]+_rna_seq(_all-samples)?_trimmed_multiqc_report\.htm(l)?$':
         datatype("trimmed multiqc report"),
+    r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.rda$':
+        datatype("processed microarray data (rda)"),
     r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.txt$':
         datatype("processed microarray data", **CACHEABLE_TABLE),
     r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Normalized_Counts\.csv$':

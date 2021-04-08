@@ -94,7 +94,7 @@ def iter_formatters(obj, context, shortnames):
             yield get_browser_glds_formatter(context, i)
         elif (key == "info") and (target == "assay"):
             yield get_browser_assay_formatter(context, i, shortnames)
-        elif key in {"file.datatype", "file.filename"}:
+        elif (key == "file") and (target == "filename"):
             yield get_browser_file_formatter(context, i)
         else:
             cat, *fields = key.split(".")
