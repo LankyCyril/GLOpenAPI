@@ -1,5 +1,4 @@
 from genefab3.common.types import Routes
-from genefab3.common.exceptions import GeneFabException
 from genefab3.api import views
 
 
@@ -13,17 +12,9 @@ class DefaultRoutes(Routes):
     def favicon(self, imgtype, context=None):
         return ""
  
-    @Routes.register_endpoint(endpoint="/debug/", fmt="raw")
-    def debug(self, context=None):
-        return "OK"
- 
-    @Routes.register_endpoint(endpoint="/debug/error/", fmt="raw")
-    def debug_error(self, context=None):
-        raise GeneFabException("Generic error", test=None)
- 
-    @Routes.register_endpoint(endpoint="/", fmt="html")
-    def root(self, context=None):
-        return "Hello space"
+    @Routes.register_endpoint(endpoint="/", fmt="html", cache=False)
+    def root(self, context):
+        return views.root.get(self.mongo_collections, context=context)
  
     @Routes.register_endpoint()
     def status(self, context=None):

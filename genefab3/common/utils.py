@@ -3,7 +3,6 @@ from requests import head as request_head
 from urllib.request import urlopen
 from urllib.error import URLError
 from uuid import uuid3, uuid4
-from os import path
 from re import sub, escape, split
 from copy import deepcopy
 from pandas import DataFrame, Series
@@ -43,14 +42,6 @@ def pick_reachable_url(urls, desc=None):
 def urn(s):
     """Generate uuid3 URN for `s`"""
     return uuid3(uuid4(), s).urn
-
-
-def walk_up(from_path, n_steps):
-    """Get path of directory `n_steps` above `from_path`"""
-    if n_steps >= 1:
-        return walk_up(path.split(from_path)[0], n_steps-1)
-    else:
-        return from_path
 
 
 def map_replace(string, mappings):
