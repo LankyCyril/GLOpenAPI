@@ -12,23 +12,23 @@ def validate_joinable_files(descriptor_dataframe):
     getset = lru_cache(maxsize=None)(lambda col, default=None:
         set(descriptor_dataframe.get(col, Series(default)).drop_duplicates())
     )
-    if len(getset(("file.filename", "datatype"))) > 1:
+    if len(getset(("file", "datatype"))) > 1:
         msg = "Cannot combine data of multiple datatypes"
-        return msg, dict(datatypes=getset(("file.filename", "datatype")))
+        return msg, dict(datatypes=getset(("file", "datatype")))
     elif len(getset(TECH_TYPE_LOCATOR)) > 1:
         msg = "Cannot combine data for multiple technology types"
         return msg, dict(technology_types=getset(TECH_TYPE_LOCATOR))
-    elif getset(("file.filename", "joinable")) != {True}:
+    elif getset(("file", "joinable")) != {True}:
         return "Cannot combine multiple files of this datatype", dict(
-            datatype=getset(("file.filename", "datatype")).pop(),
-            filenames=getset(("file.filename", "*")),
+            datatype=getset(("file", "datatype")).pop(),
+            filenames=getset(("file", "filename")),
         )
-    elif getset(("file.filename", "type")) != {"table"}:
+    elif getset(("file", "type")) != {"table"}:
         msg = "Cannot combine non-table files"
-        return msg, dict(types=getset(("file.filename", "type")))
-    elif len(getset(("file.filename", "index_name"))) > 1:
+        return msg, dict(types=getset(("file", "type")))
+    elif len(getset(("file", "index_name"))) > 1:
         msg = "Cannot combine tables with conflicting index names"
-        return msg, dict(index_names=getset(("file.filename", "index_name")))
+        return msg, dict(index_names=getset(("file", "index_name")))
     else:
         return None, {}
 
@@ -41,11 +41,11 @@ def get(mongo_collections, *, locale, context):
     )
     if descriptor_dataframe.empty:
         raise FileNotFoundError("No file found matching specified constraints")
-    elif ("file.filename", "*") not in descriptor_dataframe:
+    elif ("file", "filename") not in descriptor_dataframe:
         raise FileNotFoundError("No file found matching specified constraints")
     elif len(descriptor_dataframe) > 1:
         msg, _kw = validate_joinable_files(descriptor_dataframe)
         if msg:
             raise GeneFabFileException(msg, **_kw)
-    files = descriptor_dataframe["file.filename"].to_dict(orient="records")
+    files = descriptor_dataframe["file"].to_dict(orient="records")
     return files

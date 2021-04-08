@@ -16,7 +16,7 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
     }
     try:
         dataframe = retrieve_by_context(
-            mongo_collections.metadata, context.pipeline, context.query,
+            mongo_collections.metadata, context.query,
             full_projection, sortby, locale,
         )
     except MongoOperationError as e:
@@ -67,7 +67,7 @@ def get(mongo_collections, *, locale, context, include=(), drop_trailing_fields=
         dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
         dataframe = iisaf_sort_dataframe(dataframe)
         dataframe.columns = MultiIndex.from_tuples(
-            (fields[0], ".".join(fields[1:])) if fields[0] == "info"
+            (fields[0], ".".join(fields[1:])) if fields[0] in {"info", "file"}
             else (".".join(fields[:2]), ".".join(fields[2:]) or "*")
             for fields in map(lambda s: s.split("."), dataframe.columns)
         )

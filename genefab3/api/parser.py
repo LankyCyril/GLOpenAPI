@@ -11,11 +11,7 @@ from collections import defaultdict
 from genefab3.common.types import UniversalSet
 
 
-SPECIAL_ARGUMENT_PARSER_DISPATCHER = lru_cache(1)(lambda: {
-    "file.filename": KeyValueParsers.kvp_filename,
-    "debug": empty_iterator, # pass as attribute
-    "format": empty_iterator, # pass as attribute
-})
+CONTEXT_ARGUMENTS = {"debug", "format"}
 
 KEYVALUE_PARSER_DISPATCHER = lru_cache(1)(lambda: {
     "from": KeyValueParsers.kvp_assay,
@@ -31,7 +27,8 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(1)(lambda: {
         constrain_to={"factor value", "parameter value", "characteristics"},
     ),
     "file": partial(
-        KeyValueParsers.kvp_generic, category="file", constrain_to={"datatype"},
+        KeyValueParsers.kvp_generic, category="file", shift=True,
+        constrain_to={"datatype", "filename"},
     ),
 })
 
@@ -60,13 +57,7 @@ DISALLOWED_CONTEXTS = {
 
 
 class Context():
-    """Stores request components parsed into MongoDB queries, projections, pipelines"""
- 
-    SPECIAL_ARGUMENT_PARSER_DISPATCHER = lru_cache(1)(lambda: {
-        "file.filename": KeyValueParsers.kvp_filename,
-        "debug": empty_iterator, # pass as kwarg
-        "format": empty_iterator, # pass as kwarg
-    })
+    """Stores request components parsed into MongoDB queries, projections"""
  
     def __init__(self):
         """Parse request components"""
@@ -76,15 +67,15 @@ class Context():
         self.full_path = request.full_path
         self.view = sub(url_root, "", base_url).strip("/")
         self.complete_kwargs = request.args.to_dict(flat=False)
-        self.pipeline = []
-        self.query = {"$and": []}
-        self.projection = {}
+        self.query, self.projection = {"$and": []}, {}
         self.accessions_and_assays = {}
         self.parser_errors = []
         processed_args = set(
             arg for arg, values in request.args.lists()
             if self.update(arg, values, auto_reduce=False)
         )
+        if set(self.projection) & {"file.datatype", "file.filename"}:
+            self.projection.update({"file.filename": 1, "file.datatype": 1})
         self.projection = reduce_projection(self.projection)
         if not self.query["$and"]:
             self.query = {}
@@ -104,17 +95,16 @@ class Context():
             if scenario(self):
                 if self.debug == "0":
                     raise GeneFabParserException(description)
-                else:
-                    self.parser_errors.append(description)
+                self.parser_errors.append(description)
  
     def update(self, arg, values=("",), auto_reduce=True):
-        """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections, pipelines"""
+        """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections"""
         def _it():
             category, *fields = arg.split(".")
             if not is_safe_token(arg):
                 raise GeneFabParserException("Forbidden argument", arg=arg)
-            elif arg in SPECIAL_ARGUMENT_PARSER_DISPATCHER():
-                parser = SPECIAL_ARGUMENT_PARSER_DISPATCHER()[arg]
+            elif arg in CONTEXT_ARGUMENTS:
+                parser = empty_iterator
             elif category in KEYVALUE_PARSER_DISPATCHER():
                 parser = KEYVALUE_PARSER_DISPATCHER()[category]
             else:
@@ -132,9 +122,7 @@ class Context():
                     # from=GLDS-1.assay
                     yield from parser(fields=fields, value=value)
         is_converted_to_query = None
-        for pipestep, query, projection_keys, accessions_and_assays in _it():
-            if pipestep:
-                self.pipeline.append(pipestep)
+        for query, projection_keys, accessions_and_assays in _it():
             if query:
                 self.query["$and"].append(query)
             self.projection.update({k: True for k in projection_keys})
@@ -148,29 +136,13 @@ class Context():
 
 class KeyValueParsers():
  
-    def kvp_filename(fields=(), value=""):
-        """Interpret single key-value pair for filename constraint"""
-        if (len(fields) == 2) and (fields[0] == "filename") and (not value):
-            query = {"file.filename.": fields[1]} # passed as 'file.filename.??'
-        elif (len(fields) == 1) and (fields[0] == "filename") and value:
-            query = {"file.filename.": value} # passed as 'file.filename=??'
-        elif (len(fields) == 1) and (fields[0] == "filename") and (not value):
-            query = None # passed as 'file.filename', i.e. catch-all
-        else:
-            msg, arg = "Unrecognized argument", ".".join("file", *fields)
-            raise GeneFabParserException(msg, **{arg: value})
-        pipestep = {"$unwind": "$file.filename"}
-        projection_keys = {"file.filename"}
-        accessions_and_assays = {}
-        yield pipestep, query, projection_keys, accessions_and_assays
- 
     def kvp_assay(fields=None, value=""):
         """Interpret single key-value pair for dataset / assay constraint"""
         if (fields) or (not value):
             msg = "Unrecognized argument"
             raise GeneFabParserException(msg, arg=f"from.{fields[0]}")
         else:
-            pipestep, query = None, {"$or": []}
+            query = {"$or": []}
             projection_keys, accessions_and_assays = (), defaultdict(set)
         for expr in value.split("|"):
             if expr.count(".") == 0:
@@ -181,20 +153,24 @@ class KeyValueParsers():
                 subqry = {"info.accession": accession, "info.assay": assay_name}
                 query["$or"].append(subqry)
                 accessions_and_assays[accession].add(assay_name)
-        yield pipestep, query, projection_keys, accessions_and_assays
+        yield query, projection_keys, accessions_and_assays
  
-    def kvp_generic(category, fields, value, constrain_to=UniversalSet(), dot_postfix="auto"):
+    def kvp_generic(category, fields, value, constrain_to=UniversalSet(), dot_postfix="auto", shift=False):
         """Interpret single key-value pair if it gives rise to database query"""
         if (not fields) or (fields[0] not in constrain_to):
             msg = "Unrecognized argument"
             raise GeneFabParserException(msg, arg=".".join([category, *fields]))
-        elif (len(fields) == 2) and (dot_postfix == "auto"):
-            projection_key = ".".join([category] + fields)
+        elif shift and (len(fields) > 1):
+            _fields, _value = fields[:-1], fields[-1]
+        else:
+            _fields, _value = fields, value
+        if (len(_fields) == 2) and (dot_postfix == "auto"):
+            projection_key = ".".join([category] + _fields)
             lookup_key = projection_key + "."
         else:
-            projection_key = lookup_key = ".".join([category] + fields)
-        if value: # metadata field must equal value or one of values
-            query = {lookup_key: {"$in": value.split("|")}}
+            projection_key = lookup_key = ".".join([category] + _fields)
+        if _value: # metadata field must equal value or one of values
+            query = {lookup_key: {"$in": _value.split("|")}}
             projection_keys = {projection_key}
         else: # metadata field or one of metadata fields must exist
             block_match = search(r'\.[^\.]+\.*$', lookup_key)
@@ -211,5 +187,5 @@ class KeyValueParsers():
                 else:
                     lookup_keys = projection_keys
                 query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
-        pipestep, accessions_and_assays = None, {}
-        yield pipestep, query, projection_keys, accessions_and_assays
+        accessions_and_assays = {}
+        yield query, projection_keys, accessions_and_assays
