@@ -79,7 +79,7 @@ def get(mongo_collections, context):
             "/* METADATA_WILDCARDS */": dumps_sorted(wildcards),
             "/* METADATA_EXISTENCE */": dumps_sorted(existence_json),
             "/* METADATA_EQUALS */": dumps_sorted(equals_json),
-            "/* METADATA_ASSAYS */": dumps_sorted(metadata_assays),
+            "/* METADATA_ASSAYS */": dumps(metadata_assays),
             "/* METADATA_DATATYPES */": dumps_sorted(metadata_datatypes),
             "<!--DEBUG ": "" if is_debug() else "<!--",
             " DEBUG-->": "" if is_debug() else "-->",

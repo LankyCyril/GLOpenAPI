@@ -7,7 +7,6 @@ from urllib.parse import quote
 from re import search, sub
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.types import Adapter
-from natsort import natsorted
 from genefab3.common.exceptions import GeneFabJSONException
 from warnings import catch_warnings, filterwarnings
 from dateutil.parser import UnknownTimezoneWarning
@@ -127,10 +126,10 @@ class GeneLabAdapter(Adapter):
         """Return list of dataset accessions available through genelab.nasa.gov/genelabAPIs"""
         try:
             n_datasets = read_json(COLD_SEARCH_MASK.format(0))["hits"]["total"]
-            return natsorted(
+            return {
                 entry["_id"] for entry in
                 read_json(COLD_SEARCH_MASK.format(n_datasets))["hits"]["hits"]
-            )
+            }
         except (KeyError, TypeError):
             raise GeneFabJSONException("Malformed GeneLab search JSON")
  
