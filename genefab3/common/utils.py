@@ -15,7 +15,7 @@ empty_iterator = lambda *a, **k: []
 
 
 @contextmanager
-def pick_reachable_url(urls, desc=None):
+def pick_reachable_url(urls, name=None):
     """Iterate `urls` and get the first reachable URL"""
     def _pick():
         for url in urls:
@@ -31,8 +31,8 @@ def pick_reachable_url(urls, desc=None):
                 else:
                     return url
             else:
-                if desc:
-                    raise URLError(f"No URLs are reachable for {desc}: {urls}")
+                if name:
+                    raise URLError(f"No URLs are reachable for {name}: {urls}")
                 else:
                     raise URLError(f"No URLs are reachable: {urls}")
     yield _pick()

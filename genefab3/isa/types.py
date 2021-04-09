@@ -25,10 +25,11 @@ class Dataset():
             raise GeneFabFileException(msg, accession, filenames=set(isa_files))
         else:
             isa_name, isa_desc = next(iter(isa_files.items()))
-            with pick_reachable_url(isa_desc["urls"]) as url:
+            urls = isa_desc.get("urls", ())
+            with pick_reachable_url(urls, name=isa_name) as url:
                 isa_file = CachedBinaryFile(
                     name=isa_name, sqlite_db=self.sqlite_blobs,
-                    url=url, timestamp=isa_desc["timestamp"],
+                    url=url, timestamp=isa_desc.get("timestamp", -1),
                 )
             self.isa = IsaFromZip(
                 data=isa_file.data,

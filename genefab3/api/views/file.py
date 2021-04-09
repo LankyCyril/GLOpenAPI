@@ -41,10 +41,6 @@ def get(mongo_collections, *, locale, context):
     if context.format == "json":
         return descriptor
     else:
-        if descriptor.get("cacheable") == True:
-            raise NotImplementedError(f"Redirect to CACHED file {descriptor}")
-        else:
-            urls = descriptor.get("urls", ())
-            desc = descriptor.get("filename", "filename")
-            with pick_reachable_url(urls, desc=desc) as url:
-                return redirect(url, code=303, Response=Response)
+        urls = descriptor.get("urls", ())
+        with pick_reachable_url(urls, name=descriptor["filename"]) as url:
+            return redirect(url, code=303, Response=Response)
