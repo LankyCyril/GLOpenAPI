@@ -8,10 +8,8 @@ from genefab3.db.mongo.utils import run_mongo_transaction
 
 def safe_default_one_way_encode(f):
     """One-way encoder of functions; only used for identity checks; code is never executed"""
-    return {
-        "vars": f.__code__.co_varnames,
-        "hash": md5(f.__code__.co_code).hexdigest(),
-    }
+    code = f.__code__
+    return {"vars": code.co_varnames, "hash": md5(code.co_code).hexdigest()}
 
 
 class ValueCheckedRecord():
@@ -24,9 +22,8 @@ class ValueCheckedRecord():
             raise GeneFabConfigurationException(msg, identifier=identifier)
         elif "base64value" in identifier:
             msg = "ValueCheckedRecord(): `identifier` uses a reserved key"
-            raise GeneFabConfigurationException(
-                msg, identifier=identifier, key="base64value",
-            )
+            _kw = dict(identifier=identifier, key="base64value")
+            raise GeneFabConfigurationException(msg, **_kw)
         else:
             self.identifier, self.value = identifier, value
             try:
@@ -36,9 +33,8 @@ class ValueCheckedRecord():
                 self.base64value = compress(encodebytes(dumped.encode()))
             except TypeError as e:
                 msg = "ValueCheckedRecord(): " + str(e)
-                raise GeneFabConfigurationException(
-                    msg, identifier=identifier, value=value,
-                )
+                _kw = dict(identifier=identifier, value=value)
+                raise GeneFabConfigurationException(msg, **_kw)
             else:
                 self.changed, n_stale_entries = True, 0
                 for entry in collection.find(identifier):

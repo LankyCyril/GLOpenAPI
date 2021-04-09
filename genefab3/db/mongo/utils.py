@@ -27,18 +27,16 @@ def is_regex(v):
     return search(r'^\/.*\/$', v)
 
 
-def is_unit_formattable(entry, unit_key):
-    """Check if entry contains keys "" and unit_key and that entry[unit_key] is not empty"""
-    return (
-        ("" in entry) and (unit_key in entry) and (not isempty(entry[unit_key]))
-    )
+def is_unit_formattable(e, unit_key):
+    """Check if entry `e` contains keys "" and unit_key and that `e[unit_key]` is not empty"""
+    return ("" in e) and (unit_key in e) and (not isempty(e[unit_key]))
 
 
-def format_units(entry, unit_key, units_formatter):
-    """Replace entry[""] with value with formatted entry[unit_key], discard entry[unit_key]"""
+def format_units(e, unit_key, units_formatter):
+    """Replace `e[""]` with value with formatted `e[unit_key]`, discard `e[unit_key]`"""
     return {
-        k: units_formatter(value=v, unit=entry[unit_key]) if k == "" else v
-        for k, v in entry.items() if k != unit_key
+        k: units_formatter(value=v, unit=e[unit_key]) if k == "" else v
+        for k, v in e.items() if k != unit_key
     }
 
 
@@ -130,13 +128,14 @@ def reduce_projection(fp, longest=False):
 
 
 def _iter_blackjack_items_cache(f):
+    """Custom lru_cache-like memoizer for `iter_blackjack_items` with hashing of simple dictionaries"""
     cache = OrderedDict()
     @wraps(f)
     def wrapper(e, head=()):
         k = marshals(e, 4), head
-        if len(cache) > 4096:
-            cache.popitem(last=False)
         if k not in cache:
+            if len(cache) > 4096:
+                cache.popitem(last=False)
             cache[k] = list(f(e, head))
         return cache[k]
     return wrapper

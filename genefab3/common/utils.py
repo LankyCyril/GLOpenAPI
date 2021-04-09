@@ -2,7 +2,6 @@ from contextlib import contextmanager
 from requests import head as request_head
 from urllib.request import urlopen
 from urllib.error import URLError
-from uuid import uuid3, uuid4
 from re import sub, escape, split
 from copy import deepcopy
 from pandas import DataFrame, Series
@@ -39,18 +38,10 @@ def pick_reachable_url(urls, desc=None):
     yield _pick()
 
 
-def urn(s):
-    """Generate uuid3 URN for `s`"""
-    return uuid3(uuid4(), s).urn
-
-
 def map_replace(string, mappings):
     """Perform multiple replacements in one go"""
-    return sub(
-        r'|'.join(map(escape, mappings.keys())),
-        lambda m: mappings[m.group()],
-        string,
-    )
+    pattern = r'|'.join(map(escape, mappings.keys())),
+    return sub(pattern, lambda m: mappings[m.group()], string)
 
 
 def copy_and_drop(d, drop):
@@ -110,10 +101,8 @@ def get_attribute(dataframe, a):
 def iterate_terminal_leaves(d, step_tracker=1, max_steps=256):
     """Descend into branches breadth-first and iterate terminal leaves"""
     if step_tracker >= max_steps:
-        raise GeneFabConfigurationException(
-            "Document branch exceeds nestedness threshold",
-            max_steps=max_steps,
-        )
+        msg = "Document branch exceeds nestedness threshold"
+        raise GeneFabConfigurationException(msg, max_steps=max_steps)
     else:
         if isinstance(d, dict):
             for i, branch in enumerate(d.values(), start=1):
@@ -130,7 +119,7 @@ def iterate_terminal_leaf_elements(d, sep=r'\s*,\s'):
 
 
 class JSONByteEncoder(JSONEncoder):
-    """Allow dumps to convert sets to serializable lists"""
+    """Allow dumps to convert bytes to strings"""
     def default(self, entry):
         if isinstance(entry, bytes):
             return entry.decode(errors="replace")
