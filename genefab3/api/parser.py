@@ -6,7 +6,7 @@ from urllib.request import quote
 from json import dumps
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabParserException
-from genefab3.db.mongo.utils import is_safe_token, reduce_projection
+from genefab3.db.mongo.utils import is_safe_token, reduce_projection, is_regex
 from collections import defaultdict
 from genefab3.common.types import UniversalSet
 
@@ -111,7 +111,7 @@ class Context():
                 msg = "Unrecognized argument"
                 raise GeneFabParserException(msg, **{arg: values})
             for value in values:
-                if not is_safe_token(value):
+                if not is_safe_token(value, allow_regex=(arg=="file.filename")):
                     raise GeneFabParserException("Forbidden value", arg=value)
                 if (value) and (len(fields) == 1):
                     # assay.characteristics=age -> assay.characteristics.age
@@ -170,7 +170,10 @@ class KeyValueParsers():
         else:
             projection_key = lookup_key = ".".join([category] + _fields)
         if _value: # metadata field must equal value or one of values
-            query = {lookup_key: {"$in": _value.split("|")}}
+            if is_regex(_value):
+                query = {lookup_key: {"$regex": _value[1:-1]}}
+            else:
+                query = {lookup_key: {"$in": _value.split("|")}}
             projection_keys = {projection_key}
         else: # metadata field or one of metadata fields must exist
             block_match = search(r'\.[^\.]+\.*$', lookup_key)

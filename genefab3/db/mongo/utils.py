@@ -1,4 +1,5 @@
 from pandas import isnull, DataFrame
+from re import sub, search
 from functools import partial, reduce, wraps
 from bson.errors import InvalidDocument as InvalidDocumentError
 from collections.abc import ValuesView
@@ -16,9 +17,14 @@ def isempty(v):
     return isnull(v) or (v == "")
 
 
-def is_safe_token(v):
+def is_safe_token(v, allow_regex=False):
     """Check if value is safe for PyMongo queries"""
-    return "$" not in v
+    return "$" not in (sub(r'\$\/$', "", v) if allow_regex else v)
+
+
+def is_regex(v):
+    """Check if value is a regex"""
+    return search(r'^\/.*\/$', v)
 
 
 def is_unit_formattable(entry, unit_key):
