@@ -4,9 +4,12 @@ from genefab3.common.utils import pick_reachable_url
 from flask import redirect, Response
 
 
-def get_descriptor_dataframe(mongo_collections, *, locale, context, include=()):
+def get_descriptor_dataframe(mongo_collections, *, locale, context, include=(), project_info=False):
     """Return DataFrame of file descriptors that match user query"""
     context.projection["file"] = True
+    if project_info:
+        for key in "info.accession", "info.assay", "info.sample name":
+            context.projection[key] = True
     for key in map(".".join, include):
         context.update(key)
     for key in set(context.projection):
@@ -22,7 +25,11 @@ def get_descriptor_dataframe(mongo_collections, *, locale, context, include=()):
         annotation[("file", "urls")] = (
             annotation[("file", "urls")].apply(sorted).apply(tuple)
         )
-    return annotation[["file"]].drop_duplicates()
+    if project_info:
+        columns = ["file", "info", *{k[0] for k in include}]
+    else:
+        columns = ["file", *{k[0] for k in include}]
+    return annotation[columns].drop_duplicates()
 
 
 def get(mongo_collections, *, locale, context):
