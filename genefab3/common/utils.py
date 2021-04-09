@@ -82,8 +82,8 @@ def set_attributes(dataframe, **kwargs):
                 dataframe._metadata.append(a)
                 setattr(dataframe, a, v)
             except AttributeError:
-                msg = f"Cannot set attribute {a} of DataFrame"
-                raise GeneFabConfigurationException(msg)
+                msg = "Cannot set attribute of DataFrame"
+                raise GeneFabConfigurationException(msg, attribute=a)
 
 
 def get_attribute(dataframe, a):

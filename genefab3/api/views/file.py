@@ -31,10 +31,9 @@ def get(mongo_collections, *, locale, context):
     if descriptor_dataframe.empty:
         raise FileNotFoundError("No file found matching specified constraints")
     elif len(descriptor_dataframe) > 1:
-        raise GeneFabFileException(
-            "Multiple files match search criteria",
-            filenames=descriptor_dataframe[("file", "filename")].tolist(),
-        )
+        msg = "Multiple files match search criteria"
+        _kw = {"filenames": descriptor_dataframe[("file", "filename")].tolist()}
+        raise GeneFabFileException(msg, **_kw)
     else:
         descriptor = descriptor_dataframe["file"].iloc[0].to_dict()
     if context.format == "json":

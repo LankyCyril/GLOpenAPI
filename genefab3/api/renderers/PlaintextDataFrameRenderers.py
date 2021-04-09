@@ -11,16 +11,16 @@ def cls(obj, context=None, continuous=None, space_sub=lambda s: sub(r'\s', "", s
     """Display presumed annotation/factor dataframe in plaintext CLS format"""
     columns = [(l0, l1) for (l0, l1) in obj.columns if l0 != "info"]
     if len(columns) != 1:
-        m = "Exactly one metadata field must be requested"
-        raise GeneFabFormatException(m, columns=columns, format="cls")
+        msg = "Exactly one metadata field must be requested"
+        raise GeneFabFormatException(msg, columns=columns, format="cls")
     target, sample_count = columns[0], obj.shape[0]
     if (continuous is None) or (continuous is True):
         try:
             _data = [["#numeric"], ["#"+target], obj[target].astype(float)]
         except ValueError:
             if continuous is True:
-                m = "Cannot represent target annotation as continuous"
-                raise GeneFabFormatException(m, target=target, format="cls")
+                msg = "Cannot represent target annotation as continuous"
+                raise GeneFabFormatException(msg, target=target, format="cls")
             else:
                 continuous = False
     if continuous is False:

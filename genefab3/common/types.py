@@ -54,10 +54,8 @@ class HashableEnough():
             if field in self.__as_strings:
                 value = str(value)
             if not isinstance(value, Hashable):
-                raise TypeError(
-                    "{}: unhashable field value".format(type(self).__name__),
-                    f"{field}={repr(value)}",
-                )
+                msg = "{}: unhashable field value".format(type(self).__name__)
+                raise TypeError(msg, f"{field}={repr(value)}")
             else:
                 yield value
  
@@ -81,10 +79,9 @@ class Adapter():
         """Validate subclassed Adapter"""
         for method_name in "get_accessions", "get_files_by_accession":
             if not isinstance(getattr(self, method_name, None), Callable):
-                raise GeneFabConfigurationException(
-                    "Adapter must define method",
-                    adapter=type(self).__name__, method=method_name,
-                )
+                msg = "Adapter must define method"
+                _kw = dict(adapter=type(self).__name__, method=method_name)
+                raise GeneFabConfigurationException(msg, **_kw)
  
     def best_sample_name_matches(self, name, names):
         """Fallback sample name identity test"""

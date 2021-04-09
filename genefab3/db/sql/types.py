@@ -38,10 +38,8 @@ class SQLiteObject():
         """Parse the update/retrieve spec and the re-cache trigger condition; create tables if they do not exist"""
         self.__sqlite_db, self.__table_schemas = sqlite_db, table_schemas
         if len(signature) != 1:
-            raise GeneFabConfigurationException(
-                "SQLiteObject(): Only one 'identifier' field can be specified",
-                signatures=signature,
-            )
+            msg = "SQLiteObject(): Only one 'identifier' field can be specified"
+            raise GeneFabConfigurationException(msg, signatures=signature)
         else:
             self.__identifier_field, self.__identifier_value = next(
                 iter(signature.items()),
@@ -49,9 +47,8 @@ class SQLiteObject():
             try:
                 self.__signature = ImmutableTree(signature)
             except ValueError:
-                raise GeneFabConfigurationException(
-                    "SQLiteObject(): Bad signature", signature=signature,
-                )
+                msg = "SQLiteObject(): Bad signature"
+                raise GeneFabConfigurationException(msg, signature=signature)
         if sqlite_db is not None: # TODO: auto_vacuum
             for table, schema in table_schemas.items():
                 if schema is not None:
@@ -61,10 +58,9 @@ class SQLiteObject():
             self.__retrieve_spec = ImmutableTree(retrieve)
             self.__update_spec = ImmutableTree(update)
         except ValueError:
-            raise GeneFabConfigurationException(
-                "SQLiteObject(): Bad spec",
-                trigger=trigger, update=update, retrieve=retrieve,
-            )
+            msg = "SQLiteObject(): Bad spec"
+            _kw = dict(trigger=trigger, update=update, retrieve=retrieve)
+            raise GeneFabConfigurationException(msg, **_kw)
         self.changed = None
  
     def __ensure_table(self, table, schema):
@@ -111,17 +107,15 @@ class SQLiteObject():
         """Update table in SQLite"""
         dataframe = spec()
         if not isinstance(dataframe, DataFrame):
-            raise NotImplementedError(
-                "Cached table not represented as a pandas DataFrame",
-            )
+            msg = "Cached table not represented as a pandas DataFrame"
+            raise NotImplementedError(msg)
         if dataframe.index.nlevels != 1:
             raise NotImplementedError("MultiIndex in cached DataFrame")
         if dataframe.columns.nlevels != 1:
             raise NotImplementedError("MultiIndex columns in cached DataFrame")
         if dataframe.index.name not in {None, "index"}:
-            raise NotImplementedError(
-                "Cached DataFrame index name is neither 'index' nor None",
-            )
+            msg = "Cached DataFrame index name is neither 'index' nor None"
+            raise NotImplementedError(msg)
         with closing(connect(self.__sqlite_db)) as connection:
             dataframe.to_sql(table, connection, index=True, if_exists="replace")
  
@@ -158,17 +152,14 @@ class SQLiteObject():
             """
             ret = connection.cursor().execute(query).fetchall()
             if len(ret) == 0:
-                raise GeneFabDatabaseException(
-                    "No data found", signature=self.__signature,
-                )
+                msg = "No data found"
+                raise GeneFabDatabaseException(msg, signature=self.__signature)
             elif (len(ret) == 1) and (len(ret[0]) == 1):
                 return postprocess_function(ret[0][0])
             else:
                 self.__drop_self_from(connection, table)
-                raise GeneFabDatabaseException(
-                    "Entries conflict (will attempt to fix on next request)",
-                    signature=self.__signature,
-                )
+                msg = "Entries conflict (will attempt to fix on next request)"
+                raise GeneFabDatabaseException(msg, signature=self.__signature)
  
     def __retrieve_table(self, table, postprocess_function):
         """Retrieve target table from database"""
@@ -179,17 +170,14 @@ class SQLiteObject():
                     read_sql(query, connection, index_col="index"),
                 )
             except (OperationalError, DatabaseError):
-                raise GeneFabDatabaseException(
-                    "No data found", signature=self.__signature,
-                )
+                msg = "No data found"
+                raise GeneFabDatabaseException(msg, signature=self.__signature)
  
     def __retrieve(self):
         """Retrieve target table or table field from database"""
         if not is_singular_spec(self.__retrieve_spec):
-            raise GeneFabConfigurationException(
-                "SQLiteObject(): Only one 'retrieve' field can be specified",
-                signature=self.__signature,
-            )
+            msg = "SQLiteObject(): Only one 'retrieve' field can be specified"
+            raise GeneFabConfigurationException(msg, signature=self.__signature)
         else:
             table = next(iter(self.__retrieve_spec))
             if isinstance(self.__retrieve_spec[table], dict):
@@ -204,10 +192,8 @@ class SQLiteObject():
     def data(self):
         """Main interface: returns data associated with this SQLiteObject; will have auto-updated itself in the process if necessary"""
         if not is_singular_spec(self.__trigger_spec):
-            raise GeneFabConfigurationException(
-                "SQLiteObject(): Only one 'trigger' field can be specified",
-                signature=self.__signature,
-            )
+            msg = "SQLiteObject(): Only one 'trigger' field can be specified"
+            raise GeneFabConfigurationException(msg, signature=self.__signature)
         else:
             table = next(iter(self.__trigger_spec))
             trigger_field = next(iter(self.__trigger_spec[table]))
@@ -271,10 +257,9 @@ class SQLiteTable(SQLiteObject):
  
     def __init__(self, data_getter, sqlite_db, table, timestamp_table, identifier, timestamp):
         if table == timestamp_table:
-            raise GeneFabConfigurationException(
-                "Table name cannot be equal to a reserved table name",
-                table=table, identifier=identifier,
-            )
+            msg = "Table name cannot be equal to a reserved table name"
+            _kw = dict(table=table, identifier=identifier)
+            raise GeneFabConfigurationException(msg, **_kw)
         SQLiteObject.__init__(
             self, sqlite_db, signature={"identifier": identifier},
             table_schemas={
@@ -370,6 +355,5 @@ class CachedTableFile(HashableEnough, SQLiteTable):
                     url, sep=sep, compression=compression, **pandas_kws,
                 )
             except (IOError, UnicodeDecodeError, CSVError, PandasParserError):
-                raise GeneFabFileException(
-                    "Not recognized as a table file", name=self.name, url=url,
-                )
+                msg = "Not recognized as a table file"
+                raise GeneFabFileException(msg, name=self.name, url=url)

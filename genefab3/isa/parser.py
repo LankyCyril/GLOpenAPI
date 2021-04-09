@@ -38,9 +38,8 @@ class Investigation(dict):
                         else:
                             super().__setitem__(real_name, json[target])
                     except (TypeError, IndexError, KeyError):
-                        raise GeneFabISAException(
-                            "Unexpected structure of field", field=real_name,
-                        )
+                        msg = "Unexpected structure of field"
+                        raise GeneFabISAException(msg, field=real_name)
                 elif target and pattern:
                     try:
                         super().__setitem__(real_name, {
@@ -48,9 +47,8 @@ class Investigation(dict):
                             for entry in json
                         })
                     except (TypeError, AttributeError, IndexError, KeyError):
-                        raise GeneFabISAException(
-                            "Could not break up field by name", field=real_name,
-                        )
+                        msg = "Could not break up field by name"
+                        raise GeneFabISAException(msg, field=real_name)
                 else:
                     super().__setitem__(real_name, json)
 
@@ -254,9 +252,8 @@ class IsaFromZip():
                             raw.assays[name] = reader(handle, status_kwargs)
         for tab, value in raw.__dict__.items():
             if not value:
-                raise GeneFabISAException(
-                    "Missing ISA tab", tab=tab, **status_kwargs,
-                )
+                msg = "Missing ISA tab"
+                raise GeneFabISAException(msg, tab=tab, **status_kwargs)
         return raw
  
     def _read_investigation(self, handle):

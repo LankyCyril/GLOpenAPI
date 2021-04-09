@@ -12,7 +12,7 @@ def _assert_type(obj, nlevels):
     passed_nlevels = getattr(getattr(obj, "columns", None), "nlevels", 0)
     if (not isinstance(obj, DataFrame)) or (passed_nlevels != nlevels):
         msg = "Data cannot be represented as an interactive dataframe"
-        _kw = {"type": type(obj).__name__, "nlevels": passed_nlevels}
+        _kw = dict(type=type(obj).__name__, nlevels=passed_nlevels)
         raise GeneFabConfigurationException(msg, **_kw)
 
 

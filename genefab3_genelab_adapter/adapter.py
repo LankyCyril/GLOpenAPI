@@ -106,10 +106,9 @@ def format_file_entry(row):
             entry.update(metadata)
             matched_patterns.add(pattern)
     if len(matched_patterns) > 1:
-        raise GeneFabConfigurationException(
-            "File name matches more than one predefined pattern",
-            filename=filename, patterns=sorted(matched_patterns),
-        )
+        msg = "File name matches more than one predefined pattern"
+        _kw = dict(filename=filename, patterns=sorted(matched_patterns))
+        raise GeneFabConfigurationException(msg, **_kw)
     return entry
 
 
