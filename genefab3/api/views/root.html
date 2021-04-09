@@ -387,9 +387,12 @@ function prefill_example() {
     initiator = $("#meta-assay-list .key-level.level-0")
     initiator.val("GLDS-168");
     refresh_dropdown_section(initiator, "assay", 0);
+    $("#meta-assay-list .key-level.level-1").val("");
     initiator = $("#meta-assay-list .list-item:first-child .key-level.level-0")
     initiator.val("GLDS-48");
     refresh_dropdown_section(initiator, "assay", 0);
+    $("#meta-assay-list .list-item:first-child .key-level.level-1").val("");
+    $("#meta-file-datatype-list .value-level").val("unnormalized counts");
     $("#url-description").text("You are here:");
     $("#url").html("%URL_ROOT%");
     $("#url-follow a").attr("href", "");

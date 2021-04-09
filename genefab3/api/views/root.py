@@ -72,14 +72,15 @@ def get(mongo_collections, context):
     wildcards = get_metadata_wildcards(existence_json)
     metadata_assays = get_metadata_assays(mongo_collections)
     metadata_datatypes = get_metadata_datatypes(mongo_collections)
+    dumps_sorted = lambda j: dumps(j, sort_keys=True)
     return map_replace(
         _get_root_html(), {
             "%URL_ROOT%": context.url_root,
-            "/* METADATA_WILDCARDS */": dumps(wildcards),
-            "/* METADATA_EXISTENCE */": dumps(existence_json),
-            "/* METADATA_EQUALS */": dumps(equals_json),
-            "/* METADATA_ASSAYS */": dumps(metadata_assays),
-            "/* METADATA_DATATYPES */": dumps(metadata_datatypes),
+            "/* METADATA_WILDCARDS */": dumps_sorted(wildcards),
+            "/* METADATA_EXISTENCE */": dumps_sorted(existence_json),
+            "/* METADATA_EQUALS */": dumps_sorted(equals_json),
+            "/* METADATA_ASSAYS */": dumps_sorted(metadata_assays),
+            "/* METADATA_DATATYPES */": dumps_sorted(metadata_datatypes),
             "<!--DEBUG ": "" if is_debug() else "<!--",
             " DEBUG-->": "" if is_debug() else "-->",
         },
