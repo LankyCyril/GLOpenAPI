@@ -4,7 +4,7 @@ from genefab3.common.exceptions import GeneFabParserException
 from genefab3.frontend.renderers.forms import needs_datatype, render_dropdown
 from genefab3.frontend.utils import is_debug
 from json import dumps
-from genefab3.config import USE_RESPONSE_CACHE, RESPONSE_CACHE, ROW_TYPES
+from genefab3.config import USE_RESPONSE_CACHE, RESPONSE_CACHE
 from genefab3.backend.sql.readers.cache import retrieve_cached_response
 from genefab3.backend.sql.writers.cache import cache_response
 
