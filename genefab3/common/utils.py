@@ -40,7 +40,7 @@ def pick_reachable_url(urls, desc=None):
 
 def map_replace(string, mappings):
     """Perform multiple replacements in one go"""
-    pattern = r'|'.join(map(escape, mappings.keys())),
+    pattern = r'|'.join(map(escape, mappings.keys()))
     return sub(pattern, lambda m: mappings[m.group()], string)
 
 
