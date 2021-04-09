@@ -20,12 +20,9 @@ COLD_GLDS_MASK = COLD_API_ROOT + "/data/study/data/{}/"
 COLD_FILELISTINGS_MASK = COLD_API_ROOT + "/data/study/filelistings/{}"
 ALT_FILEPATH = "/genelab/static/media/dataset/"
 
-datatype = lambda t, **kwargs: dict(datatype=t, **kwargs)
-CACHEABLE_TABLE = dict(cacheable=True, type="table")
+datatype = lambda t, **kw: dict(datatype=t, **kw)
+tabletype = lambda t, **kw: dict(datatype=t, **kw, cacheable=True, type="table")
 
-sample_name_matches = lambda sample, filename: (
-    sample.name and (sample.name in filename)
-)
 get_tech_type = lambda sample: (sample
     .get("Investigation", {}).get("Study Assays", {})
     .get("Study Assay Technology Type", "").lower()
@@ -37,12 +34,9 @@ is_expression_profiling = lambda sample, filename: get_tech_type(sample) in {
 KNOWN_DATATYPES = {
     r'.*_metadata_.*[_-]ISA\.zip$': datatype("isa", internal=True),
     r'^GLDS-[0-9]+_.*annotReport\.txt$': datatype("annotation report"),
-    r'^GLDS-[0-9]+_.*_raw\.fastq(\.gz)?$':
-        datatype("raw reads", condition=sample_name_matches),
-    r'^GLDS-[0-9]+_.*_trimmed\.fastq(\.gz)?$':
-        datatype("trimmed reads", condition=sample_name_matches),
-    r'^GLDS-[0-9]+_.*\.bam$':
-        datatype("alignment", condition=sample_name_matches),
+    r'^GLDS-[0-9]+_.*_raw\.fastq(\.gz)?$': datatype("raw reads"),
+    r'^GLDS-[0-9]+_.*_trimmed\.fastq(\.gz)?$': datatype("trimmed reads"),
+    r'^GLDS-[0-9]+_.*\.bam$': datatype("alignment"),
     r'^GLDS-[0-9]+_rna_seq(_all-samples)?_raw_multiqc_data\.zip$':
         datatype("raw multiqc data"),
     r'^GLDS-[0-9]+_rna_seq(_all-samples)?_raw_multiqc_report\.htm(l)?$':
@@ -54,23 +48,22 @@ KNOWN_DATATYPES = {
     r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.rda$':
         datatype("processed microarray data (rda)"),
     r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.txt$':
-        datatype("processed microarray data", **CACHEABLE_TABLE),
+        tabletype("processed microarray data"),
     r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Normalized_Counts\.csv$':
-        datatype("normalized counts", **CACHEABLE_TABLE,
-            column_subset="sample name"),
+        tabletype("normalized counts", column_subset="sample name"),
     r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Unnormalized_Counts\.csv$':
-        datatype("unnormalized counts", **CACHEABLE_TABLE,
-            joinable=True, column_subset="sample name"),
+        tabletype("unnormalized counts", column_subset="sample name",
+            joinable=True),
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression\.csv$':
-        datatype("differential expression", **CACHEABLE_TABLE),
+        tabletype("differential expression"),
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_contrasts\.csv$':
         datatype("differential expression contrasts"),
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table\.csv$':
-        datatype("visualization table", **CACHEABLE_TABLE,
-            internal=True, condition=is_expression_profiling),
+        tabletype("visualization table", internal=True,
+            condition=is_expression_profiling),
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table\.csv$':
-        datatype("pca", **CACHEABLE_TABLE, index_name="sample name",
-            internal=True, condition=is_expression_profiling),
+        tabletype("pca", index_name="sample name", internal=True,
+            condition=is_expression_profiling),
 }
 
 
