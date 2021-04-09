@@ -1,3 +1,4 @@
+from flask import Response
 from genefab3.api.renderers import SimpleRenderers, PlaintextDataFrameRenderers
 from genefab3.api.renderers import BrowserDataFrameRenderers
 from pandas import DataFrame
@@ -12,6 +13,16 @@ from genefab3.api.parser import Context
 LevelCount = lambda *a:a
 
 TYPE_RENDERERS = {
+    Response: {
+        "raw": {LevelCount(None): lambda obj, *a, **k: obj},
+    },
+    (str, bytes): {
+        "raw": {LevelCount(None): SimpleRenderers.raw},
+        "html": {LevelCount(None): SimpleRenderers.html},
+    },
+    (list, dict): {
+        "json": {LevelCount(None): SimpleRenderers.json},
+    },
     DataFrame: {
         "cls": {LevelCount(2): PlaintextDataFrameRenderers.cls},
         "gct": {LevelCount(3): PlaintextDataFrameRenderers.gct},
@@ -22,13 +33,6 @@ TYPE_RENDERERS = {
             LevelCount(2): BrowserDataFrameRenderers.twolevel,
             LevelCount(3): BrowserDataFrameRenderers.threelevel,
         },
-    },
-    (str, bytes): {
-        "raw": {LevelCount(None): SimpleRenderers.raw},
-        "html": {LevelCount(None): SimpleRenderers.html},
-    },
-    (list, dict): {
-        "json": {LevelCount(None): SimpleRenderers.json},
     },
 }
 
@@ -71,6 +75,7 @@ class CacheableRenderer():
                 obj = method(*args, context=context, **kwargs)
                 fmt = context.format or getattr(method, "fmt", "raw")
                 response = self.dispatch_renderer(obj, context, fmt=fmt)
-                # TODO cache
+                if response.status_code // 100 == 2:
+                    pass # TODO cache
             return response
         return wrapper

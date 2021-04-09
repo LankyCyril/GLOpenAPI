@@ -1,5 +1,7 @@
 from genefab3.api.views import metadata
 from genefab3.common.exceptions import GeneFabFileException
+from genefab3.common.utils import pick_reachable_url
+from flask import redirect, Response
 
 
 def get_descriptor_dataframe(mongo_collections, *, locale, context, include=()):
@@ -39,4 +41,10 @@ def get(mongo_collections, *, locale, context):
     if context.format == "json":
         return descriptor
     else:
-        raise NotImplementedError(f"Redirect to file {descriptor}")
+        if descriptor.get("cacheable") == True:
+            raise NotImplementedError(f"Redirect to CACHED file {descriptor}")
+        else:
+            urls = descriptor.get("urls", ())
+            desc = descriptor.get("filename", "filename")
+            with pick_reachable_url(urls, desc=desc) as url:
+                return redirect(url, code=303, Response=Response)

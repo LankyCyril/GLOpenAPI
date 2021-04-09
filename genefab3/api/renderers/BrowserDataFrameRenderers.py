@@ -60,7 +60,7 @@ def get_browser_file_formatter(context, i):
     url = build_url(context, "file", drop={"format", "file.filename"})
     _fr = f"""function(r,c,v,d,x){{
         return (v == "NA") ? "<i style='color:#BBB'>"+v+"</i>" :
-        "<a class='file' href='{url}file.filename="+escape(v)+"&format=json'>"+
+        "<a class='file' href='{url}file.filename="+escape(v)+"&format=raw'>"+
         v+"</a>";}};"""
     return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
 
