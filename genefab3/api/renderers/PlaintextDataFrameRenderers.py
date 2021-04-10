@@ -40,7 +40,8 @@ def cls(obj, context=None, continuous=None, space_sub=lambda s: sub(r'\s', "", s
 
 def gct(obj, context=None, indent=None):
     """Display presumed data dataframe in plaintext GCT format"""
-    text = obj.to_csv(sep="\t", index=False, header=False)
+    text = obj.to_csv(sep="\t", index=False, header=False, na_rep="")
+    # NaNs left empty: https://www.genepattern.org/file-formats-guide#GCT
     content = (
         "#1.2\n{}\t{}\n".format(obj.shape[0], obj.shape[1]-1) +
         "Name\tDescription\t" +

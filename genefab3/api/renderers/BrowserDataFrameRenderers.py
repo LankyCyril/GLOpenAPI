@@ -17,11 +17,11 @@ def _assert_type(obj, nlevels):
 
 
 def _na_repr(x):
-    """For format=browser, convert empty entries to 'NA'"""
+    """For format=browser, convert empty entries to 'NaN'"""
     if isinstance(x, Iterable):
-        return "NA" if (hasattr(x, "__len__") and (len(x) == 0)) else str(x)
+        return "NaN" if (hasattr(x, "__len__") and (len(x) == 0)) else str(x)
     else:
-        return "NA" if isnull(x) else str(x)
+        return "NaN" if isnull(x) else str(x)
 
 
 @lru_cache(maxsize=None)
@@ -59,7 +59,7 @@ def get_browser_file_formatter(context, i):
     """Get SlickGrid formatter for file column"""
     url = build_url(context, "data", drop={"format", "file.filename"})
     _fr = f"""function(r,c,v,d,x){{
-        return (v == "NA") ? "<i style='color:#BBB'>"+v+"</i>" :
+        return (v == "NaN") ? "<i style='color:#BBB'>"+v+"</i>" :
         "<a class='file' href='{url}file.filename="+escape(v)+"&format=raw'>"+
         v+"</a>";}};"""
     return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
@@ -70,7 +70,7 @@ def get_browser_meta_formatter(context, i, head, target):
     url = build_url(context)
     if context.view == "assays":
         _fr = f"""function(r,c,v,d,x){{
-            return (v == "NA")
+            return (v == "NaN")
             ? "<i style='color:#BBB'>"+v+"</i>"
             : ((v == "False")
             ? "<font style='color:#FAA'>"+v+"</font>"
@@ -79,7 +79,7 @@ def get_browser_meta_formatter(context, i, head, target):
         }};"""
     else:
         _fr = f"""function(r,c,v,d,x){{
-            return (v == "NA")
+            return (v == "NaN")
             ? "<i style='color:#BBB'>"+v+"</i>"
             : "<a href='{url}"+escape("{head}.{target}")+
                 "="+escape(v)+"' class='filter'>"+v+"</a>";

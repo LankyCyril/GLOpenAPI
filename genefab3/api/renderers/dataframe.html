@@ -94,7 +94,7 @@ for (var i = 0, l = columns.length; i < l; i++) {
     var formatter = function(r,c,v,d,x) {
         return (v == "True") ? "<font color=green>"+v+"</font>" : (
                (v == "False") ? "<font color='#FAA'>"+v+"</font>" : (
-               (v == "NA") ? "<i style='color:#BBB'>"+v+"</i>" : v))
+               (v == "NaN") ? "<i style='color:#BBB'>"+v+"</i>" : v))
     };
     columns[i].sortable = true;
     columns[i].resizable = false;
@@ -199,9 +199,9 @@ grid.onSort.subscribe(function(e, args) {
             var v1 = r1[f], v2 = r2[f];
             var sign = sortcols[i].sortAsc ? 1 : -1;
             var ans = sign * (
-                (v1 == "NA")
-                ? ((v2 == "NA") ? 0 : -1)
-                : ((v2 == "NA")
+                (v1 == "NaN")
+                ? ((v2 == "NaN") ? 0 : -1)
+                : ((v2 == "NaN")
                     ? 1
                     : v1.localeCompare(v2, undefined, {numeric: true})
                 )
