@@ -74,5 +74,9 @@ def get(mongo_collections, *, locale, context, include=(), drop_trailing_fields=
                 gby = dataframe.groupby(info_cols, as_index=False, sort=False)
                 return gby.agg(lambda a: ~isnull(a).all())
         else:
-            set_attributes(dataframe, genefab_type="annotation")
+            set_attributes(
+                dataframe, genefab_type="annotation", accessions=set(
+                    dataframe[("info", "accession")].drop_duplicates(),
+                ),
+            )
             return dataframe

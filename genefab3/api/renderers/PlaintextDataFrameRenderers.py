@@ -4,7 +4,14 @@ from pandas import Series
 from flask import Response
 from functools import partial
 from genefab3.common.utils import get_attribute, JSONByteEncoder
+from genefab3.common.exceptions import GeneFabConfigurationException
 from json import dumps
+
+
+GCT_ALLOWED_DATATYPES = {
+    "processed microarray data", "normalized counts",
+    "unnormalized counts",
+}
 
 
 def cls(obj, context=None, continuous=None, space_sub=lambda s: sub(r'\s', "", s), indent=None):
@@ -40,15 +47,26 @@ def cls(obj, context=None, continuous=None, space_sub=lambda s: sub(r'\s', "", s
 
 def gct(obj, context=None, indent=None):
     """Display presumed data dataframe in plaintext GCT format"""
-    text = obj.to_csv(sep="\t", index=False, header=False, na_rep="")
-    # NaNs left empty: https://www.genepattern.org/file-formats-guide#GCT
-    content = (
-        "#1.2\n{}\t{}\n".format(obj.shape[0], obj.shape[1]-1) +
-        "Name\tDescription\t" +
-        "\t".join("/".join(levels) for levels in obj.columns[1:]) +
-        "\n" + sub(r'^(.+?\t)', r'\1\1', text, flags=MULTILINE)
-    )
-    return Response(content, mimetype="text/plain")
+    datatypes = get_attribute(obj, "datatypes", set())
+    if len(datatypes) == 0:
+        msg = "No datatype information associated with retrieved data"
+        raise GeneFabConfigurationException(msg)
+    elif len(datatypes) > 1:
+        msg = "GCT format does not support mixed datatypes"
+        raise GeneFabFormatException(msg, datatypes=datatypes)
+    elif next(iter(datatypes)) not in GCT_ALLOWED_DATATYPES:
+        msg = "GCT format is not valid for given datatype"
+        raise GeneFabFormatException(msg, datatype=datatypes.pop())
+    else:
+        text = obj.to_csv(sep="\t", index=False, header=False, na_rep="")
+        # NaNs left empty: https://www.genepattern.org/file-formats-guide#GCT
+        content = (
+            "#1.2\n{}\t{}\n".format(obj.shape[0], obj.shape[1]-1) +
+            "Name\tDescription\t" +
+            "\t".join("/".join(levels) for levels in obj.columns[1:]) +
+            "\n" + sub(r'^(.+?\t)', r'\1\1', text, flags=MULTILINE)
+        )
+        return Response(content, mimetype="text/plain")
 
 
 def xsv(obj, context=None, sep=None, indent=None):

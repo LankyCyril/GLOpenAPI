@@ -86,14 +86,14 @@ def set_attributes(dataframe, **kwargs):
                 raise GeneFabConfigurationException(msg, attribute=a)
 
 
-def get_attribute(dataframe, a):
+def get_attribute(dataframe, a, default=None):
     """Retrieve custom attribute of dataframe"""
     if not isinstance(dataframe, DataFrame):
         raise GeneFabConfigurationException("get_attribute(): not a DataFrame")
     else:
-        value = getattr(dataframe, a, None)
+        value = getattr(dataframe, a, default)
         if isinstance(value, (Series, DataFrame)):
-            return None
+            return default
         else:
             return value
 

@@ -169,12 +169,17 @@ def combined_data(descriptors, sqlite_dbs, adapter):
         combine = next
     else:
         raise NotImplementedError(f"Joining data of types {types}")
-    return combine(
+    data = combine(
         get_formatted_data(d, sqlite_db, CachedFile, adapter, _kws)
         for d in natsorted(
             descriptors, key=lambda d: (d.get("accession"), d.get("assay")),
         )
     )
+    set_attributes(
+        data, datatypes=getset("file", "datatype"),
+        accessions=getset("accession"),
+    )
+    return data
 
 
 def get(mongo_collections, *, locale, context, sqlite_dbs, adapter):
