@@ -110,6 +110,18 @@ SQUASHED_PREHEADER_CSS = """
 """
 
 
+def get_view_dependent_links(context):
+    """Add CLS/GCT links to samples and data views, respectively"""
+    if context.view == "samples":
+        url = build_url(context, drop={"format"}) + "format=cls"
+        return f", <a style='color:#D10' href='{url}'>cls</a>"
+    elif context.view == "data":
+        url = build_url(context, drop={"format"}) + "format=gct"
+        return f", <a style='color:#D10' href='{url}'>gct</a>"
+    else:
+        return ""
+
+
 def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_preheader=False):
     """Display dataframe with two-level columns using SlickGrid"""
     _assert_type(obj, nlevels=2)
@@ -130,8 +142,8 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_pr
         f"{{id:'{n}',field:'{n}',columnGroup:'{a}',name:'{b}'}},"
         for (a, b), n in zip(obj.columns, shortnames)
     )
-    formatters = iter_formatters(obj, context, shortnames)
     title_postfix = f"{context.view.capitalize()} {context.complete_kwargs}"
+    formatters = iter_formatters(obj, context, shortnames)
     content = map_replace(_get_browser_html(), {
         "</title><!--TITLEPOSTFIX-->": f": {title_postfix}</title>",
         "// FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
@@ -140,6 +152,7 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_pr
         "CSVLINK": build_url(context, drop={"format"}) + "format=csv",
         "TSVLINK": build_url(context, drop={"format"}) + "format=tsv",
         "JSONLINK": build_url(context, drop={"format"}) + "format=json",
+        "<!--VIEWDEPENDENTLINKS-->": get_view_dependent_links(context),
         "ASSAYSVIEW": build_url(context, "assays"),
         "SAMPLESVIEW": build_url(context, "samples"),
         "DATAVIEW": build_url(context, "data"),
