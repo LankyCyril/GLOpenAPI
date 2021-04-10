@@ -47,9 +47,6 @@ DISALLOWED_CONTEXTS = {
         (c.view != "samples") and (c.format == "cls"),
     "'format=gct' is only valid for /data/": lambda c:
         (c.view != "data") and (c.format == "gct"),
-    "'format=gct' is not valid for the requested datatype": lambda c:
-        (c.format == "gct") and
-        (c.complete_kwargs.get("file.datatype", []) != ["unnormalized counts"]),
 }
 
 
