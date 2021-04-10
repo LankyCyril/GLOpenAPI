@@ -1,6 +1,6 @@
 from genefab3.common.utils import iterate_terminal_leaves, as_is
 from genefab3.common.exceptions import GeneFabConfigurationException
-from genefab3.common.types import ImmutableTree, HashableEnough
+from genefab3.common.types import ImmutableTree
 from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
 from genefab3.common.logger import GeneFabLogger
@@ -279,7 +279,7 @@ class SQLiteTable(SQLiteObject):
         )
 
 
-class CachedBinaryFile(HashableEnough, SQLiteBlob):
+class CachedBinaryFile(SQLiteBlob):
     """Represents an SQLiteObject that stores up-to-date file contents as a binary blob"""
  
     def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="BLOBS:blobs", compressor=None, decompressor=None):
@@ -293,9 +293,6 @@ class CachedBinaryFile(HashableEnough, SQLiteBlob):
             sqlite_db=sqlite_db,
             table=aux_table,
             compressor=compressor, decompressor=decompressor,
-        )
-        HashableEnough.__init__(
-            self, ("name", "identifier", "timestamp", "sqlite_db", "aux_table"),
         )
  
     def __download_as_blob(self, urls):
@@ -318,7 +315,7 @@ class CachedBinaryFile(HashableEnough, SQLiteBlob):
             raise GeneFabDataManagerException(msg, name=self.name, urls=urls)
 
 
-class CachedTableFile(HashableEnough, SQLiteTable):
+class CachedTableFile(SQLiteTable):
     """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
  
     def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, **pandas_kws):
@@ -333,9 +330,6 @@ class CachedTableFile(HashableEnough, SQLiteTable):
             ),
             sqlite_db=sqlite_db,
             table=f"TABLE:{identifier}", aux_table=aux_table,
-        )
-        HashableEnough.__init__(
-            self, ("name", "identifier", "timestamp", "sqlite_db", "aux_table"),
         )
  
     def __copyfileobj(self, urls, tempfile):
