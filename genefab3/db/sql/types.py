@@ -306,8 +306,11 @@ class CachedBinaryFile(HashableEnough, SQLiteBlob):
                 with urlopen(url) as response:
                     data = response.read()
             except URLError:
-                pass
+                msg = f"{self.name}; tried URL and failed: {url}"
+                GeneFabLogger().warning(msg)
             else:
+                msg = f"{self.name}; successfully fetched blob: {url}"
+                GeneFabLogger().info(msg)
                 self.url = url
                 return data
         else:
@@ -335,23 +338,29 @@ class CachedTableFile(HashableEnough, SQLiteTable):
             self, ("name", "identifier", "timestamp", "sqlite_db", "aux_table"),
         )
  
+    def __copyfileobj(self, urls, tempfile):
+        """Try all URLs and push data into temporary file"""
+        for url in urls:
+            with open(tempfile, mode="wb") as handle:
+                try:
+                    with urlopen(url) as response:
+                        copyfileobj(response, handle)
+                except URLError:
+                    msg = f"{self.name}; tried URL and failed: {url}"
+                    GeneFabLogger().warning(msg)
+                else:
+                    msg = f"{self.name}; successfully fetched data: {url}"
+                    GeneFabLogger().info(msg)
+                    return url
+        else:
+            msg = "None of the URLs are reachable for file"
+            raise GeneFabDataManagerException(msg, name=self.name, urls=urls)
+ 
     def __download_as_pandas_dataframe(self, urls, pandas_kws, INPLACE_process=as_is):
         """Download and parse data from URL as a table"""
         with TemporaryDirectory() as tempdir:
-            self.url, tempfile = None, path.join(tempdir, self.name)
-            for url in urls:
-                with open(tempfile, mode="wb") as handle:
-                    try:
-                        with urlopen(url) as response:
-                            copyfileobj(response, handle)
-                    except URLError:
-                        pass
-                    else:
-                        self.url = url
-                        break
-            if self.url is None:
-                msg, name = "None of the URLs are reachable for file", self.name
-                raise GeneFabDataManagerException(msg, name=name, urls=urls)
+            tempfile = path.join(tempdir, self.name)
+            self.url = self.__copyfileobj(urls, tempfile)
             with open(tempfile, mode="rb") as handle:
                 magic = handle.read(3)
             if magic == b"\x1f\x8b\x08":
@@ -366,8 +375,10 @@ class CachedTableFile(HashableEnough, SQLiteTable):
                 with _open(tempfile, mode="rt", newline="") as handle:
                     sep = Sniffer().sniff(handle.read(2**20)).delimiter
                 dataframe = read_csv(
-                    self.url, sep=sep, compression=compression, **pandas_kws,
+                    tempfile, sep=sep, compression=compression, **pandas_kws,
                 )
+                msg = f"{self.name}; interpreted as table: {tempfile}"
+                GeneFabLogger().info(msg)
                 INPLACE_process(dataframe)
                 return dataframe
             except (IOError, UnicodeDecodeError, CSVError, PandasParserError):
