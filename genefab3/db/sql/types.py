@@ -8,6 +8,7 @@ from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
 from pandas import read_sql, DataFrame, read_csv
 from pandas.io.sql import DatabaseError
+from genefab3.common.utils import pick_reachable_url
 from urllib.request import urlopen
 from urllib.error import URLError
 from tempfile import TemporaryDirectory
@@ -285,59 +286,65 @@ class SQLiteTable(SQLiteObject):
 class CachedBinaryFile(HashableEnough, SQLiteBlob):
     """Represents an SQLiteObject that stores up-to-date file contents as a binary blob"""
  
-    def __init__(self, *, name, url, timestamp, sqlite_db, aux_table="blobs", compressor=None, decompressor=None):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="blobs", compressor=None, decompressor=None):
         """Interpret file descriptors; inherit functionality from SQLiteBlob; define equality (hashableness) of self"""
-        self.name, self.url, self.timestamp = name, url, timestamp
+        self.name, self.url, self.timestamp = name, None, timestamp
+        self.identifier = identifier
         self.aux_table = aux_table
         SQLiteBlob.__init__(
-            self, identifier=url, timestamp=timestamp,
-            data_getter=lambda: self.__download_as_blob(url),
+            self, identifier=identifier, timestamp=timestamp,
+            data_getter=lambda: self.__download_as_blob(urls),
             sqlite_db=sqlite_db,
             table=aux_table,
             compressor=compressor, decompressor=decompressor,
         )
         HashableEnough.__init__(
-            self, ("name", "url", "timestamp", "sqlite_db", "aux_table"),
+            self, ("name", "identifier", "timestamp", "sqlite_db", "aux_table"),
         )
  
-    def __download_as_blob(self, url):
+    def __download_as_blob(self, urls):
         """Download data from URL as-is"""
-        try:
-            with urlopen(url) as response:
-                return response.read()
-        except URLError:
-            raise GeneFabDataManagerException("Not found", url=url)
+        with pick_reachable_url(urls, name=self.name) as url:
+            self.url = url
+            try:
+                with urlopen(url) as response:
+                    return response.read()
+            except URLError:
+                raise GeneFabDataManagerException("Not found", url=url)
 
 
 class CachedTableFile(HashableEnough, SQLiteTable):
     """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
  
-    def __init__(self, *, name, url, timestamp, sqlite_db, aux_table="timestamp_table", **pandas_kws):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="timestamp_table", **pandas_kws):
         """Interpret file descriptors; inherit functionality from SQLiteTable; define equality (hashableness) of self"""
-        self.name, self.url, self.timestamp = name, url, timestamp
+        self.name, self.url, self.timestamp = name, None, timestamp
+        self.identifier = identifier
         self.aux_table = aux_table
         SQLiteTable.__init__(
-            self, identifier=url, timestamp=timestamp,
+            self, identifier=identifier, timestamp=timestamp,
             data_getter=lambda: self.__download_as_pandas_dataframe(
-                url, pandas_kws,
+                urls, pandas_kws,
             ),
             sqlite_db=sqlite_db,
             table=name, timestamp_table=aux_table,
         )
         HashableEnough.__init__(
-            self, ("name", "url", "timestamp", "sqlite_db", "aux_table"),
+            self, ("name", "identifier", "timestamp", "sqlite_db", "aux_table"),
         )
  
-    def __download_as_pandas_dataframe(self, url, pandas_kws):
+    def __download_as_pandas_dataframe(self, urls, pandas_kws):
         """Download and parse data from URL as a table"""
         with TemporaryDirectory() as tempdir:
             tempfile = path.join(tempdir, self.name)
-            with open(tempfile, mode="wb") as handle:
-                try:
-                    with urlopen(url) as response:
-                        copyfileobj(response, handle)
-                except URLError:
-                    raise GeneFabDataManagerException("Not found", url=url)
+            with pick_reachable_url(urls, name=self.name) as url:
+                self.url = url
+                with open(tempfile, mode="wb") as handle:
+                    try:
+                        with urlopen(url) as response:
+                            copyfileobj(response, handle)
+                    except URLError:
+                        raise GeneFabDataManagerException("Not found", url=url)
             with open(tempfile, mode="rb") as handle:
                 magic = handle.read(3)
             if magic == b"\x1f\x8b\x08":

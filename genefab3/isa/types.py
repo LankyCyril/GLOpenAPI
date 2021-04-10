@@ -1,6 +1,5 @@
 from genefab3.common.types import Adapter
 from genefab3.common.exceptions import GeneFabFileException, GeneFabISAException
-from genefab3.common.utils import pick_reachable_url
 from genefab3.db.sql.types import CachedBinaryFile
 from genefab3.isa.parser import IsaFromZip
 from genefab3.common.utils import deepcopy_and_drop, copy_and_drop
@@ -26,11 +25,11 @@ class Dataset():
         else:
             isa_name, isa_desc = next(iter(isa_files.items()))
             urls = isa_desc.get("urls", ())
-            with pick_reachable_url(urls, name=isa_name) as url:
-                isa_file = CachedBinaryFile(
-                    name=isa_name, sqlite_db=self.sqlite_blobs,
-                    url=url, timestamp=isa_desc.get("timestamp", -1),
-                )
+            isa_file = CachedBinaryFile(
+                name=isa_name, identifier=f"{accession}/ISA/{isa_name}",
+                sqlite_db=self.sqlite_blobs,
+                urls=urls, timestamp=isa_desc.get("timestamp", -1),
+            )
             self.isa = IsaFromZip(
                 data=isa_file.data,
                 status_kwargs={
