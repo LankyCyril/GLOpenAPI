@@ -252,8 +252,8 @@ class SQLiteBlob(SQLiteObject):
 class SQLiteTable(SQLiteObject):
     """Represents an SQLiteObject initialized with a spec suitable for a generic table"""
  
-    def __init__(self, data_getter, sqlite_db, table, timestamp_table, identifier, timestamp):
-        if table == timestamp_table:
+    def __init__(self, data_getter, sqlite_db, table, aux_table, identifier, timestamp):
+        if table == aux_table:
             msg = "Table name cannot be equal to a reserved table name"
             _kw = dict(table=table, identifier=identifier)
             raise GeneFabConfigurationException(msg, **_kw)
@@ -261,16 +261,16 @@ class SQLiteTable(SQLiteObject):
             self, sqlite_db, signature={"identifier": identifier},
             table_schemas={
                 table: None,
-                timestamp_table: {"identifier": "TEXT", "timestamp": "INTEGER"},
+                aux_table: {"identifier": "TEXT", "timestamp": "INTEGER"},
             },
             trigger={
-                timestamp_table: {
+                aux_table: {
                     "timestamp": lambda val: (val is None) or (timestamp > val),
                 },
             },
             update={
                 table: [data_getter],
-                timestamp_table: [{
+                aux_table: [{
                     "identifier": lambda: identifier,
                     "timestamp": lambda: timestamp,
                 }],
@@ -282,7 +282,7 @@ class SQLiteTable(SQLiteObject):
 class CachedBinaryFile(HashableEnough, SQLiteBlob):
     """Represents an SQLiteObject that stores up-to-date file contents as a binary blob"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="blobs", compressor=None, decompressor=None):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="BLOBS:blobs", compressor=None, decompressor=None):
         """Interpret file descriptors; inherit functionality from SQLiteBlob; define equality (hashableness) of self"""
         self.name, self.url, self.timestamp = name, None, timestamp
         self.identifier = identifier
@@ -318,18 +318,18 @@ class CachedBinaryFile(HashableEnough, SQLiteBlob):
 class CachedTableFile(HashableEnough, SQLiteTable):
     """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="timestamp_table", INPLACE_process=as_is, **pandas_kws):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, **pandas_kws):
         """Interpret file descriptors; inherit functionality from SQLiteTable; define equality (hashableness) of self"""
         self.name, self.url, self.timestamp = name, None, timestamp
         self.identifier = identifier
         self.aux_table = aux_table
         SQLiteTable.__init__(
-            self, identifier=identifier, timestamp=timestamp,
+            self, identifier=f"TABLE:{identifier}", timestamp=timestamp,
             data_getter=lambda: self.__download_as_pandas_dataframe(
                 urls, pandas_kws, INPLACE_process,
             ),
             sqlite_db=sqlite_db,
-            table=identifier, timestamp_table=aux_table,
+            table=f"TABLE:{identifier}", aux_table=aux_table,
         )
         HashableEnough.__init__(
             self, ("name", "identifier", "timestamp", "sqlite_db", "aux_table"),
