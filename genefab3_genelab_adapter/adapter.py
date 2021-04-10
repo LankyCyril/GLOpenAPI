@@ -48,7 +48,7 @@ KNOWN_DATATYPES = {
     r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.rda$':
         datatype("processed microarray data (rda)"),
     r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.txt$':
-        tabletype("processed microarray data"),
+        tabletype("processed microarray data", column_subset="sample name"),
     r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Normalized_Counts\.csv$':
         tabletype("normalized counts", column_subset="sample name"),
     r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Unnormalized_Counts\.csv$':
@@ -161,19 +161,27 @@ class GeneLabAdapter(Adapter):
             for _, row in files.sort_values(by="timestamp").iterrows()
         }
  
-    def best_sample_name_matches(self, name, names):
+    def best_sample_name_matches(self, name, names, return_positions=False):
         """Match ISA sample names to their variants in data files (R-like dot-separated, postfixed)"""
         dotted = lru_cache(maxsize=None)(lambda s: sub(r'[._-]', ".", s))
-        matches = [ns for ns in names if ns == name]
-        if matches:
-            return matches
+        positions_and_matches = [
+            (p, ns) for p, ns in enumerate(names) if ns == name
+        ]
+        if not positions_and_matches:
+            positions_and_matches = [
+                (p, ns) for p, ns in enumerate(names)
+                if dotted(ns) == dotted(name)
+            ]
+        if not positions_and_matches:
+            positions_and_matches = [
+                (p, ns) for p, ns in enumerate(names) if
+                dotted(ns).startswith(dotted(name)) or
+                dotted(name).startswith(dotted(ns))
+            ]
+        if return_positions:
+            return (
+                [ns for p, ns in positions_and_matches],
+                [p for p, ns in positions_and_matches],
+            )
         else:
-            matches = [ns for ns in names if dotted(ns) == dotted(name)]
-            if matches:
-                return matches
-            else:
-                return [
-                    ns for ns in names if
-                    dotted(ns).startswith(dotted(name)) or
-                    dotted(name).startswith(dotted(ns))
-                ]
+            return [ns for p, ns in positions_and_matches]

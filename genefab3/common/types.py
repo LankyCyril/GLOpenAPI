@@ -83,9 +83,18 @@ class Adapter():
                 _kw = dict(adapter=type(self).__name__, method=method_name)
                 raise GeneFabConfigurationException(msg, **_kw)
  
-    def best_sample_name_matches(self, name, names):
+    def best_sample_name_matches(self, name, names, return_positions=False):
         """Fallback sample name identity test"""
-        return [ns for ns in names if ns == name]
+        if return_positions:
+            positions_and_matches = [
+                (p, ns) for p, ns in enumerate(names) if ns == name
+            ]
+            return (
+                [ns for p, ns in positions_and_matches],
+                [p for p, ns in positions_and_matches],
+            )
+        else:
+            return [ns for ns in names if ns == name]
 
 
 class Routes():

@@ -1,12 +1,13 @@
 from genefab3.db.mongo.utils import retrieve_by_context
 from functools import lru_cache, reduce, partial
-from genefab3.db.sql.types import CachedBinaryFile, CachedTableFile
-from genefab3.common.exceptions import GeneFabFileException
-from genefab3.common.exceptions import GeneFabDataManagerException
-from genefab3.common.exceptions import GeneFabDatabaseException
-from pandas import DataFrame, MultiIndex, concat
 from genefab3.common.utils import pick_reachable_url
 from flask import redirect, Response
+from genefab3.common.exceptions import GeneFabFileException
+from genefab3.common.exceptions import GeneFabDataManagerException
+from pandas import DataFrame, MultiIndex, concat
+from genefab3.db.sql.types import CachedTableFile, CachedBinaryFile
+from natsort import natsorted
+from genefab3.common.exceptions import GeneFabDatabaseException
 
 
 TECH_TYPE_LOCATOR = "investigation.study assays", "study assay technology type"
@@ -76,20 +77,37 @@ def file_redirect(descriptors):
         )
 
 
-def INPLACE_postprocess_dataframe(dataframe, *, descriptor, best_sample_name_matches):
-    """Harmonize column names, index name"""
+def INPLACE_process_dataframe(dataframe, *, descriptor, best_sample_name_matches):
+    """Harmonize index name, column names, reorder sample columns to match annotation"""
     if not dataframe.index.name:
         dataframe.index.name = descriptor["file"].get("index_name", "index")
-    harmonized_columns, sample_names = [], descriptor.get("sample name", ())
-    for c in dataframe.columns:
-        hc = best_sample_name_matches(c, sample_names)
-        if len(hc) == 0:
+    sample_names = natsorted(descriptor.get("sample name", ()))
+    harmonized_columns, harmonized_positions = [], []
+    for i, c in enumerate(dataframe.columns):
+        hcs, ps = best_sample_name_matches(
+            c, sample_names, return_positions=True,
+        )
+        if len(hcs) == 0:
             harmonized_columns.append(c)
-        elif len(hc) == 1:
-            harmonized_columns.append(hc[0])
+        elif len(hcs) == 1:
+            harmonized_columns.append(hcs[0])
+            harmonized_positions.append((ps[0], i))
         else:
             msg = "Column name matches multiple sample names"
-            raise GeneFabDataManagerException(msg, column=c, sample_names=hc)
+            filename = descriptor["file"].get("filename")
+            _kws = dict(filename=filename, column=c, sample_names=hcs)
+            raise GeneFabDataManagerException(msg, **_kws)
+    if descriptor.get("column_subset") == "sample name":
+        if len(harmonized_positions) != len(sample_names):
+            msg = "Data columns do not match sample names 1-to-1"
+            _kws_a = dict(filename=descriptor["file"].get("filename"))
+            _kws_b = dict(columns=harmonized_columns, sample_names=sample_names)
+            raise GeneFabDataManagerException(msg, **_kws_a, **_kws_b)
+    unordered = harmonized_columns[:]
+    current_positions = [i for p, i in harmonized_positions]
+    target_positions = [i for p, i in sorted(harmonized_positions)]
+    for cp, tp in zip(current_positions, target_positions):
+        harmonized_columns[tp] = unordered[cp]
     dataframe.columns = harmonized_columns
 
 
@@ -101,7 +119,7 @@ def get_formatted_data(descriptor, sqlite_db, CachedFile, adapter, _kws):
     identifier = f"{accession}/File/{assay}/{name}"
     if "INPLACE_process" in _kws:
         _kws = {**_kws, "INPLACE_process": partial(
-            INPLACE_postprocess_dataframe, descriptor=descriptor,
+            INPLACE_process_dataframe, descriptor=descriptor,
             best_sample_name_matches=adapter.best_sample_name_matches,
         )}
     file = CachedFile(
@@ -152,7 +170,9 @@ def combined_data(descriptors, sqlite_dbs, adapter):
         raise NotImplementedError(f"Joining data of types {types}")
     return combine(
         get_formatted_data(d, sqlite_db, CachedFile, adapter, _kws)
-        for d in descriptors
+        for d in natsorted(
+            descriptors, key=lambda d: (d.get("accession"), d.get("assay")),
+        )
     )
 
 
