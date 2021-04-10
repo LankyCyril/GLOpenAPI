@@ -1,4 +1,4 @@
-from genefab3.db.mongo.utils import retrieve_by_context
+from genefab3.db.mongo.utils import blackjack_normalize, retrieve_by_context
 from pandas import MultiIndex, isnull
 from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -9,16 +9,12 @@ from genefab3.common.utils import set_attributes
 
 def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
     """Get target metadata as a single-level dataframe, numerically sorted by info fields"""
-    sortby = ["info.accession", "info.assay", *include]
-    full_projection = {
-        "info.accession": True, "info.assay": True,
-        **context.projection, **{field: True for field in include},
-    }
+    cursor, full_projection = retrieve_by_context(
+        mongo_collections.metadata, locale=locale, context=context,
+        include=include,
+    )
     try:
-        dataframe = retrieve_by_context(
-            mongo_collections.metadata, context.query,
-            full_projection, sortby, locale,
-        )
+        dataframe = blackjack_normalize(cursor)
     except MongoOperationError as e:
         errmsg = getattr(e, "details", {}).get("errmsg", "").lower()
         has_index = ("info" in mongo_collections.metadata.index_information())

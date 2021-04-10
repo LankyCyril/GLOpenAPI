@@ -156,13 +156,23 @@ def blackjack_normalize(cursor):
     return DataFrame(dict(iter_blackjack_items(e)) for e in cursor)
 
 
-def retrieve_by_context(collection, query, full_projection, sortby, locale):
+def retrieve_by_context(collection, *, locale, context, include=(), postprocess=()):
     """Run .find() or .aggregate() based on query, projection"""
-    return blackjack_normalize(collection.aggregate(
-        pipeline=[
-            {"$sort": {f: ASCENDING for f in sortby}},
-            {"$unwind": "$file"}, {"$match": query},
-            {"$project": {**full_projection, "_id": False}},
-        ],
-        collation={"locale": locale, "numericOrdering": True},
-    ))
+    full_projection = {
+        "info.accession": True, "info.assay": True,
+        **context.projection, **{field: True for field in include},
+    }
+    collation = {"locale": locale, "numericOrdering": True}
+    pipeline = [
+        {"$sort": {
+            f: ASCENDING
+            for f in ["info.accession", "info.assay", *include]
+        }},
+        {"$unwind": "$file"},
+        {"$match": context.query},
+        {"$project": {**full_projection, "_id": False}},
+    ]
+    cursor = collection.aggregate(
+        pipeline=[*pipeline, *postprocess], collation=collation,
+    )
+    return cursor, full_projection

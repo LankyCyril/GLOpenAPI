@@ -38,21 +38,18 @@ DISALLOWED_CONTEXTS = {
         (len(c.projection) == 0) and (len(c.accessions_and_assays) == 0),
     "metadata queries are not valid for /status/": lambda c:
         (c.view == "status") and (leaf_count(c.query) > 0),
-    "'format=cls' is only valid for /samples/": lambda c:
-        (c.view != "samples") and (c.format == "cls"),
-    "'format=gct' is only valid for /data/": lambda c:
-        (c.view != "data") and (c.format == "gct"),
     "'file.filename=' can only be specified once": lambda c:
         (len(c.complete_kwargs.get("file.filename", [])) > 1),
     "only one of 'file.filename=', 'file.datatype=' can be specified": lambda c:
         (len(c.complete_kwargs.get("file.filename", [])) > 1) and
         (len(c.complete_kwargs.get("file.datatype", [])) > 1),
+    "'format=cls' is only valid for /samples/": lambda c:
+        (c.view != "samples") and (c.format == "cls"),
+    "'format=gct' is only valid for /data/": lambda c:
+        (c.view != "data") and (c.format == "gct"),
     "'format=gct' is not valid for the requested datatype": lambda c:
         (c.format == "gct") and
         (c.complete_kwargs.get("file.datatype", []) != ["unnormalized counts"]),
-    "/file/ only accepts 'format=raw' or 'format=json'": lambda c:
-        (c.view == "file") and
-        ((c.format or "raw") not in {"raw", "json"}),
 }
 
 

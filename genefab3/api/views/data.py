@@ -1,9 +1,8 @@
-from functools import lru_cache
-from pandas import Series
+from genefab3.db.mongo.utils import retrieve_by_context
+from functools import lru_cache, reduce
 from genefab3.db.sql.types import CachedBinaryFile, CachedTableFile
-from genefab3.common.exceptions import GeneFabParserException
-from genefab3.api.views.file import get_descriptor_dataframe
 from genefab3.common.exceptions import GeneFabFileException
+from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.utils import pick_reachable_url
 from flask import redirect, Response
 
@@ -11,102 +10,103 @@ from flask import redirect, Response
 TECH_TYPE_LOCATOR = "investigation.study assays", "study assay technology type"
 
 
-def validate_joinable_files(descriptor_dataframe):
-    """Check for ability to join data from requested files"""
-    getset = lru_cache(maxsize=None)(lambda col, default=None:
-        set(descriptor_dataframe.get(col, Series(default)).drop_duplicates())
+def get_file_descriptors(mongo_collections, *, locale, context):
+    """Return DataFrame of file descriptors that match user query"""
+    context.projection["file"] = True
+    context.update(".".join(TECH_TYPE_LOCATOR))
+    descriptors, _ = retrieve_by_context(
+        mongo_collections.metadata, locale=locale, context=context,
+        include={"info.sample name"}, postprocess=[
+            {"$group": {
+                "_id": {
+                    "accession": "$info.accession",
+                    "assay": "$info.assay",
+                    "technology type": "$"+".".join(TECH_TYPE_LOCATOR),
+                    "file": "$file",
+                },
+                "sample name": {"$addToSet": "$info.sample name"},
+            }},
+            {"$addFields": {"_id.sample name": "$sample name"}},
+            {"$replaceRoot": {"newRoot": "$_id"}},
+        ],
     )
-    if len(getset(("datatype"))) > 1:
+    return list(descriptors)
+
+
+def validate_joinable_files(descriptors):
+    """Check for ability to join data from requested files"""
+    getset = lru_cache(maxsize=None)(lambda *keys: set(
+        reduce(lambda d, k: d.get(k, {}), keys, d) or None for d in descriptors
+    ))
+    if len(getset("file", "datatype")) > 1:
         msg = "Cannot combine data of multiple datatypes"
-        return msg, dict(datatypes=getset(("datatype")))
-    elif len(getset(TECH_TYPE_LOCATOR)) > 1:
+        return msg, dict(datatypes=getset("file", "datatype"))
+    elif len(getset("technology type")) > 1:
         msg = "Cannot combine data for multiple technology types"
-        return msg, dict(technology_types=getset(TECH_TYPE_LOCATOR))
-    elif getset(("joinable")) != {True}:
+        return msg, dict(technology_types=getset("technology type"))
+    elif getset("file", "joinable") != {True}:
         return "Cannot combine multiple files of this datatype", dict(
-            datatype=getset(("datatype")).pop(),
-            filenames=getset(("filename")),
+            datatype=getset("file", "datatype").pop(),
+            filenames=getset("file", "filename"),
         )
-    elif getset(("type")) != {"table"}:
+    elif getset("file", "type") != {"table"}:
         msg = "Cannot combine non-table files"
-        return msg, dict(types=getset(("type")))
-    elif len(getset(("index_name"))) > 1:
+        return msg, dict(types=getset("file", "type"))
+    elif len(getset("file", "index_name")) > 1:
         msg = "Cannot combine tables with conflicting index names"
-        return msg, dict(index_names=getset(("index_name")))
+        return msg, dict(index_names=getset("file", "index_name"))
     else:
         return None, {}
 
 
-def get_sql_manager(files, context):
-    """Select an SQLiteObject type suitable for passed files (CachedTableFile for tables, CachedBinaryFile for everything else)"""
-    types = {f.get("type") for f in files}
-    if types == {"table"}:
-        if context.format != "raw":
-            return CachedTableFile
-        else:
-            msg = "Cannot represent table data in format 'raw'"
-            _kw = {"type": "table", "format": context.format}
-            raise GeneFabParserException(msg, **_kw)
-    elif len(types) == 1:
-        if context.format == "raw":
-            return CachedBinaryFile
-        else:
-            msg = "Cannot represent non-table data in non-raw format"
-            _kw = {"type": "table", "format": context.format}
-            raise GeneFabParserException(msg, **_kw)
+def file_redirect(descriptors):
+    """Redirect to file at original URL, without caching or interpreting"""
+    if len(descriptors) == 1:
+        name = descriptors[0]["file"]["filename"]
+        urls = descriptors[0]["file"].get("urls", ())
+        with pick_reachable_url(urls, name=name) as url:
+            return redirect(url, code=303, Response=Response)
     else:
-        raise NotImplementedError("Joining data of type(s)", types=types)
+        raise GeneFabFileException(
+            ("Multiple files match query; " +
+            "with format 'raw', only one file can be requested"),
+            format="raw", files={d["file"]["filename"] for d in descriptors},
+        )
 
 
-def combined_cached_data(files, context):
+def combined_data(descriptors, sqlite_dbs):
     """Patch through to cached data for each file and combine them"""
-    CachedFile = get_sql_manager(files, context)
-    objects = [
-    ]
-
-
-def squash_sample_names(descriptor_dataframe):
-    """Collapse sample names belonging to same assay and file into lists"""
-    cols = [c for c in descriptor_dataframe if c != ("info", "sample name")]
-    squashed = descriptor_dataframe.groupby(cols, as_index=False).agg(list)
-    squashed.columns = [c[1] if c[0] == "file" else c for c in squashed]
-    return squashed
-
-
-def get(mongo_collections, *, locale, context, sqlite_dbs):
-    """Return data corresponding to search parameters; merged if multiple underlying files are same type and joinable"""
-    descriptor_dataframe = squash_sample_names(
-        get_descriptor_dataframe(
-            mongo_collections, locale=locale, context=context,
-            project_info=True, include={TECH_TYPE_LOCATOR},
-        ),
-    )
-    print(descriptor_dataframe.T)
-    if descriptor_dataframe.empty:
-        raise FileNotFoundError("No file found matching specified constraints")
-    elif "filename" not in descriptor_dataframe:
-        raise FileNotFoundError("No file found matching specified constraints")
-    elif len(descriptor_dataframe) > 1:
-        msg, _kw = validate_joinable_files(descriptor_dataframe)
+    if len(descriptors) > 1:
+        msg, _kw = validate_joinable_files(descriptors)
         if msg:
             raise GeneFabFileException(msg, **_kw)
-    files = descriptor_dataframe.to_dict(orient="records")
-    if {f.get("cacheable") for f in files} != {True}:
-        if len(files) == 1:
-            if context.format == "raw":
-                urls = files[0].get("urls", ())
-                with pick_reachable_url(urls, name=files[0]["filename"]) as url:
-                    return redirect(url, code=303, Response=Response)
-            else:
-                msg = "Cannot represent non-cacheable file in format '{}'"
-                raise NotImplementedError(msg.format(context.format))
-        else:
-            msg = "Cannot combine these data as they were not marked cacheable"
-            raise NotImplementedError(msg)
+    getset = lru_cache(maxsize=None)(lambda *keys: set(
+        reduce(lambda d, k: d.get(k, {}), keys, d) or None for d in descriptors
+    ))
+    if getset("file", "cacheable") != {True}:
+        msg = "Cannot combine these data as they were not marked cacheable"
+        raise NotImplementedError(msg)
+    types = getset("file", "type")
+    if types == {"table"}:
+        CachedFile = CachedTableFile
+    elif len(types) == 1:
+        CachedFile = CachedBinaryFile
     else:
-        return combined_cached_data(files, context)
-    return repr(files)
-
+        raise NotImplementedError(f"Joining data of types {types}")
+    objects = []
+    for d in descriptors:
+        name = d["file"]["filename"]
+        urls = d["file"].get("urls", ())
+        with pick_reachable_url(urls, name=name) as url:
+            objects.append(
+                #CachedFile(
+                dict(
+                    name=name, sqlite_db=sqlite_dbs.blobs,
+                    url=url, timestamp=d["file"].get("timestamp", -1),
+                )
+            )
+    print(objects)
+    return objects
 """
             if descriptor.get("cacheable") == True:
                 cached_object_kwargs = dict(
@@ -119,3 +119,23 @@ def get(mongo_collections, *, locale, context, sqlite_dbs):
                     file = CachedBinaryFile(**cached_object_kwargs)
             else:
 """
+
+
+def get(mongo_collections, *, locale, context, sqlite_dbs):
+    """Return data corresponding to search parameters; merged if multiple underlying files are same type and joinable"""
+    descriptors = get_file_descriptors(
+        mongo_collections, locale=locale, context=context,
+    )
+    for d in descriptors:
+        if ("file" not in d) or ("filename" not in d["file"]):
+            msg = "File information missing for entry"
+            raise GeneFabDatabaseException(msg, entry=d)
+    if not len(descriptors):
+        raise FileNotFoundError("No file found matching specified constraints")
+    elif context.format == "html": # TODO temporary
+        from json import dumps
+        return "<pre>"+dumps(descriptors, sort_keys=True, indent=4)
+    elif context.format == "raw":
+        return file_redirect(descriptors)
+    else:
+        return combined_data(descriptors, sqlite_dbs)
