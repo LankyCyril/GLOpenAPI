@@ -3,6 +3,7 @@ from functools import lru_cache, reduce
 from genefab3.db.sql.types import CachedBinaryFile, CachedTableFile
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDatabaseException
+from pandas import DataFrame, MultiIndex, concat
 from genefab3.common.utils import pick_reachable_url
 from flask import redirect, Response
 
@@ -74,6 +75,36 @@ def file_redirect(descriptors):
         )
 
 
+def get_formatted_data(descriptor, sqlite_db, CachedFile, _kws):
+    """Instantiate and initialize CachedFile object; post-process its data"""
+    accession = descriptor.get("accession", "NO_ACCESSION")
+    assay = descriptor.get("assay", "NO_ASSAY")
+    name = descriptor["file"]["filename"]
+    identifier = f"{accession}/File/{assay}/{name}"
+    file = CachedFile(
+        identifier=identifier,
+        name=name, urls=descriptor["file"].get("urls", ()),
+        timestamp=descriptor["file"].get("timestamp", -1),
+        sqlite_db=sqlite_db, **_kws,
+    )
+    data = file.data
+    if isinstance(data, DataFrame):
+        if not data.index.name:
+            data.index.name = descriptor["file"].get("index_name", "index")
+        data.columns = MultiIndex.from_tuples((
+            (accession, assay, column) for column in data.columns
+            # TODO: infer correct sample names here
+        ))
+    return data
+
+
+def combine_dataframes(dataframes):
+    """Combine dataframes in-memory; this faster than sqlite3: wesmckinney.com/blog/high-performance-database-joins-with-pandas-dataframe-more-benchmarks"""
+    dataframe = concat(dataframes, axis=1, sort=False)
+    dataframe.reset_index(inplace=True, col_level=-1, col_fill="*")
+    return dataframe
+
+
 def combined_data(descriptors, sqlite_dbs):
     """Patch through to cached data for each file and combine them"""
     if len(descriptors) > 1:
@@ -88,37 +119,18 @@ def combined_data(descriptors, sqlite_dbs):
         raise NotImplementedError(msg)
     types = getset("file", "type")
     if types == {"table"}:
-        CachedFile = CachedTableFile
+        sqlite_db = sqlite_dbs.tables
+        CachedFile, _kws = CachedTableFile, dict(index_col=0)
+        combine = combine_dataframes
     elif len(types) == 1:
-        CachedFile = CachedBinaryFile
+        sqlite_db, CachedFile, _kws = sqlite_dbs.blobs, CachedBinaryFile, {}
+        combine = next
     else:
         raise NotImplementedError(f"Joining data of types {types}")
-    objects = []
-    for d in descriptors:
-        name = d["file"]["filename"]
-        urls = d["file"].get("urls", ())
-        with pick_reachable_url(urls, name=name) as url:
-            objects.append(
-                #CachedFile(
-                dict(
-                    name=name, sqlite_db=sqlite_dbs.blobs,
-                    url=url, timestamp=d["file"].get("timestamp", -1),
-                )
-            )
-    print(objects)
-    return objects
-"""
-            if descriptor.get("cacheable") == True:
-                cached_object_kwargs = dict(
-                    name=descriptor["filename"], sqlite_db=sqlite_dbs.blobs,
-                    url=url, timestamp=descriptor.get("timestamp", -1),
-                )
-                if descriptor.get("type") == "table":
-                    file = CachedTableFile(**cached_object_kwargs)
-                else:
-                    file = CachedBinaryFile(**cached_object_kwargs)
-            else:
-"""
+    return combine(
+        get_formatted_data(d, sqlite_db, CachedFile, _kws)
+        for d in descriptors
+    )
 
 
 def get(mongo_collections, *, locale, context, sqlite_dbs):
@@ -132,9 +144,6 @@ def get(mongo_collections, *, locale, context, sqlite_dbs):
             raise GeneFabDatabaseException(msg, entry=d)
     if not len(descriptors):
         raise FileNotFoundError("No file found matching specified constraints")
-    elif context.format == "html": # TODO temporary
-        from json import dumps
-        return "<pre>"+dumps(descriptors, sort_keys=True, indent=4)
     elif context.format == "raw":
         return file_redirect(descriptors)
     else:
