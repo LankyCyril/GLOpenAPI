@@ -1,7 +1,8 @@
 from genefab3.db.mongo.utils import retrieve_by_context
-from functools import lru_cache, reduce
+from functools import lru_cache, reduce, partial
 from genefab3.db.sql.types import CachedBinaryFile, CachedTableFile
 from genefab3.common.exceptions import GeneFabFileException
+from genefab3.common.exceptions import GeneFabDataManagerException
 from genefab3.common.exceptions import GeneFabDatabaseException
 from pandas import DataFrame, MultiIndex, concat
 from genefab3.common.utils import pick_reachable_url
@@ -75,12 +76,34 @@ def file_redirect(descriptors):
         )
 
 
-def get_formatted_data(descriptor, sqlite_db, CachedFile, _kws):
+def INPLACE_postprocess_dataframe(dataframe, *, descriptor, best_sample_name_matches):
+    """Harmonize column names, index name"""
+    if not dataframe.index.name:
+        dataframe.index.name = descriptor["file"].get("index_name", "index")
+    harmonized_columns, sample_names = [], descriptor.get("sample name", ())
+    for c in dataframe.columns:
+        hc = best_sample_name_matches(c, sample_names)
+        if len(hc) == 0:
+            harmonized_columns.append(c)
+        elif len(hc) == 1:
+            harmonized_columns.append(hc[0])
+        else:
+            msg = "Column name matches multiple sample names"
+            raise GeneFabDataManagerException(msg, column=c, sample_names=hc)
+    dataframe.columns = harmonized_columns
+
+
+def get_formatted_data(descriptor, sqlite_db, CachedFile, adapter, _kws):
     """Instantiate and initialize CachedFile object; post-process its data"""
     accession = descriptor.get("accession", "NO_ACCESSION")
     assay = descriptor.get("assay", "NO_ASSAY")
     name = descriptor["file"]["filename"]
     identifier = f"{accession}/File/{assay}/{name}"
+    if "INPLACE_postprocess" in _kws:
+        _kws = {**_kws, "INPLACE_postprocess": partial(
+            INPLACE_postprocess_dataframe, descriptor=descriptor,
+            best_sample_name_matches=adapter.best_sample_name_matches,
+        )}
     file = CachedFile(
         identifier=identifier,
         name=name, urls=descriptor["file"].get("urls", ()),
@@ -89,11 +112,8 @@ def get_formatted_data(descriptor, sqlite_db, CachedFile, _kws):
     )
     data = file.data
     if isinstance(data, DataFrame):
-        if not data.index.name:
-            data.index.name = descriptor["file"].get("index_name", "index")
         data.columns = MultiIndex.from_tuples((
             (accession, assay, column) for column in data.columns
-            # TODO: infer correct sample names here
         ))
     return data
 
@@ -102,11 +122,13 @@ def combine_dataframes(dataframes):
     """Combine dataframes in-memory; this faster than sqlite3"""
     # wesmckinney.com/blog/high-performance-database-joins-with-pandas-dataframe-more-benchmarks
     dataframe = concat(dataframes, axis=1, sort=False)
+    if dataframe.index.name is None: # happens if original index names differed
+        dataframe.index.name = "index" # best we can do
     dataframe.reset_index(inplace=True, col_level=-1, col_fill="*")
     return dataframe
 
 
-def combined_data(descriptors, sqlite_dbs):
+def combined_data(descriptors, sqlite_dbs, adapter):
     """Patch through to cached data for each file and combine them"""
     if len(descriptors) > 1:
         msg, _kw = validate_joinable_files(descriptors)
@@ -120,8 +142,8 @@ def combined_data(descriptors, sqlite_dbs):
         raise NotImplementedError(msg)
     types = getset("file", "type")
     if types == {"table"}:
-        sqlite_db = sqlite_dbs.tables
-        CachedFile, _kws = CachedTableFile, dict(index_col=0)
+        sqlite_db, CachedFile = sqlite_dbs.tables, CachedTableFile
+        _kws = dict(index_col=0, INPLACE_postprocess=True)
         combine = combine_dataframes
     elif len(types) == 1:
         sqlite_db, CachedFile, _kws = sqlite_dbs.blobs, CachedBinaryFile, {}
@@ -129,12 +151,12 @@ def combined_data(descriptors, sqlite_dbs):
     else:
         raise NotImplementedError(f"Joining data of types {types}")
     return combine(
-        get_formatted_data(d, sqlite_db, CachedFile, _kws)
+        get_formatted_data(d, sqlite_db, CachedFile, adapter, _kws)
         for d in descriptors
     )
 
 
-def get(mongo_collections, *, locale, context, sqlite_dbs):
+def get(mongo_collections, *, locale, context, sqlite_dbs, adapter):
     """Return data corresponding to search parameters; merged if multiple underlying files are same type and joinable"""
     descriptors = get_file_descriptors(
         mongo_collections, locale=locale, context=context,
@@ -148,4 +170,4 @@ def get(mongo_collections, *, locale, context, sqlite_dbs):
     elif context.format == "raw":
         return file_redirect(descriptors)
     else:
-        return combined_data(descriptors, sqlite_dbs)
+        return combined_data(descriptors, sqlite_dbs, adapter)

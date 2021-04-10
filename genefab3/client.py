@@ -29,7 +29,8 @@ class GeneFabClient():
         else:
             self.adapter = AdapterClass()
             self.routes = RoutesClass(
-                self.mongo_collections, self.locale, self.sqlite_dbs,
+                self.mongo_collections, locale=self.locale,
+                sqlite_dbs=self.sqlite_dbs, adapter=self.adapter,
             )
             self.cacher_params = cacher_params
             self._init_routes()

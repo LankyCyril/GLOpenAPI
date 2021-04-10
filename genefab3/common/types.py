@@ -91,6 +91,10 @@ class Adapter():
 class Routes():
     """Base class for registered endpoints"""
  
+    def __init__(self, mongo_collections, *, locale, sqlite_dbs, adapter):
+        self.mongo_collections, self.locale = mongo_collections, locale
+        self.sqlite_dbs, self.adapter = sqlite_dbs, adapter
+ 
     def register_endpoint(*, endpoint=None, fmt="tsv", cache=True):
         """Decorator that adds `endpoint` and `fmt` attributes to class method"""
         def outer(method):

@@ -313,7 +313,7 @@ class CachedBinaryFile(HashableEnough, SQLiteBlob):
 class CachedTableFile(HashableEnough, SQLiteTable):
     """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="timestamp_table", **pandas_kws):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="timestamp_table", INPLACE_postprocess=None, **pandas_kws):
         """Interpret file descriptors; inherit functionality from SQLiteTable; define equality (hashableness) of self"""
         self.name, self.url, self.timestamp = name, None, timestamp
         self.identifier = identifier
@@ -321,7 +321,7 @@ class CachedTableFile(HashableEnough, SQLiteTable):
         SQLiteTable.__init__(
             self, identifier=identifier, timestamp=timestamp,
             data_getter=lambda: self.__download_as_pandas_dataframe(
-                urls, pandas_kws,
+                urls, pandas_kws, INPLACE_postprocess,
             ),
             sqlite_db=sqlite_db,
             table=identifier, timestamp_table=aux_table,
@@ -330,7 +330,7 @@ class CachedTableFile(HashableEnough, SQLiteTable):
             self, ("name", "identifier", "timestamp", "sqlite_db", "aux_table"),
         )
  
-    def __download_as_pandas_dataframe(self, urls, pandas_kws):
+    def __download_as_pandas_dataframe(self, urls, pandas_kws, INPLACE_postprocess):
         """Download and parse data from URL as a table"""
         with TemporaryDirectory() as tempdir:
             tempfile = path.join(tempdir, self.name)
@@ -355,9 +355,12 @@ class CachedTableFile(HashableEnough, SQLiteTable):
             try:
                 with _open(tempfile, mode="rt", newline="") as handle:
                     sep = Sniffer().sniff(handle.read(2**20)).delimiter
-                return read_csv(
+                dataframe = read_csv(
                     url, sep=sep, compression=compression, **pandas_kws,
                 )
+                if INPLACE_postprocess:
+                    INPLACE_postprocess(dataframe)
+                return dataframe
             except (IOError, UnicodeDecodeError, CSVError, PandasParserError):
                 msg = "Not recognized as a table file"
                 raise GeneFabFileException(msg, name=self.name, url=url)

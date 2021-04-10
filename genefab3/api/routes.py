@@ -5,10 +5,6 @@ from genefab3.api import views
 class DefaultRoutes(Routes):
     """Defines standard endpoints"""
  
-    def __init__(self, mongo_collections, locale, sqlite_dbs):
-        self.mongo_collections, self.locale = mongo_collections, locale
-        self.sqlite_dbs = sqlite_dbs
- 
     @Routes.register_endpoint(endpoint="/favicon.<imgtype>", fmt="raw")
     def favicon(self, imgtype, context=None):
         return ""
@@ -39,5 +35,5 @@ class DefaultRoutes(Routes):
     def data(self, context):
         return views.data.get(
             self.mongo_collections, locale=self.locale, context=context,
-            sqlite_dbs=self.sqlite_dbs,
+            sqlite_dbs=self.sqlite_dbs, adapter=self.adapter,
         )
