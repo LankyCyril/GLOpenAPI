@@ -101,7 +101,8 @@ class CacherThread(Thread):
                     update_status(
                         **self.status_kwargs, status="warning",
                         warning="Study entry missing",
-                        accession=dataset.accession, assay_name=sample.assay_name,
+                        accession=dataset.accession,
+                        assay_name=sample.assay_name,
                         sample_name=sample.name,
                     )
             if not has_samples:

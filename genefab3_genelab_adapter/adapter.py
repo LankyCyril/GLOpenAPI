@@ -163,7 +163,9 @@ class GeneLabAdapter(Adapter):
  
     def best_sample_name_matches(self, name, names, return_positions=False):
         """Match ISA sample names to their variants in data files (R-like dot-separated, postfixed)"""
-        dotted = lru_cache(maxsize=None)(lambda s: sub(r'[._-]', ".", s))
+        dotted = lru_cache(maxsize=None)(
+            lambda s: sub(r'[._-]', ".", s) if isinstance(s, str) else None
+        )
         positions_and_matches = [
             (p, ns) for p, ns in enumerate(names) if ns == name
         ]
@@ -174,9 +176,11 @@ class GeneLabAdapter(Adapter):
             ]
         if not positions_and_matches:
             positions_and_matches = [
-                (p, ns) for p, ns in enumerate(names) if
-                dotted(ns).startswith(dotted(name)) or
-                dotted(name).startswith(dotted(ns))
+                (p, ns) for p, ns in enumerate(names)
+                if dotted(ns) and dotted(name) and (
+                    dotted(ns).startswith(dotted(name)) or
+                    dotted(name).startswith(dotted(ns))
+                )
             ]
         if return_positions:
             return (
