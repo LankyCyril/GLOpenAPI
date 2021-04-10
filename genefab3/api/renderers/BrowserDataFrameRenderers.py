@@ -89,18 +89,19 @@ def get_browser_meta_formatter(context, i, head, target):
 
 def iter_formatters(obj, context, shortnames):
     """Get SlickGrid formatters for columns"""
-    for i, (key, target) in enumerate(obj.columns):
-        if key == "info":
-            if target == "accession":
-                yield get_browser_glds_formatter(context, i)
-            elif target == "assay":
-                yield get_browser_assay_formatter(context, i, shortnames)
-        elif (key, target, context.view) == ("file", "filename", "samples"):
-            yield get_browser_file_formatter(context, i)
-        else:
-            category, *fields = key.split(".")
-            head = f"{category}.{fields[0]}" if fields else category
-            yield get_browser_meta_formatter(context, i, head, target)
+    if context.view != "data":
+        for i, (key, target) in enumerate(obj.columns):
+            if key == "info":
+                if target == "accession":
+                    yield get_browser_glds_formatter(context, i)
+                elif target == "assay":
+                    yield get_browser_assay_formatter(context, i, shortnames)
+            elif (key, target, context.view) == ("file", "filename", "samples"):
+                yield get_browser_file_formatter(context, i)
+            else:
+                category, *fields = key.split(".")
+                head = f"{category}.{fields[0]}" if fields else category
+                yield get_browser_meta_formatter(context, i, head, target)
 
 
 SQUASHED_PREHEADER_CSS = """
@@ -130,7 +131,9 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_pr
         for (a, b), n in zip(obj.columns, shortnames)
     )
     formatters = iter_formatters(obj, context, shortnames)
+    title_postfix = f"{context.view.capitalize()} {context.complete_kwargs}"
     content = map_replace(_get_browser_html(), {
+        "</title><!--TITLEPOSTFIX-->": f": {title_postfix}</title>",
         "// FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
         "/*SQUASH_PREHDR*/": SQUASHED_PREHEADER_CSS if squash_preheader else "",
         "// FORMATTERS": "\n".join(formatters) if use_formatters else "",
