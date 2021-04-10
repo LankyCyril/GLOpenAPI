@@ -99,8 +99,8 @@ def get_formatted_data(descriptor, sqlite_db, CachedFile, adapter, _kws):
     assay = descriptor.get("assay", "NO_ASSAY")
     name = descriptor["file"]["filename"]
     identifier = f"{accession}/File/{assay}/{name}"
-    if "INPLACE_postprocess" in _kws:
-        _kws = {**_kws, "INPLACE_postprocess": partial(
+    if "INPLACE_process" in _kws:
+        _kws = {**_kws, "INPLACE_process": partial(
             INPLACE_postprocess_dataframe, descriptor=descriptor,
             best_sample_name_matches=adapter.best_sample_name_matches,
         )}
@@ -143,7 +143,7 @@ def combined_data(descriptors, sqlite_dbs, adapter):
     types = getset("file", "type")
     if types == {"table"}:
         sqlite_db, CachedFile = sqlite_dbs.tables, CachedTableFile
-        _kws = dict(index_col=0, INPLACE_postprocess=True)
+        _kws = dict(index_col=0, INPLACE_process=True)
         combine = combine_dataframes
     elif len(types) == 1:
         sqlite_db, CachedFile, _kws = sqlite_dbs.blobs, CachedBinaryFile, {}
