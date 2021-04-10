@@ -9,14 +9,17 @@ from genefab3.common.utils import JSONByteEncoder
 
 def cls(obj, context=None, continuous=None, space_sub=lambda s: sub(r'\s', "", s), indent=None):
     """Display presumed annotation/factor dataframe in plaintext CLS format"""
-    columns = [(l0, l1) for (l0, l1) in obj.columns if l0 != "info"]
+    columns = [c for c in obj.columns if c[0] not in {"info", "file"}]
     if len(columns) != 1:
-        msg = "Exactly one metadata field must be requested"
-        raise GeneFabFormatException(msg, columns=columns, format="cls")
+        msg = "Exactly one target assay/study metadata field must be present"
+        raise GeneFabFormatException(msg, target_columns=columns, format="cls")
     target, sample_count = columns[0], obj.shape[0]
     if (continuous is None) or (continuous is True):
         try:
-            _data = [["#numeric"], ["#"+target], obj[target].astype(float)]
+            _data = [
+                ["#numeric"], ["#" + (".".join(target))],
+                obj[target].astype(float),
+            ]
         except ValueError:
             if continuous is True:
                 msg = "Cannot represent target annotation as continuous"
