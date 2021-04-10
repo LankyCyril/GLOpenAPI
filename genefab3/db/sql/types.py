@@ -114,9 +114,6 @@ class SQLiteObject():
             raise NotImplementedError("MultiIndex in cached DataFrame")
         if dataframe.columns.nlevels != 1:
             raise NotImplementedError("MultiIndex columns in cached DataFrame")
-        if dataframe.index.name not in {None, "index"}:
-            msg = "Cached DataFrame index name is neither 'index' nor None"
-            raise NotImplementedError(msg)
         with closing(connect(self.__sqlite_db)) as connection:
             dataframe.to_sql(table, connection, index=True, if_exists="replace")
  
@@ -167,9 +164,9 @@ class SQLiteObject():
         with closing(connect(self.__sqlite_db)) as connection:
             query = f"SELECT * from '{table}'"
             try:
-                return postprocess_function(
-                    read_sql(query, connection, index_col="index"),
-                )
+                dataframe = read_sql(query, connection)
+                dataframe.set_index(dataframe.columns[0], inplace=True)
+                return postprocess_function(dataframe)
             except (OperationalError, DatabaseError):
                 msg = "No data found"
                 raise GeneFabDatabaseException(msg, signature=self.__signature)
@@ -327,7 +324,7 @@ class CachedTableFile(HashableEnough, SQLiteTable):
                 urls, pandas_kws,
             ),
             sqlite_db=sqlite_db,
-            table=name, timestamp_table=aux_table,
+            table=identifier, timestamp_table=aux_table,
         )
         HashableEnough.__init__(
             self, ("name", "identifier", "timestamp", "sqlite_db", "aux_table"),

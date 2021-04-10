@@ -99,7 +99,8 @@ def get_formatted_data(descriptor, sqlite_db, CachedFile, _kws):
 
 
 def combine_dataframes(dataframes):
-    """Combine dataframes in-memory; this faster than sqlite3: wesmckinney.com/blog/high-performance-database-joins-with-pandas-dataframe-more-benchmarks"""
+    """Combine dataframes in-memory; this faster than sqlite3"""
+    # wesmckinney.com/blog/high-performance-database-joins-with-pandas-dataframe-more-benchmarks
     dataframe = concat(dataframes, axis=1, sort=False)
     dataframe.reset_index(inplace=True, col_level=-1, col_fill="*")
     return dataframe
