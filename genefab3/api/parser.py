@@ -8,7 +8,6 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabParserException
 from genefab3.db.mongo.utils import is_safe_token, reduce_projection, is_regex
 from collections import defaultdict
-from genefab3.common.types import UniversalSet
 
 
 CONTEXT_ARGUMENTS = {"debug", "format"}
@@ -149,9 +148,9 @@ class KeyValueParsers():
                 accessions_and_assays[accession].add(assay_name)
         yield query, projection_keys, accessions_and_assays
  
-    def kvp_generic(category, fields, value, constrain_to=UniversalSet(), dot_postfix="auto", shift=False):
+    def kvp_generic(category, fields, value, constrain_to=None, dot_postfix="auto", shift=False):
         """Interpret single key-value pair if it gives rise to database query"""
-        if (not fields) or (fields[0] not in constrain_to):
+        if (not fields) or (constrain_to and (fields[0] not in constrain_to)):
             msg = "Unrecognized argument"
             raise GeneFabParserException(msg, arg=".".join([category, *fields]))
         elif shift and (len(fields) > 1):

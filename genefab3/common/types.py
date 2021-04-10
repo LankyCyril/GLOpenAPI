@@ -5,17 +5,6 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
 
 
-class UniversalSet(set):
-    """Naive universal set"""
-    def __and__(self, x): return x
-    def __iand__(self, x): return x
-    def __rand__(self, x): return x
-    def __or__(self, x): return self
-    def __ior__(self, x): return self
-    def __ror__(self, x): return self
-    def __contains__(self, x): return True
-
-
 NestedDefaultDict = lambda: defaultdict(NestedDefaultDict)
 
 
