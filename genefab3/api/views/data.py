@@ -1,6 +1,6 @@
 from genefab3.db.mongo.utils import retrieve_by_context
 from functools import lru_cache, reduce, partial
-from genefab3.common.utils import pick_reachable_url
+from genefab3.common.utils import pick_reachable_url, set_attributes
 from flask import redirect, Response
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDataManagerException
@@ -143,6 +143,7 @@ def combine_dataframes(dataframes):
     if dataframe.index.name is None: # happens if original index names differed
         dataframe.index.name = "index" # best we can do
     dataframe.reset_index(inplace=True, col_level=-1, col_fill="*")
+    set_attributes(dataframe, genefab_type="datatable")
     return dataframe
 
 

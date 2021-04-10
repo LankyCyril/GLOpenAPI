@@ -3,8 +3,8 @@ from genefab3.common.exceptions import GeneFabFormatException
 from pandas import Series
 from flask import Response
 from functools import partial
+from genefab3.common.utils import get_attribute, JSONByteEncoder
 from json import dumps
-from genefab3.common.utils import JSONByteEncoder
 
 
 def cls(obj, context=None, continuous=None, space_sub=lambda s: sub(r'\s', "", s), indent=None):
@@ -65,6 +65,14 @@ tsv = partial(xsv, sep="\t")
 
 def json(obj, context=None, indent=None):
     """Display dataframe as JSON"""
-    raw_json = {"columns": obj.columns.tolist(), "data": obj.values.tolist()}
-    content = dumps(raw_json, indent=indent, cls=JSONByteEncoder)
+    if get_attribute(obj, "genefab_type") == "datatable":
+        _json = {
+            "columns": obj.columns.tolist(), "index": obj.values[:,0].tolist(),
+            "data": obj.values[:,1:].tolist(),
+        }
+    else:
+        _json = {
+            "columns": obj.columns.tolist(), "data": obj.values.tolist(),
+        }
+    content = dumps(_json, indent=indent, cls=JSONByteEncoder)
     return Response(content, mimetype="text/json")
