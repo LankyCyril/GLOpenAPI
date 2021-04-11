@@ -5,7 +5,7 @@ from genefab3.api import views
 class DefaultRoutes(Routes):
     """Defines standard endpoints"""
  
-    @Routes.register_endpoint(endpoint="/favicon.<imgtype>", fmt="raw")
+    @Routes.register_endpoint(endpoint="/favicon.<imgtype>", fmt="raw", cache=False)
     def favicon(self, imgtype, context=None):
         return ""
  
@@ -13,7 +13,7 @@ class DefaultRoutes(Routes):
     def root(self, context):
         return views.root.get(self.mongo_collections, context=context)
  
-    @Routes.register_endpoint()
+    @Routes.register_endpoint(cache=False)
     def status(self, context=None):
         return views.status.get(self.mongo_collections)
  

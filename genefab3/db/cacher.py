@@ -1,4 +1,5 @@
 from threading import Thread
+from genefab3.db.sql.response_cache import ResponseCache
 from genefab3.common.logger import GeneFabLogger
 from genefab3.db.mongo.index import ensure_info_index
 from genefab3.db.mongo.index import update_metadata_value_lookup
@@ -21,6 +22,7 @@ class CacherThread(Thread):
         self.metadata_update_interval = metadata_update_interval
         self.metadata_retry_delay = metadata_retry_delay
         self.units_formatter = units_formatter
+        self.response_cache = ResponseCache(self.sqlite_dbs)
         self.status_kwargs = dict(
             collection=self.mongo_collections.status,
             logger=GeneFabLogger(),
@@ -34,8 +36,13 @@ class CacherThread(Thread):
             accessions, success = self.recache_metadata()
             if success:
                 update_metadata_value_lookup(self.mongo_collections)
-                # drop_cached_responses TODO
-                # shrink_response_cache TODO
+                accessions_to_drop = (
+                    accessions["updated"] | accessions["dropped"] |
+                    accessions["failed"]
+                )
+                for accession in accessions_to_drop:
+                    self.response_cache.drop(accession)
+                self.response_cache.shrink()
                 delay = self.metadata_update_interval
             else:
                 delay = self.metadata_retry_delay

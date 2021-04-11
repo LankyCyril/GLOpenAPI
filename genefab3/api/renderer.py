@@ -8,6 +8,7 @@ from operator import eq
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.api.parser import Context
+from genefab3.db.sql.response_cache import ResponseCache
 
 
 LevelCount = lambda *a:a
@@ -71,11 +72,19 @@ class CacheableRenderer():
                 _kw = dict(context=context, indent=4, fmt="json")
                 response = self.dispatch_renderer(context.__dict__, **_kw)
             else:
-                # TODO check cache based on context.identity
-                obj = method(*args, context=context, **kwargs)
-                fmt = context.format or getattr(method, "fmt", "raw")
-                response = self.dispatch_renderer(obj, context, fmt=fmt)
-                if response.status_code // 100 == 2:
-                    pass # TODO cache
+                cacheable = getattr(method, "cache") is True
+                if cacheable:
+                    response_cache = ResponseCache(self.sqlite_dbs)
+                    response = response_cache.get(context)
+                else:
+                    response_cache = None
+                    response = None
+                if response is None:
+                    obj = method(*args, context=context, **kwargs)
+                    fmt = context.format or getattr(method, "fmt", "raw")
+                    response = self.dispatch_renderer(obj, context, fmt=fmt)
+                    if response.status_code // 100 == 2:
+                        if response_cache is not None:
+                            response_cache.put(context, obj, response)
             return response
         return wrapper
