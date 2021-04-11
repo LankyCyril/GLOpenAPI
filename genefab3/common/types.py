@@ -1,29 +1,10 @@
 from collections import defaultdict
-from werkzeug.datastructures import ImmutableDict
 from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
 
 
 NestedDefaultDict = lambda: defaultdict(NestedDefaultDict)
-
-
-def ImmutableTree(d, step_tracker=1, max_steps=256):
-    """Converts nested dictionaries, lists, tuples into immutable equivalents"""
-    if step_tracker >= max_steps:
-        raise ValueError("Tree exceeded nestedness threshold", max_steps)
-    elif isinstance(d, dict):
-        return ImmutableDict({
-            k: ImmutableTree(v, step_tracker+i)
-            for i, (k, v) in enumerate(d.items(), start=1)
-        })
-    elif isinstance(d, (list, tuple)):
-        return tuple(
-            ImmutableTree(v, step_tracker+i)
-            for i, v in enumerate(d, start=1)
-        )
-    else:
-        return d
 
 
 class Adapter():

@@ -1,6 +1,6 @@
 from genefab3.common.utils import iterate_terminal_leaves, as_is
 from genefab3.common.exceptions import GeneFabConfigurationException
-from genefab3.common.types import ImmutableTree
+from copy import deepcopy
 from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
 from genefab3.common.logger import GeneFabLogger
@@ -45,7 +45,7 @@ class SQLiteObject():
                 iter(signature.items()),
             )
             try:
-                self.__signature = ImmutableTree(signature)
+                self.__signature = deepcopy(signature)
             except ValueError:
                 msg = "SQLiteObject(): Bad signature"
                 raise GeneFabConfigurationException(msg, signature=signature)
@@ -54,9 +54,9 @@ class SQLiteObject():
                 if schema is not None:
                     self.__ensure_table(table, schema)
         try:
-            self.__trigger_spec = ImmutableTree(trigger)
-            self.__retrieve_spec = ImmutableTree(retrieve)
-            self.__update_spec = ImmutableTree(update)
+            self.__trigger_spec = deepcopy(trigger)
+            self.__retrieve_spec = deepcopy(retrieve)
+            self.__update_spec = deepcopy(update)
         except ValueError:
             msg = "SQLiteObject(): Bad spec"
             _kw = dict(trigger=trigger, update=update, retrieve=retrieve)
