@@ -5,6 +5,7 @@ from flask import redirect, Response
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDataManagerException
 from pandas import DataFrame, MultiIndex, concat
+from genefab3.common.logger import GeneFabLogger
 from genefab3.db.sql.types import CachedTableFile, CachedBinaryFile
 from natsort import natsorted
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -142,6 +143,7 @@ def combine_dataframes(dataframes):
     dataframe = concat(dataframes, axis=1, sort=False)
     if dataframe.index.name is None: # happens if original index names differed
         dataframe.index.name = "index" # best we can do
+    GeneFabLogger().info("Merging dataframes in-memory")
     dataframe.reset_index(inplace=True, col_level=-1, col_fill="*")
     set_attributes(dataframe, genefab_type="datatable")
     return dataframe

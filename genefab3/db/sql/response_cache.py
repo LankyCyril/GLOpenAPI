@@ -26,6 +26,7 @@ class ResponseCache():
     def __init__(self, sqlite_dbs, maxsize=24*1024*1024*1024):
         self.sqlite_dbs = sqlite_dbs
         self.maxsize = maxsize
+        self.logger = GeneFabLogger()
         if sqlite_dbs.cache is not None:
             # if not path.exists(response_cache): # TODO: auto_vacuum
             #     with closing(connect(response_cache)) as sql_connection:
@@ -36,13 +37,17 @@ class ResponseCache():
                         f"CREATE TABLE IF NOT EXISTS '{table}' {schema}",
                     )
         else:
-            GeneFabLogger().warning("Not using LRU response SQL cache")
+            self.logger.warning("Not using LRU response SQL cache")
  
     def put(self, context, obj, response):
         """Store response object blob in response_cache table, if possible"""
         if self.sqlite_dbs.cache is None:
             return
-        obj_accessions = get_attribute(obj, "accessions", set())
+        _logi, _loge = self.logger.info, self.logger.error
+        obj_accessions = get_attribute(obj, "accessions")
+        if obj_accessions is None:
+            _loge(f"LRU response cache: could not infer accessions used")
+            return
         accessions = obj_accessions | set(context.accessions_and_assays)
         api_path = quote(context.full_path)
         blob = Binary(compress(response.get_data()))
@@ -68,12 +73,10 @@ class ResponseCache():
                     cursor.execute(make_insert_accession_entry_command(*args))
             except OperationalError:
                 connection.rollback()
-                msg = f"LRU response cache: could not store {context.identity}"
-                GeneFabLogger().error(msg)
+                _loge(f"LRU response cache: could not store {context.identity}")
             else:
                 connection.commit()
-                msg = f"LRU response cache: stored {context.identity}"
-                GeneFabLogger().info(msg)
+                _logi(f"LRU response cache: stored {context.identity}")
  
     def drop(self, accession):
         """Drop responses for given accession"""
@@ -101,7 +104,7 @@ class ResponseCache():
     def shrink(self, to=None):
         """Drop oldest cached responses to keep file size on disk under `to` or `self.maxsize`"""
         msg = "Shrinking Flask response cache not implemented yet" # TODO
-        GeneFabLogger().warning(msg)
+        self.logger.warning(msg)
  
     def get(self, context):
         """Retrieve cached response object blob from response_cache table if possible; otherwise return None"""
@@ -119,13 +122,13 @@ class ResponseCache():
                 )
             except ZlibError:
                 msg = "Could not decompress cached response, staging deletion"
-                GeneFabLogger().warning(msg)
+                self.logger.warning(msg)
                 return None
             else:
                 msg = f"LRU response cache: retrieved {context.identity}"
-                GeneFabLogger().info(msg)
+                self.logger.info(msg)
                 return response
         else:
             msg = f"LRU response cache: nothing yet for {context.identity}"
-            GeneFabLogger().info(msg)
+            self.logger.info(msg)
             return None
