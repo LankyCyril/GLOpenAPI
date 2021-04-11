@@ -302,21 +302,26 @@ class SQLiteTable(SQLiteObject):
                     "timestamp": lambda: timestamp,
                 }]),
             )),
-            retrieve={table: partial(self._append_parts_if_any, table=table)}
+            retrieve={table: partial(self._from_memory_or_parts, table=table)}
         )
  
-    def _append_parts_if_any(self, dataframe, table):
+    def _from_memory_or_parts(self, dataframe, table):
         """In case dataframe was stored as multipart table, concatenate all remaining parts to leading part"""
+        if hasattr(self, "dataframe_in_RAM"):
+            if self.dataframe_in_RAM is not None:
+                msg = "Bypassing SQLite merging, getting dataframe from memory"
+                GeneFabLogger().info(msg)
+                return self.dataframe_in_RAM
         def _get_part(i):
             partname = self.make_table_part_name(table, i)
             try:
                 return self.retrieve_table(partname, as_is)
             except GeneFabDatabaseException:
                 return None
-        _not_None = lambda t: t is not None
+        _notnone = lambda t: t is not None
         return concat(
-            (dataframe, *takewhile(_not_None, (_get_part(i) for i in count(1)))),
-            axis=1,
+            (dataframe, *takewhile(_notnone, (_get_part(i) for i in count(1)))),
+            axis=1, sort=False, copy=False,
         )
 
 
@@ -415,6 +420,7 @@ class CachedTableFile(SQLiteTable):
                 msg = f"{self.name}; interpreted as table: {tempfile}"
                 GeneFabLogger().info(msg)
                 INPLACE_process(dataframe)
+                self.dataframe_in_RAM = dataframe
                 return (
                     dataframe.iloc[:,p:p+maxpartwidth]
                     for p in range(0, dataframe.shape[1], maxpartwidth)
