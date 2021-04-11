@@ -8,6 +8,7 @@ from pandas import read_sql, DataFrame, read_csv
 from genefab3.common.exceptions import GeneFabDatabaseException
 from pandas.io.sql import DatabaseError
 from urllib.request import urlopen
+from collections import OrderedDict
 from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabDataManagerException
 from tempfile import TemporaryDirectory
@@ -268,13 +269,13 @@ class SQLiteTable(SQLiteObject):
                     "timestamp": lambda val: (val is None) or (timestamp > val),
                 },
             },
-            update={
-                table: [data_getter],
-                aux_table: [{
+            update=OrderedDict((
+                (table, [data_getter]),
+                (aux_table, [{
                     "identifier": lambda: identifier,
                     "timestamp": lambda: timestamp,
-                }],
-            },
+                }]),
+            )),
             retrieve={table: as_is},
         )
 
