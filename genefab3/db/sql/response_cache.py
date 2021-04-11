@@ -42,7 +42,7 @@ class ResponseCache():
         """Store response object blob in response_cache table, if possible"""
         if self.sqlite_dbs.cache is None:
             return
-        obj_accessions = get_attribute(obj, "accessions")
+        obj_accessions = get_attribute(obj, "accessions", set())
         accessions = obj_accessions | set(context.accessions_and_assays)
         api_path = quote(context.full_path)
         blob = Binary(compress(response.get_data()))

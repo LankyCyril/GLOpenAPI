@@ -69,14 +69,13 @@ def get(mongo_collections, *, locale, context, include=(), drop_trailing_fields=
         if aggregate: # coerce to boolean "existence" if requested
             info_cols = list(dataframe[["info"]].columns)
             if len(info_cols) == dataframe.shape[1]: # only 'info' cols present
-                return dataframe.drop_duplicates()
+                dataframe = dataframe.drop_duplicates()
             else: # metadata cols present and can be collapsed into booleans
                 gby = dataframe.groupby(info_cols, as_index=False, sort=False)
-                return gby.agg(lambda a: ~isnull(a).all())
-        else:
-            set_attributes(
-                dataframe, genefab_type="annotation", accessions=set(
-                    dataframe[("info", "accession")].drop_duplicates(),
-                ),
-            )
-            return dataframe
+                dataframe = gby.agg(lambda a: ~isnull(a).all())
+        set_attributes(
+            dataframe, genefab_type="annotation", accessions=set(
+                dataframe[("info", "accession")].drop_duplicates(),
+            ),
+        )
+        return dataframe
