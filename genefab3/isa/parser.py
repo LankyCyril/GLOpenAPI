@@ -114,7 +114,9 @@ class StudyEntries(list):
                     raise GeneFabISAException(error)
                 else:
                     sample_name = row["Sample Name"]
-                json = self._row_to_json(row, name, status_kwargs)
+                json = self._row_to_json(
+                    row, name, {**status_kwargs, "sample_name": sample_name},
+                )
                 super().append(json)
                 if self._self_identifier == "Study":
                     if sample_name in self._by_sample_name:
@@ -280,8 +282,8 @@ class IsaFromZip():
             string_tee = StringIO(byte_tee.read().decode(errors="replace"))
             raw_tab = read_csv(string_tee, **reader_kwargs)
             update_status(
-                **status_kwargs, status="warning", error=e,
-                warning="Absorbing exception when parsing file",
+                **status_kwargs, report_type="parser message", status="warning",
+                error=e, warning="Absorbing exception when parsing file",
             )
         raw_tab.columns = raw_tab.iloc[0,:]
         raw_tab.columns.name = None

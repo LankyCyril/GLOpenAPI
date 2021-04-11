@@ -22,15 +22,14 @@ def drop_status(collection, logger=None, accession=None, status=None, info=None,
         log_status(logger, status, info, warning, error, query)
 
 
-def update_status(collection, logger=None, accession=None, assay_name=None, sample_name=None, status=None, info=None, warning=None, error=None, **kwargs):
+def update_status(collection, logger=None, report_type=None, accession=None, assay_name=None, sample_name=None, status=None, info=None, warning=None, error=None, **kwargs):
     """Update status of dataset (and, optionally, assay/sample) in `collection`, log with logger"""
     query = {
-        "status": status, "report type": (
+        "status": status, "report type": report_type or (
             "dataset status" if sample_name is None else "parser message"
         ),
         "accession": accession, "assay name": assay_name,
-        "sample name": sample_name,
-        "info": info, "warning": warning,
+        "sample name": sample_name, "info": info, "warning": warning,
         "error": None if (error is None) else type(error).__name__,
         "args": getattr(error, "args", []), "kwargs": kwargs,
     }
