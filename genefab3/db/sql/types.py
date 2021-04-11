@@ -4,11 +4,14 @@ from copy import deepcopy
 from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
 from genefab3.common.logger import GeneFabLogger
-from pandas import read_sql, DataFrame, read_csv
+from pandas import read_sql, DataFrame, read_csv, concat
+from collections.abc import Iterable, Callable
 from genefab3.common.exceptions import GeneFabDatabaseException
 from pandas.io.sql import DatabaseError
 from urllib.request import urlopen
 from collections import OrderedDict
+from functools import partial
+from itertools import takewhile, count
 from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabDataManagerException
 from tempfile import TemporaryDirectory
@@ -95,27 +98,47 @@ class SQLiteObject():
             try:
                 connection.cursor().execute(delete_action)
                 connection.cursor().execute(insert_action, values)
+                GeneFabLogger().info(
+                    "Updated SQLiteObject (%s == %s) fields",
+                    self.__identifier_field, self.__identifier_value,
+                )
             except OperationalError:
                 GeneFabLogger().warning(
-                    "Could not update SQLiteObject (%s == %s)",
+                    "Could not update SQLiteObject (%s == %s) fields",
                     self.__identifier_field, self.__identifier_value,
                 )
                 connection.rollback()
             else:
                 connection.commit()
  
+    def make_table_part_name(self, table, i):
+        return table if i == 0 else f"{table}://{i}"
+ 
     def __update_table(self, table, spec):
-        """Update table in SQLite"""
-        dataframe = spec()
-        if not isinstance(dataframe, DataFrame):
-            msg = "Cached table not represented as a pandas DataFrame"
+        """Update table(s) in SQLite"""
+        obj = spec()
+        if isinstance(obj, DataFrame):
+            if obj.index.nlevels != 1:
+                msg = "MultiIndex in cached DataFrame"
+                raise NotImplementedError(msg)
+            elif obj.columns.nlevels != 1:
+                msg = "MultiIndex columns in cached DataFrame"
+                raise NotImplementedError(msg)
+            else:
+                with closing(connect(self.__sqlite_db)) as connection:
+                    _kw = dict(index=True, if_exists="replace")
+                    obj.to_sql(table, connection, **_kw)
+                    GeneFabLogger().info(
+                        "Created table for SQLiteObject (%s == %s): %s",
+                        self.__identifier_field, self.__identifier_value, table,
+                    )
+        elif isinstance(obj, Iterable):
+            for i, dataframe in enumerate(obj):
+                partname = self.make_table_part_name(table, i)
+                self.__update_table(partname, lambda: dataframe)
+        else:
+            msg = "Cached table not represented as pandas DataFrame(s)"
             raise NotImplementedError(msg)
-        if dataframe.index.nlevels != 1:
-            raise NotImplementedError("MultiIndex in cached DataFrame")
-        if dataframe.columns.nlevels != 1:
-            raise NotImplementedError("MultiIndex columns in cached DataFrame")
-        with closing(connect(self.__sqlite_db)) as connection:
-            dataframe.to_sql(table, connection, index=True, if_exists="replace")
  
     def __update(self, trigger_field, trigger_value):
         """Update table or table field in SQLite and drop `trigger_field` (to be replaced according to spec)"""
@@ -125,8 +148,11 @@ class SQLiteObject():
                     self.__update_fields(
                         table, spec, trigger_field, trigger_value,
                     )
-                else:
+                elif isinstance(spec, Callable):
                     self.__update_table(table, spec)
+                else:
+                    msg = "SQLiteObject: unsupported type of update spec"
+                    raise TypeError(msg, type(spec))
  
     def __drop_self_from(self, connection, table):
         """Helper method (during an open connection) to drop rows matching `self.signature` from `table`"""
@@ -141,7 +167,7 @@ class SQLiteObject():
                 self.__identifier_field, self.__identifier_value,
             )
  
-    def __retrieve_field(self, table, field, postprocess_function):
+    def retrieve_field(self, table, field, postprocess_function):
         """Retrieve target table field from database"""
         with closing(connect(self.__sqlite_db)) as connection:
             query = f"""
@@ -159,7 +185,7 @@ class SQLiteObject():
                 msg = "Entries conflict (will attempt to fix on next request)"
                 raise GeneFabDatabaseException(msg, signature=self.__signature)
  
-    def __retrieve_table(self, table, postprocess_function):
+    def retrieve_table(self, table, postprocess_function=as_is):
         """Retrieve target table from database"""
         with closing(connect(self.__sqlite_db)) as connection:
             query = f"SELECT * from '{table}'"
@@ -171,7 +197,7 @@ class SQLiteObject():
                 msg = "No data found"
                 raise GeneFabDatabaseException(msg, signature=self.__signature)
  
-    def __retrieve(self):
+    def retrieve(self):
         """Retrieve target table or table field from database"""
         if not is_singular_spec(self.__retrieve_spec):
             msg = "SQLiteObject(): Only one 'retrieve' field can be specified"
@@ -181,10 +207,10 @@ class SQLiteObject():
             if isinstance(self.__retrieve_spec[table], dict):
                 field = next(iter(self.__retrieve_spec[table]))
                 postprocess_function = self.__retrieve_spec[table][field]
-                return self.__retrieve_field(table, field, postprocess_function)
+                return self.retrieve_field(table, field, postprocess_function)
             else:
                 postprocess_function = self.__retrieve_spec[table]
-                return self.__retrieve_table(table, postprocess_function)
+                return self.retrieve_table(table, postprocess_function)
  
     @property
     def data(self):
@@ -218,7 +244,7 @@ class SQLiteObject():
             self.__update(trigger_field, trigger_value)
         else:
             self.changed = False
-        return self.__retrieve()
+        return self.retrieve()
 
 
 class SQLiteBlob(SQLiteObject):
@@ -276,7 +302,21 @@ class SQLiteTable(SQLiteObject):
                     "timestamp": lambda: timestamp,
                 }]),
             )),
-            retrieve={table: as_is},
+            retrieve={table: partial(self._append_parts_if_any, table=table)}
+        )
+ 
+    def _append_parts_if_any(self, dataframe, table):
+        """In case dataframe was stored as multipart table, concatenate all remaining parts to leading part"""
+        def _get_part(i):
+            partname = self.make_table_part_name(table, i)
+            try:
+                return self.retrieve_table(partname, as_is)
+            except GeneFabDatabaseException:
+                return None
+        _not_None = lambda t: t is not None
+        return concat(
+            (dataframe, *takewhile(_not_None, (_get_part(i) for i in count(1)))),
+            axis=1,
         )
 
 
@@ -319,15 +359,15 @@ class CachedBinaryFile(SQLiteBlob):
 class CachedTableFile(SQLiteTable):
     """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, **pandas_kws):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxpartwidth=1000, **pandas_kws):
         """Interpret file descriptors; inherit functionality from SQLiteTable; define equality (hashableness) of self"""
         self.name, self.url, self.timestamp = name, None, timestamp
         self.identifier = identifier
         self.aux_table = aux_table
         SQLiteTable.__init__(
             self, identifier=f"TABLE:{identifier}", timestamp=timestamp,
-            data_getter=lambda: self.__download_as_pandas_dataframe(
-                urls, pandas_kws, INPLACE_process,
+            data_getter=lambda: self.__download_as_pandas_dataframes(
+                urls, pandas_kws, INPLACE_process, maxpartwidth=maxpartwidth,
             ),
             sqlite_db=sqlite_db,
             table=f"TABLE:{identifier}", aux_table=aux_table,
@@ -351,7 +391,7 @@ class CachedTableFile(SQLiteTable):
             msg = "None of the URLs are reachable for file"
             raise GeneFabDataManagerException(msg, name=self.name, urls=urls)
  
-    def __download_as_pandas_dataframe(self, urls, pandas_kws, INPLACE_process=as_is):
+    def __download_as_pandas_dataframes(self, urls, pandas_kws, INPLACE_process=as_is, maxpartwidth=1000):
         """Download and parse data from URL as a table"""
         with TemporaryDirectory() as tempdir:
             tempfile = path.join(tempdir, self.name)
@@ -375,7 +415,10 @@ class CachedTableFile(SQLiteTable):
                 msg = f"{self.name}; interpreted as table: {tempfile}"
                 GeneFabLogger().info(msg)
                 INPLACE_process(dataframe)
-                return dataframe
+                return (
+                    dataframe.iloc[:,p:p+maxpartwidth]
+                    for p in range(0, dataframe.shape[1], maxpartwidth)
+                )
             except (IOError, UnicodeDecodeError, CSVError, PandasParserError):
                 msg = "Not recognized as a table file"
                 raise GeneFabFileException(msg, name=self.name, url=self.url)
