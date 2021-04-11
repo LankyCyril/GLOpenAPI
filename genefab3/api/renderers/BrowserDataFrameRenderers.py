@@ -89,7 +89,7 @@ def get_browser_meta_formatter(context, i, head, target):
 
 def iter_formatters(obj, context, shortnames):
     """Get SlickGrid formatters for columns"""
-    if context.view != "data":
+    if context.view in {"assays", "samples"}:
         for i, (key, target) in enumerate(obj.columns):
             if key == "info":
                 if target == "accession":
