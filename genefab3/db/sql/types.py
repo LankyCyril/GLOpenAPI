@@ -157,7 +157,7 @@ class SQLiteObject():
     def __drop_self_from(self, connection, table):
         """Helper method (during an open connection) to drop rows matching `self.signature` from `table`"""
         try:
-            connection.cursor.execute(f"""
+            connection.cursor().execute(f"""
                 DELETE FROM '{table}' WHERE
                 {self.__identifier_field} = '{self.__identifier_value}'
             """)
