@@ -137,16 +137,24 @@ def get_formatted_data(descriptor, sqlite_db, CachedFile, adapter, _kws):
     return data
 
 
-def combine_dataframes(dataframes):
-    """Combine dataframes in-memory; this faster than sqlite3"""
-    # wesmckinney.com/blog/high-performance-database-joins-with-pandas-dataframe-more-benchmarks
-    dataframe = concat(dataframes, axis=1, sort=False)
-    if dataframe.index.name is None: # happens if original index names differed
-        dataframe.index.name = "index" # best we can do
-    GeneFabLogger().info("Merging dataframes in-memory")
-    dataframe.reset_index(inplace=True, col_level=-1, col_fill="*")
-    set_attributes(dataframe, genefab_type="datatable")
-    return dataframe
+def combine_objects(objects, n_objects):
+    """Combine dataframes in-memory""" # TODO: implement DelayedDataFrame, DelayedBlob and use their methods
+    if n_objects == 1:
+        obj = next(objects)
+        if isinstance(obj, DataFrame): # TODO: will happen w/o condition checks and code duplication
+            if obj.index.name is None: # if original index names differed
+                obj.index.name = "index" # best we can do
+            obj.reset_index(inplace=True, col_level=-1, col_fill="*")
+            set_attributes(obj, genefab_type="datatable")
+        return obj
+    else: # TODO more checks
+        dataframe = concat(objects, axis=1, sort=False)
+        if dataframe.index.name is None: # if original index names differed
+            dataframe.index.name = "index" # best we can do
+        GeneFabLogger().info("Merging dataframes in-memory")
+        dataframe.reset_index(inplace=True, col_level=-1, col_fill="*")
+        set_attributes(dataframe, genefab_type="datatable")
+        return dataframe
 
 
 def combined_data(descriptors, sqlite_dbs, adapter):
@@ -165,17 +173,18 @@ def combined_data(descriptors, sqlite_dbs, adapter):
     if types == {"table"}:
         sqlite_db, CachedFile = sqlite_dbs.tables, CachedTableFile
         _kws = dict(index_col=0, INPLACE_process=True)
-        combine = combine_dataframes
     elif len(types) == 1:
         sqlite_db, CachedFile, _kws = sqlite_dbs.blobs, CachedBinaryFile, {}
-        combine = next
     else:
         raise NotImplementedError(f"Joining data of types {types}")
-    data = combine(
-        get_formatted_data(d, sqlite_db, CachedFile, adapter, _kws)
-        for d in natsorted(
-            descriptors, key=lambda d: (d.get("accession"), d.get("assay")),
-        )
+    data = combine_objects(
+        objects=(
+            get_formatted_data(d, sqlite_db, CachedFile, adapter, _kws)
+            for d in natsorted(
+                descriptors, key=lambda d: (d.get("accession"), d.get("assay")),
+            )
+        ),
+        n_objects=len(descriptors),
     )
     set_attributes(
         data, datatypes=getset("file", "datatype"),
