@@ -13,5 +13,4 @@ Data access API for GeneLab
 * isatools
 * numpy
 * pandas
-* memoized_property
 * natsort

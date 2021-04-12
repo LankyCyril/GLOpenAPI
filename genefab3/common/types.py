@@ -1,64 +1,62 @@
-from genefab3.common.exceptions import GeneLabDataManagerException
-from types import SimpleNamespace
+from collections import defaultdict
+from collections.abc import Callable
+from genefab3.common.exceptions import GeneFabConfigurationException
+from functools import wraps
 
 
-def PlaceholderLogger():
-    """Placeholder that masquerades as a logger but does not do anything"""
-    return SimpleNamespace(
-        info=lambda *args, **kwargs: None,
-        warning=lambda *args, **kwargs: None,
-    )
+NestedDefaultDict = lambda: defaultdict(NestedDefaultDict)
 
 
-class UniversalSet(set):
-    """Naive universal set"""
-    def __and__(self, x): return x
-    def __iand__(self, x): return x
-    def __rand__(self, x): return x
-    def __or__(self, x): return self
-    def __ior__(self, x): return self
-    def __ror__(self, x): return self
-    def __contains__(self, x): return True
-
-
-class DatasetBaseClass():
-    """Placeholder for identifying classes representing datasets"""
-    pass
-
-
-class AssayBaseClass():
-    """Placeholder for identifying classes representing assays"""
-    pass
-
-
-class IterableNamespace(SimpleNamespace):
-    """SimpleNamespace that iterates its values (can be used for tests with all(), any(), etc)"""
-    def __iter__(self):
-        yield from self.__dict__.values()
-
-
-class FileDescriptor():
-    """Holds name, url, timestamp; raises delayed error on url==None, returns negative timestamps for malformed/absent timestamps"""
-    def __init__(self, name, url, timestamp):
-        self.name, self._url, self._timestamp = name, url, timestamp
-    @property
-    def url(self):
-        if self._url is None:
-            raise GeneLabDataManagerException("No URL for file", name=self.name)
+class Adapter():
+    """Base class for database adapters"""
+ 
+    def __init__(self):
+        """Validate subclassed Adapter"""
+        for method_name in "get_accessions", "get_files_by_accession":
+            if not isinstance(getattr(self, method_name, None), Callable):
+                msg = "Adapter must define method"
+                _kw = dict(adapter=type(self).__name__, method=method_name)
+                raise GeneFabConfigurationException(msg, **_kw)
+ 
+    def best_sample_name_matches(self, name, names, return_positions=False):
+        """Fallback sample name identity test"""
+        if return_positions:
+            positions_and_matches = [
+                (p, ns) for p, ns in enumerate(names) if ns == name
+            ]
+            return (
+                [ns for p, ns in positions_and_matches],
+                [p for p, ns in positions_and_matches],
+            )
         else:
-            return self._url
-    @property
-    def timestamp(self):
-        if isinstance(self._timestamp, int):
-            return self._timestamp
-        elif isinstance(self._timestamp, str) and self._timestamp.isdigit():
-            return int(self._timestamp)
-        else:
-            return -1
-    def __eq__(self, other):
-        return (
-            (self.name == other.name) and (self._url == other._url) and
-            (self._timestamp == other._timestamp)
-        )
-    def __hash__(self):
-        return hash((self.name, self._url, self._timestamp))
+            return [ns for ns in names if ns == name]
+
+
+class Routes():
+    """Base class for registered endpoints"""
+ 
+    def __init__(self, mongo_collections, *, locale, sqlite_dbs, adapter):
+        self.mongo_collections, self.locale = mongo_collections, locale
+        self.sqlite_dbs, self.adapter = sqlite_dbs, adapter
+ 
+    def register_endpoint(*, endpoint=None, fmt="tsv", cache=True):
+        """Decorator that adds `endpoint` and `fmt` attributes to class method"""
+        def outer(method):
+            @wraps(method)
+            def inner(*args, **kwargs):
+                return method(*args, **kwargs)
+            if endpoint:
+                inner.endpoint = endpoint
+            elif hasattr(method, "__name__"):
+                if isinstance(method.__name__, str):
+                    inner.endpoint = "/" + method.__name__ + "/"
+            inner.fmt, inner.cache = fmt, cache
+            return inner
+        return outer
+ 
+    def items(self):
+        """Iterate over methods of `Routes` object that have `endpoint` attribute"""
+        for name in dir(self):
+            method = getattr(self, name)
+            if isinstance(getattr(method, "endpoint", None), str):
+                yield method.endpoint, method
