@@ -8,15 +8,17 @@
         <link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Oxygen+Mono&family=Roboto:wght@300;500&display=swap'/>
         <style>
             * {font-size: 13pt; font-family: "Roboto", sans-serif; font-weight: 300}
-            a {cursor: pointer}
+            a {cursor: pointer; color: #C10; text-decoration: none}
+            a:hover {text-decoration: underline}
             b {font-weight: 500}
             strong {color: #00A; font-weight: 500}
             em {font-style: normal; color: black; font-family: "Oxygen", monospace; font-size: 12pt}
             em.remover, em.remover-or {color: #D10; cursor: pointer; border-bottom: 1pt dashed #D10}
             label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
             select {margin: 1pt 0; min-width: 120pt; max-width: 120pt; overflow: hidden; text-overflow: ellipsis; white-space: nowrap}
-            h1 {font-size: 28pt; font-weight: 500; border-bottom: 1pt solid black; display: inline-block; margin: 5pt 0 20pt 0}
-            h2 {font-size: 20pt; font-weight: 500; display: inline-block; margin: 10pt 0 0 0}
+            b.header {font-size: 24pt; font-weight: 500}
+            h2 {font-size: 20pt; font-weight: 500; display: block; margin: 10pt 0}
+            div.description {max-width: 640pt; padding-bottom: 7pt}
             #url-builder {position: sticky; top: 0; background: #FFFFFFEE; z-index: 8}
             #url-wrapper {display: inline-block}
             #url-description {
@@ -31,7 +33,9 @@
                 width: 480pt; min-width: 480pt; max-width: 90vw; resize: both;
                 word-break: break-all; word-wrap: break-word; overflow-y: auto;
             }
-            #url tt {font-family: "Oxygen", monospace; font-size: 13pt;}
+            code {font-family: "Oxygen", monospace; font-size: 12pt; background-color: #EEE; white-space: nowrap}
+            code b {font-family: "Oxygen", monospace; font-size: 12pt; font-weight: 500; color: #44B}
+            #url tt {font-family: "Oxygen", monospace; font-size: 13pt; background: transparent}
             #url tt.base_url, #url tt.pale {color: #AAA;}
             #url tt.plain, #url tt.view {color: #222;}
             #url tt.sep {color: #D10;}
@@ -51,8 +55,8 @@
             #selectors > div > div {display: inline-block; vertical-align: top}
             #selectors > div > div ~ div {margin-left: 12pt; margin-top: 3pt}
             #selectors > div > div ~ div input {position: relative; top: 1pt}
-            a.add, a.or {color: #777; font-style: italic; border-bottom: 1pt dashed #CCC}
-            a.del {color: #AAA; font-style: italic; margin-left: 3pt}
+            a.add, a.or {color: #777; font-style: italic; border-bottom: 1pt dashed #CCC; text-decoration: none}
+            a.del {color: #AAA; font-style: italic; margin-left: 3pt; text-decoration: none}
             .list-item:not(:first-child) em.key {visibility: hidden}
             .or-selects {display: inline-block}
         </style>
@@ -281,9 +285,8 @@ function generate_url() {
 }
 
 function toggle_builder() {
-    $("#selectors").show();
-    $("#url-builder").show();
-    $("h2").show();
+    $(".interactive").show();
+    $(".on-newline").css("display", "block");
     $("#noscript").hide();
 }
 
@@ -411,20 +414,38 @@ $(document).ready(function() {
 
 </script>
     <body>
-        <h1>NASA GeneLab Data API v3 Introduction</h1>
-        <div id='url-builder' style='display:none'>
+        <table style='border-left: 0; border-right: 0; border-top: 0; border-bottom: 1px solid black; margin-bottom: 24pt'>
+            <tr valign='middle'>
+                <td style='width: 260pt'>
+                    <img src='https://genelab-data.ndc.nasa.gov/genelab/img/nasa-genelab-logo.png' style='height: 50pt'>
+                </td>
+                <td><b class='header'>NASA GeneLab Data API</b></td>
+                <td style='width: 126pt; text-align: right'>
+                    <img src='https://genelab-data.ndc.nasa.gov/genelab/img/nasa_logo.png' style='height: 50pt'>
+                </td>
+            </tr>
+        </table>
+        <div id='url-builder' class='interactive' style='display:none'>
             <div id='url-wrapper'>
                 <div id='url-description'>You are here:</div>
                 <div id='url'>%URL_ROOT%</div>
                 <div id='url-follow'><a href=''>Follow generated URL</a></div>
             </div>
         </div>
-        <h2 style='display:none'>Build a request:</h2>
-        <div id='noscript' style='display:block'>This interactive guide requires a browser with JavaScript support</div>
-        <div id='selectors' style='display:none'>
+        <div id='noscript' style='display: inline-block; color: #D10; font-weight: bold; padding: 5pt; margin-bottom: 10pt; border: 1px solid #A10'>
+            Additional interactive features on this page require a browser with JavaScript support.<br>
+        </div>
+        <h2>API Syntax</h2>
+        <div class='description' style='margin-bottom: 0; padding-bottom: 0'>
+            <p>This API provides the means to query the GeneLab database for annotation and data
+            associated with datasets, assays, and samples hosted by GeneLab,
+            and represents results as tables and/or JSON records.</p>
+            <p>Request URLs are formed by combining an arbitrary number of queries, described below.</p>
+        </div>
+        <div id='selectors'>
             <div>
-                <div><b>View level:</b></div><br>
-                <div>
+                <div><b>Choice of view level</b></div><br>
+                <div class='interactive' style='display:none'>
                     <select id='view'>
                         <option value='' selected></option>
                         <option value='assays'>/assays/</option>
@@ -432,10 +453,25 @@ $(document).ready(function() {
                         <option value='data'>/data/</option>
                     </select>
                 </div>
+                <div class='description on-newline'>
+                    <p>This part of the URL is required.</p>
+                    <p>The &quot;assays&quot; view generates overview tables;
+                    each column represents a property (such as a factor value), and
+                    each row represents one assay, followed by boolean values (True/False)
+                    denoting whether a property is associated with the assay.</p>
+                    <p>The &quot;samples&quot; view generates annotation (metadata) tables;
+                    each column represents a property (such as a factor value), and
+                    each row represents one sample, followed by its property values.</p>
+                    <p>The &quot;data&quot; view outputs data associated with sample(s);
+                    table data is returned in formats 'csv', 'tsv', 'json', 'browser' (see below);
+                    raw file data is returned if the requested format is 'raw' and a single file
+                    matches the rest of the query.</p>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%<b>samples</b>/...</code>
+                </div>
             </div>
             <div>
-                <div><b>Retrieve entries with metadata <strong>categories</strong>:</b></div><br>
-                <div>
+                <div><b>Retrieval of entries with metadata <strong>categories</strong></b></div><br>
+                <div class='interactive' style='display:none'>
                     <div id='meta-wildcard-list' class='list'>
                         <div class='meta-wildcard list-item'>
                             <input type='checkbox'>
@@ -450,10 +486,33 @@ $(document).ready(function() {
                         <a class='meta-wildcard add'>AND</a>
                     </div>
                 </div>
+                <div class='description on-newline'>
+                    <p>This part of the URL, as well as all following parts, can be specified any number of times
+                    (including zero times; however, at least one query overall must be specified).</p>
+                    <p>The database is organized according to the
+                    <a href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab model</a>,
+                    and can be queried by the content of the following ISA categories:
+                        <ul>
+                            <li>investigation.study</li>
+                            <li>investigation.study assays</li>
+                            <li>investigation.investigation</li>
+                            <li>study.characteristics</li>
+                            <li>study.factor value</li>
+                            <li>study.parameter value</li>
+                            <li>assay.characteristics</li>
+                            <li>assay.factor value</li>
+                            <li>assay.parameter value</li>
+                        </ul>
+                    Querying directly by any of these categories will constrain the results
+                    to only the datasets, assays, and samples that have this category annotated.</p>
+                    <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
+                    the values of fields in the category will be reported in table columns.</p>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>study.factor value</b></code>
+                </div>
             </div>
             <div>
-                <div><b>Retrieve entries with metadata <strong>fields</strong>:</b></div><br>
-                <div>
+                <div><b>Retrieval of entries with metadata <strong>fields</strong></b></div><br>
+                <div class='interactive' style='display:none'>
                     <div id='meta-existence-list' class='list'>
                         <div class='meta-existence list-item'>
                             <input type='checkbox'>
@@ -473,10 +532,18 @@ $(document).ready(function() {
                         <a class='meta-existence add'>AND</a>
                     </div>
                 </div>
+                <div class='description on-newline'>
+                    <p>Each ISA category contains multiple fields; querying by any such field
+                    will constrain the results to only the datasets, assays, and samples that
+                    have this field annotated.</p>
+                    <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
+                    the values of this field will be reported in table columns.</p>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>study.factor value.spaceflight</b></code>
+                </div>
             </div>
             <div>
-                <div><b>Retrieve entries with metadata field <strong>values</strong>:</b></div><br>
-                <div>
+                <div><b>Retrieval of entries with metadata field <strong>values</strong></b></div><br>
+                <div class='interactive' style='display:none'>
                     <div id='meta-equals-list' class='list'>
                         <div class='meta-equals list-item'>
                             <input type='checkbox'>
@@ -498,10 +565,18 @@ $(document).ready(function() {
                         <a class='meta-equals add'>AND</a>
                     </div>
                 </div>
+                <div class='description on-newline'>
+                    <p>The search can be constrained to only the samples that are
+                    annotated with a specific value of an ISA field.</p>
+                    <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
+                    the values of this field will be reported in table columns.</p>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>study.characteristics.genotype=WT</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>study.characteristics.genotype=WT|TK6</b></code><br>
+                </div>
             </div>
             <div>
                 <div><b>Subset entries to <strong>datasets and/or assays</strong>:</b></div><br>
-                <div>
+                <div class='interactive' style='display:none'>
                     <div id='meta-assay-list' class='list'>
                         <div class='meta-assay list-item'>
                             <input type='checkbox'>
@@ -517,10 +592,17 @@ $(document).ready(function() {
                         <a class='meta-assay add'>OR</a>
                     </div>
                 </div>
+                <div class='description on-newline'>
+                    <p>The search can be constrained to only the samples from
+                    specific datasets (<code>from=ACCESSION</code>) and/or assays
+                    (<code>from=ACCESSION.ASSAY</code>)</p>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.characteristics&<b>from=GLDS-38</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.characteristics&<b>from=GLDS-38.proteomics|GLDS-276</b></code><br>
+                </div>
             </div>
             <div>
                 <div><b><strong>Files or data</strong> to retrieve:</b></div><br>
-                <div>
+                <div class='interactive' style='display:none'>
                     <div id='meta-file-filename-pseudo-list' class='list'>
                         <div class='meta-file-filename-pseudo list-item'>
                             <input type='checkbox'>
@@ -530,7 +612,7 @@ $(document).ready(function() {
                         </div>
                     </div>
                 </div>
-                <div style='display: block; margin-top: 0'>
+                <div class='interactive on-newline' style='display: none; margin-top: 0'>
                     <div id='meta-file-datatype-pseudo-list' class='list'>
                         <div class='meta-file-datatype-pseudo list-item'>
                             <input type='checkbox'>
@@ -542,7 +624,7 @@ $(document).ready(function() {
                         </div>
                     </div>
                 </div>
-                <div style='display: block; margin-top: 0'>
+                <div class='interactive on-newline' style='display: none; margin-top: 0'>
                     <div id='meta-file-datatype-list' class='list'>
                         <div class='meta-file-datatype list-item'>
                             <input type='checkbox'>
@@ -555,10 +637,23 @@ $(document).ready(function() {
                         </div>
                     </div>
                 </div>
+                <div class='description on-newline'>
+                    <p>For the resultant queried datasets, assays, and samples,
+                    there may be files associated. All files with recognized datatypes
+                    can be queried by passing <code>file.datatype</code>.</p>
+                    <p>The query can be constrained to files of particular datatypes
+                    by specifying these datatypes in the query (<code>file.datatype=pca</code>).</p>
+                    <p>Finally, the query can be constrained by specifying a full file name
+                    of interest or a regular expression pattern enclosed in forward slashes.</p>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>file.datatype</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>file.datatype=differential expression</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>file.datatype=visualization table|pca</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>file.filename=/trimmed\.fastq\.gz$/</b></code><br>
+                </div>
             </div>
             <div>
                 <div><b>Display in format:</b></div><br>
-                <div>
+                <div class='interactive' style='display:none'>
                     <div id='meta-format-list' class='list'>
                         <div class='meta-format list-item'>
                             <input type='checkbox' checked disabled>
@@ -576,10 +671,31 @@ $(document).ready(function() {
                         </div>
                     </div>
                 </div>
+                <div class='description on-newline'>
+                    <p>Data returned for the query can be formatted in multiple ways.</p>
+                    <p>If an annotation table is requested (as produced by views &quot;assays&quot;, &quot;samples&quot;)
+                    formats <code>csv</code>, <code>tsv</code>, <code>json</code> are recommended for programmatic use,
+                    and format <code>browser</code> for interactive inspection.
+                    In cases where exactly one annotation column is present (such as a factor value, a characteristic, etc)
+                    the <code>cls</code> format is also supported.</p>
+                    <p>If data is requested (view &quot;data&quot;) and is expected to be tabular
+                    (e.g., unnormalized counts, differential expression, etc),
+                    formats <code>csv</code>, <code>tsv</code>, <code>json</code> are recommended as well,
+                    and format <code>browser</code> is supported, but discouraged.
+                    For data types representable as GCT (RNA-Seq counts, microarray data),
+                    the <code>gct</code> format is also supported.</p>
+                    <p>The <code>raw</code> format is <i><u>not</u></i> supported for tabular data,
+                    and instead exists as the only suitable format for requesting non-tabular data.
+                    Note that currently it only resolves successfully if exactly one data file matches the query.</p>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.factor value.spaceflight&<b>format=browser</b></code>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.factor value.spaceflight&<b>format=json</b></code>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%data/?file.datatype=unnormalized counts&<b>format=tsv</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&from=GLDS-37&<b>format=raw</b></code><br>
+                </div>
             </div>
             <!--DEBUG <div>
                 <div><b>Debug:</b></div><br>
-                <div>
+                <div class='interactive' style='display:none'>
                     <div id='meta-debug-list' class='list'>
                         <div class='meta-debug list-item'>
                             <input type='checkbox'>
