@@ -4,8 +4,8 @@ from numpy import nan
 
 
 STATUS_COLUMNS = [
-    "report timestamp", "report type", "accession", "assay name",
-    "sample name", "status", "warning", "error", "args", "kwargs",
+    "report timestamp", "report type", "status", "accession", "assay name",
+    "sample name", "warning", "error", "args", "kwargs",
 ]
 
 
