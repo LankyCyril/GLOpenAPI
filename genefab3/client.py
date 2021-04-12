@@ -98,7 +98,7 @@ class GeneFabClient():
  
     def _init_routes(self):
         """Route Response-generating methods to Flask endpoints"""
-        renderer = CacheableRenderer(self.sqlite_dbs)
+        renderer = CacheableRenderer(self.sqlite_dbs, self.flask_app)
         for endpoint, method in self.routes.items():
             self.flask_app.route(endpoint, methods=["GET"])(renderer(method))
  

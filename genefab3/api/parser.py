@@ -52,8 +52,9 @@ DISALLOWED_CONTEXTS = {
 class Context():
     """Stores request components parsed into MongoDB queries, projections"""
  
-    def __init__(self):
+    def __init__(self, flask_app):
         """Parse request components"""
+        self.app_name = flask_app.name
         url_root = escape(request.url_root.strip("/"))
         base_url = request.base_url.strip("/")
         self.url_root = request.url_root

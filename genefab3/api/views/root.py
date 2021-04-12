@@ -75,6 +75,7 @@ def get(mongo_collections, context):
     dumps_sorted = lambda j: dumps(j, sort_keys=True)
     return map_replace(
         _get_root_html(), {
+            "%APPNAME%": context.app_name,
             "%URL_ROOT%": context.url_root,
             "/* METADATA_WILDCARDS */": dumps_sorted(wildcards),
             "/* METADATA_EXISTENCE */": dumps_sorted(existence_json),

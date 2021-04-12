@@ -145,6 +145,7 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_pr
     title_postfix = f"{context.view.capitalize()} {context.complete_kwargs}"
     formatters = iter_formatters(obj, context, shortnames)
     content = map_replace(_get_browser_html(), {
+        "%APPNAME%": context.app_name,
         "</title><!--TITLEPOSTFIX-->": f": {title_postfix}</title>",
         "// FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
         "/*SQUASH_PREHDR*/": SQUASHED_PREHEADER_CSS if squash_preheader else "",

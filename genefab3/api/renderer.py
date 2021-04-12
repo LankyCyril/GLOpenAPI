@@ -41,9 +41,10 @@ TYPE_RENDERERS = {
 class CacheableRenderer():
     """Renders objects returned by routes, and keeps them in LRU cache by `context.identity`"""
  
-    def __init__(self, sqlite_dbs):
+    def __init__(self, sqlite_dbs, flask_app):
         """Initialize object renderer and LRU cacher"""
         self.sqlite_dbs = sqlite_dbs
+        self.flask_app = flask_app
  
     def dispatch_renderer(self, obj, context, indent=None, fmt="raw"):
         """Render `obj` according to its type and passed kwargs"""
@@ -67,7 +68,7 @@ class CacheableRenderer():
         """Render object returned from `method`, put in LRU cache by `context.identity`"""
         @wraps(method)
         def wrapper(*args, **kwargs):
-            context = Context()
+            context = Context(self.flask_app)
             if context.debug == "1":
                 _kw = dict(context=context, indent=4, fmt="json")
                 response = self.dispatch_renderer(context.__dict__, **_kw)
