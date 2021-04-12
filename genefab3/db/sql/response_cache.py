@@ -80,6 +80,8 @@ class ResponseCache():
  
     def drop(self, accession):
         """Drop responses for given accession"""
+        if self.sqlite_dbs.cache is None:
+            return
         with closing(connect(self.sqlite_dbs.cache)) as connection:
             try:
                 cursor = connection.cursor()
@@ -103,11 +105,15 @@ class ResponseCache():
  
     def shrink(self, to=None):
         """Drop oldest cached responses to keep file size on disk under `to` or `self.maxsize`"""
+        if self.sqlite_dbs.cache is None:
+            return
         msg = "Shrinking Flask response cache not implemented yet" # TODO
         self.logger.warning(msg)
  
     def get(self, context):
         """Retrieve cached response object blob from response_cache table if possible; otherwise return None"""
+        if self.sqlite_dbs.cache is None:
+            return
         query = f"""SELECT response, mimetype FROM 'response_cache'
             WHERE context_identity = '{context.identity}' LIMIT 1"""
         try:
