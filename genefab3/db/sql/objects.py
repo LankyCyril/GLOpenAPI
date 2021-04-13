@@ -6,6 +6,7 @@ from sqlite3 import connect, Binary, OperationalError
 from genefab3.common.logger import GeneFabLogger
 from pandas import DataFrame
 from collections.abc import Callable
+from collections import OrderedDict
 from genefab3.common.exceptions import GeneFabDatabaseException
 from pandas.io.sql import DatabaseError
 from itertools import count
@@ -103,18 +104,6 @@ class SQLiteObject():
     def __make_table_part_name(self, table, i):
         return table if i == 0 else f"{table}://{i}"
  
-    def __iterate_table_part_names(self, table):
-        with closing(connect(self.__sqlite_db)) as connection:
-            for i in count():
-                partname = self.__make_table_part_name(table, i)
-                query = f"SELECT * FROM '{partname}' LIMIT 1"
-                try:
-                    connection.cursor().execute(query)
-                except OperationalError:
-                    break
-                else:
-                    yield partname
- 
     def __update_table(self, table, spec):
         """Update table(s) in SQLite"""
         dataframe = spec()
@@ -197,41 +186,33 @@ class SQLiteObject():
                 raise GeneFabDatabaseException(msg, signature=self.__signature)
  
     def __retrieve_table(self, table, postprocess_function=as_is):
-        """Retrieve target table from database; join if multiple exist"""
-        partnames = list(self.__iterate_table_part_names(table))
-        if not partnames:
+        """Retrieve target table from database; join if multiple exist""" # TODO now phantom
+        from genefab3.db.sql.types import SQLiteIndexName
+        column_dispatcher = OrderedDict()
+        with closing(connect(self.__sqlite_db)) as connection:
+            for i in count():
+                partname = self.__make_table_part_name(table, i)
+                query = f"SELECT * FROM '{partname}' LIMIT 0"
+                try:
+                    cursor = connection.cursor()
+                    cursor.execute(query).fetchall()
+                    desc = cursor.description
+                    index_name = SQLiteIndexName(desc[0][0])
+                    if index_name not in column_dispatcher:
+                        column_dispatcher[index_name] = partname
+                    for c in desc[1:]:
+                        column_dispatcher[c[0]] = partname
+                except OperationalError:
+                    break
+        if not column_dispatcher:
             msg = "No data found"
             raise GeneFabDatabaseException(msg, signature=self.__signature)
+        else:
+            from genefab3.db.sql.types import OndemandSQLiteDataFrame
+            return postprocess_function(
+                OndemandSQLiteDataFrame(self.__sqlite_db, column_dispatcher),
+            )
         # TODO: here's where the magic will happen, but for now just join all
-        query = " ".join((
-            f"SELECT * FROM '{partnames[0]}'", *(
-                f"INNER JOIN '{n}' ON '{partnames[0]}'.[index] == '{n}'.[index]"
-                for n in partnames[1:]
-            ),
-        ))
-        with closing(connect(self.__sqlite_db)) as connection:
-            try:
-                cursor = connection.cursor()
-                data = cursor.execute(query).fetchall()
-                raw_columns = [c[0] for c in cursor.description]
-            except OperationalError:
-                msg = "No data found"
-                raise GeneFabDatabaseException(msg, signature=self.__signature)
-            else:
-                GeneFabLogger().info(
-                    "Joined tables for SQLiteObject (%s == %s): %s",
-                    self.__identifier_field, self.__identifier_value,
-                    ", ".join(partnames),
-                )
-        index_name = raw_columns[0]
-        prefiltered_columns = [index_name, *(
-            c if (c != index_name) else False for c in raw_columns[1:]
-        )]
-        dataframe = DataFrame(data=data, columns=prefiltered_columns)
-        dataframe.set_index(index_name, inplace=True)
-        if False in dataframe.columns:
-            dataframe.drop(columns=[False], inplace=True)
-        return postprocess_function(dataframe)
  
     def __retrieve(self):
         """Retrieve target table or table field from database"""

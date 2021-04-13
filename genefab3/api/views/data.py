@@ -5,6 +5,7 @@ from flask import redirect, Response
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDataManagerException
 from pandas import DataFrame, MultiIndex, concat
+from genefab3.db.sql.types import OndemandSQLiteDataFrame
 from genefab3.common.logger import GeneFabLogger
 from genefab3.db.sql.types import CachedTableFile, CachedBinaryFile
 from natsort import natsorted
@@ -130,15 +131,15 @@ def get_formatted_data(descriptor, sqlite_db, CachedFile, adapter, _kws):
         sqlite_db=sqlite_db, **_kws,
     )
     data = file.data
-    if isinstance(data, DataFrame):
+    if isinstance(data, (DataFrame, OndemandSQLiteDataFrame)):
         data.columns = MultiIndex.from_tuples((
             (accession, assay, column) for column in data.columns
         ))
-    return data
+    return data[:] # TODO: delay this evaluation to after `combine_objects`
 
 
 def combine_objects(objects, n_objects):
-    """Combine dataframes in-memory""" # TODO: implement DelayedDataFrame, DelayedBlob and use their methods
+    """Combine dataframes in-memory""" # TODO: use OndemandSQLiteDataFrame.concat
     if n_objects == 1:
         obj = next(objects)
         if isinstance(obj, DataFrame): # TODO: will happen w/o condition checks and code duplication
