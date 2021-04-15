@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from pandas import Index, read_sql
+from pandas import Index, read_sql, DataFrame
 from uuid import uuid3, uuid4
 from itertools import count
 from contextlib import closing
@@ -40,7 +40,22 @@ class OndemandSQLiteDataFrame():
         self.index = Index([], name=_index_names.pop())
         self.columns = Index(_columns, name=None)
  
-    def __retrieve(self, index, part_to_column):
+    def __retrieve_singlepart(self, index, part_to_column, columns):
+        left, targets = next(iter(part_to_column.items()))
+        select = ",".join(f"[{t}]" for t in targets)
+        with closing(connect(self.sqlite_db)) as connection:
+            try:
+                data = read_sql(f"SELECT {select} FROM '{left}'", connection)
+            except OperationalError:
+                msg = "No data found"
+                raise GeneFabDatabaseException(msg, table=self.name)
+            else:
+                data.set_index(self.index.name, inplace=True)
+                msg = "Read 1 table (0 joins) for OndemandSQLiteDataFrame(): %s"
+                GeneFabLogger().info(msg, self.name)
+                return data
+ 
+    def __retrieve_fulljoin(self, index, part_to_column, columns):
         view_name = "VIEW:" + uuid3(uuid4(), self.name).hex
         views = [f"{view_name}:{i}" for i in range(1, len(part_to_column))]
         parts, partcols = list(part_to_column), list(part_to_column.values())
@@ -72,6 +87,10 @@ class OndemandSQLiteDataFrame():
                 raise GeneFabDatabaseException(msg, table=self.name)
             else:
                 data.set_index(self.index.name, inplace=True)
+                # order may be a bit off because columns are attracted to parts:
+                if (data.columns != columns).any():
+                    for column in columns: # this may be kinda slow...
+                        data[column] = data.pop(column)
                 msg = "Joined %s tables for OndemandSQLiteDataFrame(): %s"
                 GeneFabLogger().info(msg, len(parts), self.name)
                 return data
@@ -94,7 +113,12 @@ class OndemandSQLiteDataFrame():
         for column in (self.columns if columns is None else columns):
             part = self.__column_dispatcher[column]
             part_to_column.setdefault(part, []).append(column)
-        return self.__retrieve(index, part_to_column)
+        if len(part_to_column) == 0:
+            return DataFrame()
+        elif len(part_to_column) == 1:
+            return self.__retrieve_singlepart(index, part_to_column, columns)
+        else:
+            return self.__retrieve_fulljoin(index, part_to_column, columns)
 
 
 from collections import OrderedDict
@@ -115,25 +139,31 @@ odf = OndemandSQLiteDataFrame(
     )),
 )
 
-from numpy.random import choice, randint
-ALL_COLUMNS = ["B", "C", "D", "E", "F", "G", "H", "J", "K", "A"]
-COLUMNS = choice(ALL_COLUMNS, randint(len(ALL_COLUMNS)), replace=False)
-print(COLUMNS, end="\n\n")
+#ALL_COLUMNS = ["B", "C", "D", "E", "F", "G", "H", "J", "K", "A"]
 
 from pandas import read_csv
-orig = read_csv("D.tsv", sep="\t", index_col=0)[COLUMNS]
+from numpy.random import choice, randint
+original = read_csv("D.tsv", sep="\t", index_col=0)
+ALL_COLUMNS = list(original.columns)
 
-try:
-    print("Getting data...")
-    data = odf.get(columns=COLUMNS)
-except Exception as e:
-    print("Exception occurred:", e)
+sane = lambda df: df[sorted(set(df))].dropna(how="all").fillna("NA")
 
-try:
-    print("Columns match:", (data.columns == orig.columns).all())
-    print("Indexes match:", (data.index == orig.index).all())
-    print("Values match:", (data.fillna("NA") == orig.fillna("NA")).all().all())
-except Exception as e:
-    print("Exception occurred:", e)
-    print(orig, end="\n\n")
-    print(data)
+for n in range(1, 251):
+    print(n, end="\r", flush=True)
+    columns = choice(ALL_COLUMNS, randint(1, len(ALL_COLUMNS)), replace=False)
+    colrep = " ".join((list(columns) + [" "]*len(ALL_COLUMNS))[:len(ALL_COLUMNS)])
+    orig = sane(original[columns])
+    try:
+        data = sane(odf.get(columns=columns))
+        reports = [
+            colrep,
+            (data.index == orig.index).all(),
+            (data.columns == orig.columns).all(),
+            (data == orig).all().all(),
+        ]
+        if not all(reports[1:]):
+            print(flush=True)
+            print(*reports, sep="\t")
+    except Exception as e:
+        print(flush=True)
+        print(colrep, e, sep="\t")
