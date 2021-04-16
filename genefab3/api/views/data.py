@@ -131,11 +131,14 @@ def get_formatted_data(descriptor, sqlite_db, CachedFile, adapter, _kws):
         sqlite_db=sqlite_db, **_kws,
     )
     data = file.data
+    print(data.__dict__)
     if isinstance(data, (DataFrame, OndemandSQLiteDataFrame)):
         data.columns = MultiIndex.from_tuples((
             (accession, assay, column) for column in data.columns
         ))
-    return data[:] # TODO: delay this evaluation to after `combine_objects`
+    print(data.__dict__)
+    return data.get()
+    #return data[:] # TODO: delay this evaluation to after `combine_objects`
 
 
 def combine_objects(objects, n_objects):

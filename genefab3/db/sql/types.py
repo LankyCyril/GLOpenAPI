@@ -10,7 +10,7 @@ from shutil import copyfileobj
 from tempfile import TemporaryDirectory
 from os import path
 from csv import Error as CSVError, Sniffer
-from pandas import read_csv, DataFrame
+from pandas import read_csv, DataFrame, Index, read_sql
 from pandas.errors import ParserError as PandasParserError
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -183,65 +183,80 @@ class SQLiteIndexName(str): pass
 
 
 class OndemandSQLiteDataFrame():
-    """ ... """ # TODO
+    """DataFrame to be retrieved from SQLite, possibly from multiple tables, including parts of same tabular file"""
  
     def __init__(self, sqlite_db, column_dispatcher):
+        """Interpret `column_dispatcher`"""
         self.sqlite_db = sqlite_db
-        self.column_dispatcher = column_dispatcher
-        self.parts, _pac = [], set()
-        self.raw_columns, index_names = [], set()
+        self.__column_dispatcher = column_dispatcher
+        self.__parts, _pac = [], set()
+        self._raw_columns, _index_names = [], set()
         for n, p in column_dispatcher.items():
             if isinstance(n, SQLiteIndexName):
-                index_names.add(n)
+                _index_names.add(n)
             else:
-                self.raw_columns.append(n)
+                self._raw_columns.append(n)
             if p not in _pac:
                 _pac.add(p)
-                self.parts.append(p)
-        if len(index_names) == 0:
+                self.__parts.append(p)
+        if len(_index_names) == 0:
             msg = "OndemandSQLiteDataFrame(): no index"
-            raise GeneFabDatabaseException(msg, table=self.first_part)
-        elif len(index_names) > 1:
+            raise GeneFabDatabaseException(msg, table=self.__parts[0])
+        elif len(_index_names) > 1:
             msg = "OndemandSQLiteDataFrame(): parts indexes do not match"
-            _kw = dict(table=self.first_part, index_names=index_names)
+            _kw = dict(table=self.__parts[0], index_names=_index_names)
             raise GeneFabDatabaseException(msg, **_kw)
-        else:
-            self.index_name = index_names.pop()
-        self.name = self.parts[0]
-        self.columns = self.raw_columns[:]
+        self.name = self.__parts[0]
+        self.index = Index([], name=_index_names.pop())
+        self.columns = Index(self._raw_columns, name=None)
  
-    def __getitem__(self, ix):
-        """ ... """ # TODO
-        if (ix == slice(None)) or (ix == (slice(None), slice(None))):
-            targets = ", ".join(( # TODO guard special characters here and everywhere
-                f"'{self.parts[0]}'.[{self.index_name}]",
-                *(f"[{c}]" for c in self.raw_columns),
-            ))
-            query = " ".join((
-                f"SELECT {targets} FROM '{self.parts[0]}'", *(f"""
-                    INNER JOIN '{part}' ON
-                    '{self.parts[0]}'.[{self.index_name}] ==
-                    '{part}'.[{self.index_name}]
-                """ for part in self.parts[1:]),
-            ))
+    def get(self, *, rows=None, columns=None, limit=None, offset=0):
+        """Interpret arguments in order to retrieve data as DataFrame by running SQL queries"""
+        if (offset != 0) and (limit is None):
+            msg = "OndemandSQLiteDataFrame: `offset` without `limit`"
+            raise GeneFabDatabaseException(msg, table=self.name)
+        if rows is not None:
+            raise NotImplementedError("Slicing by row names")
+        if columns is not None:
+            _cs = set(columns)
+            if len(_cs) != len(columns):
+                raise IndexError(f"Slicing by duplicate column name")
+            elif self.index.name in _cs:
+                raise IndexError(f"Requesting index as if it were a column")
         else:
-            raise NotImplementedError("Slicing an OndemandSQLiteDataFrame")
+            columns = self._raw_columns
+        part_to_column = OrderedDict({
+            # get index column from part containing first requested column:
+            self.__column_dispatcher[columns[0]]: [self.index.name],
+        })
+        for column in (self._raw_columns if columns is None else columns):
+            part = self.__column_dispatcher[column]
+            part_to_column.setdefault(part, []).append(column)
+        if len(part_to_column) == 0:
+            return DataFrame()
+        else:
+            args = rows, part_to_column, columns, limit, offset
+            return self.__retrieve_natural_join(*args)
+ 
+    def __retrieve_natural_join(self, rows, part_to_column, columns, limit, offset):
+        """Retrieve data as DataFrame by running SQL queries"""
+        joined = " NATURAL JOIN ".join(f"'{p}'" for p in part_to_column)
+        first_table = next(iter(part_to_column))
+        targets = ",".join((
+            f"'{first_table}'.[{self.index.name}]",
+            *(f"[{c}]" for c in columns),
+        ))
         with closing(connect(self.sqlite_db)) as connection:
-            print(query)
             try:
-                cursor = connection.cursor()
-                data = cursor.execute(query).fetchall()
-                header = [c[0] for c in cursor.description]
+                if limit is None:
+                    query = f"SELECT {targets} FROM {joined}"
+                else:
+                    _limits = f"LIMIT {limit} OFFSET {offset}"
+                    query = f"SELECT {targets} FROM {joined} {_limits}"
+                data = read_sql(query, connection, index_col=self.index.name)
             except OperationalError:
                 msg = "No data found"
                 raise GeneFabDatabaseException(msg, table=self.name)
             else:
-                GeneFabLogger().info(
-                    "Joined %s tables for OndemandSQLiteDataFrame(): %s",
-                    len(self.parts), self.name,
-                )
-        dataframe = DataFrame(data=data, columns=header)
-        dataframe.set_index(header[0], inplace=True)
-        assert header[1:] == self.raw_columns # TODO
-        dataframe.columns = self.columns
-        return dataframe
+                data.columns = self.columns
+                return data
