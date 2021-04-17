@@ -41,7 +41,7 @@ def get_browser_glds_formatter(context, i):
 
 def get_browser_assay_formatter(context, i):
     """Get SlickGrid formatter for column 'assay name'"""
-    url = build_url(context, "samples", drop={"from"})
+    url = build_url(context, drop={"from"})
     _fr = f"""function(r,c,v,d,x){{return "<a class='filter' "+
         "href='{url}from="+data[r][0]+"."+escape(v)+"'>"+v+"</a>";}}"""
     return f"columns[{i}].formatter = columns[{i}].defaultFormatter = {_fr};"
