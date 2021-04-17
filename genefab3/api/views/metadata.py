@@ -2,7 +2,6 @@ from genefab3.db.mongo.utils import blackjack_normalize, retrieve_by_context
 from pandas import MultiIndex, isnull
 from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException
-from re import findall
 from genefab3.api.renderers import Placeholders
 from genefab3.common.utils import set_attributes
 
@@ -14,7 +13,7 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
         include=include,
     )
     try:
-        dataframe = blackjack_normalize(cursor)
+        dataframe = blackjack_normalize(cursor, max_depth=3)
     except MongoOperationError as e:
         errmsg = getattr(e, "details", {}).get("errmsg", "").lower()
         has_index = ("info" in mongo_collections.metadata.index_information())
@@ -26,14 +25,6 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
         raise GeneFabDatabaseException(msg, locale=locale, reason=str(e))
     else:
         return dataframe, full_projection
-
-
-def INPLACE_drop_trailing_fields(dataframe, full_projection):
-    """Drop qualifier fields from single-level dataframe, unless explicitly requested in projection"""
-    is_trailing = lambda c: (
-        (c not in full_projection) and (len(findall(r'\..', c)) >= 3)
-    )
-    dataframe.drop(inplace=True, columns=filter(is_trailing, dataframe.columns))
 
 
 def iisaf_sort_dataframe(dataframe):
@@ -48,18 +39,15 @@ def iisaf_sort_dataframe(dataframe):
     return dataframe[sum((sorted(column_order[p]) for p in prefix_order), [])]
 
 
-def get(mongo_collections, *, locale, context, include=(), drop_trailing_fields=True, aggregate=False):
+def get(mongo_collections, *, locale, context, include=(), aggregate=False):
     """Select assays/samples based on annotation filters"""
     dataframe, full_projection = get_raw_metadata_dataframe( # single-level
         mongo_collections, locale=locale, context=context, include=include,
     )
-    if drop_trailing_fields:
-        INPLACE_drop_trailing_fields(dataframe, full_projection)
     if dataframe.empty:
         _kw = dict(include=include, object_type="annotation")
         return Placeholders.metadata_dataframe(**_kw)
     else:
-        dataframe.columns = dataframe.columns.map(lambda c: c.rstrip("."))
         dataframe = iisaf_sort_dataframe(dataframe)
         dataframe.columns = MultiIndex.from_tuples(
             (fields[0], ".".join(fields[1:])) if fields[0] in {"info", "file"}
