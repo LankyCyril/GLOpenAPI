@@ -4,9 +4,9 @@ from genefab3.common.utils import pick_reachable_url, set_attributes
 from flask import redirect, Response
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDataManagerException
-from pandas import DataFrame, MultiIndex, concat
+from pandas import MultiIndex
 from genefab3.db.sql.types import OndemandSQLiteDataFrame
-from genefab3.common.logger import GeneFabLogger
+from genefab3.common.logger import GeneFabLogger # TODO
 from genefab3.db.sql.types import CachedTableFile, CachedBinaryFile
 from natsort import natsorted
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -131,34 +131,32 @@ def get_formatted_data(descriptor, sqlite_db, CachedFile, adapter, _kws):
         sqlite_db=sqlite_db, **_kws,
     )
     data = file.data
-    print(data.__dict__)
-    if isinstance(data, (DataFrame, OndemandSQLiteDataFrame)):
+    if isinstance(data, OndemandSQLiteDataFrame):
         data.columns = MultiIndex.from_tuples((
             (accession, assay, column) for column in data.columns
         ))
-    print(data.__dict__)
-    return data.get()
-    #return data[:] # TODO: delay this evaluation to after `combine_objects`
+    return data
 
 
-def combine_objects(objects, n_objects):
-    """Combine dataframes in-memory""" # TODO: use OndemandSQLiteDataFrame.concat
-    if n_objects == 1:
-        obj = next(objects)
-        if isinstance(obj, DataFrame): # TODO: will happen w/o condition checks and code duplication
-            if obj.index.name is None: # if original index names differed
-                obj.index.name = "index" # best we can do
-            obj.reset_index(inplace=True, col_level=-1, col_fill="*")
-            set_attributes(obj, genefab_type="datatable")
-        return obj
-    else: # TODO more checks
-        dataframe = concat(objects, axis=1, sort=False)
-        if dataframe.index.name is None: # if original index names differed
-            dataframe.index.name = "index" # best we can do
-        GeneFabLogger().info("Merging dataframes in-memory")
-        dataframe.reset_index(inplace=True, col_level=-1, col_fill="*")
-        set_attributes(dataframe, genefab_type="datatable")
-        return dataframe
+def combine_objects(objects):
+    """Combine objects and post-process"""
+    if len(objects) == 0:
+        return None
+    elif len(objects) == 1:
+        combined = objects[0]
+    elif all(isinstance(obj, OndemandSQLiteDataFrame) for obj in objects):
+        combined = OndemandSQLiteDataFrame.concat(objects, axis=1)
+    else:
+        raise NotImplementedError("Merging non-dataframe data objects")
+    if isinstance(combined, OndemandSQLiteDataFrame):
+        data = combined.get() # TODO: get() arguments
+        if data.index.name is None:
+            data.index.name = "index" # best we can do
+        data.reset_index(inplace=True, col_level=-1, col_fill="*")
+        set_attributes(data, genefab_type="datatable")
+        return data
+    else:
+        return combined
 
 
 def combined_data(descriptors, sqlite_dbs, adapter):
@@ -181,15 +179,12 @@ def combined_data(descriptors, sqlite_dbs, adapter):
         sqlite_db, CachedFile, _kws = sqlite_dbs.blobs, CachedBinaryFile, {}
     else:
         raise NotImplementedError(f"Joining data of types {types}")
-    data = combine_objects(
-        objects=(
-            get_formatted_data(d, sqlite_db, CachedFile, adapter, _kws)
-            for d in natsorted(
-                descriptors, key=lambda d: (d.get("accession"), d.get("assay")),
-            )
-        ),
-        n_objects=len(descriptors),
-    )
+    data = combine_objects([
+        get_formatted_data(d, sqlite_db, CachedFile, adapter, _kws)
+        for d in natsorted(
+            descriptors, key=lambda d: (d.get("accession"), d.get("assay")),
+        )
+    ])
     set_attributes(
         data, datatypes=getset("file", "datatype"),
         accessions=getset("accession"),

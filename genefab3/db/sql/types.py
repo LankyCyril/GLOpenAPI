@@ -10,7 +10,7 @@ from shutil import copyfileobj
 from tempfile import TemporaryDirectory
 from os import path
 from csv import Error as CSVError, Sniffer
-from pandas import read_csv, DataFrame, Index, read_sql
+from pandas import read_csv, read_sql, DataFrame, Index, MultiIndex
 from pandas.errors import ParserError as PandasParserError
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -117,7 +117,7 @@ class CachedBinaryFile(SQLiteBlob):
 class CachedTableFile(SQLiteTable):
     """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxpartwidth=5, **pandas_kws):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxpartwidth=1000, **pandas_kws):
         """Interpret file descriptors; inherit functionality from SQLiteTable; define equality (hashableness) of self"""
         self.name, self.url, self.timestamp = name, None, timestamp
         self.identifier = identifier
@@ -185,11 +185,11 @@ class SQLiteIndexName(str): pass
 class OndemandSQLiteDataFrame():
     """DataFrame to be retrieved from SQLite, possibly from multiple tables, including parts of same tabular file"""
  
-    def __init__(self, sqlite_db, column_dispatcher):
+    def __init__(self, sqlite_db, column_dispatcher, columns=None):
         """Interpret `column_dispatcher`"""
         self.sqlite_db = sqlite_db
-        self.__column_dispatcher = column_dispatcher
-        self.__parts, _pac = [], set()
+        self._column_dispatcher = column_dispatcher
+        _parts, _pac = [], set()
         self._raw_columns, _index_names = [], set()
         for n, p in column_dispatcher.items():
             if isinstance(n, SQLiteIndexName):
@@ -198,17 +198,36 @@ class OndemandSQLiteDataFrame():
                 self._raw_columns.append(n)
             if p not in _pac:
                 _pac.add(p)
-                self.__parts.append(p)
+                _parts.append(p)
         if len(_index_names) == 0:
             msg = "OndemandSQLiteDataFrame(): no index"
-            raise GeneFabDatabaseException(msg, table=self.__parts[0])
+            raise GeneFabDatabaseException(msg, table=_parts[0])
         elif len(_index_names) > 1:
             msg = "OndemandSQLiteDataFrame(): parts indexes do not match"
-            _kw = dict(table=self.__parts[0], index_names=_index_names)
+            _kw = dict(table=_parts[0], index_names=_index_names)
             raise GeneFabDatabaseException(msg, **_kw)
-        self.name = self.__parts[0]
+        self.name = _parts[0]
         self.index = Index([], name=_index_names.pop())
-        self.columns = Index(self._raw_columns, name=None)
+        if columns is None:
+            self._columns = Index(self._raw_columns, name=None)
+        else:
+            r, c = len(self._raw_columns), len(columns)
+            if r == c:
+                self._columns = columns
+            else:
+                m = f"Passed `columns` have {c} elements, data has {r} columns"
+                raise ValueError(f"Length mismatch: {m}")
+ 
+    @property
+    def columns(self): return self._columns
+    @columns.setter
+    def columns(self, value):
+        c, v = len(self._columns), len(value)
+        if c == v:
+            self._columns = value
+        else:
+            m = f"Expected axis has {c} elements, new values have {v} elements"
+            raise ValueError(f"Length mismatch: {m}")
  
     def get(self, *, rows=None, columns=None, limit=None, offset=0):
         """Interpret arguments in order to retrieve data as DataFrame by running SQL queries"""
@@ -227,10 +246,10 @@ class OndemandSQLiteDataFrame():
             columns = self._raw_columns
         part_to_column = OrderedDict({
             # get index column from part containing first requested column:
-            self.__column_dispatcher[columns[0]]: [self.index.name],
+            self._column_dispatcher[columns[0]]: [self.index.name],
         })
         for column in (self._raw_columns if columns is None else columns):
-            part = self.__column_dispatcher[column]
+            part = self._column_dispatcher[column]
             part_to_column.setdefault(part, []).append(column)
         if len(part_to_column) == 0:
             return DataFrame()
@@ -260,3 +279,40 @@ class OndemandSQLiteDataFrame():
             else:
                 data.columns = self.columns
                 return data
+ 
+    @staticmethod
+    def concat(objs, axis=1):
+        """Concatenate OndemandSQLiteDataFrame objects without evaluation"""
+        _t = "OndemandSQLiteDataFrame"
+        if axis != 1:
+            raise ValueError(f"{_t}.concat(..., axis={axis}) makes no sense")
+        elif not all(isinstance(obj, OndemandSQLiteDataFrame) for obj in objs):
+            raise TypeError(f"{_t}.concat() on non-{_t} objects")
+        elif len(set(obj.sqlite_db for obj in objs)) != 1:
+            msg = f"Concatenating {_t} objects from different database files"
+            raise ValueError(msg)
+        elif len(set(obj.index.name for obj in objs)) != 1:
+            msg = f"Concatenating {_t} objects with differing index names"
+            raise ValueError(msg)
+        elif len(set(obj.columns.nlevels for obj in objs)) != 1:
+            msg = f"Concatenating {_t} objects with differing column `nlevels`"
+            raise ValueError(msg)
+        else:
+            column_dispatcher = OrderedDict()
+            for obj in objs:
+                for n, p in obj._column_dispatcher.items():
+                    if n in column_dispatcher:
+                        if not isinstance(n, SQLiteIndexName):
+                            e = f"duplicate column name: {n}"
+                            msg = f"Cannot merge multiple {_t} objects with {e}"
+                            raise IndexError(msg)
+                    else:
+                        column_dispatcher[n] = p
+            if objs[0].columns.nlevels == 1:
+                _mkindex = Index
+            else:
+                _mkindex = MultiIndex.from_tuples
+            columns = _mkindex(sum((obj.columns.to_list() for obj in objs), []))
+            return OndemandSQLiteDataFrame(
+                objs[0].sqlite_db, column_dispatcher, columns,
+            )
