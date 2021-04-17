@@ -13,7 +13,7 @@ def generic_dataframe(*level_values):
     return DataFrame(columns=MultiIndex.from_tuples(zip(*cyclers)))
 
 
-def metadata_dataframe(*, include=(), genefab_type="annotation"):
+def metadata_dataframe(*, include=(), object_type="annotation"):
     """Return an empty dataframe that matches metadata format"""
     dataframe = generic_dataframe(
         ["info"], [
@@ -21,12 +21,12 @@ def metadata_dataframe(*, include=(), genefab_type="annotation"):
             *(c.lstrip("info.").strip(".") for c in include),
         ],
     )
-    set_attributes(dataframe, genefab_type=genefab_type)
+    set_attributes(dataframe, object_type=object_type)
     return dataframe
 
 
-def data_dataframe(*, genefab_type="datatable"):
+def data_dataframe(*, object_type="datatable"):
     """Return an empty dataframe that matches data format"""
     dataframe = generic_dataframe(["info"], ["info"], ["entry"])
-    set_attributes(dataframe, genefab_type=genefab_type)
+    set_attributes(dataframe, object_type=object_type)
     return dataframe

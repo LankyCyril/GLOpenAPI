@@ -120,7 +120,7 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_pr
     title_postfix = f"{context.view.capitalize()} {context.complete_kwargs}"
     columndata = dumps(obj.columns.to_list(), separators=(",", ":"))
     strdata = obj.fillna("NaN").astype(str)
-    if get_attribute(obj, "genefab_type") != "datatable":
+    if get_attribute(obj, "object_type") != "datatable":
         strdata[(strdata=="[]") | (strdata=="()")] = "NaN"
     rowdata = strdata.to_json(orient="values")
     formatters = iterate_formatters(obj, context)

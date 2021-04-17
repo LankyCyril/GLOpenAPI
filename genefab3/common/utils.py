@@ -4,7 +4,8 @@ from urllib.request import urlopen
 from urllib.error import URLError
 from re import sub, escape, split
 from copy import deepcopy
-from pandas import DataFrame, Series
+from pandas import DataFrame
+from pandas.core.base import PandasObject
 from genefab3.common.exceptions import GeneFabConfigurationException
 from json import JSONEncoder
 
@@ -72,30 +73,30 @@ def match_mapping(mapping, matchers):
     return dispatcher
 
 
-def set_attributes(dataframe, **kwargs):
-    """Add custom attributes to dataframe"""
-    if not isinstance(dataframe, DataFrame):
-        raise GeneFabConfigurationException("set_attributes(): not a DataFrame")
-    else:
-        for a, v in kwargs.items():
-            try:
-                dataframe._metadata.append(a)
-                setattr(dataframe, a, v)
-            except AttributeError:
-                msg = "Cannot set attribute of DataFrame"
-                raise GeneFabConfigurationException(msg, attribute=a)
+def set_attributes(obj, **kwargs):
+    """Add custom attributes to object"""
+    if isinstance(obj, DataFrame):
+        for a in kwargs:
+            obj._metadata.append(a)
+    elif isinstance(obj, PandasObject):
+        msg = f"Cannot set attributes to object of this type"
+        raise GeneFabConfigurationException(msg, type=type(obj).__name__)
+    for a, v in kwargs.items():
+        try:
+            setattr(obj, a, v)
+        except Exception as e:
+            msg = f"Cannot set this attribute to object of this type"
+            _kw = dict(type=type(obj).__name__, error=e)
+            raise GeneFabConfigurationException(msg, **{a: v}, **_kw)
 
 
-def get_attribute(dataframe, a, default=None):
-    """Retrieve custom attribute of dataframe"""
-    if not isinstance(dataframe, DataFrame):
-        raise GeneFabConfigurationException("get_attribute(): not a DataFrame")
+def get_attribute(obj, a, default=None):
+    """Retrieve custom attribute of object"""
+    value = getattr(obj, a, default)
+    if isinstance(obj, PandasObject) and isinstance(value, PandasObject):
+        return default
     else:
-        value = getattr(dataframe, a, default)
-        if isinstance(value, (Series, DataFrame)):
-            return default
-        else:
-            return value
+        return value
 
 
 def iterate_terminal_leaves(d, step_tracker=1, max_steps=256):

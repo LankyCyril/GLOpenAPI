@@ -152,7 +152,7 @@ def combine_objects(objects):
         if data.index.name is None:
             data.index.name = "index" # best we can do
         data.reset_index(inplace=True, col_level=-1, col_fill="*")
-        set_attributes(data, genefab_type="datatable")
+        set_attributes(data, object_type="datatable")
         return data
     else:
         return combined

@@ -83,7 +83,7 @@ tsv = partial(xsv, sep="\t")
 
 def json(obj, context=None, indent=None):
     """Display dataframe as JSON"""
-    if get_attribute(obj, "genefab_type") == "datatable":
+    if get_attribute(obj, "object_type") == "datatable":
         _json = {
             "columns": obj.columns.tolist(), "index": obj.values[:,0].tolist(),
             "data": obj.values[:,1:].tolist(),
