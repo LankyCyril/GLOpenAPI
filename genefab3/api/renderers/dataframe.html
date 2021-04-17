@@ -5,7 +5,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <title>$APPNAME</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/6pac-slickgrid/2.4.27/slick.grid.min.css" type="text/css"/>
-    <link href="https://fonts.googleapis.com/css2?family=Oxygen+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxygen+Mono&display=swap"/>
     <style>
         html, body {margin: 0; padding: 0; background: #FFF; overflow: auto}
         body {font-size: 10pt; font-family: "Oxygen Mono", monospace}
@@ -88,7 +88,7 @@ var basic_formatter = function(r,c,v,d,x) {
 };
 
 var columns = [], _rc = $COLUMNDATA;
-for (i = _rc.length; i-->0;)
+for (var i = _rc.length; i-->0;)
     columns[i] = {
         id: i, field: i, columnGroup: _rc[i][0], name: _rc[i][1],
         sortable: true, resizable: false, momentarilyFormattable: true,
@@ -130,11 +130,11 @@ function render_header_groups(pre_header_panel, start, end) {
     }
 }
 
-for (var i = 0, cl = columns.length; i < cl; i++) {
+for (var i = columns.length; i-->0;) {
     c = columns[i];
     var field = c.field;
     var longest = c.name;
-    for (var j = 0, dl = data.length; j < dl; j++) {
+    for (var j = data.length; j-->0;) {
         var value = data[j][field];
         if (value.length > longest.length)
             longest = value;
