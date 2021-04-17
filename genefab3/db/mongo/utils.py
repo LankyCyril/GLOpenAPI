@@ -171,10 +171,11 @@ def retrieve_by_context(collection, *, locale, context, include=(), postprocess=
             f: ASCENDING
             for f in ["info.accession", "info.assay", *include]
         }},
-        {"$unwind": "$file"},
         {"$match": context.query},
         {"$project": {**full_projection, "_id": False}},
     ]
+    if any(key.split(".")[0] == "file" for key in full_projection):
+        pipeline.insert(1, {"$unwind": "$file"})
     cursor = collection.aggregate(
         pipeline=[*pipeline, *postprocess], collation=collation,
     )
