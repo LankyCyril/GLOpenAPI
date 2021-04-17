@@ -6,7 +6,6 @@ from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDataManagerException
 from pandas import MultiIndex
 from genefab3.db.sql.types import OndemandSQLiteDataFrame
-from genefab3.common.logger import GeneFabLogger # TODO
 from genefab3.db.sql.types import CachedTableFile, CachedBinaryFile
 from natsort import natsorted
 from genefab3.common.exceptions import GeneFabDatabaseException

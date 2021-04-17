@@ -98,6 +98,8 @@ class CachedBinaryFile(SQLiteBlob):
         """Download data from URL as-is"""
         self.url, data = None, None
         for url in urls:
+            msg = f"{self.name}; trying URL: {url}"
+            GeneFabLogger().info(msg)
             try:
                 with urlopen(url) as response:
                     data = response.read()
@@ -135,6 +137,8 @@ class CachedTableFile(SQLiteTable):
         """Try all URLs and push data into temporary file"""
         for url in urls:
             with open(tempfile, mode="wb") as handle:
+                msg = f"{self.name}; trying URL: {url}"
+                GeneFabLogger().info(msg)
                 try:
                     with urlopen(url) as response:
                         copyfileobj(response, handle)
@@ -266,6 +270,10 @@ class OndemandSQLiteDataFrame():
             *(f"[{c}]" for c in columns),
         ))
         with closing(connect(self.sqlite_db)) as connection:
+            _n, _m = len(columns), len(part_to_column)
+            _tt = "\n\t".join(("", *part_to_column))
+            msg = f"retrieving {_n} columns from {_m} table(s):{_tt}"
+            GeneFabLogger().info(f"{self.name}; {msg}")
             try:
                 if limit is None:
                     query = f"SELECT {targets} FROM {joined}"
