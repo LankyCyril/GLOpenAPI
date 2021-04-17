@@ -3,6 +3,7 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps, lru_cache
 from collections.abc import Iterable
 from pathlib import Path
+from json import dumps
 from genefab3.common.utils import map_replace
 from flask import Response
 
@@ -63,11 +64,11 @@ def get_browser_glds_formatter(context, i):
     return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
 
 
-def get_browser_assay_formatter(context, i, shortnames):
+def get_browser_assay_formatter(context, i):
     """Get SlickGrid formatter for column 'assay name'"""
-    url, s = build_url(context, "samples", drop={"from"}), shortnames[0]
+    url = build_url(context, "samples", drop={"from"})
     _fr = f"""function(r,c,v,d,x){{return "<a class='filter' "+
-        "href='{url}from="+data[r]["{s}"]+"."+escape(v)+"'>"+v+"</a>";}};"""
+        "href='{url}from="+data[r][0]+"."+escape(v)+"'>"+v+"</a>";}};"""
     return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
 
 
@@ -103,7 +104,7 @@ def get_browser_meta_formatter(context, i, head, target):
     return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
 
 
-def iter_formatters(obj, context, shortnames):
+def iter_formatters(obj, context):
     """Get SlickGrid formatters for columns"""
     if context.view in {"assays", "samples"}:
         for i, (key, target) in enumerate(obj.columns):
@@ -111,7 +112,7 @@ def iter_formatters(obj, context, shortnames):
                 if target == "accession":
                     yield get_browser_glds_formatter(context, i)
                 elif target == "assay":
-                    yield get_browser_assay_formatter(context, i, shortnames)
+                    yield get_browser_assay_formatter(context, i)
             elif (key, target, context.view) == ("file", "filename", "samples"):
                 yield get_browser_file_formatter(context, i)
             else:
@@ -141,25 +142,14 @@ def get_view_dependent_links(context):
 def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_preheader=False):
     """Display dataframe with two-level columns using SlickGrid"""
     _assert_type(obj, nlevels=2)
-    shortnames = []
-    def _WITH_SIDE_EFFECT_generate_short_names(*args):
-        s, j = "", len(shortnames) + 1
-        while j > 0:
-            s, j = chr(((j % 26) or 26) + 96) + s, (j - 1) // 26
-        shortnames.append(s)
-        return s
-    rowdata = (
-        obj.droplevel(0, axis=1)
-        .rename(_WITH_SIDE_EFFECT_generate_short_names, axis=1)
-        .applymap(_na_repr)
-        .to_json(orient="records")
-    )
+    value_dict = obj.applymap(_na_repr).to_dict(orient="split")["data"]
+    rowdata = dumps(value_dict, separators=(",", ":"))
     columndata = "\n".join(
-        f"{{id:'{n}',field:'{n}',columnGroup:'{a}',name:'{b}'}},"
-        for (a, b), n in zip(obj.columns, shortnames)
+        f"{{id:{n},field:{n},columnGroup:'{a}',name:'{b}'}},"
+        for n, (a, b) in enumerate(obj.columns)
     )
     title_postfix = f"{context.view.capitalize()} {context.complete_kwargs}"
-    formatters = iter_formatters(obj, context, shortnames)
+    formatters = iter_formatters(obj, context)
     content = map_replace(_get_browser_html(), {
         "%APPNAME%": context.app_name,
         "</title><!--TITLEPOSTFIX-->": f": {title_postfix}</title>",
