@@ -20,12 +20,24 @@ RESPONSE_CACHE_SCHEMAS = ImmutableDict({
 })
 
 
+def iterate_accession_reprs(accessions, _loge):
+    """Iterate sane accession reprs, prevent syntax-breaking accessions from sneaking in"""
+    for accession in accessions:
+        if '"' not in accession:
+            yield f'"{accession}"'
+        elif "'" not in accession:
+            yield f"'{accession}'"
+        else:
+            _r = repr(accession)
+            _loge(f"LRU response cache: accession contains '\"', \"'\": {_r}")
+            raise OperationalError
+
+
 class ResponseCache():
     """LRU response cache; responses are identified by context.identity, dropped if underlying (meta)data changed"""
  
     def __init__(self, sqlite_dbs, maxsize=24*1024*1024*1024):
-        self.sqlite_dbs = sqlite_dbs
-        self.maxsize = maxsize
+        self.sqlite_dbs, self.maxsize = sqlite_dbs, maxsize
         self.logger = GeneFabLogger()
         if sqlite_dbs.cache is not None:
             # if not path.exists(response_cache): # TODO: auto_vacuum
@@ -33,9 +45,8 @@ class ResponseCache():
             #         sql_connection.cursor().execute("PRAGMA auto_vacuum = 1")
             with closing(connect(sqlite_dbs.cache)) as connection:
                 for table, schema in RESPONSE_CACHE_SCHEMAS.items():
-                    connection.cursor().execute(
-                        f"CREATE TABLE IF NOT EXISTS '{table}' {schema}",
-                    )
+                    query = f"CREATE TABLE IF NOT EXISTS `{table}` {schema}"
+                    connection.cursor().execute(query)
         else:
             self.logger.warning("Not using LRU response SQL cache")
  
@@ -52,22 +63,22 @@ class ResponseCache():
         api_path = quote(context.full_path)
         blob = Binary(compress(response.get_data()))
         timestamp = int(datetime.now().timestamp())
-        delete_blob_command = f"""DELETE FROM 'response_cache'
-            WHERE context_identity = '{context.identity}'"""
-        insert_blob_command = f"""INSERT INTO 'response_cache'
+        delete_blob_command = f"""DELETE FROM `response_cache`
+            WHERE `context_identity` == "{context.identity}" """
+        insert_blob_command = f"""INSERT INTO `response_cache`
             (context_identity, api_path, timestamp, response, nbytes, mimetype)
-            VALUES ('{context.identity}', '{api_path}', {timestamp},
-                ?, {blob.nbytes}, '{response.mimetype}')"""
-        make_delete_accession_entry_command = """DELETE FROM 'accessions_used'
-            WHERE accession = '{}' AND context_identity = '{}'""".format
-        make_insert_accession_entry_command = """ INSERT INTO 'accessions_used'
-            (accession, context_identity) VALUES ('{}', '{}')""".format
+            VALUES ("{context.identity}", "{api_path}", {timestamp},
+                ?, {blob.nbytes}, "{response.mimetype}")"""
+        make_delete_accession_entry_command = """DELETE FROM `accessions_used`
+            WHERE `accession` == {} AND `context_identity` == "{}" """.format
+        make_insert_accession_entry_command = """INSERT INTO `accessions_used`
+            (accession, context_identity) VALUES ({}, "{}")""".format
         with closing(connect(self.sqlite_dbs.cache)) as connection:
             try:
                 cursor = connection.cursor()
                 cursor.execute(delete_blob_command)
                 cursor.execute(insert_blob_command, [blob])
-                for accession in accessions:
+                for accession in iterate_accession_reprs(accessions, _loge):
                     args = accession, context.identity
                     cursor.execute(make_delete_accession_entry_command(*args))
                     cursor.execute(make_insert_accession_entry_command(*args))
@@ -85,15 +96,16 @@ class ResponseCache():
         with closing(connect(self.sqlite_dbs.cache)) as connection:
             try:
                 cursor = connection.cursor()
-                query = f"""SELECT context_identity FROM 'accessions_used'
-                    WHERE accession = '{accession}'"""
+                accession_repr = next(iterate_accession_reprs([accession]))
+                query = f"""SELECT `context_identity` FROM `accessions_used`
+                    WHERE `accession` == {accession_repr}"""
                 identity_entries = cursor.execute(query).fetchall()
                 for entry in identity_entries:
                     context_identity = entry[0]
-                    cursor.execute(f"""DELETE FROM 'accessions_used'
-                        WHERE context_identity = '{context_identity}'""")
-                    cursor.execute(f"""DELETE FROM 'response_cache'
-                        WHERE context_identity = '{context_identity}'""")
+                    cursor.execute(f"""DELETE FROM `accessions_used`
+                        WHERE `context_identity` == "{context_identity}" """)
+                    cursor.execute(f"""DELETE FROM `response_cache`
+                        WHERE `context_identity` == "{context_identity}" """)
             except OperationalError as e:
                 connection.rollback()
                 msg = "Could not drop cached Flask responses for %s: %s"
@@ -114,8 +126,8 @@ class ResponseCache():
         """Retrieve cached response object blob from response_cache table if possible; otherwise return None"""
         if self.sqlite_dbs.cache is None:
             return
-        query = f"""SELECT response, mimetype FROM 'response_cache'
-            WHERE context_identity = '{context.identity}' LIMIT 1"""
+        query = f"""SELECT `response`, `mimetype` FROM `response_cache`
+            WHERE `context_identity` == "{context.identity}" LIMIT 1"""
         try:
             with closing(connect(self.sqlite_dbs.cache)) as connection:
                 row = connection.cursor().execute(query).fetchone()
