@@ -133,11 +133,9 @@ def _iter_blackjack_items_cache(f):
     @wraps(f)
     def wrapper(e, head=()):
         k = marshals(e, 4), head
-        if k not in cache:
-            if len(cache) > 4096:
-                cache.popitem(last=False)
-            cache[k] = list(f(e, head))
-        return cache[k]
+        if (k not in cache) and (len(cache) >= 4096):
+            cache.popitem(last=False)
+        return cache.setdefault(k, list(f(e, head)))
     return wrapper
 
 
