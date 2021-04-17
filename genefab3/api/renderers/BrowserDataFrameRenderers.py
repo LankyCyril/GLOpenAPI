@@ -32,7 +32,7 @@ def _na_repr_permissive_cache(f):
     return wrapper
 
 
-@_na_repr_permissive_cache
+#@_na_repr_permissive_cache # TODO: something weird is happening
 def _na_repr(x):
     """For format=browser, convert empty entries to 'NaN'"""
     if isinstance(x, Iterable):
