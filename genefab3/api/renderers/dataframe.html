@@ -81,8 +81,13 @@
 
 <script>
 
-var columns = [$COLUMNDATA];
-var data = $ROWDATA;
+var values = $VALUES;
+var data = values.data;
+var columns = [];
+for (i = 0; i < values.columns.length; i++) {
+    _c = values.columns[i];
+    columns[i] = {id: i, field: i, columnGroup: _c[0], name: _c[1]};
+}
 
 for (var i = 0, l = columns.length; i < l; i++) {
     var formatter = function(r,c,v,d,x) {

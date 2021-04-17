@@ -3,7 +3,6 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps, lru_cache
 from collections.abc import Iterable
 from pathlib import Path
-from json import dumps
 from genefab3.common.utils import map_replace
 from flask import Response
 
@@ -104,7 +103,7 @@ def get_browser_meta_formatter(context, i, head, target):
     return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
 
 
-def iter_formatters(obj, context):
+def iterate_formatters(obj, context):
     """Get SlickGrid formatters for columns"""
     if context.view in {"assays", "samples"}:
         for i, (key, target) in enumerate(obj.columns):
@@ -143,13 +142,8 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_pr
     """Display dataframe with two-level columns using SlickGrid"""
     _assert_type(obj, nlevels=2)
     title_postfix = f"{context.view.capitalize()} {context.complete_kwargs}"
-    value_dict = obj.applymap(_na_repr).to_dict(orient="split")["data"]
-    rowdata = dumps(value_dict, separators=(",", ":"))
-    columndata = "\n".join(
-        f"{{id:{n},field:{n},columnGroup:'{a}',name:'{b}'}},"
-        for n, (a, b) in enumerate(obj.columns)
-    )
-    formatters = iter_formatters(obj, context)
+    values_json = obj.applymap(_na_repr).to_json(orient="split", index=False)
+    formatters = iterate_formatters(obj, context)
     content = map_replace(_get_browser_html(), {
         "$APPNAME": f"{context.app_name}: {title_postfix}",
         "$SQUASH_PREHEADER": SQUASHED_PREHEADER_CSS if squash_preheader else "",
@@ -160,8 +154,7 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_pr
         "$ASSAYSVIEW": build_url(context, "assays"),
         "$SAMPLESVIEW": build_url(context, "samples"),
         "$DATAVIEW": build_url(context, "data"),
-        "$COLUMNDATA": columndata,
-        "$ROWDATA": rowdata,
+        "$VALUES": values_json,
         "$FORMATTERS": "\n".join(formatters) if use_formatters else "",
         "$FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
     })
