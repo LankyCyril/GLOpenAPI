@@ -88,13 +88,30 @@ var basic_formatter = function(r,c,v,d,x) {
 };
 
 var columns = [], _rc = $COLUMNDATA;
-for (var i = _rc.length; i-->0;)
+for (var i = _rc.length; i --> 0;)
     columns[i] = {
         id: i, field: i, columnGroup: _rc[i][0], name: _rc[i][1],
         sortable: true, resizable: false, momentarilyFormattable: true,
         formatter: basic_formatter, defaultFormatter: basic_formatter,
     };
 var data = $ROWDATA;
+
+var context_url = "$CONTEXTURL";
+var fr_assays = function(v, postfix) {
+    return (v == "NaN")
+        ? "<i style='color:#BBB'>" + v + "</i>"
+        : ((v == "False")
+            ? "<font style='color:#FAA'>" + v + "</font>"
+            : "<a class='filter' style='color:green' href='" +
+              context_url + escape(postfix) + "'>" + v + "</a>");
+}
+var fr_samples = function(v, postfix) {
+    return (v == "NaN")
+        ? "<i style='color:#BBB'>" + v + "</i>"
+        : "<a class='filter' href='" +
+          context_url + escape(postfix) + "=" + escape(v) + "'>" + v + "</a>";
+}
+
 $FORMATTERS
 
 var options = {
@@ -130,11 +147,11 @@ function render_header_groups(pre_header_panel, start, end) {
     }
 }
 
-for (var i = columns.length; i-->0;) {
+for (var i = columns.length; i --> 0;) {
     c = columns[i];
     var field = c.field;
     var longest = c.name;
-    for (var j = data.length; j-->0;) {
+    for (var j = data.length; j --> 0;) {
         var value = data[j][field];
         if (value.length > longest.length)
             longest = value;
@@ -162,11 +179,11 @@ grid.onMouseEnter.subscribe(function (e, args) {
     var g = args.grid;
     var cell = g.getCellFromEvent(e);
     var r = cell.row, c = cell.cell;
-    for (var x = 0, l = columns.length; x < l; x++) {
+    for (var x = 0, cl = columns.length; x < cl; x++) {
         if (momentarily_formatted[x] === true) {
             momentarily_formatted[x] = false;
             columns[x].formatter = columns[x].defaultFormatter;
-            for (var y = 0, l = data.length; y < l; y++)
+            for (var y = 0, dl = data.length; y < dl; y++)
                 g.updateCell(y, x);
         }
     }
@@ -179,7 +196,7 @@ grid.onMouseEnter.subscribe(function (e, args) {
             return (v == value)
                 ? "<font style='background:#FF8'>"+fmt+"</font>" : fmt;
         }
-        for (var y = 0, l = data.length; y < l; y++)
+        for (var y = 0, dl = data.length; y < dl; y++)
             g.updateCell(y, c);
     }
 });
@@ -187,7 +204,7 @@ grid.onMouseEnter.subscribe(function (e, args) {
 grid.onSort.subscribe(function(e, args) {
     var sortcols = args.sortCols, g = args.grid;
     data.sort(function (r1, r2) {
-        for (var i = 0, l = sortcols.length; i < l; i++) {
+        for (var i = 0, sl = sortcols.length; i < sl; i++) {
             var f = sortcols[i].sortCol.field;
             var v1 = r1[f], v2 = r2[f];
             var sign = sortcols[i].sortAsc ? 1 : -1;

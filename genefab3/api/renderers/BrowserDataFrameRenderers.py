@@ -35,16 +35,16 @@ def get_browser_glds_formatter(context, i):
     """Get SlickGrid formatter for column 'accession'"""
     url = build_url(context, drop={"from"})
     _fr = f"""function(r,c,v,d,x){{return "<a class='filter' "+
-        "href='{url}from="+escape(v)+"'>"+v+"</a>";}};"""
-    return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
+        "href='{url}from="+escape(v)+"'>"+v+"</a>";}}"""
+    return f"columns[{i}].formatter = columns[{i}].defaultFormatter = {_fr};"
 
 
 def get_browser_assay_formatter(context, i):
     """Get SlickGrid formatter for column 'assay name'"""
     url = build_url(context, "samples", drop={"from"})
     _fr = f"""function(r,c,v,d,x){{return "<a class='filter' "+
-        "href='{url}from="+data[r][0]+"."+escape(v)+"'>"+v+"</a>";}};"""
-    return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
+        "href='{url}from="+data[r][0]+"."+escape(v)+"'>"+v+"</a>";}}"""
+    return f"columns[{i}].formatter = columns[{i}].defaultFormatter = {_fr};"
 
 
 def get_browser_file_formatter(context, i):
@@ -53,30 +53,15 @@ def get_browser_file_formatter(context, i):
     _fr = f"""function(r,c,v,d,x){{
         return (v == "NaN") ? "<i style='color:#BBB'>"+v+"</i>" :
         "<a class='file' href='{url}file.filename="+escape(v)+"&format=raw'>"+
-        v+"</a>";}};"""
-    return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
+        v+"</a>";}}"""
+    return f"columns[{i}].formatter = columns[{i}].defaultFormatter = {_fr};"
 
 
 def get_browser_meta_formatter(context, i, head, target):
     """Get SlickGrid formatter for meta column"""
-    url = build_url(context)
-    if context.view == "assays":
-        _fr = f"""function(r,c,v,d,x){{
-            return (v == "NaN")
-            ? "<i style='color:#BBB'>"+v+"</i>"
-            : ((v == "False")
-            ? "<font style='color:#FAA'>"+v+"</font>"
-            : "<a href='{url}"+escape("{head}.{target}")+
-                "' style='color:green' class='filter'>"+v+"</a>");
-        }};"""
-    else:
-        _fr = f"""function(r,c,v,d,x){{
-            return (v == "NaN")
-            ? "<i style='color:#BBB'>"+v+"</i>"
-            : "<a href='{url}"+escape("{head}.{target}")+
-                "="+escape(v)+"' class='filter'>"+v+"</a>";
-        }};"""
-    return f"columns[{i}].formatter={_fr}; columns[{i}].defaultFormatter={_fr};"
+    _type = "assays" if (context.view == "assays") else "samples"
+    _fr = f'function(r,c,v,d,x){{return fr_{_type}(v, "{head}.{target}")}}'
+    return f"columns[{i}].formatter = columns[{i}].defaultFormatter = {_fr};"
 
 
 def iterate_formatters(obj, context):
@@ -136,6 +121,7 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_pr
         "$DATAVIEW": build_url(context, "data"),
         "$COLUMNDATA": columndata,
         "$ROWDATA": rowdata,
+        "$CONTEXTURL": build_url(context),
         "$FORMATTERS": "\n".join(formatters) if use_formatters else "",
         "$FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
     })
