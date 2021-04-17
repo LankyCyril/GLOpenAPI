@@ -3,6 +3,7 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps, lru_cache
 from collections.abc import Iterable
 from pathlib import Path
+from json import dumps
 from genefab3.common.utils import map_replace
 from flask import Response
 
@@ -142,7 +143,8 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_pr
     """Display dataframe with two-level columns using SlickGrid"""
     _assert_type(obj, nlevels=2)
     title_postfix = f"{context.view.capitalize()} {context.complete_kwargs}"
-    values_json = obj.applymap(_na_repr).to_json(orient="split", index=False)
+    columndata = dumps(obj.columns.to_list(), separators=(",", ":"))
+    rowdata = obj.applymap(_na_repr).to_json(orient="values")
     formatters = iterate_formatters(obj, context)
     content = map_replace(_get_browser_html(), {
         "$APPNAME": f"{context.app_name}: {title_postfix}",
@@ -154,7 +156,8 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_pr
         "$ASSAYSVIEW": build_url(context, "assays"),
         "$SAMPLESVIEW": build_url(context, "samples"),
         "$DATAVIEW": build_url(context, "data"),
-        "$VALUES": values_json,
+        "$COLUMNDATA": columndata,
+        "$ROWDATA": rowdata,
         "$FORMATTERS": "\n".join(formatters) if use_formatters else "",
         "$FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
     })
