@@ -1,10 +1,9 @@
-from pandas import DataFrame, isnull
+from pandas import DataFrame
 from genefab3.common.exceptions import GeneFabConfigurationException
-from functools import wraps, lru_cache
-from collections.abc import Iterable
+from functools import lru_cache
 from pathlib import Path
 from json import dumps
-from genefab3.common.utils import map_replace
+from genefab3.common.utils import get_attribute, map_replace
 from flask import Response
 
 
@@ -15,30 +14,6 @@ def _assert_type(obj, nlevels):
         msg = "Data cannot be represented as an interactive dataframe"
         _kw = dict(type=type(obj).__name__, nlevels=passed_nlevels)
         raise GeneFabConfigurationException(msg, **_kw)
-
-
-def _na_repr_permissive_cache(f):
-    """Custom memoizer for `_na_repr`, bypasses hashing if not Hashable"""
-    cache = {}
-    @wraps(f)
-    def wrapper(x):
-        try:
-            k = hash(x)
-        except TypeError:
-            return f(x)
-        if (k not in cache) and (len(cache) >= 4096):
-            del cache[next(iter(cache.keys()))]
-        return cache.setdefault(k, f(x))
-    return wrapper
-
-
-#@_na_repr_permissive_cache # TODO: something weird is happening
-def _na_repr(x):
-    """For format=browser, convert empty entries to 'NaN'"""
-    if isinstance(x, Iterable):
-        return "NaN" if (hasattr(x, "__len__") and (len(x) == 0)) else str(x)
-    else:
-        return "NaN" if isnull(x) else str(x)
 
 
 @lru_cache(maxsize=None)
@@ -144,7 +119,10 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_pr
     _assert_type(obj, nlevels=2)
     title_postfix = f"{context.view.capitalize()} {context.complete_kwargs}"
     columndata = dumps(obj.columns.to_list(), separators=(",", ":"))
-    rowdata = obj.applymap(_na_repr).to_json(orient="values")
+    strdata = obj.fillna("NaN").astype(str)
+    if get_attribute(obj, "genefab_type") != "datatable":
+        strdata[(strdata=="[]") | (strdata=="()")] = "NaN"
+    rowdata = strdata.to_json(orient="values")
     formatters = iterate_formatters(obj, context)
     content = map_replace(_get_browser_html(), {
         "$APPNAME": f"{context.app_name}: {title_postfix}",

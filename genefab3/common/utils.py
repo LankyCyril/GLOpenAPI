@@ -119,9 +119,9 @@ def iterate_terminal_leaf_elements(d, sep=r'\s*,\s'):
 
 
 class JSONByteEncoder(JSONEncoder):
-    """Allow dumps to convert bytes to strings"""
+    """Allow dumps to convert bytes to string reprs"""
     def default(self, entry):
         if isinstance(entry, bytes):
-            return entry.decode(errors="replace")
+            return str(entry)
         else:
             return JSONEncoder.default(self, entry)
