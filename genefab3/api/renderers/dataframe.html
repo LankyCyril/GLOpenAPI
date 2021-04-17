@@ -81,23 +81,20 @@
 
 <script>
 
+var basic_formatter = function(r,c,v,d,x) {
+    return (v == "True") ? "<font color=green>"+v+"</font>" : (
+           (v == "False") ? "<font color='#FAA'>"+v+"</font>" : (
+           (v == "NaN") ? "<i style='color:#BBB'>"+v+"</i>" : v))
+};
+
 var columns = [], _rc = $COLUMNDATA;
 for (i = _rc.length; i-->0;)
-    columns[i] = {id: i, field: i, columnGroup: _rc[i][0], name: _rc[i][1]};
-var data = $ROWDATA;
-
-for (var i = 0, l = columns.length; i < l; i++) {
-    var formatter = function(r,c,v,d,x) {
-        return (v == "True") ? "<font color=green>"+v+"</font>" : (
-               (v == "False") ? "<font color='#FAA'>"+v+"</font>" : (
-               (v == "NaN") ? "<i style='color:#BBB'>"+v+"</i>" : v))
+    columns[i] = {
+        id: i, field: i, columnGroup: _rc[i][0], name: _rc[i][1],
+        sortable: true, resizable: false, momentarilyFormattable: true,
+        formatter: basic_formatter, defaultFormatter: basic_formatter,
     };
-    columns[i].sortable = true;
-    columns[i].resizable = false;
-    columns[i].formatter = formatter;
-    columns[i].defaultFormatter = formatter;
-    columns[i].momentarilyFormattable = true;
-}
+var data = $ROWDATA;
 $FORMATTERS
 
 var options = {
