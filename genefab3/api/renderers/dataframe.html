@@ -3,7 +3,7 @@
 <head>
     <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-    <title>%APPNAME%</title><!--TITLEPOSTFIX-->
+    <title>$APPNAME</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/6pac-slickgrid/2.4.27/slick.grid.min.css" type="text/css"/>
     <link href="https://fonts.googleapis.com/css2?family=Oxygen+Mono&display=swap" rel="stylesheet">
     <style>
@@ -35,7 +35,7 @@
         #crosshair-h {width: 100%}
         #crosshair-v {height: 100%}
         .slick-header-column {background: #DDD; font-weight: 600; border: .5pt solid black !important}
-        /*SQUASH_PREHDR*/
+        $SQUASH_PREHEADER
         .slick-cell {line-height: 1.65; background: #FFFFFF99; border: .25pt solid black}
         .slick-cell.frozen {font-weight: 600}
         .slick-row.odd {background: #E8E8E8}
@@ -57,13 +57,13 @@
         Hover to highlight equal values.
         <a style="color:#D10" id="crosshair-toggle">Toggle crosshairs</a>.<br>
         <b>Download:</b> as
-        <a style="color:#D10" href="CSVLINK">csv</a>,
-        <a style="color:#D10" href="TSVLINK">tsv</a>,
-        <a style="color:#D10" href="JSONLINK">json</a><!--VIEWDEPENDENTLINKS-->.
+        <a style="color:#D10" href="$CSVLINK">csv</a>,
+        <a style="color:#D10" href="$TSVLINK">tsv</a>,
+        <a style="color:#D10" href="$JSONLINK">json</a>$VIEWDEPENDENTLINKS.
         <b>Switch view level:</b>
-        <a style="color:#D10" href="ASSAYSVIEW">assays</a>,
-        <a style="color:#D10" href="SAMPLESVIEW">samples</a>,
-        <a style="color:#D10" href="DATAVIEW">data</a>.
+        <a style="color:#D10" href="$ASSAYSVIEW">assays</a>,
+        <a style="color:#D10" href="$SAMPLESVIEW">samples</a>,
+        <a style="color:#D10" href="$DATAVIEW">data</a>.
     </div>
     <div id="grid" class="fullpage">
         <div id="noscript">
@@ -81,13 +81,8 @@
 
 <script>
 
-var data =
-// ROWDATA
-;
-
-var columns = [
-// COLUMNDATA
-];
+var columns = [$COLUMNDATA];
+var data = $ROWDATA;
 
 for (var i = 0, l = columns.length; i < l; i++) {
     var formatter = function(r,c,v,d,x) {
@@ -101,13 +96,13 @@ for (var i = 0, l = columns.length; i < l; i++) {
     columns[i].defaultFormatter = formatter;
     columns[i].momentarilyFormattable = true;
 }
-// FORMATTERS
+$FORMATTERS
 
 var options = {
     createPreHeaderPanel: true, showPreHeaderPanel: true,
     defaultColumnWidth: 120, multiColumnSort: true,
     enableTextSelectionOnCells: true, enableColumnReorder: false,
-    frozenColumn: // FROZENCOLUMN
+    frozenColumn: $FROZENCOLUMN,
 };
 options.defaultFrozenColumn = options.frozenColumn;
 

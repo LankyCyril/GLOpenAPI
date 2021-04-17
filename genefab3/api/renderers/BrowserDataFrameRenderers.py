@@ -142,28 +142,28 @@ def get_view_dependent_links(context):
 def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_preheader=False):
     """Display dataframe with two-level columns using SlickGrid"""
     _assert_type(obj, nlevels=2)
+    title_postfix = f"{context.view.capitalize()} {context.complete_kwargs}"
     value_dict = obj.applymap(_na_repr).to_dict(orient="split")["data"]
     rowdata = dumps(value_dict, separators=(",", ":"))
     columndata = "\n".join(
         f"{{id:{n},field:{n},columnGroup:'{a}',name:'{b}'}},"
         for n, (a, b) in enumerate(obj.columns)
     )
-    title_postfix = f"{context.view.capitalize()} {context.complete_kwargs}"
     formatters = iter_formatters(obj, context)
     content = map_replace(_get_browser_html(), {
-        "%APPNAME%": context.app_name,
-        "</title><!--TITLEPOSTFIX-->": f": {title_postfix}</title>",
-        "// FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
-        "/*SQUASH_PREHDR*/": SQUASHED_PREHEADER_CSS if squash_preheader else "",
-        "// FORMATTERS": "\n".join(formatters) if use_formatters else "",
-        "CSVLINK": build_url(context, drop={"format"}) + "format=csv",
-        "TSVLINK": build_url(context, drop={"format"}) + "format=tsv",
-        "JSONLINK": build_url(context, drop={"format"}) + "format=json",
-        "<!--VIEWDEPENDENTLINKS-->": get_view_dependent_links(context),
-        "ASSAYSVIEW": build_url(context, "assays"),
-        "SAMPLESVIEW": build_url(context, "samples"),
-        "DATAVIEW": build_url(context, "data"),
-        "// COLUMNDATA": columndata, "// ROWDATA": rowdata,
+        "$APPNAME": f"{context.app_name}: {title_postfix}",
+        "$SQUASH_PREHEADER": SQUASHED_PREHEADER_CSS if squash_preheader else "",
+        "$CSVLINK": build_url(context, drop={"format"}) + "format=csv",
+        "$TSVLINK": build_url(context, drop={"format"}) + "format=tsv",
+        "$JSONLINK": build_url(context, drop={"format"}) + "format=json",
+        "$VIEWDEPENDENTLINKS": get_view_dependent_links(context),
+        "$ASSAYSVIEW": build_url(context, "assays"),
+        "$SAMPLESVIEW": build_url(context, "samples"),
+        "$DATAVIEW": build_url(context, "data"),
+        "$COLUMNDATA": columndata,
+        "$ROWDATA": rowdata,
+        "$FORMATTERS": "\n".join(formatters) if use_formatters else "",
+        "$FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
     })
     return Response(content, mimetype="text/html")
 
