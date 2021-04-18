@@ -11,26 +11,25 @@ from flask import Response
 
 RESPONSE_CACHE_SCHEMAS = ImmutableDict({
     "response_cache": """(
-        'context_identity' TEXT, 'api_path' TEXT, 'timestamp' INTEGER,
-        'response' BLOB, 'nbytes' INTEGER, 'mimetype' TEXT
+        `context_identity` TEXT, `api_path` TEXT, `timestamp` INTEGER,
+        `response` BLOB, `nbytes` INTEGER, `mimetype` TEXT
     )""",
     "accessions_used": """(
-        'context_identity' TEXT, 'accession' TEXT
+        `context_identity` TEXT, `accession` TEXT
     )""",
 })
 
 
-def iterate_accession_reprs(accessions, _loge):
-    """Iterate sane accession reprs, prevent syntax-breaking accessions from sneaking in"""
-    for accession in accessions:
-        if '"' not in accession:
-            yield f'"{accession}"'
-        elif "'" not in accession:
-            yield f"'{accession}'"
-        else:
-            _r = repr(accession)
-            _loge(f"LRU response cache: accession contains '\"', \"'\": {_r}")
-            raise OperationalError
+def sane_sql_repr(accession, _loge):
+    """Enclose accession in single or double quotes, fail if contains both"""
+    if '"' not in accession:
+        return f'"{accession}"'
+    elif "'" not in accession:
+        return f"'{accession}'"
+    else:
+        _r = repr(accession)
+        _loge(f"LRU response cache: accession contains '\"', \"'\": {_r}")
+        raise OperationalError
 
 
 class ResponseCache():
@@ -78,8 +77,8 @@ class ResponseCache():
                 cursor = connection.cursor()
                 cursor.execute(delete_blob_command)
                 cursor.execute(insert_blob_command, [blob])
-                for accession in iterate_accession_reprs(accessions, _loge):
-                    args = accession, context.identity
+                for acc_repr in (sane_sql_repr(a, _loge) for a in accessions):
+                    args = acc_repr, context.identity
                     cursor.execute(make_delete_accession_entry_command(*args))
                     cursor.execute(make_insert_accession_entry_command(*args))
             except OperationalError:
@@ -96,9 +95,9 @@ class ResponseCache():
         with closing(connect(self.sqlite_dbs.cache)) as connection:
             try:
                 cursor = connection.cursor()
-                accession_repr = next(iterate_accession_reprs([accession]))
+                acc_repr = sane_sql_repr(accession)
                 query = f"""SELECT `context_identity` FROM `accessions_used`
-                    WHERE `accession` == {accession_repr}"""
+                    WHERE `accession` == {acc_repr}"""
                 identity_entries = cursor.execute(query).fetchall()
                 for entry in identity_entries:
                     context_identity = entry[0]

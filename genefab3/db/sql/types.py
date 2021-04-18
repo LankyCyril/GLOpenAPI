@@ -1,6 +1,6 @@
-from genefab3.db.sql.objects import SQLiteObject
-from genefab3.common.utils import as_is
+from genefab3.db.sql.objects import SQLiteObject, validate_no_backtick
 from genefab3.common.exceptions import GeneFabConfigurationException
+from genefab3.common.utils import as_is
 from collections import OrderedDict
 from urllib.request import urlopen
 from urllib.error import URLError
@@ -22,6 +22,10 @@ class SQLiteBlob(SQLiteObject):
     """Represents an SQLiteObject initialized with a spec suitable for a binary blob"""
  
     def __init__(self, data_getter, sqlite_db, table, identifier, timestamp, compressor, decompressor):
+        if not table.startswith("BLOBS:"):
+            msg = "Table name for SQLiteBlob must start with 'BLOBS:'"
+            _kw = dict(table=table, identifier=identifier)
+            raise GeneFabConfigurationException(msg, **_kw)
         SQLiteObject.__init__(
             self, sqlite_db, signature={"identifier": identifier},
             table_schemas={
@@ -51,9 +55,13 @@ class SQLiteTable(SQLiteObject):
     """Represents an SQLiteObject initialized with a spec suitable for a generic table"""
  
     def __init__(self, data_getter, sqlite_db, table, aux_table, identifier, timestamp, maxpartwidth=1000):
-        if table == aux_table:
-            msg = "Table name cannot be equal to a reserved table name"
+        if not table.startswith("TABLE:"):
+            msg = "Table name for SQLiteTable must start with 'TABLE:'"
             _kw = dict(table=table, identifier=identifier)
+            raise GeneFabConfigurationException(msg, **_kw)
+        if not aux_table.startswith("AUX:"):
+            msg = "Aux table name for SQLiteTable must start with 'AUX:'"
+            _kw = dict(aux_table=aux_table, identifier=identifier)
             raise GeneFabConfigurationException(msg, **_kw)
         self.maxpartwidth = maxpartwidth
         SQLiteObject.__init__(
@@ -81,16 +89,15 @@ class SQLiteTable(SQLiteObject):
 class CachedBinaryFile(SQLiteBlob):
     """Represents an SQLiteObject that stores up-to-date file contents as a binary blob"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="BLOBS:blobs", compressor=None, decompressor=None):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, table="BLOBS:blobs", compressor=None, decompressor=None):
         """Interpret file descriptors; inherit functionality from SQLiteBlob; define equality (hashableness) of self"""
         self.name, self.url, self.timestamp = name, None, timestamp
         self.identifier = identifier
-        self.aux_table = aux_table
+        self.table = table
         SQLiteBlob.__init__(
             self, identifier=identifier, timestamp=timestamp,
             data_getter=lambda: self.__download_as_blob(urls),
-            sqlite_db=sqlite_db,
-            table=aux_table,
+            sqlite_db=sqlite_db, table=table,
             compressor=compressor, decompressor=decompressor,
         )
  
@@ -124,13 +131,14 @@ class CachedTableFile(SQLiteTable):
         self.name, self.url, self.timestamp = name, None, timestamp
         self.identifier = identifier
         self.aux_table = aux_table
+        self.table = f"TABLE:{identifier}"
         SQLiteTable.__init__(
             self, identifier=f"TABLE:{identifier}", timestamp=timestamp,
             data_getter=lambda: self.__download_as_pandas_dataframe(
                 urls, pandas_kws, INPLACE_process,
             ),
             sqlite_db=sqlite_db, maxpartwidth=maxpartwidth,
-            table=f"TABLE:{identifier}", aux_table=aux_table,
+            table=self.table, aux_table=aux_table,
         )
  
     def __copyfileobj(self, urls, tempfile):
@@ -193,24 +201,24 @@ class OndemandSQLiteDataFrame():
         """Interpret `column_dispatcher`"""
         self.sqlite_db = sqlite_db
         self._column_dispatcher = column_dispatcher
-        _parts, _pac = [], set()
+        self.name = None
         self._raw_columns, _index_names = [], set()
         for n, p in column_dispatcher.items():
+            validate_no_backtick(n, "column")
+            validate_no_backtick(p, "table_part")
             if isinstance(n, SQLiteIndexName):
                 _index_names.add(n)
             else:
                 self._raw_columns.append(n)
-            if p not in _pac:
-                _pac.add(p)
-                _parts.append(p)
+            if self.name is None:
+                self.name = p
         if len(_index_names) == 0:
             msg = "OndemandSQLiteDataFrame(): no index"
-            raise GeneFabDatabaseException(msg, table=_parts[0])
+            raise GeneFabDatabaseException(msg, table=self.name)
         elif len(_index_names) > 1:
             msg = "OndemandSQLiteDataFrame(): parts indexes do not match"
-            _kw = dict(table=_parts[0], index_names=_index_names)
+            _kw = dict(table=self.name, index_names=_index_names)
             raise GeneFabDatabaseException(msg, **_kw)
-        self.name = _parts[0]
         self.index = Index([], name=_index_names.pop())
         if columns is None:
             self._columns = Index(self._raw_columns, name=None)
@@ -263,11 +271,11 @@ class OndemandSQLiteDataFrame():
  
     def __retrieve_natural_join(self, rows, part_to_column, columns, limit, offset):
         """Retrieve data as DataFrame by running SQL queries"""
-        joined = " NATURAL JOIN ".join(f"'{p}'" for p in part_to_column)
+        joined = " NATURAL JOIN ".join(f"`{p}`" for p in part_to_column)
         first_table = next(iter(part_to_column))
         targets = ",".join((
-            f"'{first_table}'.[{self.index.name}]",
-            *(f"[{c}]" for c in columns),
+            f"`{first_table}`.`{self.index.name}`",
+            *(f"`{c}`" for c in columns),
         ))
         with closing(connect(self.sqlite_db)) as connection:
             _n, _m = len(columns), len(part_to_column)

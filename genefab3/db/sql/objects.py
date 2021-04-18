@@ -1,5 +1,6 @@
 from genefab3.common.utils import iterate_terminal_leaves, as_is
 from genefab3.common.exceptions import GeneFabConfigurationException
+from functools import partial
 from copy import deepcopy
 from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
@@ -17,12 +18,23 @@ def is_singular_spec(spec):
     try:
         if not isinstance(spec, dict):
             return False
-        elif sum(1 for _ in iterate_terminal_leaves(spec)) != 1:
-            return False
         else:
-            return True
+            return (sum(1 for _ in iterate_terminal_leaves(spec)) == 1)
     except ValueError:
         return False
+
+
+def validate_no_special_character(identifier, desc, c):
+    """Pass through `identifier` if contains no `c`, raise GeneFabConfigurationException otherwise"""
+    if (not isinstance(identifier, str)) or (c not in identifier):
+        return identifier
+    else:
+        msg = f"{repr(c)} in {desc} name"
+        raise GeneFabConfigurationException(msg, **{desc: identifier})
+
+
+validate_no_backtick = partial(validate_no_special_character, c="`")
+validate_no_doublequote = partial(validate_no_special_character, c='"')
 
 
 class SQLiteObject():
@@ -35,8 +47,11 @@ class SQLiteObject():
             msg = "SQLiteObject(): Only one 'identifier' field can be specified"
             raise GeneFabConfigurationException(msg, signatures=signature)
         else:
-            self.__identifier_field, self.__identifier_value = next(
-                iter(signature.items()),
+            self.__identifier_field = validate_no_backtick(
+                next(iter(signature)), "__identifier_field",
+            )
+            self.__identifier_value = validate_no_doublequote(
+                next(iter(signature.values())), "__identifier_value",
             )
             try:
                 self.__signature = deepcopy(signature)
@@ -47,6 +62,8 @@ class SQLiteObject():
             for table, schema in table_schemas.items():
                 if schema is not None:
                     self.__ensure_table(table, schema)
+                else:
+                    validate_no_backtick(table, "table")
         try:
             self.__trigger_spec = deepcopy(trigger)
             self.__retrieve_spec = deepcopy(retrieve)
@@ -61,42 +78,38 @@ class SQLiteObject():
         """Create table with schema, provided as a dictionary"""
         with closing(connect(self.__sqlite_db)) as connection:
             connection.cursor().execute(
-                "CREATE TABLE IF NOT EXISTS '{}' ({})".format(
-                    table, ", ".join(f"'{f}' {k}" for f, k in schema.items()),
+                "CREATE TABLE IF NOT EXISTS `{}` ({})".format(
+                    validate_no_backtick(table, "table"), ", ".join(
+                        "`" + validate_no_backtick(f, "field") + "` " + k
+                        for f, k in schema.items()
+                    ),
                 ),
             )
-            connection.commit()
  
     def __update_fields(self, table, spec, trigger_field, trigger_value):
         """Update table field(s) in SQLite and drop `trigger_field` (which should be replaced according to spec)"""
         fields, values = sorted(spec), []
-        for field in fields:
+        for field in (validate_no_backtick(f, "field") for f in fields):
             value = spec[field]()
             if self.__table_schemas[table][field] == "BLOB":
                 values.append(Binary(bytes(value)))
             else:
                 values.append(value)
-        delete_action = f"""
-            DELETE FROM '{table}' WHERE {trigger_field} = '{trigger_value}'
-            AND {self.__identifier_field} = '{self.__identifier_value}'
-        """
-        insert_action = f"""
-            INSERT INTO '{table}' ({", ".join(fields)})
-            VALUES ({", ".join("?" for _ in fields)})
-        """
+        delete_action = f"""DELETE FROM `{table}`
+            WHERE `{trigger_field}` == "{trigger_value}"
+            AND `{self.__identifier_field}` == "{self.__identifier_value}" """
+        insert_action = f"""INSERT INTO `{table}` (`{"`, `".join(fields)}`)
+            VALUES ({", ".join("?" for _ in fields)})"""
         with closing(connect(self.__sqlite_db)) as connection:
+            logger_args = self.__identifier_field, self.__identifier_value
             try:
                 connection.cursor().execute(delete_action)
                 connection.cursor().execute(insert_action, values)
-                GeneFabLogger().info(
-                    "Updated SQLiteObject (%s == %s) fields",
-                    self.__identifier_field, self.__identifier_value,
-                )
+                msg = "Updated SQLiteObject (%s == %s) fields"
+                GeneFabLogger().info(msg, *logger_args)
             except OperationalError:
-                GeneFabLogger().warning(
-                    "Could not update SQLiteObject (%s == %s) fields",
-                    self.__identifier_field, self.__identifier_value,
-                )
+                msg = "Could not update SQLiteObject (%s == %s) fields"
+                GeneFabLogger().warning(msg, *logger_args)
                 connection.rollback()
             else:
                 connection.commit()
@@ -157,23 +170,18 @@ class SQLiteObject():
     def __drop_self_from(self, connection, table):
         """Helper method (during an open connection) to drop rows matching `self.signature` from `table`"""
         try:
-            connection.cursor().execute(f"""
-                DELETE FROM '{table}' WHERE
-                {self.__identifier_field} = '{self.__identifier_value}'
-            """)
+            connection.cursor().execute(f"""DELETE FROM `{table}` WHERE
+                `{self.__identifier_field}` == "{self.__identifier_value}" """)
         except OperationalError:
-            GeneFabLogger().warning(
-                "Could not drop multiple entries for same %s == %s",
-                self.__identifier_field, self.__identifier_value,
-            )
+            msg = "Could not drop multiple entries for same %s == %s"
+            logger_args = self.__identifier_field, self.__identifier_value
+            GeneFabLogger().error(msg, *logger_args)
  
     def __retrieve_field(self, table, field, postprocess_function):
         """Retrieve target table field from database"""
         with closing(connect(self.__sqlite_db)) as connection:
-            query = f"""
-                SELECT {field} from '{table}' WHERE
-                {self.__identifier_field} = '{self.__identifier_value}'
-            """
+            query = f"""SELECT `{field}` from `{table}` WHERE
+                `{self.__identifier_field}` == "{self.__identifier_value}" """
             ret = connection.cursor().execute(query).fetchall()
             if len(ret) == 0:
                 msg = "No data found"
@@ -186,13 +194,13 @@ class SQLiteObject():
                 raise GeneFabDatabaseException(msg, signature=self.__signature)
  
     def __retrieve_table(self, table, postprocess_function=as_is):
-        """Retrieve target table from database; join if multiple exist""" # TODO now phantom
+        """Create an OndemandSQLiteDataFrame object dispatching columns to table parts"""
         from genefab3.db.sql.types import SQLiteIndexName
         column_dispatcher = OrderedDict()
         with closing(connect(self.__sqlite_db)) as connection:
             for i in count():
                 partname = self.__make_table_part_name(table, i)
-                query = f"SELECT * FROM '{partname}' LIMIT 0"
+                query = f"SELECT * FROM `{partname}` LIMIT 0"
                 try:
                     cursor = connection.cursor()
                     cursor.execute(query).fetchall()
@@ -212,7 +220,6 @@ class SQLiteObject():
             return postprocess_function(
                 OndemandSQLiteDataFrame(self.__sqlite_db, column_dispatcher),
             )
-        # TODO: here's where the magic will happen, but for now just join all
  
     def __retrieve(self):
         """Retrieve target table or table field from database"""
@@ -238,24 +245,27 @@ class SQLiteObject():
             msg = "SQLiteObject(): Only one 'trigger' field can be specified"
             raise GeneFabConfigurationException(msg, signature=self.__signature)
         else:
-            table = next(iter(self.__trigger_spec))
-            trigger_field = next(iter(self.__trigger_spec[table]))
+            table = validate_no_backtick(
+                next(iter(self.__trigger_spec)), "table",
+            )
+            trigger_field = validate_no_backtick(
+                next(iter(self.__trigger_spec[table])), "trigger_field",
+            )
             trigger_function = self.__trigger_spec[table][trigger_field]
         with closing(connect(self.__sqlite_db)) as connection:
-            query = f"""
-                SELECT {trigger_field} FROM '{table}'
-                WHERE {self.__identifier_field} = '{self.__identifier_value}'
-            """
+            query = f"""SELECT `{trigger_field}` FROM `{table}` WHERE
+                `{self.__identifier_field}` == "{self.__identifier_value}" """
             ret = connection.cursor().execute(query).fetchall()
             if len(ret) == 0:
                 trigger_value = None
             elif (len(ret) == 1) and (len(ret[0]) == 1):
-                trigger_value = ret[0][0]
-            else:
-                GeneFabLogger().warning(
-                    "Conflicting trigger values for SQLiteObject (%s == %s)",
-                    self.__identifier_field, self.__identifier_value,
+                trigger_value = validate_no_doublequote(
+                    ret[0][0], "trigger_value",
                 )
+            else:
+                msg = "Conflicting trigger values for SQLiteObject (%s == %s)"
+                logger_args = self.__identifier_field, self.__identifier_value
+                GeneFabLogger().warning(msg, *logger_args)
                 self.__drop_self_from(connection, table)
                 trigger_value = None
         if trigger_function(trigger_value):
