@@ -52,7 +52,7 @@ def get_browser_file_formatter(context, i):
     """Get SlickGrid formatter for file column"""
     url = build_url(context, "data", drop={"format", "file.filename"})
     _fr = f"""function(r,c,v,d,x){{
-        return (v == "NaN") ? "<i style='color:#BBB'>"+v+"</i>" :
+        return (v === null) ? "<i style='color:#BBB'>"+v+"</i>" :
         "<a class='file' href='{url}file.filename="+escape(v)+"&format=raw'>"+
         v+"</a>";}}"""
     return f"columns[{i}].formatter = columns[{i}].defaultFormatter = {_fr};"
@@ -105,13 +105,7 @@ def twolevel(obj, context, indent=None, frozen=0, squash_preheader=False):
     title_postfix = f"{context.view.capitalize()} {context.complete_kwargs}"
     GeneFabLogger().info("HTML: converting DataFrame into interactive table")
     columndata = dumps(obj.columns.to_list(), separators=(",", ":"))
-    if get_attribute(obj, "object_type") == "datatable":
-        strdata = obj
-    else:
-        GeneFabLogger().info("HTML: forcing string type, NaN'ing [] and ()")
-        strdata = obj.fillna("NaN").astype(str)
-        strdata[(strdata=="[]") | (strdata=="()")] = "NaN"
-    rowdata = strdata.to_json(orient="values")
+    rowdata = obj.to_json(orient="values")
     if get_attribute(obj, "object_type") == "annotation":
         formatters = iterate_formatters(obj, context)
     else:

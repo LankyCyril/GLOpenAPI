@@ -20,6 +20,8 @@ def get(mongo_collections):
     status_df["report timestamp"] = status_df["report timestamp"].apply(
         lambda t: datetime.utcfromtimestamp(t).isoformat() + "Z"
     )
+    status_df["args"] = status_df["args"].astype(str)
+    status_df["kwargs"] = status_df["kwargs"].astype(str)
     return concat(
         {"database status": status_df.applymap(lambda v: v or nan)},
         axis=1,

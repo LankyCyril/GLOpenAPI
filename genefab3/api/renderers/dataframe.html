@@ -82,10 +82,10 @@
 <script>
 
 var basic_formatter = function(r,c,v,d,x) {
-    return (v == "True") ? "<font color=green>True</font>" : (
-           (v == "False") ? "<font color='#FAA'>False</font>" : (
-           (v == "NaN") ? "<i style='color:#BBB'>NaN</i>" : (
-           (v === null) ? "<i style='color:#BBB'>NaN</i>" : v )))
+    return (v === "True") ? "<font color=green>True</font>" : (
+           (v === "False") ? "<font color='#FAA'>False</font>" : (
+           ((v === null) || (v === "NaN") || (v === "null"))
+               ? "<i style='color:#BBB'>NaN</i>" : v ))
 };
 
 var columns = [], _rc = $COLUMNDATA;
@@ -99,16 +99,16 @@ var data = $ROWDATA;
 
 var context_url = "$CONTEXTURL";
 var fr_assays = function(v, postfix) {
-    return (v == "NaN")
-        ? "<i style='color:#BBB'>" + v + "</i>"
+    return ((v === null) || (v === "NaN") || (v === "null"))
+        ? "<i style='color:#BBB'>NaN</i>"
         : ((v == "False")
             ? "<font style='color:#FAA'>" + v + "</font>"
             : "<a class='filter' style='color:green' href='" +
               context_url + escape(postfix) + "'>" + v + "</a>");
 }
 var fr_samples = function(v, postfix) {
-    return (v == "NaN")
-        ? "<i style='color:#BBB'>" + v + "</i>"
+    return ((v === null) || (v === "NaN") || (v === "null"))
+        ? "<i style='color:#BBB'>NaN</i>"
         : "<a class='filter' href='" +
           context_url + escape(postfix) + "=" + escape(v) + "'>" + v + "</a>";
 }
@@ -210,9 +210,9 @@ grid.onSort.subscribe(function(e, args) {
             var v1 = r1[f], v2 = r2[f];
             var sign = sortcols[i].sortAsc ? 1 : -1;
             var ans = sign * (
-                ((v1 == "NaN") || (v1 === null))
-                ? (((v2 == "NaN") || (v2 === null)) ? 0 : -1)
-                : (((v2 == "NaN") || (v2 === null))
+                ((v1 === "NaN") || (v1 === null) || (v1 === "null"))
+                ? (((v2 === "NaN") || (v2 === null) || (v2 === "null")) ? 0 : -1)
+                : (((v2 === "NaN") || (v2 === null) || (v2 === "null"))
                     ? 1
                     : v1.localeCompare(v2, undefined, {numeric: true})
                 )
