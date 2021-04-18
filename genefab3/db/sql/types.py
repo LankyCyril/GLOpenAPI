@@ -293,6 +293,8 @@ class OndemandSQLiteDataFrame():
                 msg = "No data found"
                 raise GeneFabDatabaseException(msg, table=self.name)
             else:
+                msg = f"retrieved from SQLite as pandas DataFrame"
+                GeneFabLogger().info(f"{self.name}; {msg}")
                 data.columns = self.columns
                 return data
  

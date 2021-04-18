@@ -2,6 +2,7 @@ from pandas import DataFrame
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import lru_cache
 from pathlib import Path
+from genefab3.common.logger import GeneFabLogger
 from json import dumps
 from genefab3.common.utils import get_attribute, map_replace
 from flask import Response
@@ -66,19 +67,18 @@ def get_browser_meta_formatter(context, i, head, target):
 
 def iterate_formatters(obj, context):
     """Get SlickGrid formatters for columns"""
-    if context.view in {"assays", "samples"}:
-        for i, (key, target) in enumerate(obj.columns):
-            if key == "info":
-                if target == "accession":
-                    yield get_browser_glds_formatter(context, i)
-                elif target == "assay":
-                    yield get_browser_assay_formatter(context, i)
-            elif (key, target, context.view) == ("file", "filename", "samples"):
-                yield get_browser_file_formatter(context, i)
-            else:
-                category, *fields = key.split(".")
-                head = f"{category}.{fields[0]}" if fields else category
-                yield get_browser_meta_formatter(context, i, head, target)
+    for i, (key, target) in enumerate(obj.columns):
+        if key == "info":
+            if target == "accession":
+                yield get_browser_glds_formatter(context, i)
+            elif target == "assay":
+                yield get_browser_assay_formatter(context, i)
+        elif (key, target, context.view) == ("file", "filename", "samples"):
+            yield get_browser_file_formatter(context, i)
+        else:
+            category, *fields = key.split(".")
+            head = f"{category}.{fields[0]}" if fields else category
+            yield get_browser_meta_formatter(context, i, head, target)
 
 
 SQUASHED_PREHEADER_CSS = """
@@ -99,16 +99,23 @@ def get_view_dependent_links(context):
         return ""
 
 
-def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_preheader=False):
+def twolevel(obj, context, indent=None, frozen=0, squash_preheader=False):
     """Display dataframe with two-level columns using SlickGrid"""
     _assert_type(obj, nlevels=2)
     title_postfix = f"{context.view.capitalize()} {context.complete_kwargs}"
+    GeneFabLogger().info("HTML: converting DataFrame into interactive table")
     columndata = dumps(obj.columns.to_list(), separators=(",", ":"))
-    strdata = obj.fillna("NaN").astype(str)
-    if get_attribute(obj, "object_type") != "datatable":
+    if get_attribute(obj, "object_type") == "datatable":
+        strdata = obj
+    else:
+        GeneFabLogger().info("HTML: forcing string type, NaN'ing [] and ()")
+        strdata = obj.fillna("NaN").astype(str)
         strdata[(strdata=="[]") | (strdata=="()")] = "NaN"
     rowdata = strdata.to_json(orient="values")
-    formatters = iterate_formatters(obj, context)
+    if get_attribute(obj, "object_type") == "annotation":
+        formatters = iterate_formatters(obj, context)
+    else:
+        formatters = []
     content = map_replace(_get_browser_html(), {
         "$APPNAME": f"{context.app_name}: {title_postfix}",
         "$SQUASH_PREHEADER": SQUASHED_PREHEADER_CSS if squash_preheader else "",
@@ -122,7 +129,7 @@ def twolevel(obj, context, indent=None, frozen=0, use_formatters=True, squash_pr
         "$COLUMNDATA": columndata,
         "$ROWDATA": rowdata,
         "$CONTEXTURL": build_url(context),
-        "$FORMATTERS": "\n".join(formatters) if use_formatters else "",
+        "$FORMATTERS": "\n".join(formatters),
         "$FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
     })
     return Response(content, mimetype="text/html")
@@ -135,5 +142,5 @@ def threelevel(obj, context, indent=None):
     renamer = lambda *a: next(squashed_names)
     return twolevel(
         obj.droplevel(0, axis=1).rename(renamer, axis=1, level=0),
-        context=context, use_formatters=False, squash_preheader=True,
+        context=context, squash_preheader=True,
     )

@@ -82,9 +82,10 @@
 <script>
 
 var basic_formatter = function(r,c,v,d,x) {
-    return (v == "True") ? "<font color=green>"+v+"</font>" : (
-           (v == "False") ? "<font color='#FAA'>"+v+"</font>" : (
-           (v == "NaN") ? "<i style='color:#BBB'>"+v+"</i>" : v))
+    return (v == "True") ? "<font color=green>True</font>" : (
+           (v == "False") ? "<font color='#FAA'>False</font>" : (
+           (v == "NaN") ? "<i style='color:#BBB'>NaN</i>" : (
+           (v === null) ? "<i style='color:#BBB'>NaN</i>" : v )))
 };
 
 var columns = [], _rc = $COLUMNDATA;
@@ -153,7 +154,7 @@ for (var i = columns.length; i --> 0;) {
     var longest = c.name;
     for (var j = data.length; j --> 0;) {
         var value = data[j][field];
-        if (value.length > longest.length)
+        if ((value !== null) && (value.length > longest.length))
             longest = value;
     }
     var widthchecker = $("<span>"+longest+"&nbsp;&times;</span>").hide();
@@ -209,9 +210,9 @@ grid.onSort.subscribe(function(e, args) {
             var v1 = r1[f], v2 = r2[f];
             var sign = sortcols[i].sortAsc ? 1 : -1;
             var ans = sign * (
-                (v1 == "NaN")
-                ? ((v2 == "NaN") ? 0 : -1)
-                : ((v2 == "NaN")
+                ((v1 == "NaN") || (v1 === null))
+                ? (((v2 == "NaN") || (v2 === null)) ? 0 : -1)
+                : (((v2 == "NaN") || (v2 === null))
                     ? 1
                     : v1.localeCompare(v2, undefined, {numeric: true})
                 )
