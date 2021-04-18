@@ -83,14 +83,15 @@ tsv = partial(xsv, sep="\t")
 
 def json(obj, context=None, indent=None):
     """Display dataframe as JSON"""
+    _dump_kws = dict(indent=indent, separators=(",", ":"), cls=JSONByteEncoder)
     if get_attribute(obj, "object_type") == "datatable":
-        _json = {
-            "columns": obj.columns.tolist(), "index": obj.values[:,0].tolist(),
-            "data": obj.values[:,1:].tolist(),
-        }
+        columns = dumps(obj.columns.tolist(), **_dump_kws)
+        index = dumps(obj.values[:,0].tolist(), **_dump_kws)
+        data = obj.iloc[:,1:].to_json(orient="values")
+        content = f'{{"columns":{columns},"index":{index},"data":{data}}}'
     else:
-        _json = {
-            "columns": obj.columns.tolist(), "data": obj.values.tolist(),
-        }
-    content = dumps(_json, indent=indent, cls=JSONByteEncoder)
+        content = dumps(
+            {"columns": obj.columns.tolist(), "data": obj.values.tolist()},
+            **_dump_kws,
+        )
     return Response(content, mimetype="text/json")
