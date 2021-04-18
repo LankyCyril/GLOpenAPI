@@ -20,9 +20,10 @@ def get(mongo_collections):
     status_df["report timestamp"] = status_df["report timestamp"].apply(
         lambda t: datetime.utcfromtimestamp(t).isoformat() + "Z"
     )
-    status_df["args"] = status_df["args"].astype(str)
-    status_df["kwargs"] = status_df["kwargs"].astype(str)
-    return concat(
-        {"database status": status_df.applymap(lambda v: v or nan)},
-        axis=1,
-    )
+    def sanitize_args(column):
+        astype_str = status_df[column].astype(str)
+        astype_str[astype_str.isin({"[]", "{}", "()", ""})] = nan
+        return astype_str
+    status_df["args"] = sanitize_args("args")
+    status_df["kwargs"] = sanitize_args("kwargs")
+    return concat({"database status": status_df}, axis=1)
