@@ -85,13 +85,24 @@ def json(obj, context=None, indent=None):
     """Display dataframe as JSON"""
     _dump_kws = dict(indent=indent, separators=(",", ":"), cls=JSONByteEncoder)
     if get_attribute(obj, "object_type") == "datatable":
-        columns = dumps(obj.columns.tolist(), **_dump_kws)
-        index = dumps(obj.values[:,0].tolist(), **_dump_kws)
-        data = obj.iloc[:,1:].to_json(orient="values")
-        content = f'{{"columns":{columns},"index":{index},"data":{data}}}'
+        n = 1
+    elif "info" in obj:
+        n = len(obj["info"].columns)
     else:
-        content = dumps(
-            {"columns": obj.columns.tolist(), "data": obj.values.tolist()},
-            **_dump_kws,
-        )
+        n = None
+    if n is not None:
+        index_names = dumps(obj.columns[:n].tolist(), **_dump_kws)
+        m = f'{{"index_names":{index_names}}}'
+        c = dumps(obj.columns[n:].tolist(), **_dump_kws)
+        if n == 1:
+            i = dumps(obj.values[:,0].tolist(), **_dump_kws)
+        else:
+            i = dumps(obj.values[:,:n].tolist(), **_dump_kws)
+        d = obj.iloc[:,n:].to_json(orient="values")
+        content = f'{{"meta":{m},"columns":{c},"index":{i},"data":{d}}}'
+    else:
+        c = obj.columns.tolist()
+        d = obj.values.tolist()
+        _json = {"meta": None, "columns": c, "index": None, "data": d}
+        content = dumps(_json, **_dump_kws)
     return Response(content, mimetype="text/json")
