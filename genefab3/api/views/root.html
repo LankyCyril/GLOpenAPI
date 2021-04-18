@@ -581,7 +581,7 @@ $(document).ready(function() {
                         <div class='meta-assay list-item'>
                             <input type='checkbox'>
                             <em class='remover'>&amp;</em>
-                            <em class='key included-key'>from=</em>
+                            <em class='key included-key'>id=</em>
                             <select class='key-level level-0'></select>
                             <em>.</em>
                             <select class='key-level level-1'></select>
@@ -594,10 +594,10 @@ $(document).ready(function() {
                 </div>
                 <div class='description on-newline'>
                     <p>The search can be constrained to only the samples from
-                    specific datasets (<code>from=ACCESSION</code>) and/or assays
-                    (<code>from=ACCESSION.ASSAY</code>)</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.characteristics&<b>from=GLDS-38</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.characteristics&<b>from=GLDS-38.proteomics|GLDS-276</b></code><br>
+                    specific datasets (<code>id=ACCESSION</code>) and/or assays
+                    (<code>id=ACCESSION.ASSAY</code>)</p>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.characteristics&<b>id=GLDS-38</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.characteristics&<b>id=GLDS-38.proteomics|GLDS-276</b></code><br>
                 </div>
             </div>
             <div>
@@ -690,7 +690,7 @@ $(document).ready(function() {
                     <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.factor value.spaceflight&<b>format=browser</b></code>
                     <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.factor value.spaceflight&<b>format=json</b></code>
                     <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&<b>format=tsv</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&from=GLDS-37&<b>format=raw</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&<b>format=raw</b></code><br>
                 </div>
             </div>
             <!--DEBUG <div>

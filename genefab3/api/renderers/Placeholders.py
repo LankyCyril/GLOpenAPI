@@ -16,9 +16,9 @@ def generic_dataframe(*level_values):
 def metadata_dataframe(*, include=(), object_type="annotation"):
     """Return an empty dataframe that matches metadata format"""
     dataframe = generic_dataframe(
-        ["info"], [
+        ["id"], [
             "accession", "assay",
-            *(c.lstrip("info.").strip(".") for c in include),
+            *(c.lstrip("id.").strip(".") for c in include),
         ],
     )
     set_attributes(dataframe, object_type=object_type)
@@ -27,6 +27,6 @@ def metadata_dataframe(*, include=(), object_type="annotation"):
 
 def data_dataframe(*, object_type="datatable"):
     """Return an empty dataframe that matches data format"""
-    dataframe = generic_dataframe(["info"], ["info"], ["entry"])
+    dataframe = generic_dataframe(["*"], ["*"], ["index"])
     set_attributes(dataframe, object_type=object_type)
     return dataframe

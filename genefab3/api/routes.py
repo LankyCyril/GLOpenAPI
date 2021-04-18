@@ -28,7 +28,7 @@ class DefaultRoutes(Routes):
     def samples(self, context):
         return views.metadata.get(
             self.mongo_collections, locale=self.locale, context=context,
-            include={"info.sample name"}, aggregate=False,
+            include={"id.sample name"}, aggregate=False,
         )
  
     @Routes.register_endpoint()

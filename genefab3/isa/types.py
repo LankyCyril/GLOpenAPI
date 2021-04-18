@@ -53,25 +53,25 @@ class Sample(dict):
     """Represents a single Sample entry generated from Assay, Study, general Investigation entries"""
  
     @property
-    def name(self): return self.get("Info", {}).get("Sample Name")
+    def name(self): return self.get("Id", {}).get("Sample Name")
     @property
     def sample_name(self): return self.name
     @property
-    def study_name(self): return self.get("Info", {}).get("Study")
+    def study_name(self): return self.get("Id", {}).get("Study")
     @property
-    def assay_name(self): return self.get("Info", {}).get("Assay")
+    def assay_name(self): return self.get("Id", {}).get("Assay")
     @property
-    def accession(self): return self.get("Info", {}).get("Accession")
+    def accession(self): return self.get("Id", {}).get("Accession")
  
     def __init__(self, dataset, assay_entry):
         """Represents a single Sample entry generated from Assay, Study, general Investigation entries"""
-        self.dataset, self["Info"] = dataset, {"Accession": dataset.accession}
+        self.dataset, self["Id"] = dataset, {"Accession": dataset.accession}
         # associate with assay name:
-        self["Info"]["Assay"] = self._get_subkey_value(
-            assay_entry, "Info", "Assay",
+        self["Id"]["Assay"] = self._get_subkey_value(
+            assay_entry, "Id", "Assay",
         )
         # associate with sample name:
-        self["Info"]["Sample Name"] = self._get_unique_primary_value(
+        self["Id"]["Sample Name"] = self._get_unique_primary_value(
             assay_entry, "Sample Name",
         )
         # associate with assay and study metadata:
@@ -81,7 +81,7 @@ class Sample(dict):
  
     def _INPLACE_extend_with_assay_metadata(self, assay_entry):
         """Populate with Assay tab annotation, Investigation Study Assays entry"""
-        self["Assay"] = deepcopy_and_drop(assay_entry, {"Info"})
+        self["Assay"] = deepcopy_and_drop(assay_entry, {"Id"})
         self["Investigation"] = {
             k: v for k, v in self.dataset.isa.investigation.items()
             if (isinstance(v, list) or k == "Investigation")
@@ -103,10 +103,10 @@ class Sample(dict):
             study_entry = self.dataset.isa.studies._by_sample_name[
                 matching_study_sample_names.pop()
             ]
-            self["Info"]["Study"] = self._get_subkey_value(
-                study_entry, "Info", "Study",
+            self["Id"]["Study"] = self._get_subkey_value(
+                study_entry, "Id", "Study",
             )
-            self["Study"] = deepcopy_and_drop(study_entry, {"Info"})
+            self["Study"] = deepcopy_and_drop(study_entry, {"Id"})
             self["Investigation"]["Study"] = (
                 self.dataset.isa.investigation["Study"].get(self.study_name, {})
             )

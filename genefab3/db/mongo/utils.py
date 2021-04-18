@@ -162,14 +162,14 @@ def blackjack_normalize(cursor, max_depth=3):
 def retrieve_by_context(collection, *, locale, context, include=(), postprocess=()):
     """Run .find() or .aggregate() based on query, projection"""
     full_projection = {
-        "info.accession": True, "info.assay": True,
+        "id.accession": True, "id.assay": True,
         **context.projection, **{field: True for field in include},
     }
     collation = {"locale": locale, "numericOrdering": True}
     pipeline = [
         {"$sort": {
             f: ASCENDING
-            for f in ["info.accession", "info.assay", *include]
+            for f in ["id.accession", "id.assay", *include]
         }},
         {"$match": context.query},
         {"$project": {**full_projection, "_id": False}},

@@ -28,16 +28,16 @@ FINAL_INDEX_KEY_BLACKLIST = {"comment"}
 
 
 def ensure_info_index(mongo_collections, locale, subkeys=INFO_SUBKEYS):
-    """Index `info.*` for sorting"""
-    if "info" not in mongo_collections.metadata.index_information():
+    """Index `id.*` for sorting"""
+    if "id" not in mongo_collections.metadata.index_information():
         logger = GeneFabLogger()
-        msgmask = "Generating index for metadata collection ('{}'), key 'info'"
+        msgmask = "Generating index for metadata collection ('{}'), key 'id'"
         logger.info(msgmask.format(mongo_collections.metadata.name))
         mongo_collections.metadata.create_index(
-            name="info", keys=[(f"info.{key}", ASCENDING) for key in subkeys],
+            name="id", keys=[(f"id.{key}", ASCENDING) for key in subkeys],
             collation={"locale": locale, "numericOrdering": True},
         )
-        msgmask = "Index generated for metadata collection ('{}'), key 'info'"
+        msgmask = "Index generated for metadata collection ('{}'), key 'id'"
         logger.info(msgmask.format(mongo_collections.metadata.name))
 
 

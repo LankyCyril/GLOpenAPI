@@ -34,17 +34,17 @@ def build_url(context, target_view=None, drop=set()):
 
 def get_browser_glds_formatter(context, i):
     """Get SlickGrid formatter for column 'accession'"""
-    url = build_url(context, drop={"from"})
+    url = build_url(context, drop={"id"})
     _fr = f"""function(r,c,v,d,x){{return "<a class='filter' "+
-        "href='{url}from="+escape(v)+"'>"+v+"</a>";}}"""
+        "href='{url}id="+escape(v)+"'>"+v+"</a>";}}"""
     return f"columns[{i}].formatter = columns[{i}].defaultFormatter = {_fr};"
 
 
 def get_browser_assay_formatter(context, i):
     """Get SlickGrid formatter for column 'assay name'"""
-    url = build_url(context, drop={"from"})
+    url = build_url(context, drop={"id"})
     _fr = f"""function(r,c,v,d,x){{return "<a class='filter' "+
-        "href='{url}from="+data[r][0]+"."+escape(v)+"'>"+v+"</a>";}}"""
+        "href='{url}id="+data[r][0]+"."+escape(v)+"'>"+v+"</a>";}}"""
     return f"columns[{i}].formatter = columns[{i}].defaultFormatter = {_fr};"
 
 
@@ -68,7 +68,7 @@ def get_browser_meta_formatter(context, i, head, target):
 def iterate_formatters(obj, context):
     """Get SlickGrid formatters for columns"""
     for i, (key, target) in enumerate(obj.columns):
-        if key == "info":
+        if key == "id":
             if target == "accession":
                 yield get_browser_glds_formatter(context, i)
             elif target == "assay":

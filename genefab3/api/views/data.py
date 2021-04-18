@@ -20,15 +20,15 @@ def get_file_descriptors(mongo_collections, *, locale, context):
     context.update(".".join(TECH_TYPE_LOCATOR))
     descriptors, _ = retrieve_by_context(
         mongo_collections.metadata, locale=locale, context=context,
-        include={"info.sample name"}, postprocess=[
+        include={"id.sample name"}, postprocess=[
             {"$group": {
                 "_id": {
-                    "accession": "$info.accession",
-                    "assay": "$info.assay",
+                    "accession": "$id.accession",
+                    "assay": "$id.assay",
                     "technology type": "$"+".".join(TECH_TYPE_LOCATOR),
                     "file": "$file",
                 },
-                "sample name": {"$addToSet": "$info.sample name"},
+                "sample name": {"$addToSet": "$id.sample name"},
             }},
             {"$addFields": {"_id.sample name": "$sample name"}},
             {"$replaceRoot": {"newRoot": "$_id"}},

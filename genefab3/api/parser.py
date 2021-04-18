@@ -13,7 +13,7 @@ from collections import defaultdict
 CONTEXT_ARGUMENTS = {"debug", "format"}
 
 KEYVALUE_PARSER_DISPATCHER = lru_cache(1)(lambda: {
-    "from": KeyValueParsers.kvp_assay,
+    "id": KeyValueParsers.kvp_assay,
     "investigation": partial(
         KeyValueParsers.kvp_generic, category="investigation", dot_postfix=None,
     ),
@@ -134,17 +134,17 @@ class KeyValueParsers():
         """Interpret single key-value pair for dataset / assay constraint"""
         if (fields) or (not value):
             msg = "Unrecognized argument"
-            raise GeneFabParserException(msg, arg=f"from.{fields[0]}")
+            raise GeneFabParserException(msg, arg=f"id.{fields[0]}")
         else:
             query = {"$or": []}
             projection_keys, accessions_and_assays = (), defaultdict(set)
         for expr in value.split("|"):
             if expr.count(".") == 0:
-                query["$or"].append({"info.accession": expr})
+                query["$or"].append({"id.accession": expr})
                 accessions_and_assays[expr] = set()
             else:
                 accession, assay_name = expr.split(".", 1)
-                subqry = {"info.accession": accession, "info.assay": assay_name}
+                subqry = {"id.accession": accession, "id.assay": assay_name}
                 query["$or"].append(subqry)
                 accessions_and_assays[accession].add(assay_name)
         yield query, projection_keys, accessions_and_assays

@@ -46,9 +46,7 @@ class CacherThread(Thread):
                 delay = self.metadata_update_interval
             else:
                 delay = self.metadata_retry_delay
-            GeneFabLogger().info(
-                f"CacherThread: Sleeping for {delay} seconds",
-            )
+            GeneFabLogger().info(f"CacherThread: Sleeping for {delay} seconds")
             sleep(delay)
  
     def recache_metadata(self):
@@ -57,7 +55,7 @@ class CacherThread(Thread):
         try:
             accessions = OrderedDict(
                 cached=set(
-                    self.mongo_collections.metadata.distinct("info.accession"),
+                    self.mongo_collections.metadata.distinct("id.accession"),
                 ),
                 live=set(self.adapter.get_accessions()),
                 fresh=set(), updated=set(), stale=set(),
@@ -92,7 +90,7 @@ class CacherThread(Thread):
         """Drop all metadata entries associated with `accession` from `self.mongo_collections.metadata`"""
         run_mongo_transaction(
             "delete_many", self.mongo_collections.metadata,
-            query={"info.accession": accession},
+            query={"id.accession": accession},
         )
         return "dropped", "removed from database", None
  

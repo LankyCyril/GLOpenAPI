@@ -7,7 +7,7 @@ from genefab3.common.utils import set_attributes
 
 
 def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
-    """Get target metadata as a single-level dataframe, numerically sorted by info fields"""
+    """Get target metadata as a single-level dataframe, numerically sorted by id fields"""
     cursor, full_projection = retrieve_by_context(
         mongo_collections.metadata, locale=locale, context=context,
         include=include,
@@ -16,7 +16,7 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
         dataframe = blackjack_normalize(cursor, max_depth=3)
     except MongoOperationError as e:
         errmsg = getattr(e, "details", {}).get("errmsg", "").lower()
-        has_index = ("info" in mongo_collections.metadata.index_information())
+        has_index = ("id" in mongo_collections.metadata.index_information())
         index_reason = ("index" in errmsg)
         if index_reason and (not has_index):
             msg = "Metadata is not indexed yet; this is a temporary error"
@@ -28,8 +28,8 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
 
 
 def iisaf_sort_dataframe(dataframe):
-    """Sort single-level dataframe in order info-investigation-study-assay-file"""
-    prefix_order = ["info", "investigation", "study", "assay", "file", ""]
+    """Sort single-level dataframe in order id-investigation-study-assay-file"""
+    prefix_order = ["id", "investigation", "study", "assay", "file", ""]
     column_order = {p: set() for p in prefix_order}
     for column in dataframe.columns:
         for prefix in prefix_order:
@@ -50,20 +50,20 @@ def get(mongo_collections, *, locale, context, include=(), aggregate=False):
     else:
         dataframe = iisaf_sort_dataframe(dataframe)
         dataframe.columns = MultiIndex.from_tuples(
-            (fields[0], ".".join(fields[1:])) if fields[0] in {"info", "file"}
+            (fields[0], ".".join(fields[1:])) if fields[0] in {"id", "file"}
             else (".".join(fields[:2]), ".".join(fields[2:]) or "*")
             for fields in map(lambda s: s.split("."), dataframe.columns)
         )
         if aggregate: # coerce to boolean "existence" if requested
-            info_cols = list(dataframe[["info"]].columns)
-            if len(info_cols) == dataframe.shape[1]: # only 'info' cols present
+            info_cols = list(dataframe[["id"]].columns)
+            if len(info_cols) == dataframe.shape[1]: # only 'id' cols present
                 dataframe = dataframe.drop_duplicates()
             else: # metadata cols present and can be collapsed into booleans
                 gby = dataframe.groupby(info_cols, as_index=False, sort=False)
                 dataframe = gby.agg(lambda a: ~isnull(a).all())
         set_attributes(
             dataframe, object_type="annotation", accessions=set(
-                dataframe[("info", "accession")].drop_duplicates(),
+                dataframe[("id", "accession")].drop_duplicates(),
             ),
         )
         return dataframe

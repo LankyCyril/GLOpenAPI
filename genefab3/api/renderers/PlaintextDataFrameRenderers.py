@@ -16,7 +16,7 @@ GCT_ALLOWED_DATATYPES = {
 
 def cls(obj, context=None, continuous=None, space_sub=lambda s: sub(r'\s', "", s), indent=None):
     """Display presumed annotation/factor dataframe in plaintext CLS format"""
-    columns = [c for c in obj.columns if c[0] not in {"info", "file"}]
+    columns = [c for c in obj.columns if c[0] not in {"id", "file"}]
     if len(columns) != 1:
         msg = "Exactly one target assay/study metadata field must be present"
         raise GeneFabFormatException(msg, target_columns=columns, format="cls")
@@ -86,8 +86,8 @@ def json(obj, context=None, indent=None):
     _dump_kws = dict(indent=indent, separators=(",", ":"), cls=JSONByteEncoder)
     if get_attribute(obj, "object_type") == "datatable":
         n = 1
-    elif "info" in obj:
-        n = len(obj["info"].columns)
+    elif "id" in obj:
+        n = len(obj["id"].columns)
     else:
         n = None
     if n is not None:
