@@ -69,9 +69,10 @@ def gct(obj, context=None, indent=None):
         return Response(content, mimetype="text/plain")
 
 
-def xsv(obj, context=None, sep=None, indent=None):
+def xsv(obj, context=None, sep=None, indent=None, na_rep="NaN"):
     """Display dataframe in plaintext `sep`-separated format"""
-    _kws = dict(sep=sep, index=False, header=False, na_rep="NaN")
+    _na_rep = type("UnquotedNaN", (float,), dict(__str__=lambda _: na_rep))()
+    _kws = dict(sep=sep, index=False, header=False, quoting=2, na_rep=_na_rep)
     raw_header = obj.columns.to_frame().T.to_csv(**_kws)
     header = sub(r'^', "#", sub(r'\n(.)', r'\n#\1', raw_header))
     return Response(header + obj.to_csv(**_kws), mimetype="text/plain")
