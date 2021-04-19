@@ -130,24 +130,32 @@ class Context():
 
 class KeyValueParsers():
  
-    def kvp_assay(fields=None, value=""):
+    def kvp_assay(fields=None, value="", shift=True):
         """Interpret single key-value pair for dataset / assay constraint"""
-        if (fields) or (not value):
+        if fields and value:
             msg = "Unrecognized argument"
-            raise GeneFabParserException(msg, arg=f"id.{fields[0]}")
+            arg = ".".join(("id", *fields))
+            raise GeneFabParserException(msg, **{arg: value})
+        elif shift and (len(fields) > 1):
+            _fields, _value = fields[:-1], fields[-1]
         else:
+            _fields, _value = fields, value
+        if _fields: # standard syntax, id.accession=GLDS-1
+            query = {"$or": []}
+            raise ValueError
+        else: # mixed syntax, id=GLDS-1|GLDS-2.assay-2
             query = {"$or": []}
             projection_keys, accessions_and_assays = (), defaultdict(set)
-        for expr in value.split("|"):
-            if expr.count(".") == 0:
-                query["$or"].append({"id.accession": expr})
-                accessions_and_assays[expr] = set()
-            else:
-                accession, assay_name = expr.split(".", 1)
-                subqry = {"id.accession": accession, "id.assay": assay_name}
-                query["$or"].append(subqry)
-                accessions_and_assays[accession].add(assay_name)
-        yield query, projection_keys, accessions_and_assays
+            for expr in _value.split("|"):
+                if expr.count(".") == 0:
+                    query["$or"].append({"id.accession": expr})
+                    accessions_and_assays[expr] = set()
+                else:
+                    accession, assay_name = expr.split(".", 1)
+                    subqry = {"id.accession": accession, "id.assay": assay_name}
+                    query["$or"].append(subqry)
+                    accessions_and_assays[accession].add(assay_name)
+            yield query, projection_keys, accessions_and_assays
  
     def kvp_generic(category, fields, value, constrain_to=None, dot_postfix="auto", shift=False):
         """Interpret single key-value pair if it gives rise to database query"""
