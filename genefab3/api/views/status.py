@@ -1,11 +1,12 @@
-from pandas import json_normalize, concat
+from pandas import json_normalize, MultiIndex
 from datetime import datetime
 from numpy import nan
+from itertools import chain, cycle
 
 
 STATUS_COLUMNS = [
-    "report timestamp", "report type", "status", "accession", "assay name",
-    "sample name", "warning", "error", "args", "kwargs",
+    "accession", "assay name", "sample name", "report type", "status",
+    "warning", "error", "args", "kwargs", "report timestamp",
 ]
 
 
@@ -20,10 +21,10 @@ def get(mongo_collections):
     status_df["report timestamp"] = status_df["report timestamp"].apply(
         lambda t: datetime.utcfromtimestamp(t).isoformat() + "Z"
     )
-    def sanitize_args(column):
-        astype_str = status_df[column].astype(str)
-        astype_str[astype_str.isin({"[]", "{}", "()", ""})] = nan
-        return astype_str
-    status_df["args"] = sanitize_args("args")
-    status_df["kwargs"] = sanitize_args("kwargs")
-    return concat({"database status": status_df}, axis=1)
+    astype_args = status_df[["args", "kwargs"]].astype(str)
+    astype_args[astype_args.isin({"[]", "{}", "()"})] = nan
+    status_df[["args", "kwargs"]] = astype_args
+    status_df.columns = MultiIndex.from_tuples(
+        zip(chain(["id"]*3, cycle(["report"])), status_df.columns),
+    )
+    return status_df
