@@ -16,6 +16,13 @@
             line-height: 1.1;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap
         }
+        #sorting_popup {
+            position: absolute; top: 0; right: 0;
+            margin: 2pt !important; max-height: 18pt; height: 18pt;
+            padding: 1pt 2pt !important; line-height: 1.05; font-size: 9pt;
+            overflow: hidden; text-overflow: ellipsis;
+            background: #D10; color: white;
+        }
         .fullpage{position: absolute; top: 25pt; left: 0; right: 0; bottom: 0}
         #grid {border: .25pt solid black}
         #info {
@@ -65,6 +72,7 @@
         <a style="color:#D10" href="$SAMPLESVIEW">samples</a>,
         <a style="color:#D10" href="$DATAVIEW">data</a>.
     </div>
+    <div id="sorting_popup" style="display: none">CUSTOM SORTING<br>click to reset</div>
     <div id="grid" class="fullpage">
         <div id="noscript">
             Loading data in an interactive viewer...<br>
