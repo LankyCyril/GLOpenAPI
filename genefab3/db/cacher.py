@@ -40,6 +40,9 @@ class CacherThread(Thread):
                     accessions["updated"] | accessions["dropped"] |
                     accessions["failed"]
                 )
+                # FIXME: actually, this whole logic is wrong
+                # TODO: if datasets are only REMOVED from the database, stick to this logic (drop cache that involves these datasets)
+                # TODO: if anything at all is ADDED or UPDATED in the database, we have to drop the whole cache!!!
                 for accession in accessions_to_drop:
                     self.response_cache.drop(accession)
                 self.response_cache.shrink()

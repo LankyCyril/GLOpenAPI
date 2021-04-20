@@ -58,7 +58,7 @@ class ResponseCache():
         if obj_accessions is None:
             _loge(f"LRU response cache: could not infer accessions used")
             return
-        accessions = obj_accessions | set(context.accessions_and_assays)
+        accessions = obj_accessions
         api_path = quote(context.full_path)
         blob = Binary(compress(response.get_data()))
         timestamp = int(datetime.now().timestamp())

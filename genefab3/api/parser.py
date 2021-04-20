@@ -7,26 +7,30 @@ from json import dumps
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabParserException
 from genefab3.db.mongo.utils import is_safe_token, reduce_projection, is_regex
-from collections import defaultdict
 
 
 CONTEXT_ARGUMENTS = {"debug", "format"}
 
 KEYVALUE_PARSER_DISPATCHER = lru_cache(1)(lambda: {
-    "id": KeyValueParsers.kvp_assay,
+    "id": partial(
+        KeyValueParsers.kvp_assay, category="id", fields_depth=1,
+        constrain_to={"accession", "assay", "sample name", None},
+    ),
     "investigation": partial(
-        KeyValueParsers.kvp_generic, category="investigation", dot_postfix=None,
+        KeyValueParsers.kvp_generic, category="investigation", fields_depth=2,
+        constrain_to={"investigation", "study", "study assays"},
+        dot_postfix=None,
     ),
     "study": partial(
-        KeyValueParsers.kvp_generic, category="study",
-        constrain_to={"factor value", "parameter value", "characteristics"},
+        KeyValueParsers.kvp_generic, category="study", fields_depth=2,
+        constrain_to={"characteristics", "factor value", "parameter value"},
     ),
     "assay": partial(
-        KeyValueParsers.kvp_generic, category="assay",
-        constrain_to={"factor value", "parameter value", "characteristics"},
+        KeyValueParsers.kvp_generic, category="assay", fields_depth=2,
+        constrain_to={"characteristics", "factor value", "parameter value"},
     ),
     "file": partial(
-        KeyValueParsers.kvp_generic, category="file", shift=True,
+        KeyValueParsers.kvp_generic, category="file", fields_depth=1,
         constrain_to={"datatype", "filename"},
     ),
 })
@@ -34,7 +38,7 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(1)(lambda: {
 DISALLOWED_CONTEXTS = {
     "at least one dataset or annotation category must be specified": lambda c:
         (not search(r'^(|status|debug.*|favicon\.\S*)$', c.view)) and
-        (len(c.projection) == 0) and (len(c.accessions_and_assays) == 0),
+        (len(c.projection) == 0),
     "metadata queries are not valid for /status/": lambda c:
         (c.view == "status") and (leaf_count(c.query) > 0),
     "'file.filename=' can only be specified once": lambda c:
@@ -62,7 +66,6 @@ class Context():
         self.view = sub(url_root, "", base_url).strip("/")
         self.complete_kwargs = request.args.to_dict(flat=False)
         self.query, self.projection = {"$and": []}, {}
-        self.accessions_and_assays = {}
         self.parser_errors = []
         processed_args = set(
             arg for arg, values in request.args.lists()
@@ -98,30 +101,25 @@ class Context():
             if not is_safe_token(arg):
                 raise GeneFabParserException("Forbidden argument", arg=arg)
             elif arg in CONTEXT_ARGUMENTS:
-                parser = empty_iterator
+                parser = partial(empty_iterator, fields_depth=float("inf"))
             elif category in KEYVALUE_PARSER_DISPATCHER():
                 parser = KEYVALUE_PARSER_DISPATCHER()[category]
             else:
                 msg = "Unrecognized argument"
                 raise GeneFabParserException(msg, **{arg: values})
+            _depth = parser.keywords["fields_depth"]
+            if len(fields) > _depth:
+                msg = "Too many nested fields in argument"
+                raise GeneFabParserException(msg, arg=arg, max_dots=_depth)
             for value in values:
                 if not is_safe_token(value, allow_regex=(arg=="file.filename")):
                     raise GeneFabParserException("Forbidden value", arg=value)
-                if (value) and (len(fields) == 1):
-                    # assay.characteristics=age -> assay.characteristics.age
-                    yield from parser(fields=[*fields, value], value="")
-                else:
-                    # assay.characteristics.age
-                    # assay.characteristics.age=5
-                    # from=GLDS-1.assay
-                    yield from parser(fields=fields, value=value)
+                yield from parser(fields=fields, value=value)
         is_converted_to_query = None
-        for query, projection_keys, accessions_and_assays in _it():
+        for query, projection_keys in _it():
             if query:
                 self.query["$and"].append(query)
             self.projection.update({k: True for k in projection_keys})
-            for accession, assay_names in accessions_and_assays.items():
-                self.accessions_and_assays[accession] = sorted(assay_names)
             is_converted_to_query = True
         if auto_reduce:
             self.projection = reduce_projection(self.projection)
@@ -130,52 +128,56 @@ class Context():
 
 class KeyValueParsers():
  
-    def kvp_assay(fields=None, value="", shift=True):
+    def kvp_assay(category="id", fields=(), value=None, fields_depth=1, constrain_to=None):
         """Interpret single key-value pair for dataset / assay constraint"""
-        if fields and value:
-            msg = "Unrecognized argument"
-            arg = ".".join(("id", *fields))
-            raise GeneFabParserException(msg, **{arg: value})
-        elif shift and (len(fields) > 1):
-            _fields, _value = fields[:-1], fields[-1]
-        else:
-            _fields, _value = fields, value
-        if _fields: # standard syntax, id.accession=GLDS-1
-            query = {"$or": []}
-            raise ValueError
-        else: # mixed syntax, id=GLDS-1|GLDS-2.assay-2
-            query = {"$or": []}
-            projection_keys, accessions_and_assays = (), defaultdict(set)
-            for expr in _value.split("|"):
+        _exc_kw = {".".join((category, *fields)): value}
+        if not value: # 'id' or 'id.accession' without search value
+            msg = "Argument requires a value"
+            raise GeneFabParserException(msg, **_exc_kw)
+        elif len(fields) > fields_depth:
+            msg = "Too many nested fields in argument"
+            raise GeneFabParserException(msg, max_dots=fields_depth, **_exc_kw)
+        elif len(fields) == 0: # mixed syntax, 'id=GLDS-1|GLDS-2.assay-B'
+            query, projection_keys = {"$or": []}, ()
+            for expr in value.split("|"):
                 if expr.count(".") == 0:
-                    query["$or"].append({"id.accession": expr})
-                    accessions_and_assays[expr] = set()
+                    query["$or"].append({f"{category}.accession": expr})
                 else:
                     accession, assay_name = expr.split(".", 1)
-                    subqry = {"id.accession": accession, "id.assay": assay_name}
-                    query["$or"].append(subqry)
-                    accessions_and_assays[accession].add(assay_name)
-            yield query, projection_keys, accessions_and_assays
+                    query["$or"].append({
+                        f"{category}.accession": accession,
+                        f"{category}.assay": assay_name,
+                    })
+        elif constrain_to and (fields[0] not in constrain_to):
+            msg = "Unrecognized field in argument"
+            raise GeneFabParserException(msg, field=fields[0], **_exc_kw)
+        else: # standard syntax, 'id.accession=GLDS-1'
+            query, projection_keys = {f"{category}.{fields[0]}": value}, ()
+        yield query, projection_keys
  
-    def kvp_generic(category, fields, value, constrain_to=None, dot_postfix="auto", shift=False):
+    def kvp_generic(category, fields, value, constrain_to=None, dot_postfix="auto", fields_depth=2):
         """Interpret single key-value pair if it gives rise to database query"""
-        if (not fields) or (constrain_to and (fields[0] not in constrain_to)):
-            msg = "Unrecognized argument"
-            raise GeneFabParserException(msg, arg=".".join([category, *fields]))
-        elif shift and (len(fields) > 1):
-            _fields, _value = fields[:-1], fields[-1]
-        else:
-            _fields, _value = fields, value
-        if (len(_fields) == 2) and (dot_postfix == "auto"):
-            projection_key = ".".join([category] + _fields)
+        _exc_kw = {".".join((category, *fields)): value}
+        if not fields:
+            msg = "Category requires a subfield to be specified"
+            raise GeneFabParserException(msg, category=category, **_exc_kw)
+        elif constrain_to and (fields[0] not in constrain_to):
+            msg = "Unrecognized field in argument"
+            raise GeneFabParserException(msg, field=fields[0], **_exc_kw)
+        elif len(fields) > fields_depth:
+            msg = "Too many nested fields in argument"
+            raise GeneFabParserException(msg, max_dots=fields_depth, **_exc_kw)
+        _auto_dot_postfix = (dot_postfix == "auto") and (len(fields) == 2)
+        if (dot_postfix is True) or _auto_dot_postfix:
+            projection_key = ".".join((category, *fields))
             lookup_key = projection_key + "."
         else:
-            projection_key = lookup_key = ".".join([category] + _fields)
-        if _value: # metadata field must equal value or one of values
-            if is_regex(_value):
-                query = {lookup_key: {"$regex": _value[1:-1]}}
+            projection_key = lookup_key = ".".join((category, *fields))
+        if value: # metadata field must equal value or one of values
+            if is_regex(value):
+                query = {lookup_key: {"$regex": value[1:-1]}}
             else:
-                query = {lookup_key: {"$in": _value.split("|")}}
+                query = {lookup_key: {"$in": value.split("|")}}
             projection_keys = {projection_key}
         else: # metadata field or one of metadata fields must exist
             block_match = search(r'\.[^\.]+\.*$', lookup_key)
@@ -192,5 +194,4 @@ class KeyValueParsers():
                 else:
                     lookup_keys = projection_keys
                 query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
-        accessions_and_assays = {}
-        yield query, projection_keys, accessions_and_assays
+        yield query, projection_keys
