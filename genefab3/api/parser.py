@@ -12,41 +12,38 @@ from genefab3.common.types import NestedReducibleDefaultDict
 
 CONTEXT_ARGUMENTS = {"debug", "format"}
 
-KEYVALUE_PARSER_DISPATCHER = lru_cache(1)(lambda: {
-    "id": partial(
-        KeyValueParsers.kvp_assay, category="id", fields_depth=1,
+KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
+    "id": partial(KeyValueParsers.kvp_assay,
+        category="id", fields_depth=1,
         constrain_to={"accession", "assay", "sample name", "study", None},
     ),
-    "investigation": partial(
-        KeyValueParsers.kvp_generic, category="investigation", fields_depth=2,
+    "investigation": partial(KeyValueParsers.kvp_generic,
+        category="investigation", fields_depth=2, dot_postfix=None,
         constrain_to={"investigation", "study", "study assays"},
-        dot_postfix=None,
     ),
-    "study": partial(
-        KeyValueParsers.kvp_generic, category="study", fields_depth=2,
+    "study": partial(KeyValueParsers.kvp_generic,
+        category="study", fields_depth=2,
         constrain_to={"characteristics", "factor value", "parameter value"},
     ),
-    "assay": partial(
-        KeyValueParsers.kvp_generic, category="assay", fields_depth=2,
+    "assay": partial(KeyValueParsers.kvp_generic,
+        category="assay", fields_depth=2,
         constrain_to={"characteristics", "factor value", "parameter value"},
     ),
-    "file": partial(
-        KeyValueParsers.kvp_generic, category="file", fields_depth=1,
-        constrain_to={"datatype", "filename"},
+    "file": partial(KeyValueParsers.kvp_generic,
+        category="file", fields_depth=1, constrain_to={"datatype", "filename"},
     ),
 })
 
-DISALLOWED_CONTEXTS = {
-    "metadata queries are not valid for /status/": lambda c:
+DISALLOWED_CONTEXTS = { # TODO: potentially not needed at all now
+    "metadata queries are not valid for /status/": lambda c: # check in views, also for root
         (c.view == "status") and (leaf_count(c.query) > 0),
-    "'file.filename=' can only be specified once": lambda c:
+    "'file.filename' can only be specified once": lambda c: # don't guard
         (len(c.complete_kwargs.get("file.filename", [])) > 1),
-    "only one of 'file.filename=', 'file.datatype=' can be specified": lambda c:
-        (len(c.complete_kwargs.get("file.filename", [])) > 1) and
+    "'file.datatype' can only be specified once": lambda c: # don't guard
         (len(c.complete_kwargs.get("file.datatype", [])) > 1),
-    "'format=cls' is only valid for /samples/": lambda c:
+    "'format=cls' is only valid for /samples/": lambda c: # definitely move this to renderers
         (c.view != "samples") and (c.format == "cls"),
-    "'format=gct' is only valid for /data/": lambda c:
+    "'format=gct' is only valid for /data/": lambda c: # definitely move this to renderers
         (c.view != "data") and (c.format == "gct"),
 }
 
@@ -57,8 +54,8 @@ class Context():
     def __init__(self, flask_app):
         """Parse request components"""
         self.app_name = flask_app.name
-        url_root = escape(request.url_root.strip("/"))
-        base_url = request.base_url.strip("/")
+        url_root = escape(request.url_root.strip("/")) # TODO why escape this
+        base_url = request.base_url.strip("/") # but not this?
         self.url_root = request.url_root
         self.full_path = request.full_path
         self.view = sub(url_root, "", base_url).strip("/")
@@ -67,10 +64,10 @@ class Context():
         self.projection = {"id.accession": True, "id.assay": True}
         self.sort_by = ["id.accession", "id.assay"]
         self.parser_errors = []
-        self.processed_args = set(
+        self.processed_args = {
             arg for arg, values in request.args.lists()
             if self.update(arg, values, auto_reduce=False)
-        )
+        }
         self.update_special_fields()
         self.reduce_projection()
         self.update_attributes()
@@ -83,30 +80,29 @@ class Context():
  
     def update(self, arg, values=("",), auto_reduce=True):
         """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections"""
+        (category, *fields), keyvalue = arg.split("."), {arg: values}
+        if not is_safe_token(arg):
+            raise GeneFabParserException("Forbidden argument", arg=arg)
+        elif arg in CONTEXT_ARGUMENTS:
+            parser = empty_iterator
+        elif category in KEYVALUE_PARSER_DISPATCHER():
+            parser = KEYVALUE_PARSER_DISPATCHER()[category]
+        else:
+            raise GeneFabParserException("Unrecognized argument", **keyvalue)
         def _it():
-            category, *fields = arg.split(".")
-            if not is_safe_token(arg):
-                raise GeneFabParserException("Forbidden argument", arg=arg)
-            elif arg in CONTEXT_ARGUMENTS:
-                parser = partial(empty_iterator, fields_depth=float("inf"))
-            elif category in KEYVALUE_PARSER_DISPATCHER():
-                parser = KEYVALUE_PARSER_DISPATCHER()[category]
-            else:
-                msg = "Unrecognized argument"
-                raise GeneFabParserException(msg, **{arg: values})
             for value in values:
                 if not is_safe_token(value, allow_regex=(arg=="file.filename")):
                     raise GeneFabParserException("Forbidden value", arg=value)
-                yield from parser(arg=arg, fields=fields, value=value)
-        is_converted_to_query = None
-        for query, projection_keys in _it():
+                else:
+                    yield from parser(arg=arg, fields=fields, value=value)
+        n_iterations = None
+        for n_iterations, (query, projection_keys) in enumerate(_it(), 1):
             if query:
                 self.query["$and"].append(query)
             self.projection.update({k: True for k in projection_keys})
-            is_converted_to_query = True
         if auto_reduce:
             self.reduce_projection()
-        return is_converted_to_query
+        return n_iterations
  
     def update_special_fields(self):
         """Automatically adjust projection and unwind pipeline for special fields ('file')"""
@@ -151,15 +147,15 @@ class Context():
 
 class KeyValueParsers():
  
-    def kvp_assay(arg, category="id", fields=(), value=None, fields_depth=1, constrain_to=None):
+    def kvp_assay(arg, category, fields, value, fields_depth=1, constrain_to=None, mix_separator="."):
         """Interpret single key-value pair for dataset / assay constraint"""
         if (not fields) and value: # mixed syntax: 'id=GLDS-1|GLDS-2.assay-B'
             query, projection_keys = {"$or": []}, ()
             for expr in value.split("|"):
-                if expr.count(".") == 0:
+                if expr.count(mix_separator) == 0:
                     query["$or"].append({f"{category}.accession": expr})
                 else:
-                    accession, assay_name = expr.split(".", 1)
+                    accession, assay_name = expr.split(mix_separator, 1)
                     query["$or"].append({
                         f"{category}.accession": accession,
                         f"{category}.assay": assay_name,
@@ -167,9 +163,8 @@ class KeyValueParsers():
             yield query, projection_keys
         else: # standard syntax: 'id', 'id.accession', 'id.assay=assayname', ...
             yield from KeyValueParsers.kvp_generic(
-                arg=arg, category=category, fields=fields, value=value,
-                fields_depth=fields_depth, constrain_to=constrain_to,
-                dot_postfix=None,
+                arg=arg, fields_depth=fields_depth, constrain_to=constrain_to,
+                category=category, fields=fields, value=value, dot_postfix=None,
             )
  
     def _infer_postfix(dot_postfix, fields):
