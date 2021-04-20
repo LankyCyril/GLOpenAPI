@@ -7,7 +7,7 @@ from json import dumps
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabParserException
 from genefab3.db.mongo.utils import is_safe_token, is_regex
-from genefab3.common.types import NestedReducibleDefaultDict
+from genefab3.common.types import BranchTracer
 
 
 CONTEXT_ARGUMENTS = {"debug", "format"}
@@ -112,15 +112,15 @@ class Context():
  
     def reduce_projection(self):
         """Drop longer paths that are extensions of existing shorter paths"""
-        nrdd = NestedReducibleDefaultDict()
-        for key in self.projection:
-            nrdd.descend(key.split("."))
-        for key in sorted(self.projection, reverse=True):
-            v = nrdd.descend(key.split("."))
-            v[True] = [v.clear() if v else None]
+        tracer = BranchTracer()
+        paths = [key.split(".") for key in sorted(self.projection, reverse=1)]
+        for path in paths:
+            tracer.descend(path)
+        for path in paths:
+            tracer.descend(path).make_terminal()
         self.projection = {
             key: value for key, value in self.projection.items()
-            if nrdd.descend(key.split("."))
+            if tracer.descend(key.split("."))
         }
  
     def update_attributes(self):

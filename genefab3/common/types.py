@@ -5,9 +5,16 @@ from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
 
 
-RDD = type("ReducibleDefaultDict", (defaultdict,),
-    dict(descend=lambda self, branch, r=reduce, g=getitem: r(g, branch, self)))
-NestedReducibleDefaultDict = lambda: RDD(NestedReducibleDefaultDict)
+BranchTracer = lambda: DescendableDefaultDict(BranchTracer)
+BranchTracer.__doc__ = """Infinitely nestable and descendable defaultdict"""
+class DescendableDefaultDict(defaultdict):
+    """Potentially infinitely nestable defaultdict that can propagate into nested defaultdicts"""
+    def descend(self, path, reduce=reduce, getitem=getitem):
+        """Propagate into nested defaultdicts, one level down for each key in `path`; return terminal value"""
+        return reduce(getitem, path, self)
+    def make_terminal(self):
+        """At current level, make branch (i.e. self) truthy and non-descendable"""
+        self[True] = self.clear()
 
 
 class Adapter():
