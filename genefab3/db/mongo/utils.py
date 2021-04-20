@@ -1,12 +1,10 @@
 from pandas import isnull, DataFrame
 from re import sub, search
-from functools import partial, reduce, wraps
+from functools import partial, wraps
 from bson.errors import InvalidDocument as InvalidDocumentError
 from collections.abc import ValuesView
 from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabDatabaseException
-from genefab3.common.types import NestedDefaultDict
-from operator import getitem as gi_
 from collections import OrderedDict
 from marshal import dumps as marshals
 from pymongo import ASCENDING
@@ -114,19 +112,6 @@ def run_mongo_transaction(action, collection, *, query=None, data=None, document
         )
 
 
-def reduce_projection(fp, longest=False):
-    """Drop longer OR shorter paths if they conflict with longer paths"""
-    d = NestedDefaultDict()
-    [reduce(gi_, k.split("."), d) for k in fp]
-    if longest:
-        return {k: v for k, v in fp.items() if not reduce(gi_, k.split("."), d)}
-    else:
-        for k in sorted(fp, reverse=True):
-            v = reduce(gi_, k.split("."), d)
-            v[True] = [v.clear() if v else None]
-        return {k: v for k, v in fp.items() if reduce(gi_, k.split("."), d)}
-
-
 def _iter_blackjack_items_cache(f):
     """Custom lru_cache-like memoizer for `iter_blackjack_items` with hashing of simple dictionaries"""
     cache = OrderedDict()
@@ -159,24 +144,16 @@ def blackjack_normalize(cursor, max_depth=3):
     return DataFrame(dict(iter_blackjack_items(e, max_depth)) for e in cursor)
 
 
-def retrieve_by_context(collection, *, locale, context, include=(), postprocess=()):
+def retrieve_by_context(collection, *, locale, context, id_fields=(), postprocess=()):
     """Run .find() or .aggregate() based on query, projection"""
-    full_projection = {
-        "id.accession": True, "id.assay": True,
-        **context.projection, **{field: True for field in include},
-    }
-    collation = {"locale": locale, "numericOrdering": True}
-    pipeline = [
-        {"$sort": {
-            f: ASCENDING
-            for f in ["id.accession", "id.assay", *include]
-        }},
+    full_projection = {**context.projection, **{"id."+f: 1 for f in id_fields}}
+    sort_by_too = ["id."+f for f in id_fields if "id."+f not in context.sort_by]
+    pipeline=[
+        {"$sort": {f: ASCENDING for f in (*context.sort_by, *sort_by_too)}},
+      *({"$unwind": f"${key}"} for key in context.unwind),
         {"$match": context.query},
         {"$project": {**full_projection, "_id": False}},
+        *postprocess,
     ]
-    if any(key.split(".")[0] == "file" for key in full_projection):
-        pipeline.insert(1, {"$unwind": "$file"})
-    cursor = collection.aggregate(
-        pipeline=[*pipeline, *postprocess], collation=collation,
-    )
-    return cursor, full_projection
+    collation={"locale": locale, "numericOrdering": True}
+    return collection.aggregate(pipeline, collation=collation), full_projection

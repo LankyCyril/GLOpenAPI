@@ -13,14 +13,9 @@ def generic_dataframe(*level_values):
     return DataFrame(columns=MultiIndex.from_tuples(zip(*cyclers)))
 
 
-def metadata_dataframe(*, include=(), object_type="annotation"):
+def metadata_dataframe(*, id_fields, object_type="annotation"):
     """Return an empty dataframe that matches metadata format"""
-    dataframe = generic_dataframe(
-        ["id"], [
-            "accession", "assay",
-            *(c.lstrip("id.").strip(".") for c in include),
-        ],
-    )
+    dataframe = generic_dataframe(["id"], id_fields)
     set_attributes(dataframe, object_type=object_type)
     return dataframe
 

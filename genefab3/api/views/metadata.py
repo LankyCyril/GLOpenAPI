@@ -6,11 +6,11 @@ from genefab3.api.renderers import Placeholders
 from genefab3.common.utils import set_attributes
 
 
-def get_raw_metadata_dataframe(mongo_collections, *, locale, context, include):
+def get_raw_metadata_dataframe(mongo_collections, *, locale, context, id_fields):
     """Get target metadata as a single-level dataframe, numerically sorted by id fields"""
     cursor, full_projection = retrieve_by_context(
         mongo_collections.metadata, locale=locale, context=context,
-        include=include,
+        id_fields=id_fields,
     )
     try:
         dataframe = blackjack_normalize(cursor, max_depth=3)
@@ -39,13 +39,13 @@ def iisaf_sort_dataframe(dataframe):
     return dataframe[sum((sorted(column_order[p]) for p in prefix_order), [])]
 
 
-def get(mongo_collections, *, locale, context, include=(), aggregate=False):
+def get(mongo_collections, *, locale, context, id_fields, aggregate=False):
     """Select assays/samples based on annotation filters"""
     dataframe, full_projection = get_raw_metadata_dataframe( # single-level
-        mongo_collections, locale=locale, context=context, include=include,
+        mongo_collections, locale=locale, context=context, id_fields=id_fields,
     )
     if dataframe.empty:
-        _kw = dict(include=include, object_type="annotation")
+        _kw = dict(id_fields=id_fields, object_type="annotation")
         return Placeholders.metadata_dataframe(**_kw)
     else:
         dataframe = iisaf_sort_dataframe(dataframe)

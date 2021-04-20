@@ -21,14 +21,14 @@ class DefaultRoutes(Routes):
     def assays(self, context):
         return views.metadata.get(
             self.mongo_collections, locale=self.locale, context=context,
-            include=(), aggregate=True,
+            id_fields=["accession", "assay"], aggregate=True,
         )
  
     @Routes.register_endpoint()
     def samples(self, context):
         return views.metadata.get(
             self.mongo_collections, locale=self.locale, context=context,
-            include={"id.sample name"}, aggregate=False,
+            id_fields=["accession", "assay", "sample name"], aggregate=False,
         )
  
     @Routes.register_endpoint()

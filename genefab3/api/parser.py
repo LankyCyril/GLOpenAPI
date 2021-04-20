@@ -6,7 +6,8 @@ from urllib.request import quote
 from json import dumps
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabParserException
-from genefab3.db.mongo.utils import is_safe_token, reduce_projection, is_regex
+from genefab3.db.mongo.utils import is_safe_token, is_regex
+from genefab3.common.types import NestedReducibleDefaultDict
 
 
 CONTEXT_ARGUMENTS = {"debug", "format"}
@@ -62,34 +63,23 @@ class Context():
         self.full_path = request.full_path
         self.view = sub(url_root, "", base_url).strip("/")
         self.complete_kwargs = request.args.to_dict(flat=False)
-        self.query, self.projection = {"$and": []}, {}
+        self.query, self.unwind = {"$and": []}, set()
+        self.projection = {"id.accession": True, "id.assay": True}
+        self.sort_by = ["id.accession", "id.assay"]
         self.parser_errors = []
-        processed_args = set(
+        self.processed_args = set(
             arg for arg, values in request.args.lists()
             if self.update(arg, values, auto_reduce=False)
         )
-        if set(self.projection) & {"file.datatype", "file.filename"}:
-            self.projection.update({"file.filename": 1, "file.datatype": 1})
-        self.projection = reduce_projection(self.projection)
+        self.update_special_fields()
+        self.reduce_projection()
+        self.update_attributes()
         if not self.query["$and"]:
             self.query = {}
         self.identity = quote("?".join([
             self.view, dumps(self.complete_kwargs, sort_keys=True),
         ]))
-        for k, v in request.args.items():
-            if k not in processed_args:
-                if not hasattr(self, k):
-                    setattr(self, k, v)
-                else:
-                    msg = "Cannot set context"
-                    raise GeneFabConfigurationException(msg, **{k: v})
-        self.format = getattr(self, "format", None)
-        self.debug = getattr(self, "debug", "0")
-        for description, scenario in DISALLOWED_CONTEXTS.items():
-            if scenario(self):
-                if self.debug == "0":
-                    raise GeneFabParserException(description)
-                self.parser_errors.append(description)
+        self.validate()
  
     def update(self, arg, values=("",), auto_reduce=True):
         """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections"""
@@ -115,8 +105,48 @@ class Context():
             self.projection.update({k: True for k in projection_keys})
             is_converted_to_query = True
         if auto_reduce:
-            self.projection = reduce_projection(self.projection)
+            self.reduce_projection()
         return is_converted_to_query
+ 
+    def update_special_fields(self):
+        """Automatically adjust projection and unwind pipeline for special fields ('file')"""
+        if set(self.projection) & {"file", "file.datatype", "file.filename"}:
+            self.projection.update({"file.filename": 1, "file.datatype": 1})
+            self.unwind.add("file")
+ 
+    def reduce_projection(self):
+        """Drop longer paths that are extensions of existing shorter paths"""
+        nrdd = NestedReducibleDefaultDict()
+        for key in self.projection:
+            nrdd.descend(key.split("."))
+        for key in sorted(self.projection, reverse=True):
+            v = nrdd.descend(key.split("."))
+            v[True] = [v.clear() if v else None]
+        self.projection = {
+            key: value for key, value in self.projection.items()
+            if nrdd.descend(key.split("."))
+        }
+ 
+    def update_attributes(self):
+        """Push remaining request arguments into self as attributes, set defaults"""
+        for k, v in request.args.items():
+            if k not in self.processed_args:
+                if not hasattr(self, k):
+                    setattr(self, k, v)
+                else:
+                    msg = "Cannot set context"
+                    raise GeneFabConfigurationException(msg, **{k: v})
+        self.format = getattr(self, "format", None)
+        self.debug = getattr(self, "debug", "0")
+ 
+    def validate(self):
+        """Check if any of DISALLOWED_CONTEXTS match current context, collect errors in debug mode, fail in no-debug mode"""
+        for description, scenario in DISALLOWED_CONTEXTS.items():
+            if scenario(self):
+                if self.debug == "0":
+                    raise GeneFabParserException(description)
+                else:
+                    self.parser_errors.append(description)
 
 
 class KeyValueParsers():

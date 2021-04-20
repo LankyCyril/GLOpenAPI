@@ -1,10 +1,14 @@
+from functools import reduce, wraps
+from operator import getitem
 from collections import defaultdict
 from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
-from functools import wraps
 
 
-NestedDefaultDict = lambda: defaultdict(NestedDefaultDict)
+NestedReducibleDefaultDict = lambda: type(
+    "ReducibleDefaultDict", (defaultdict,),
+    dict(descend=lambda self, branch: reduce(getitem, branch, self)),
+)(NestedReducibleDefaultDict)
 
 
 class Adapter():
