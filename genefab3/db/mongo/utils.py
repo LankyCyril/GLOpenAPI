@@ -6,7 +6,7 @@ from collections.abc import ValuesView
 from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabDatabaseException
 from collections import OrderedDict
-from marshal import dumps as marshals
+from marshal import dumps as marsh
 from pymongo import ASCENDING
 
 
@@ -112,28 +112,26 @@ def run_mongo_transaction(action, collection, *, query=None, data=None, document
         )
 
 
-def iter_blackjack_items(e, maxd, head=(), depth=0, marshals=marshals, len=len, _isi=isinstance, dict=dict, join=".".join, cache=OrderedDict()):
-    """Quickly iterate flattened dictionary key-value pairs of known schema in pure Python"""
-    cacheid = marshals(e, 4), maxd, head
-    if cacheid not in cache:
+def blackjack_items(e, max_depth, head, marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple, join=".".join, cache=OrderedDict()):
+    """Quickly iterate flattened dictionary key-value pairs of known schema in pure Python, with LRU caching"""
+    ck = marsh(e, 4), max_depth, head
+    if ck not in cache:
         if len(cache) >= 65536:
             cache.popitem(0)
-        if _isi(e, dict):
-            if depth < maxd:
-                cache[cacheid] = []
-                for k, v in e.items():
-                    for he in iter_blackjack_items(v, maxd, head+(k,), depth+1):
-                        cache[cacheid].append(he)
+        if isinstance(e, dict):
+            if len(head) < max_depth:
+                cache[ck] = sum((tuple(blackjack_items(v, max_depth, head+(k,)))
+                    for k, v in e.items()), ())
             else:
-                cache[cacheid] = ((join(head), e.get("", e)),)
+                cache[ck] = ((join(head), e.get("", e)),)
         else:
-            cache[cacheid] = ((join(head), e),)
-    yield from cache[cacheid]
+            cache[ck] = ((join(head), e),)
+    yield from cache[ck]
 
 
-def blackjack_normalize(cursor, max_depth=3, dict=dict, iter_blackjack_items=iter_blackjack_items):
+def blackjack_normalize(cursor, max_depth=3, dict=dict, blackjack_items=blackjack_items):
     """Quickly flatten iterable of dictionaries of known schema in pure Python"""
-    return DataFrame(dict(iter_blackjack_items(e, max_depth)) for e in cursor)
+    return DataFrame(dict(blackjack_items(e, max_depth, ())) for e in cursor)
 
 
 def retrieve_by_context(collection, *, locale, context, id_fields=(), postprocess=()):
@@ -142,7 +140,7 @@ def retrieve_by_context(collection, *, locale, context, id_fields=(), postproces
     sort_by_too = ["id."+f for f in id_fields if "id."+f not in context.sort_by]
     pipeline=[
         {"$sort": {f: ASCENDING for f in (*context.sort_by, *sort_by_too)}},
-      *({"$unwind": f"${key}"} for key in context.unwind),
+      *({"$unwind": f"${f}"} for f in context.unwind),
         {"$match": context.query},
         {"$project": {**full_projection, "_id": False}},
         *postprocess,
