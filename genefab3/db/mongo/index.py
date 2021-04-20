@@ -7,6 +7,7 @@ from genefab3.db.mongo.utils import run_mongo_transaction
 INFO_SUBKEYS = ["accession", "assay", "sample name"]
 
 METADATA_AUX_TEMPLATE = {
+# TODO: infer this template from keywords of partials in genefab3.api.parser
     "investigation": {
         "study": "true",
         "study assays": "true",

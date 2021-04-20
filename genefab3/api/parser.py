@@ -14,7 +14,7 @@ CONTEXT_ARGUMENTS = {"debug", "format"}
 KEYVALUE_PARSER_DISPATCHER = lru_cache(1)(lambda: {
     "id": partial(
         KeyValueParsers.kvp_assay, category="id", fields_depth=1,
-        constrain_to={"accession", "assay", "sample name", None},
+        constrain_to={"accession", "assay", "sample name", "study", None},
     ),
     "investigation": partial(
         KeyValueParsers.kvp_generic, category="investigation", fields_depth=2,
@@ -36,9 +36,6 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(1)(lambda: {
 })
 
 DISALLOWED_CONTEXTS = {
-    "at least one dataset or annotation category must be specified": lambda c:
-        (not search(r'^(|status|debug.*|favicon\.\S*)$', c.view)) and
-        (len(c.projection) == 0),
     "metadata queries are not valid for /status/": lambda c:
         (c.view == "status") and (leaf_count(c.query) > 0),
     "'file.filename=' can only be specified once": lambda c:
@@ -107,14 +104,10 @@ class Context():
             else:
                 msg = "Unrecognized argument"
                 raise GeneFabParserException(msg, **{arg: values})
-            _depth = parser.keywords["fields_depth"]
-            if len(fields) > _depth:
-                msg = "Too many nested fields in argument"
-                raise GeneFabParserException(msg, arg=arg, max_dots=_depth)
             for value in values:
                 if not is_safe_token(value, allow_regex=(arg=="file.filename")):
                     raise GeneFabParserException("Forbidden value", arg=value)
-                yield from parser(fields=fields, value=value)
+                yield from parser(arg=arg, fields=fields, value=value)
         is_converted_to_query = None
         for query, projection_keys in _it():
             if query:
@@ -128,16 +121,9 @@ class Context():
 
 class KeyValueParsers():
  
-    def kvp_assay(category="id", fields=(), value=None, fields_depth=1, constrain_to=None):
+    def kvp_assay(arg, category="id", fields=(), value=None, fields_depth=1, constrain_to=None):
         """Interpret single key-value pair for dataset / assay constraint"""
-        _exc_kw = {".".join((category, *fields)): value}
-        if not value: # 'id' or 'id.accession' without search value
-            msg = "Argument requires a value"
-            raise GeneFabParserException(msg, **_exc_kw)
-        elif len(fields) > fields_depth:
-            msg = "Too many nested fields in argument"
-            raise GeneFabParserException(msg, max_dots=fields_depth, **_exc_kw)
-        elif len(fields) == 0: # mixed syntax, 'id=GLDS-1|GLDS-2.assay-B'
+        if (not fields) and value: # mixed syntax: 'id=GLDS-1|GLDS-2.assay-B'
             query, projection_keys = {"$or": []}, ()
             for expr in value.split("|"):
                 if expr.count(".") == 0:
@@ -148,31 +134,33 @@ class KeyValueParsers():
                         f"{category}.accession": accession,
                         f"{category}.assay": assay_name,
                     })
-        elif constrain_to and (fields[0] not in constrain_to):
-            msg = "Unrecognized field in argument"
-            raise GeneFabParserException(msg, field=fields[0], **_exc_kw)
-        else: # standard syntax, 'id.accession=GLDS-1'
-            query, projection_keys = {f"{category}.{fields[0]}": value}, ()
-        yield query, projection_keys
+            yield query, projection_keys
+        else: # standard syntax: 'id', 'id.accession', 'id.assay=assayname', ...
+            yield from KeyValueParsers.kvp_generic(
+                arg=arg, category=category, fields=fields, value=value,
+                fields_depth=fields_depth, constrain_to=constrain_to,
+                dot_postfix=None,
+            )
  
-    def kvp_generic(category, fields, value, constrain_to=None, dot_postfix="auto", fields_depth=2):
+    def _infer_postfix(dot_postfix, fields):
+        _auto_postfix_true = (dot_postfix == "auto") and (len(fields) == 2)
+        return "." if ((dot_postfix is True) or _auto_postfix_true) else ""
+ 
+    def kvp_generic(arg, category, fields, value, fields_depth=2, constrain_to=None, dot_postfix="auto"):
         """Interpret single key-value pair if it gives rise to database query"""
-        _exc_kw = {".".join((category, *fields)): value}
         if not fields:
             msg = "Category requires a subfield to be specified"
-            raise GeneFabParserException(msg, category=category, **_exc_kw)
+            raise GeneFabParserException(msg, category=category, **{arg: value})
         elif constrain_to and (fields[0] not in constrain_to):
             msg = "Unrecognized field in argument"
-            raise GeneFabParserException(msg, field=fields[0], **_exc_kw)
+            raise GeneFabParserException(msg, field=fields[0], **{arg: value})
         elif len(fields) > fields_depth:
             msg = "Too many nested fields in argument"
-            raise GeneFabParserException(msg, max_dots=fields_depth, **_exc_kw)
-        _auto_dot_postfix = (dot_postfix == "auto") and (len(fields) == 2)
-        if (dot_postfix is True) or _auto_dot_postfix:
-            projection_key = ".".join((category, *fields))
-            lookup_key = projection_key + "."
+            _kw = {"max_dots": fields_depth}
+            raise GeneFabParserException(msg, **_kw, **{arg: value})
         else:
-            projection_key = lookup_key = ".".join((category, *fields))
+            _dot_postfix = KeyValueParsers._infer_postfix(dot_postfix, fields)
+            lookup_key, projection_key = arg + _dot_postfix, arg
         if value: # metadata field must equal value or one of values
             if is_regex(value):
                 query = {lookup_key: {"$regex": value[1:-1]}}
@@ -182,16 +170,13 @@ class KeyValueParsers():
         else: # metadata field or one of metadata fields must exist
             block_match = search(r'\.[^\.]+\.*$', lookup_key)
             if (not block_match) or (block_match.group().count("|") == 0):
-                # single field must exist (no OR condition):
-                query = {lookup_key: {"$exists": True}}
+                query = {lookup_key: {"$exists": True}} # single field exists
                 projection_keys = {projection_key}
-            else: # either of the fields must exist (OR condition)
+            else: # either of the fields exists (OR condition)
                 head = lookup_key[:block_match.start()]
                 targets = block_match.group().strip(".").split("|")
                 projection_keys = {f"{head}.{target}" for target in targets}
-                if block_match.group()[-1] == ".":
-                    lookup_keys = {k+"." for k in projection_keys}
-                else:
-                    lookup_keys = projection_keys
+                _pfx = "." if (block_match.group()[-1] == ".") else ""
+                lookup_keys = {k+_pfx for k in projection_keys}
                 query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
         yield query, projection_keys
