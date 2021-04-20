@@ -116,16 +116,18 @@ def _iter_blackjack_items_cache(f):
     """Custom lru_cache-like memoizer for `iter_blackjack_items` with hashing of simple dictionaries"""
     cache = OrderedDict()
     @wraps(f)
-    def wrapper(e, max_depth, head=(), depth_tracker=0):
+    def wrapper(e, max_depth=3, head=(), depth_tracker=0, marshals=marshals, len=len, list=list, f=f):
         k = marshals(e, 4), max_depth, head, depth_tracker
-        if (k not in cache) and (len(cache) >= 4096):
-            cache.popitem(last=False)
-        return cache.setdefault(k, list(f(e, max_depth, head, depth_tracker)))
+        if k not in cache:
+            if len(cache) >= 65536:
+                cache.popitem(0)
+            cache[k] = list(f(e, max_depth, head, depth_tracker))
+        return cache[k]
     return wrapper
 
 
 @_iter_blackjack_items_cache
-def iter_blackjack_items(e, max_depth, head=(), depth_tracker=0):
+def iter_blackjack_items(e, max_depth=3, head=(), depth_tracker=0, isinstance=isinstance, dict=dict, join=".".join):
     """Quickly iterate flattened dictionary key-value pairs of known schema in pure Python"""
     if isinstance(e, dict):
         if depth_tracker < max_depth:
@@ -134,12 +136,12 @@ def iter_blackjack_items(e, max_depth, head=(), depth_tracker=0):
                     v, max_depth, head+(k,), depth_tracker+1,
                 )
         else:
-            yield ".".join(head), e.get("", e)
+            yield join(head), e.get("", e)
     else:
-        yield ".".join(head), e
+        yield join(head), e
 
 
-def blackjack_normalize(cursor, max_depth=3):
+def blackjack_normalize(cursor, max_depth=3, dict=dict, iter_blackjack_items=iter_blackjack_items):
     """Quickly flatten iterable of dictionaries of known schema in pure Python"""
     return DataFrame(dict(iter_blackjack_items(e, max_depth)) for e in cursor)
 

@@ -5,10 +5,9 @@ from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
 
 
-NestedReducibleDefaultDict = lambda: type(
-    "ReducibleDefaultDict", (defaultdict,),
-    dict(descend=lambda self, branch: reduce(getitem, branch, self)),
-)(NestedReducibleDefaultDict)
+RDD = type("ReducibleDefaultDict", (defaultdict,),
+    dict(descend=lambda self, branch, r=reduce, g=getitem: r(g, branch, self)))
+NestedReducibleDefaultDict = lambda: RDD(NestedReducibleDefaultDict)
 
 
 class Adapter():
