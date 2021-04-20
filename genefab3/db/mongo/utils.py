@@ -1,6 +1,6 @@
 from pandas import isnull, DataFrame
 from re import sub, search
-from functools import partial, wraps
+from functools import partial
 from bson.errors import InvalidDocument as InvalidDocumentError
 from collections.abc import ValuesView
 from genefab3.common.logger import GeneFabLogger
@@ -112,33 +112,23 @@ def run_mongo_transaction(action, collection, *, query=None, data=None, document
         )
 
 
-def _iter_blackjack_items_cache(f):
-    """Custom lru_cache-like memoizer for `iter_blackjack_items` with hashing of simple dictionaries"""
-    cache = OrderedDict()
-    @wraps(f)
-    def wrapper(e, max_depth=3, head=(), depth_tracker=0, marshals=marshals, len=len, list=list, f=f):
-        k = marshals(e, 4), max_depth, head, depth_tracker
-        if k not in cache:
-            if len(cache) >= 65536:
-                cache.popitem(0)
-            cache[k] = list(f(e, max_depth, head, depth_tracker))
-        return cache[k]
-    return wrapper
-
-
-@_iter_blackjack_items_cache
-def iter_blackjack_items(e, max_depth=3, head=(), depth_tracker=0, isinstance=isinstance, dict=dict, join=".".join):
+def iter_blackjack_items(e, maxd, head=(), depth=0, marshals=marshals, len=len, _isi=isinstance, dict=dict, join=".".join, cache=OrderedDict()):
     """Quickly iterate flattened dictionary key-value pairs of known schema in pure Python"""
-    if isinstance(e, dict):
-        if depth_tracker < max_depth:
-            for k, v in e.items():
-                yield from iter_blackjack_items(
-                    v, max_depth, head+(k,), depth_tracker+1,
-                )
+    cacheid = marshals(e, 4), maxd, head
+    if cacheid not in cache:
+        if len(cache) >= 65536:
+            cache.popitem(0)
+        if _isi(e, dict):
+            if depth < maxd:
+                cache[cacheid] = []
+                for k, v in e.items():
+                    for he in iter_blackjack_items(v, maxd, head+(k,), depth+1):
+                        cache[cacheid].append(he)
+            else:
+                cache[cacheid] = ((join(head), e.get("", e)),)
         else:
-            yield join(head), e.get("", e)
-    else:
-        yield join(head), e
+            cache[cacheid] = ((join(head), e),)
+    yield from cache[cacheid]
 
 
 def blackjack_normalize(cursor, max_depth=3, dict=dict, iter_blackjack_items=iter_blackjack_items):
