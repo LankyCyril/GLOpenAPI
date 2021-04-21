@@ -1,6 +1,7 @@
 from functools import wraps
 from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
+from pandas import DataFrame
 
 
 class Adapter():
@@ -56,3 +57,17 @@ class Routes():
             method = getattr(self, name)
             if isinstance(getattr(method, "endpoint", None), str):
                 yield method.endpoint, method
+
+
+class AnnotationDataFrame(DataFrame):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._metadata.append("accessions")
+        self.accessions = set()
+
+
+class DataDataFrame(DataFrame):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._metadata.extend(["accessions", "datatypes"])
+        self.accessions, self.datatypes = set(), set()

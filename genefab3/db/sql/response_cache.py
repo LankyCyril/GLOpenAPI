@@ -5,7 +5,6 @@ from genefab3.common.logger import GeneFabLogger
 from urllib.request import quote
 from datetime import datetime
 from zlib import compress, decompress, error as ZlibError
-from genefab3.common.utils import get_attribute
 from flask import Response
 
 
@@ -54,11 +53,6 @@ class ResponseCache():
         if self.sqlite_dbs.cache is None:
             return
         _logi, _loge = self.logger.info, self.logger.error
-        obj_accessions = get_attribute(obj, "accessions")
-        if obj_accessions is None:
-            _loge(f"LRU response cache: could not infer accessions used")
-            return
-        accessions = obj_accessions
         api_path = quote(context.full_path)
         blob = Binary(compress(response.get_data()))
         timestamp = int(datetime.now().timestamp())
@@ -77,8 +71,8 @@ class ResponseCache():
                 cursor = connection.cursor()
                 cursor.execute(delete_blob_command)
                 cursor.execute(insert_blob_command, [blob])
-                for acc_repr in (sane_sql_repr(a, _loge) for a in accessions):
-                    args = acc_repr, context.identity
+                for a_repr in (sane_sql_repr(a, _loge) for a in obj.accessions):
+                    args = a_repr, context.identity
                     cursor.execute(make_delete_accession_entry_command(*args))
                     cursor.execute(make_insert_accession_entry_command(*args))
             except OperationalError:

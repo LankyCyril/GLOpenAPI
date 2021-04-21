@@ -90,32 +90,6 @@ def match_mapping(mapping, matchers):
     return dispatcher
 
 
-def set_attributes(obj, **kwargs):
-    """Add custom attributes to object"""
-    if isinstance(obj, DataFrame):
-        for a in kwargs:
-            obj._metadata.append(a)
-    elif isinstance(obj, PandasObject):
-        msg = f"Cannot set attributes to object of this type"
-        raise GeneFabConfigurationException(msg, type=type(obj).__name__)
-    for a, v in kwargs.items():
-        try:
-            setattr(obj, a, v)
-        except Exception as e:
-            msg = f"Cannot set this attribute to object of this type"
-            _kw = dict(type=type(obj).__name__, error=e)
-            raise GeneFabConfigurationException(msg, **{a: v}, **_kw)
-
-
-def get_attribute(obj, a, default=None):
-    """Retrieve custom attribute of object"""
-    value = getattr(obj, a, default)
-    if isinstance(obj, PandasObject) and isinstance(value, PandasObject):
-        return default
-    else:
-        return value
-
-
 def iterate_terminal_leaves(d, step_tracker=1, max_steps=256, isinstance=isinstance, dict=dict, enumerate=enumerate):
     """Descend into branches breadth-first and iterate terminal leaves; supports arbitrary values, does not support caching"""
     if step_tracker >= max_steps:

@@ -3,7 +3,7 @@ from genefab3.common.exceptions import GeneFabFormatException
 from pandas import Series
 from flask import Response
 from functools import partial
-from genefab3.common.utils import get_attribute
+from genefab3.common.types import DataDataFrame
 from genefab3.common.exceptions import GeneFabConfigurationException
 from json import dumps
 
@@ -47,16 +47,15 @@ def cls(obj, context=None, continuous=None, space_sub=lambda s: sub(r'\s', "", s
 
 def gct(obj, context=None, indent=None):
     """Display presumed data dataframe in plaintext GCT format"""
-    datatypes = get_attribute(obj, "datatypes", set())
-    if len(datatypes) == 0:
+    if (not isinstance(obj, DataDataFrame)) or (len(obj.datatypes) == 0):
         msg = "No datatype information associated with retrieved data"
         raise GeneFabConfigurationException(msg)
-    elif len(datatypes) > 1:
+    elif len(obj.datatypes) > 1:
         msg = "GCT format does not support mixed datatypes"
-        raise GeneFabFormatException(msg, datatypes=datatypes)
-    elif next(iter(datatypes)) not in GCT_ALLOWED_DATATYPES:
+        raise GeneFabFormatException(msg, datatypes=obj.datatypes)
+    elif next(iter(obj.datatypes)) not in GCT_ALLOWED_DATATYPES: # TODO use gct_valid as attribute instead
         msg = "GCT format is not valid for given datatype"
-        raise GeneFabFormatException(msg, datatype=datatypes.pop())
+        raise GeneFabFormatException(msg, datatype=obj.datatypes.pop())
     else:
         text = obj.to_csv(sep="\t", index=False, header=False, na_rep="")
         # NaNs left empty: https://www.genepattern.org/file-formats-guide#GCT
@@ -86,7 +85,7 @@ tsv = partial(xsv, sep="\t")
 def json(obj, context=None, indent=None):
     """Display dataframe as JSON""" # TODO: now that bytes are handled in genefab3.api.views.status, could fall back to df.to_json()
     _dump_kws = dict(indent=indent, separators=(",", ":"))
-    if get_attribute(obj, "object_type") == "datatable":
+    if isinstance(obj, DataDataFrame):
         n = 1
     elif "id" in obj:
         n = len(obj["id"].columns)

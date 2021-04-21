@@ -4,7 +4,8 @@ from functools import lru_cache
 from pathlib import Path
 from genefab3.common.logger import GeneFabLogger
 from json import dumps
-from genefab3.common.utils import get_attribute, map_replace
+from genefab3.common.types import AnnotationDataFrame
+from genefab3.common.utils import map_replace
 from flask import Response
 
 
@@ -106,7 +107,7 @@ def twolevel(obj, context, indent=None, frozen=0, squash_preheader=False):
     GeneFabLogger().info("HTML: converting DataFrame into interactive table")
     columndata = dumps(obj.columns.to_list(), separators=(",", ":"))
     rowdata = obj.to_json(orient="values")
-    if get_attribute(obj, "object_type") == "annotation":
+    if isinstance(obj, AnnotationDataFrame) and (context.view != "status"):
         formatters = iterate_formatters(obj, context)
     else:
         formatters = []

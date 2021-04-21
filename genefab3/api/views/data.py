@@ -1,6 +1,6 @@
 from genefab3.db.mongo.utils import retrieve_by_context
 from functools import lru_cache, reduce, partial
-from genefab3.common.utils import pick_reachable_url, set_attributes
+from genefab3.common.utils import pick_reachable_url
 from flask import redirect, Response
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDataManagerException
@@ -153,7 +153,6 @@ def combine_objects(objects):
         if data.index.name is None:
             data.index.name = "index" # best we can do
         data.reset_index(inplace=True, col_level=-1, col_fill="*")
-        set_attributes(data, object_type="datatable")
         return data
     else:
         return combined
@@ -185,10 +184,8 @@ def combined_data(descriptors, sqlite_dbs, adapter):
             descriptors, key=lambda d: (d.get("accession"), d.get("assay")),
         )
     ])
-    set_attributes(
-        data, datatypes=getset("file", "datatype"),
-        accessions=getset("accession"),
-    )
+    data.datatypes = getset("file", "datatype")
+    data.accessions = getset("accession")
     return data
 
 

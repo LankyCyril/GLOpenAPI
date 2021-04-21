@@ -10,10 +10,12 @@ from shutil import copyfileobj
 from tempfile import TemporaryDirectory
 from os import path
 from csv import Error as CSVError, Sniffer
-from pandas import read_csv, read_sql, DataFrame, Index, MultiIndex
+from pandas import read_csv, read_sql, Index, MultiIndex
 from pandas.errors import ParserError as PandasParserError
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDatabaseException
+from genefab3.api.renderers import Placeholders
+from genefab3.common.types import DataDataFrame
 from contextlib import closing
 from sqlite3 import connect, OperationalError
 
@@ -195,7 +197,7 @@ class SQLiteIndexName(str): pass
 
 
 class OndemandSQLiteDataFrame():
-    """DataFrame to be retrieved from SQLite, possibly from multiple tables, including parts of same tabular file"""
+    """DataDataFrame to be retrieved from SQLite, possibly from multiple tables, including parts of same tabular file"""
  
     def __init__(self, sqlite_db, column_dispatcher, columns=None):
         """Interpret `column_dispatcher`"""
@@ -242,7 +244,7 @@ class OndemandSQLiteDataFrame():
             raise ValueError(f"Length mismatch: {m}")
  
     def get(self, *, rows=None, columns=None, limit=None, offset=0):
-        """Interpret arguments in order to retrieve data as DataFrame by running SQL queries"""
+        """Interpret arguments in order to retrieve data as DataDataFrame by running SQL queries"""
         if (offset != 0) and (limit is None):
             msg = "OndemandSQLiteDataFrame: `offset` without `limit`"
             raise GeneFabDatabaseException(msg, table=self.name)
@@ -264,7 +266,7 @@ class OndemandSQLiteDataFrame():
             part = self._column_dispatcher[column]
             part_to_column.setdefault(part, []).append(column)
         if len(part_to_column) == 0:
-            return DataFrame()
+            return Placeholders.EmptyDataDataFrame()
         else:
             args = rows, part_to_column, columns, limit, offset
             return self.__retrieve_natural_join(*args)
@@ -296,7 +298,7 @@ class OndemandSQLiteDataFrame():
                 msg = f"retrieved from SQLite as pandas DataFrame"
                 GeneFabLogger().info(f"{self.name}; {msg}")
                 data.columns = self.columns
-                return data
+                return DataDataFrame(data)
  
     @staticmethod
     def concat(objs, axis=1):
