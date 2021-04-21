@@ -49,7 +49,6 @@ class Context():
         self.query, self.unwind = {"$and": []}, set()
         self.projection = {"id.accession": True, "id.assay": True}
         self.sort_by = ["id.accession", "id.assay"]
-        self.parser_errors = []
         self.processed_args = {
             arg for arg, values in request.args.lists()
             if self.update(arg, values, auto_reduce=False)
