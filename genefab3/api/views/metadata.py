@@ -3,8 +3,8 @@ from genefab3.common.utils import blackjack_normalize
 from pandas import MultiIndex, isnull
 from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException
-from genefab3.common.types import AnnotationDataFrame
 from genefab3.api.renderers import Placeholders
+from genefab3.common.types import AnnotationDataFrame
 
 
 def get_raw_metadata_dataframe(mongo_collections, *, locale, context, id_fields):
@@ -25,7 +25,7 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, context, id_fields)
             msg = "Could not retrieve sorted metadata"
         raise GeneFabDatabaseException(msg, locale=locale, reason=str(e))
     else:
-        return AnnotationDataFrame(dataframe), full_projection
+        return dataframe, full_projection
 
 
 def iisaf_sort_dataframe(dataframe):
@@ -61,4 +61,4 @@ def get(mongo_collections, *, locale, context, id_fields, aggregate=False):
             else: # metadata cols present and can be collapsed into booleans
                 gby = dataframe.groupby(info_cols, as_index=False, sort=False)
                 dataframe = gby.agg(lambda a: ~isnull(a).all())
-        return dataframe
+        return AnnotationDataFrame(dataframe)
