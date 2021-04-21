@@ -185,7 +185,6 @@ def combined_data(descriptors, sqlite_dbs, adapter):
         )
     ])
     data.datatypes = getset("file", "datatype")
-    data.accessions = getset("accession")
     return data
 
 

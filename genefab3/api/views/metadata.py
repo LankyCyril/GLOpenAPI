@@ -61,7 +61,4 @@ def get(mongo_collections, *, locale, context, id_fields, aggregate=False):
             else: # metadata cols present and can be collapsed into booleans
                 gby = dataframe.groupby(info_cols, as_index=False, sort=False)
                 dataframe = gby.agg(lambda a: ~isnull(a).all())
-        dataframe.accessions = set(
-            dataframe[("id", "accession")].drop_duplicates(),
-        )
         return dataframe

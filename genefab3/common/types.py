@@ -60,14 +60,17 @@ class Routes():
 
 
 class AnnotationDataFrame(DataFrame):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._metadata.append("accessions")
-        self.accessions = set()
+    @property
+    def accessions(self):
+        col = ("id", "accession")
+        return set(self[col].drop_duplicates()) if col in self else set()
 
 
 class DataDataFrame(DataFrame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._metadata.extend(["accessions", "datatypes"])
-        self.accessions, self.datatypes = set(), set()
+        self._metadata.append("datatypes")
+        self.datatypes = set()
+    @property
+    def accessions(self):
+        return set(self.columns[1:].get_level_values(0))
