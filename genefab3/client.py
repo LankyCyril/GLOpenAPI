@@ -8,7 +8,7 @@ from genefab3.api.renderer import CacheableRenderer
 from genefab3.common.logger import GeneFabLogger, MongoDBLogger
 from functools import partial
 from genefab3.common.exceptions import traceback_printer, exception_catcher
-from genefab3.api.utils import is_debug, is_flask_reloaded
+from genefab3.common.utils import is_debug, is_flask_reloaded
 from genefab3.db.cacher import CacherThread
 
 

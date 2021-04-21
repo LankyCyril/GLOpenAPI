@@ -1,3 +1,4 @@
+from os import environ
 from contextlib import contextmanager
 from requests import head as request_head
 from urllib.request import urlopen
@@ -12,6 +13,19 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 leaf_count = lambda d: sum(len(v) for v in d.values())
 as_is = lambda _:_
 empty_iterator = lambda *a, **k: []
+
+
+def is_debug():
+    """Determine if app is running in debug mode"""
+    return (
+        environ.get("FLASK_ENV", None)
+        in {"development", "staging", "stage", "debug", "debugging"}
+    )
+
+
+def is_flask_reloaded():
+    """https://stackoverflow.com/a/9476701/590676"""
+    return (environ.get("WERKZEUG_RUN_MAIN", None) == "true")
 
 
 @contextmanager

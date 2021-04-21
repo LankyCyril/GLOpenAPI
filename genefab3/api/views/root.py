@@ -2,9 +2,8 @@ from collections import defaultdict
 from natsort import natsorted
 from functools import lru_cache
 from pathlib import Path
-from genefab3.common.utils import map_replace
+from genefab3.common.utils import map_replace, is_debug
 from json import dumps
-from genefab3.api.utils import is_debug
 
 
 def get_metadata_equals_json(mongo_collections):
