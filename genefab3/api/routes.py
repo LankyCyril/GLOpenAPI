@@ -18,7 +18,7 @@ class DefaultRoutes(Routes):
  
     @Routes.register_endpoint()
     def status(self, context=None) -> DataFrame:
-        return views.status.get(self.mongo_collections)
+        return views.status.get(self.mongo_collections, context=context)
  
     @Routes.register_endpoint()
     def assays(self, context) -> AnnotationDataFrame:

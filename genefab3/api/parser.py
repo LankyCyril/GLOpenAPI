@@ -1,5 +1,5 @@
 from functools import lru_cache, partial
-from genefab3.common.utils import empty_iterator, leaf_count, BranchTracer
+from genefab3.common.utils import empty_iterator, BranchTracer
 from re import search, sub, escape
 from flask import request
 from urllib.request import quote
@@ -33,11 +33,6 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
     ),
 })
 
-DISALLOWED_CONTEXTS = { # TODO: potentially not needed at all now
-    "metadata queries are not valid for /status/": lambda c: # check in views, also for root
-        (c.view == "status") and (leaf_count(c.query) > 0),
-}
-
 
 class Context():
     """Stores request components parsed into MongoDB queries, projections"""
@@ -67,7 +62,6 @@ class Context():
         self.identity = quote("?".join([
             self.view, dumps(self.complete_kwargs, sort_keys=True),
         ]))
-        self.validate()
  
     def update(self, arg, values=("",), auto_reduce=True):
         """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections"""
@@ -121,15 +115,6 @@ class Context():
                     raise GeneFabConfigurationException(msg, **{k: v})
         self.format = getattr(self, "format", None)
         self.debug = getattr(self, "debug", "0")
- 
-    def validate(self):
-        """Check if any of DISALLOWED_CONTEXTS match current context, collect errors in debug mode, fail in no-debug mode"""
-        for description, scenario in DISALLOWED_CONTEXTS.items():
-            if scenario(self):
-                if self.debug == "0":
-                    raise GeneFabParserException(description)
-                else:
-                    self.parser_errors.append(description)
 
 
 class KeyValueParsers():
