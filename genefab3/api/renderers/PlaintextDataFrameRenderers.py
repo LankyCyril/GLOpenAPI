@@ -3,7 +3,7 @@ from genefab3.common.exceptions import GeneFabFormatException
 from pandas import Series
 from flask import Response
 from functools import partial
-from genefab3.common.utils import get_attribute, JSONByteEncoder
+from genefab3.common.utils import get_attribute
 from genefab3.common.exceptions import GeneFabConfigurationException
 from json import dumps
 
@@ -84,8 +84,8 @@ tsv = partial(xsv, sep="\t")
 
 
 def json(obj, context=None, indent=None):
-    """Display dataframe as JSON"""
-    _dump_kws = dict(indent=indent, separators=(",", ":"), cls=JSONByteEncoder)
+    """Display dataframe as JSON""" # TODO: now that bytes are handled in genefab3.api.views.status, could fall back to df.to_json()
+    _dump_kws = dict(indent=indent, separators=(",", ":"))
     if get_attribute(obj, "object_type") == "datatable":
         n = 1
     elif "id" in obj:

@@ -7,7 +7,6 @@ from copy import deepcopy
 from pandas import DataFrame
 from pandas.core.base import PandasObject
 from genefab3.common.exceptions import GeneFabConfigurationException
-from json import JSONEncoder
 
 
 leaf_count = lambda d: sum(len(v) for v in d.values())
@@ -97,15 +96,6 @@ def get_attribute(obj, a, default=None):
         return default
     else:
         return value
-
-
-class JSONByteEncoder(JSONEncoder):
-    """Allow dumps to convert bytes to string reprs"""
-    def default(self, entry):
-        if isinstance(entry, bytes):
-            return str(entry)
-        else:
-            return JSONEncoder.default(self, entry)
 
 
 def iterate_terminal_leaves(d, step_tracker=1, max_steps=256, isinstance=isinstance, dict=dict, enumerate=enumerate):
