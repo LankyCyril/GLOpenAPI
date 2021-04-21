@@ -107,4 +107,4 @@ def json(obj, context=None, indent=None):
         d = obj.values.tolist()
         _json = {"meta": None, "columns": c, "index": None, "data": d}
         content = dumps(_json, **_dump_kws)
-    return Response(content, mimetype="text/json")
+    return Response(content, mimetype="application/json")

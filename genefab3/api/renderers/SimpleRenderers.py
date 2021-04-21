@@ -30,4 +30,4 @@ def _json_default(o):
 def json(obj, context=None, indent=None):
     """Display record in plaintext dump format"""
     content = dumps(obj, indent=indent, default=_json_default)
-    return Response(content, mimetype="text/json")
+    return Response(content, mimetype="application/json")
