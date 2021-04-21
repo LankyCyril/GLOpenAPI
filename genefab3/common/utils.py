@@ -14,7 +14,7 @@ from marshal import dumps as marsh
 
 
 as_is = lambda _:_
-empty_iterator = lambda *a, **k: []
+EmptyIterator = lambda *a, **k: []
 
 
 def is_debug():

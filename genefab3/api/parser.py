@@ -1,5 +1,5 @@
 from functools import lru_cache, partial
-from genefab3.common.utils import empty_iterator, BranchTracer
+from genefab3.common.utils import EmptyIterator, BranchTracer
 from re import search, sub, escape
 from flask import request
 from urllib.request import quote
@@ -68,7 +68,7 @@ class Context():
         if not is_safe_token(arg):
             raise GeneFabParserException("Forbidden argument", arg=arg)
         elif arg in CONTEXT_ARGUMENTS:
-            parser = empty_iterator
+            parser = EmptyIterator
         elif category in KEYVALUE_PARSER_DISPATCHER():
             parser = KEYVALUE_PARSER_DISPATCHER()[category]
         else:
