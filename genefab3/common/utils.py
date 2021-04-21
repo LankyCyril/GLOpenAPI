@@ -13,7 +13,6 @@ from collections import defaultdict, OrderedDict
 from marshal import dumps as marsh
 
 
-leaf_count = lambda d: sum(len(v) for v in d.values())
 as_is = lambda _:_
 empty_iterator = lambda *a, **k: []
 

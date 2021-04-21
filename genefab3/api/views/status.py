@@ -1,4 +1,4 @@
-from genefab3.common.utils import leaf_count
+from genefab3.common.utils import iterate_terminal_leaves
 from genefab3.common.exceptions import GeneFabParserException
 from pandas import json_normalize, MultiIndex
 from datetime import datetime
@@ -13,7 +13,7 @@ STATUS_COLUMNS = [
 
 
 def get(mongo_collections, context):
-    if leaf_count(context.query):
+    for _ in iterate_terminal_leaves(context.query):
         msg = "Metadata queries are not valid for /status/"
         raise GeneFabParserException(msg)
     else:
