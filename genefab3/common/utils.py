@@ -6,7 +6,6 @@ from urllib.error import URLError
 from re import compile, escape
 from copy import deepcopy
 from pandas import DataFrame
-from pandas.core.base import PandasObject
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import partial, reduce
 from operator import getitem
