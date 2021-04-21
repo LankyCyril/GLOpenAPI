@@ -2,7 +2,7 @@ from contextlib import contextmanager
 from requests import head as request_head
 from urllib.request import urlopen
 from urllib.error import URLError
-from re import sub, escape, split
+from re import compile, escape
 from copy import deepcopy
 from pandas import DataFrame
 from pandas.core.base import PandasObject
@@ -39,10 +39,10 @@ def pick_reachable_url(urls, name=None):
     yield _pick()
 
 
-def map_replace(string, mappings):
+def map_replace(string, mappings, compile=compile, join=r'|'.join, escape=escape, map=map):
     """Perform multiple replacements in one go"""
-    pattern = r'|'.join(map(escape, mappings.keys()))
-    return sub(pattern, lambda m: mappings[m.group()], string)
+    pattern = compile(join(map(escape, mappings.keys())))
+    return pattern.sub(lambda m: mappings[m.group()], string)
 
 
 def copy_and_drop(d, drop):
@@ -99,8 +99,17 @@ def get_attribute(obj, a, default=None):
         return value
 
 
-def iterate_terminal_leaves(d, step_tracker=1, max_steps=256):
-    """Descend into branches breadth-first and iterate terminal leaves"""
+class JSONByteEncoder(JSONEncoder):
+    """Allow dumps to convert bytes to string reprs"""
+    def default(self, entry):
+        if isinstance(entry, bytes):
+            return str(entry)
+        else:
+            return JSONEncoder.default(self, entry)
+
+
+def iterate_terminal_leaves(d, step_tracker=1, max_steps=256, isinstance=isinstance, dict=dict, enumerate=enumerate):
+    """Descend into branches breadth-first and iterate terminal leaves; supports arbitrary values, does not support caching"""
     if step_tracker >= max_steps:
         msg = "Document branch exceeds nestedness threshold"
         raise GeneFabConfigurationException(msg, max_steps=max_steps)
@@ -112,17 +121,8 @@ def iterate_terminal_leaves(d, step_tracker=1, max_steps=256):
             yield d
 
 
-def iterate_terminal_leaf_elements(d, sep=r'\s*,\s'):
+def iterate_terminal_leaf_elements(d, iter_leaves=iterate_terminal_leaves, isinstance=isinstance, str=str, pattern=compile(r'\s*,\s')):
     """Get terminal leaf of document and iterate filenames stored in leaf"""
-    for value in iterate_terminal_leaves(d):
+    for value in iter_leaves(d):
         if isinstance(value, str):
-            yield from split(sep, value)
-
-
-class JSONByteEncoder(JSONEncoder):
-    """Allow dumps to convert bytes to string reprs"""
-    def default(self, entry):
-        if isinstance(entry, bytes):
-            return str(entry)
-        else:
-            return JSONEncoder.default(self, entry)
+            yield from pattern.split(value)
