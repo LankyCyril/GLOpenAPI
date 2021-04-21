@@ -8,7 +8,7 @@ from copy import deepcopy
 from pandas import DataFrame
 from pandas.core.base import PandasObject
 from genefab3.common.exceptions import GeneFabConfigurationException
-from functools import reduce
+from functools import partial, reduce
 from operator import getitem
 from collections import defaultdict, OrderedDict
 from marshal import dumps as marsh
@@ -136,15 +136,18 @@ def iterate_terminal_leaf_elements(d, iter_leaves=iterate_terminal_leaves, isins
             yield from pattern.split(value)
 
 
-BranchTracer = lambda: DescendableDefaultDict(BranchTracer)
+BranchTracer = lambda sep: BranchTracerLevel(partial(BranchTracer, sep), sep)
 BranchTracer.__doc__ = """Infinitely nestable and descendable defaultdict"""
-class DescendableDefaultDict(defaultdict):
-    """Potentially infinitely nestable defaultdict that can propagate into nested defaultdicts"""
+class BranchTracerLevel(defaultdict):
+    """Level of BranchTracer; creates nested levels by walking paths with sep"""
+    def __init__(self, factory, sep):
+        super().__init__(factory)
+        self.split = compile(sep).split
     def descend(self, path, reduce=reduce, getitem=getitem):
-        """Propagate into nested defaultdicts, one level down for each key in `path`; return terminal value"""
-        return reduce(getitem, path, self)
+        """Move one level down for each key in `path`; return terminal level"""
+        return reduce(getitem, self.split(path), self)
     def make_terminal(self):
-        """At current level, make branch (i.e. self) truthy and non-descendable"""
+        """Prune descendants of current level (self), but keep self truthy"""
         self[True] = self.clear()
 
 

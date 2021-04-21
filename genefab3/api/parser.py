@@ -111,15 +111,11 @@ class Context():
  
     def reduce_projection(self):
         """Drop longer paths that are extensions of existing shorter paths"""
-        tracer = BranchTracer()
-        paths = [key.split(".") for key in sorted(self.projection, reverse=1)]
-        for path in paths:
-            tracer.descend(path)
-        for path in paths:
-            tracer.descend(path).make_terminal()
+        tracer = BranchTracer(sep=r'\.')
+        for key in sorted(self.projection, reverse=True):
+            tracer.descend(key).make_terminal()
         self.projection = {
-            key: value for key, value in self.projection.items()
-            if tracer.descend(key.split("."))
+            key: v for key, v in self.projection.items() if tracer.descend(key)
         }
  
     def update_attributes(self):

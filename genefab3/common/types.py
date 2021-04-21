@@ -1,4 +1,4 @@
-from functools import reduce
+from functools import wraps
 from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
 
