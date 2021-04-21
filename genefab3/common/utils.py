@@ -8,6 +8,9 @@ from copy import deepcopy
 from pandas import DataFrame
 from pandas.core.base import PandasObject
 from genefab3.common.exceptions import GeneFabConfigurationException
+from functools import reduce
+from operator import getitem
+from collections import defaultdict
 
 
 leaf_count = lambda d: sum(len(v) for v in d.values())
@@ -130,3 +133,15 @@ def iterate_terminal_leaf_elements(d, iter_leaves=iterate_terminal_leaves, isins
     for value in iter_leaves(d):
         if isinstance(value, str):
             yield from pattern.split(value)
+
+
+BranchTracer = lambda: DescendableDefaultDict(BranchTracer)
+BranchTracer.__doc__ = """Infinitely nestable and descendable defaultdict"""
+class DescendableDefaultDict(defaultdict):
+    """Potentially infinitely nestable defaultdict that can propagate into nested defaultdicts"""
+    def descend(self, path, reduce=reduce, getitem=getitem):
+        """Propagate into nested defaultdicts, one level down for each key in `path`; return terminal value"""
+        return reduce(getitem, path, self)
+    def make_terminal(self):
+        """At current level, make branch (i.e. self) truthy and non-descendable"""
+        self[True] = self.clear()

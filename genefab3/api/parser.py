@@ -1,5 +1,5 @@
 from functools import lru_cache, partial
-from genefab3.common.utils import empty_iterator, leaf_count
+from genefab3.common.utils import empty_iterator, leaf_count, BranchTracer
 from re import search, sub, escape
 from flask import request
 from urllib.request import quote
@@ -7,7 +7,6 @@ from json import dumps
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabParserException
 from genefab3.db.mongo.utils import is_safe_token, is_regex
-from genefab3.common.types import BranchTracer
 
 
 CONTEXT_ARGUMENTS = {"debug", "format"}

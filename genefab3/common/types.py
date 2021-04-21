@@ -1,20 +1,6 @@
-from functools import reduce, wraps
-from operator import getitem
-from collections import defaultdict
+from functools import reduce
 from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
-
-
-BranchTracer = lambda: DescendableDefaultDict(BranchTracer)
-BranchTracer.__doc__ = """Infinitely nestable and descendable defaultdict"""
-class DescendableDefaultDict(defaultdict):
-    """Potentially infinitely nestable defaultdict that can propagate into nested defaultdicts"""
-    def descend(self, path, reduce=reduce, getitem=getitem):
-        """Propagate into nested defaultdicts, one level down for each key in `path`; return terminal value"""
-        return reduce(getitem, path, self)
-    def make_terminal(self):
-        """At current level, make branch (i.e. self) truthy and non-descendable"""
-        self[True] = self.clear()
 
 
 class Adapter():
