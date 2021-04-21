@@ -36,10 +36,6 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
 DISALLOWED_CONTEXTS = { # TODO: potentially not needed at all now
     "metadata queries are not valid for /status/": lambda c: # check in views, also for root
         (c.view == "status") and (leaf_count(c.query) > 0),
-    "'file.filename' can only be specified once": lambda c: # don't guard
-        (len(c.complete_kwargs.get("file.filename", [])) > 1),
-    "'file.datatype' can only be specified once": lambda c: # don't guard
-        (len(c.complete_kwargs.get("file.datatype", [])) > 1),
     "'format=cls' is only valid for /samples/": lambda c: # definitely move this to renderers
         (c.view != "samples") and (c.format == "cls"),
     "'format=gct' is only valid for /data/": lambda c: # definitely move this to renderers
