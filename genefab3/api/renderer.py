@@ -9,6 +9,7 @@ from genefab3.common.exceptions import GeneFabFormatException
 from typing import Union
 from functools import wraps
 from genefab3.api.parser import Context
+from copy import deepcopy
 from genefab3.db.sql.response_cache import ResponseCache
 
 
@@ -97,7 +98,9 @@ class CacheableRenderer():
         def wrapper(*args, **kwargs):
             context = Context(self.flask_app)
             if context.debug == "1":
-                _kw = dict(context=context, indent=4)
+                obj = deepcopy(context.__dict__)
+                context.format = "json"
+                _kw = dict(context=context, indent=4, default_format="json")
                 response = self.dispatch_renderer(context.__dict__, **_kw)
             else:
                 return_types, default_format, cached = self._infer_types(method)
