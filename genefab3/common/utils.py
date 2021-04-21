@@ -79,12 +79,11 @@ def iterate_terminal_leaves(d, step_tracker=1, max_steps=256, isinstance=isinsta
     if step_tracker >= max_steps:
         msg = "Document branch exceeds nestedness threshold"
         raise GeneFabConfigurationException(msg, max_steps=max_steps)
+    elif isinstance(d, dict):
+        for i, branch in enumerate(d.values(), start=1):
+            yield from iterate_terminal_leaves(branch, step_tracker+i)
     else:
-        if isinstance(d, dict):
-            for i, branch in enumerate(d.values(), start=1):
-                yield from iterate_terminal_leaves(branch, step_tracker+i)
-        else:
-            yield d
+        yield d
 
 
 def iterate_terminal_leaf_elements(d, iter_leaves=iterate_terminal_leaves, isinstance=isinstance, str=str, pattern=compile(r'\s*,\s')):
