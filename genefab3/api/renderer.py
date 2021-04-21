@@ -1,41 +1,49 @@
+from collections import OrderedDict
 from flask import Response
 from genefab3.api.renderers import SimpleRenderers, PlaintextDataFrameRenderers
 from genefab3.api.renderers import BrowserDataFrameRenderers
+from genefab3.common.types import AnnotationDataFrame, DataDataFrame
 from pandas import DataFrame
-from functools import wraps
-from genefab3.common.utils import match_mapping
-from operator import eq
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabFormatException
+from typing import Union
+from functools import wraps
 from genefab3.api.parser import Context
 from genefab3.db.sql.response_cache import ResponseCache
 
 
-LevelCount = lambda *a:a
-
-TYPE_RENDERERS = {
-    Response: {
-        "raw": {LevelCount(None): lambda obj, *a, **k: obj},
-    },
-    (str, bytes): {
-        "raw": {LevelCount(None): SimpleRenderers.raw},
-        "html": {LevelCount(None): SimpleRenderers.html},
-    },
-    (list, dict): {
-        "json": {LevelCount(None): SimpleRenderers.json},
-    },
-    DataFrame: {
-        "cls": {LevelCount(2): PlaintextDataFrameRenderers.cls},
-        "gct": {LevelCount(3): PlaintextDataFrameRenderers.gct},
-        "csv": {LevelCount(2,3): PlaintextDataFrameRenderers.csv},
-        "tsv": {LevelCount(2,3): PlaintextDataFrameRenderers.tsv},
-        "json": {LevelCount(2,3): PlaintextDataFrameRenderers.json},
-        "browser": {
-            LevelCount(2): BrowserDataFrameRenderers.twolevel,
-            LevelCount(3): BrowserDataFrameRenderers.threelevel,
-        },
-    },
-}
+TYPE_RENDERERS = OrderedDict((
+    (Response, {
+        "raw": lambda obj, *a, **k: obj,
+    }),
+    ((str, bytes), {
+        "raw": SimpleRenderers.raw,
+        "html": SimpleRenderers.html,
+    }),
+    ((list, dict), {
+        "json": SimpleRenderers.json,
+    }),
+    (AnnotationDataFrame, {
+        "cls": PlaintextDataFrameRenderers.cls,
+        "csv": PlaintextDataFrameRenderers.csv,
+        "tsv": PlaintextDataFrameRenderers.tsv,
+        "json": PlaintextDataFrameRenderers.json,
+        "browser": BrowserDataFrameRenderers.twolevel,
+    }),
+    (DataDataFrame, {
+        "gct": PlaintextDataFrameRenderers.gct,
+        "csv": PlaintextDataFrameRenderers.csv,
+        "tsv": PlaintextDataFrameRenderers.tsv,
+        "json": PlaintextDataFrameRenderers.json,
+        "browser": BrowserDataFrameRenderers.threelevel,
+    }),
+    (DataFrame, {
+        "csv": PlaintextDataFrameRenderers.csv,
+        "tsv": PlaintextDataFrameRenderers.tsv,
+        "json": PlaintextDataFrameRenderers.json,
+        "browser": BrowserDataFrameRenderers.twolevel,
+    }),
+))
 
 
 class CacheableRenderer():
@@ -43,26 +51,45 @@ class CacheableRenderer():
  
     def __init__(self, sqlite_dbs, flask_app):
         """Initialize object renderer and LRU cacher"""
-        self.sqlite_dbs = sqlite_dbs
-        self.flask_app = flask_app
+        self.sqlite_dbs, self.flask_app = sqlite_dbs, flask_app
  
-    def dispatch_renderer(self, obj, context, indent=None, fmt="raw"):
+    def _infer_types(self, method):
+        """Infer return types, default format, and cacheability based on type hints of method"""
+        return_type = method.__annotations__.get("return")
+        if return_type is None:
+            return_types = set()
+        elif getattr(return_type, "__origin__", None) is Union:
+            return_types = set(return_type.__args__)
+        else:
+            return_types = {return_type}
+        if return_types & {AnnotationDataFrame, DataDataFrame}:
+            default_format, cacheable = "csv", True
+        elif DataFrame in return_types:
+            default_format, cacheable = "csv", False
+        elif str in return_types:
+            default_format, cacheable = "html", False
+        else:
+            default_format, cacheable = "raw", False
+        return return_types, default_format, cacheable
+ 
+    def dispatch_renderer(self, obj, context, default_format, indent=None):
         """Render `obj` according to its type and passed kwargs"""
         if obj is None:
             raise GeneFabConfigurationException("Route returned no data")
-        nlevels = getattr(getattr(obj, "columns", None), "nlevels", None)
-        matchers = (isinstance, obj), (eq, fmt), (lambda a, b: a in b, nlevels)
-        _error_kws = dict(type=type(obj).__name__, nlevels=nlevels, format=fmt)
-        try:
-            renderer = match_mapping(TYPE_RENDERERS, matchers)
-        except KeyError:
-            msg = "Formatting of unsupported object type"
-            raise GeneFabFormatException(msg, **_error_kws)
-        except ValueError:
-            msg = "Multiple TYPE_RENDERERS match object type"
-            raise GeneFabConfigurationException(msg, **_error_kws)
         else:
-            return renderer(obj, context, indent=indent)
+            for types, fmt_to_renderer in TYPE_RENDERERS.items():
+                if isinstance(obj, types):
+                    if context.format in fmt_to_renderer:
+                        renderer = fmt_to_renderer[context.format]
+                    elif default_format in fmt_to_renderer:
+                        renderer = fmt_to_renderer[default_format]
+                    else:
+                        raise GeneFabFormatException(
+                            "Formatting of unsupported object type",
+                            type=type(obj).__name__, format=context.format,
+                            fallback_format=default_format,
+                        )
+                    return renderer(obj, context, indent=indent)
  
     def __call__(self, method):
         """Render object returned from `method`, put in LRU cache by `context.identity`"""
@@ -70,21 +97,20 @@ class CacheableRenderer():
         def wrapper(*args, **kwargs):
             context = Context(self.flask_app)
             if context.debug == "1":
-                _kw = dict(context=context, indent=4, fmt="json")
+                _kw = dict(context=context, indent=4)
                 response = self.dispatch_renderer(context.__dict__, **_kw)
             else:
-                cacheable = getattr(method, "cache") is True
-                if cacheable:
+                return_types, default_format, cached = self._infer_types(method)
+                if cached:
                     response_cache = ResponseCache(self.sqlite_dbs)
                     response = response_cache.get(context)
                 else:
-                    response_cache = None
-                    response = None
+                    response_cache, response = None, None
                 if response is None:
                     obj = method(*args, context=context, **kwargs)
-                    fmt = context.format or getattr(method, "fmt", "raw")
-                    response = self.dispatch_renderer(obj, context, fmt=fmt)
-                    if response.status_code // 100 == 2:
+                    _kw = dict(context=context, default_format=default_format)
+                    response = self.dispatch_renderer(obj, **_kw)
+                    if response.status_code // 100 == 2: # TODO exact
                         if response_cache is not None:
                             response_cache.put(context, obj, response)
             return response

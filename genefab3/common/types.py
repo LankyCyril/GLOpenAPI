@@ -36,7 +36,7 @@ class Routes():
         self.mongo_collections, self.locale = mongo_collections, locale
         self.sqlite_dbs, self.adapter = sqlite_dbs, adapter
  
-    def register_endpoint(*, endpoint=None, fmt="tsv", cache=True):
+    def register_endpoint(endpoint=None):
         """Decorator that adds `endpoint` and `fmt` attributes to class method"""
         def outer(method):
             @wraps(method)
@@ -47,7 +47,6 @@ class Routes():
             elif hasattr(method, "__name__"):
                 if isinstance(method.__name__, str):
                     inner.endpoint = "/" + method.__name__ + "/"
-            inner.fmt, inner.cache = fmt, cache
             return inner
         return outer
  

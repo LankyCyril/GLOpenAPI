@@ -76,20 +76,6 @@ def deepcopy_and_drop(d, drop):
     return d_copy
 
 
-def match_mapping(mapping, matchers):
-    """Descend into dictionary `mapping` if keys agree with objects as defined in `matchers`"""
-    dispatcher = mapping
-    for method, obj in matchers:
-        children = [c for k, c in dispatcher.items() if method(obj, k)]
-        if len(children) == 0:
-            raise KeyError
-        elif len(children) > 1:
-            raise ValueError
-        else:
-            dispatcher = children[0]
-    return dispatcher
-
-
 def iterate_terminal_leaves(d, step_tracker=1, max_steps=256, isinstance=isinstance, dict=dict, enumerate=enumerate):
     """Descend into branches breadth-first and iterate terminal leaves; supports arbitrary values, does not support caching"""
     if step_tracker >= max_steps:
