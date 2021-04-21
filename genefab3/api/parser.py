@@ -36,10 +36,6 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
 DISALLOWED_CONTEXTS = { # TODO: potentially not needed at all now
     "metadata queries are not valid for /status/": lambda c: # check in views, also for root
         (c.view == "status") and (leaf_count(c.query) > 0),
-    "'format=cls' is only valid for /samples/": lambda c: # definitely move this to renderers
-        (c.view != "samples") and (c.format == "cls"),
-    "'format=gct' is only valid for /data/": lambda c: # definitely move this to renderers
-        (c.view != "data") and (c.format == "gct"),
 }
 
 

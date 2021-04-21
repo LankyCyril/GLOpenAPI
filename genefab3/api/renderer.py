@@ -79,15 +79,15 @@ class CacheableRenderer():
         else:
             for types, fmt_to_renderer in TYPE_RENDERERS.items():
                 if isinstance(obj, types):
-                    if context.format in fmt_to_renderer:
-                        renderer = fmt_to_renderer[context.format]
-                    elif default_format in fmt_to_renderer:
+                    if context.format is None:
                         renderer = fmt_to_renderer[default_format]
+                    elif context.format in fmt_to_renderer:
+                        renderer = fmt_to_renderer[context.format]
                     else:
                         raise GeneFabFormatException(
-                            "Formatting of unsupported object type",
+                            "Requested format not valid for requested data",
                             type=type(obj).__name__, format=context.format,
-                            fallback_format=default_format,
+                            default_format=default_format,
                         )
                     return renderer(obj, context, indent=indent)
  
