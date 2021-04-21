@@ -68,7 +68,7 @@ class AnnotationDataFrame(DataFrame):
 class DataDataFrame(DataFrame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._metadata.append("datatypes")
+        self._metadata.extend(["datatypes", "gct_valid"])
         self.datatypes = set()
     @property
     def accessions(self):

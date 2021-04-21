@@ -8,12 +8,6 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from json import dumps
 
 
-GCT_ALLOWED_DATATYPES = {
-    "processed microarray data", "normalized counts",
-    "unnormalized counts",
-}
-
-
 def cls(obj, context=None, continuous=None, space_sub=lambda s: sub(r'\s', "", s), indent=None):
     """Display presumed annotation/factor dataframe in plaintext CLS format"""
     columns = [c for c in obj.columns if c[0] not in {"id", "file"}]
@@ -53,7 +47,7 @@ def gct(obj, context=None, indent=None):
     elif len(obj.datatypes) > 1:
         msg = "GCT format does not support mixed datatypes"
         raise GeneFabFormatException(msg, datatypes=obj.datatypes)
-    elif next(iter(obj.datatypes)) not in GCT_ALLOWED_DATATYPES: # TODO use gct_valid as attribute instead
+    elif not obj.gct_valid:
         msg = "GCT format is not valid for given datatype"
         raise GeneFabFormatException(msg, datatype=obj.datatypes.pop())
     else:
