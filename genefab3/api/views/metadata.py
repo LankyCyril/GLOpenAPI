@@ -1,4 +1,5 @@
-from genefab3.db.mongo.utils import blackjack_normalize, retrieve_by_context
+from genefab3.db.mongo.utils import retrieve_by_context
+from genefab3.common.utils import blackjack_normalize
 from pandas import MultiIndex, isnull
 from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException

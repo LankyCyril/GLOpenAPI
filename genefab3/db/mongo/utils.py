@@ -1,12 +1,10 @@
-from pandas import isnull, DataFrame
+from pandas import isnull
 from re import sub, search
 from functools import partial
 from bson.errors import InvalidDocument as InvalidDocumentError
 from collections.abc import ValuesView
 from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabDatabaseException
-from collections import OrderedDict
-from marshal import dumps as marsh
 from pymongo import ASCENDING
 
 
@@ -110,28 +108,6 @@ def run_mongo_transaction(action, collection, *, query=None, data=None, document
             error_message, action=action, collection=collection,
             query=query, data=data, documents=documents,
         )
-
-
-def blackjack_items(e, max_depth, head, marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple, join=".".join, cache=OrderedDict()):
-    """Quickly iterate flattened dictionary key-value pairs of known schema in pure Python, with LRU caching"""
-    ck = marsh(e, 4), max_depth, head
-    if ck not in cache:
-        if len(cache) >= 65536:
-            cache.popitem(0)
-        if isinstance(e, dict):
-            if len(head) < max_depth:
-                cache[ck] = sum((tuple(blackjack_items(v, max_depth, head+(k,)))
-                    for k, v in e.items()), ())
-            else:
-                cache[ck] = ((join(head), e.get("", e)),)
-        else:
-            cache[ck] = ((join(head), e),)
-    yield from cache[ck]
-
-
-def blackjack_normalize(cursor, max_depth=3, dict=dict, blackjack_items=blackjack_items):
-    """Quickly flatten iterable of dictionaries of known schema in pure Python"""
-    return DataFrame(dict(blackjack_items(e, max_depth, ())) for e in cursor)
 
 
 def retrieve_by_context(collection, *, locale, context, id_fields=(), postprocess=()):
