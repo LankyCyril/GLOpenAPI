@@ -113,7 +113,7 @@ class Context():
         """Drop longer paths that are extensions of existing shorter paths"""
         tracer = BranchTracer(sep=r'\.')
         for key in sorted(self.projection, reverse=True):
-            tracer.descend(key).make_terminal()
+            tracer.descend(key).make_terminal(truthy=True)
         self.projection = {
             key: v for key, v in self.projection.items() if tracer.descend(key)
         }

@@ -146,9 +146,11 @@ class BranchTracerLevel(defaultdict):
     def descend(self, path, reduce=reduce, getitem=getitem):
         """Move one level down for each key in `path`; return terminal level"""
         return reduce(getitem, self.split(path), self)
-    def make_terminal(self):
-        """Prune descendants of current level (self), but keep self truthy"""
-        self[True] = self.clear()
+    def make_terminal(self, truthy=True):
+        """Prune descendants of current level, optionally marking self truthy"""
+        self.clear()
+        if truthy:
+            self[True] = True # create a non-descendable element
 
 
 def blackjack_items(e, max_depth, head, marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple, join=".".join, cache=OrderedDict()):
