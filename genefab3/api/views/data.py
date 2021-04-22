@@ -9,6 +9,7 @@ from genefab3.db.sql.types import OndemandSQLiteDataFrame
 from genefab3.db.sql.types import CachedTableFile, CachedBinaryFile
 from natsort import natsorted
 from genefab3.common.exceptions import GeneFabDatabaseException
+from urllib.error import HTTPError
 
 
 TECH_TYPE_LOCATOR = "investigation.study assays", "study assay technology type"
@@ -199,7 +200,8 @@ def get(mongo_collections, *, locale, context, sqlite_dbs, adapter):
             msg = "File information missing for entry"
             raise GeneFabDatabaseException(msg, entry=d)
     if not len(descriptors):
-        raise FileNotFoundError("No file found matching specified constraints")
+        msg = "No file found matching specified constraints"
+        raise HTTPError(context.full_path, 404, msg, hdrs=None, fp=None)
     elif context.format == "raw":
         return file_redirect(descriptors)
     else:

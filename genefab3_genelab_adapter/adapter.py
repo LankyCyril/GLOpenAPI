@@ -7,7 +7,6 @@ from urllib.parse import quote
 from re import search, sub
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.types import Adapter
-from genefab3.common.exceptions import GeneFabJSONException
 from warnings import catch_warnings, filterwarnings
 from dateutil.parser import UnknownTimezoneWarning
 from functools import lru_cache
@@ -123,7 +122,7 @@ class GeneLabAdapter(Adapter):
                 read_json(COLD_SEARCH_MASK.format(n_datasets))["hits"]["hits"]
             }
         except (KeyError, TypeError):
-            raise GeneFabJSONException("Malformed GeneLab search JSON")
+            raise GeneFabDataManagerException("Malformed GeneLab search JSON")
  
     def get_files_by_accession(self, accession):
         """Get dictionary of files for dataset available through genelab.nasa.gov/genelabAPIs"""
@@ -133,7 +132,7 @@ class GeneLabAdapter(Adapter):
             assert len(glds_json) == 1
             _id = glds_json[0]["_id"]
         except (AssertionError, IndexError, KeyError, TypeError):
-            raise GeneFabJSONException(
+            raise GeneFabDataManagerException(
                 "Malformed GLDS JSON", accession=accession,
                 url=url, object_type=type(glds_json).__name__,
                 length=getattr(glds_json, "__len__", lambda: None)(),
@@ -144,7 +143,7 @@ class GeneLabAdapter(Adapter):
             filelisting_json = read_json(url)
             assert isinstance(filelisting_json, list)
         except AssertionError:
-            raise GeneFabJSONException(
+            raise GeneFabDataManagerException(
                 "Malformed 'filelistings' JSON", accession=accession, _id=_id,
                 url=url, object_type=type(filelisting_json).__name__,
                 expected_type="list",
