@@ -22,7 +22,6 @@ class GeneFabException(Exception):
 
 class GeneFabConfigurationException(GeneFabException): pass
 class GeneFabParserException(GeneFabException): pass
-class GeneFabMetadataException(GeneFabException): pass
 class GeneFabDatabaseException(GeneFabException): pass
 class GeneFabJSONException(GeneFabException): pass
 class GeneFabISAException(GeneFabException): pass
