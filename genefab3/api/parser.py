@@ -1,15 +1,15 @@
 from functools import lru_cache, partial
-from genefab3.common.utils import EmptyIterator, BranchTracer
 from re import search, sub, escape
 from flask import request
 from urllib.request import quote
 from json import dumps
-from genefab3.common.exceptions import GeneFabConfigurationException
-from genefab3.common.exceptions import GeneFabParserException
 from genefab3.db.mongo.utils import is_safe_token, is_regex
+from genefab3.common.exceptions import GeneFabParserException
+from genefab3.common.utils import EmptyIterator, BranchTracer
+from genefab3.common.exceptions import GeneFabConfigurationException
 
 
-CONTEXT_ARGUMENTS = {"debug", "format"}
+CONTEXT_ARGUMENTS = {"debug": "0", "format": None, "schema": "0"}
 
 KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
     "id": partial(KeyValueParsers.kvp_assay,
@@ -61,7 +61,7 @@ class Context():
         self.identity = quote(dumps(sort_keys=True, separators=(",", ":"), obj={
             "?": self.view, "query": self.query, "sort_by": self.sort_by,
             "unwind": sorted(self.unwind), "projection": self.projection,
-            "format": self.format, "debug": self.debug,
+            "format": self.format, "schema": self.schema, "debug": self.debug,
         }))
  
     def update(self, arg, values=("",), auto_reduce=True):
@@ -115,8 +115,8 @@ class Context():
                 else:
                     msg = "Cannot set context"
                     raise GeneFabConfigurationException(msg, **{k: v})
-        self.format = getattr(self, "format", None)
-        self.debug = getattr(self, "debug", "0")
+        for k, v in CONTEXT_ARGUMENTS.items():
+            setattr(self, k, getattr(self, k, v))
 
 
 class KeyValueParsers():

@@ -101,7 +101,7 @@ class CacheableRenderer():
                 obj = deepcopy(context.__dict__)
                 context.format = "json"
                 _kw = dict(context=context, indent=4, default_format="json")
-                response = self.dispatch_renderer(context.__dict__, **_kw)
+                response = self.dispatch_renderer(obj, **_kw)
             else:
                 return_types, default_format, cached = self._infer_types(method)
                 if cached:
