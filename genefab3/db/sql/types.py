@@ -16,8 +16,9 @@ from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.api.renderers import Placeholders
 from genefab3.common.types import DataDataFrame
-from contextlib import closing
+from contextlib import closing, contextmanager
 from sqlite3 import connect, OperationalError
+from uuid import uuid3, uuid4
 
 
 class SQLiteBlob(SQLiteObject):
@@ -310,16 +311,6 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
             part_to_column.setdefault(part, []).append(column)
         return columns, part_to_column
  
-    def get(self, *, rows=None, columns=None, limit=None, offset=0):
-        """Interpret arguments in order to retrieve data as DataDataFrame by running SQL queries"""
-        self.__validate_get_arguments(rows, offset, limit)
-        columns, part_to_column = self.__make_inverse_column_dispatcher(columns)
-        if len(part_to_column) == 0:
-            return Placeholders.EmptyDataDataFrame()
-        else:
-            args = rows, part_to_column, columns, limit, offset
-            return self.__retrieve_natural_join(*args)
- 
     def __make_natural_join_query(self, rows, part_to_column, columns, limit, offset):
         """Generate SQL query for multipart NATURAL JOIN"""
         joined = " NATURAL JOIN ".join(f"`{p}`" for p in part_to_column)
@@ -338,19 +329,51 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
             _limits = f"LIMIT {limit} OFFSET {offset}"
             return f"SELECT {targets} FROM {joined} {_limits}"
  
-    def __retrieve_natural_join(self, rows, part_to_column, columns, limit, offset):
-        """Retrieve data as DataFrame by running SQL queries"""
-        query = self.__make_natural_join_query(
-            rows, part_to_column, columns, limit, offset,
-        )
-        with closing(connect(self.sqlite_db)) as connection:
+    def get(self, *, rows=None, columns=None, limit=None, offset=0):
+        """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
+        self.__validate_get_arguments(rows, offset, limit)
+        columns, part_to_column = self.__make_inverse_column_dispatcher(columns)
+        if len(part_to_column) == 0:
+            return Placeholders.EmptyDataDataFrame()
+        else:
+            args = rows, part_to_column, columns, limit, offset
+            query = self.__make_natural_join_query(*args)
+            with closing(connect(self.sqlite_db)) as connection:
+                try:
+                    a, k = (query, connection), dict(index_col=self.index.name)
+                    data = read_sql(*a, **k)
+                except OperationalError:
+                    msg = "No data found"
+                    raise GeneFabDatabaseException(msg, table=self.name)
+                else:
+                    msg = f"retrieved from SQLite as pandas DataFrame"
+                    GeneFabLogger().info(f"{self.name}; {msg}")
+                    data.columns = self.columns
+                    return DataDataFrame(data)
+ 
+    @contextmanager
+    def view(self, *, connection, rows=None, columns=None, limit=None, offset=0):
+        """Interpret arguments and temporarily expose requested data as SQL view"""
+        self.__validate_get_arguments(rows, offset, limit)
+        columns, part_to_column = self.__make_inverse_column_dispatcher(columns)
+        if len(part_to_column) == 0:
+            yield None
+        else:
+            args = rows, part_to_column, columns, limit, offset
+            join_query = self.__make_natural_join_query(*args)
+            viewname = uuid3(uuid4(), str(self.name)).hex
+            query = f"CREATE VIEW `{viewname}` AS {join_query}"
             try:
-                data = read_sql(query, connection, index_col=self.index.name)
+                connection.cursor().execute(query)
             except OperationalError:
                 msg = "No data found"
                 raise GeneFabDatabaseException(msg, table=self.name)
             else:
-                msg = f"retrieved from SQLite as pandas DataFrame"
+                msg = f"created temporary SQLite view {viewname}"
                 GeneFabLogger().info(f"{self.name}; {msg}")
-                data.columns = self.columns
-                return DataDataFrame(data)
+                yield viewname
+                try:
+                    connection.cursor().execute(f"DROP VIEW `{viewname}`")
+                except OperationalError:
+                    msg = f"Failed to drop temporary view {viewname}"
+                    GeneFabLogger().error(f"{self.name}; {msg}")
