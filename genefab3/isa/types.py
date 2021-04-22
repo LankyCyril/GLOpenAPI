@@ -1,8 +1,9 @@
 from genefab3.common.types import Adapter
-from genefab3.common.exceptions import GeneFabFileException, GeneFabISAException
+from genefab3.common.exceptions import GeneFabDataManagerException
 from genefab3.db.sql.types import CachedBinaryFile
 from genefab3.isa.parser import IsaFromZip
 from genefab3.common.utils import deepcopy_and_drop, copy_and_drop
+from genefab3.common.exceptions import GeneFabISAException
 from genefab3.common.utils import iterate_terminal_leaf_elements
 
 
@@ -22,7 +23,7 @@ class Dataset():
         if len(isa_files) != 1:
             msg = "File entries for Dataset must contain exactly one ISA file"
             _kw = dict(accession=accession, filenames=set(isa_files))
-            raise GeneFabFileException(msg, **_kw)
+            raise GeneFabDataManagerException(msg, **_kw)
         else:
             isa_name, isa_desc = next(iter(isa_files.items()))
             urls = isa_desc.get("urls", ())

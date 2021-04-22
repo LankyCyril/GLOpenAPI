@@ -74,9 +74,11 @@ def exception_catcher(e, collection, print_to_stderr=False):
     elif isinstance(e, NotImplementedError):
         code, explanation = 501, "Not Implemented"
     elif isinstance(e, GeneFabDataManagerException):
-        code, explanation = 500, "GeneLab Data Manager Internal Server Error"
+        code, explanation = 500, "Data Manager Internal Server Error"
+    elif isinstance(e, GeneFabFileException):
+        code, explanation = 500, "Unresolvable Data Request"
     elif isinstance(e, GeneFabDatabaseException):
-        code, explanation = 500, "GeneLab Database Error"
+        code, explanation = 500, "GeneFab3 Database Error"
     else:
         code, explanation = 400, "Bad Request"
     *_, info = interpret_exc_info(exc_info())
