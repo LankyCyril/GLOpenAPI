@@ -58,9 +58,11 @@ class Context():
         self.update_attributes()
         if not self.query["$and"]:
             self.query = {}
-        self.identity = quote("?".join([
-            self.view, dumps(self.complete_kwargs, sort_keys=True),
-        ]))
+        self.identity = quote(dumps(sort_keys=True, separators=(",", ":"), obj={
+            "?": self.view, "query": self.query, "sort_by": self.sort_by,
+            "unwind": sorted(self.unwind), "projection": self.projection,
+            "format": self.format, "debug": self.debug,
+        }))
  
     def update(self, arg, values=("",), auto_reduce=True):
         """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections"""
@@ -91,7 +93,8 @@ class Context():
     def update_special_fields(self):
         """Automatically adjust projection and unwind pipeline for special fields ('file')"""
         if set(self.projection) & {"file", "file.datatype", "file.filename"}:
-            self.projection.update({"file.filename": 1, "file.datatype": 1})
+            special_projection = {"file.filename": True, "file.datatype": True}
+            self.projection.update(special_projection)
             self.unwind.add("file")
  
     def reduce_projection(self):

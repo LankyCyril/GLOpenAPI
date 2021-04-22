@@ -20,9 +20,11 @@ def html(obj, context=None, indent=None):
 
 
 def _json_default(o):
-    """Serialize numpy entries as native types, other unserializable entries as their type names"""
+    """Serialize numpy entries as native types, sets as informative strings, other unserializable entries as their type names"""
     if isinstance(o, NumpyGenericType):
         return o.item()
+    elif isinstance(o, set):
+        return f"<set>{list(o)}"
     else:
         return str(type(o))
 
