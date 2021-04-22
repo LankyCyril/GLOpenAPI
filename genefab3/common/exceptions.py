@@ -4,22 +4,9 @@ from genefab3.common.logger import log_to_mongo_collection
 
 
 class GeneFabException(Exception):
-    def __init__(self, message="Error", accession_or_object=None, explicit_assay_name=None, **kwargs):
-        from genefab3.isa.types import Dataset
+    def __init__(self, message="Error", **kwargs):
         args = [message]
-        if isinstance(accession_or_object, Dataset):
-            self.accession = accession_or_object.accession
-            self.assay_name = None
-        elif accession_or_object is None:
-            self.accession, self.assay_name = None, None
-        else:
-            self.accession, self.assay_name = str(accession_or_object), None
-        if explicit_assay_name is not None:
-            self.assay_name = explicit_assay_name
-        if self.accession is not None:
-            args.append(f'accession="{self.accession}"')
-        if self.assay_name is not None:
-            args.append(f'assay.name="{self.assay_name}"')
+        self.accession = kwargs.get("accession")
         self.kwargs = kwargs
         for k, v in self.kwargs.items():
             args.append(f'{k}={repr(v)}')

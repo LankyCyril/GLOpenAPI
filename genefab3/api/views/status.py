@@ -14,8 +14,8 @@ STATUS_COLUMNS = [
 
 def get(mongo_collections, context):
     for _ in iterate_terminal_leaves(context.query):
-        msg = "Metadata queries are not valid for /status/"
-        raise GeneFabParserException(msg)
+        msg = "Metadata queries are not valid for view"
+        raise GeneFabParserException(msg, view="status")
     else:
         status_json = mongo_collections.status.find(
             {}, {"_id": False, **{c: True for c in STATUS_COLUMNS}},

@@ -1,6 +1,7 @@
 from genefab3.common.exceptions import GeneFabISAException
 from re import search, sub
 from collections import defaultdict
+from genefab3.common.exceptions import GeneFabConfigurationException
 from numpy import nan
 from genefab3.db.mongo.status import update_status
 from types import SimpleNamespace
@@ -16,7 +17,7 @@ from pandas.errors import ParserError
 class Investigation(dict):
     """Stores GLDS ISA Tab 'investigation' in accessible formats"""
  
-    def __init__(self, raw_investigation):
+    def __init__(self, raw_investigation, status_kwargs):
         """Convert dataframes to JSONs"""
         for real_name, isatools_name, target, pattern in self._key_dispatcher:
             if isatools_name in raw_investigation:
@@ -39,7 +40,8 @@ class Investigation(dict):
                             super().__setitem__(real_name, json[target])
                     except (TypeError, IndexError, KeyError):
                         msg = "Unexpected structure of field"
-                        raise GeneFabISAException(msg, field=real_name)
+                        _kw = dict(field=real_name, **status_kwargs)
+                        raise GeneFabISAException(msg, **_kw)
                 elif target and pattern:
                     try:
                         super().__setitem__(real_name, {
@@ -48,7 +50,8 @@ class Investigation(dict):
                         })
                     except (TypeError, AttributeError, IndexError, KeyError):
                         msg = "Could not break up field by name"
-                        raise GeneFabISAException(msg, field=real_name)
+                        _kw = dict(field=real_name, **status_kwargs)
+                        raise GeneFabISAException(msg, **_kw)
                 else:
                     super().__setitem__(real_name, json)
 
@@ -110,8 +113,8 @@ class StudyEntries(list):
         for name, raw_tab in raw_tabs.items():
             for _, row in raw_tab.iterrows():
                 if "Sample Name" not in row:
-                    error = "Table entry must have 'Sample Name'"
-                    raise GeneFabISAException(error)
+                    msg = f"{self._self_identifier} entry missing 'Sample Name'"
+                    raise GeneFabISAException(msg, **status_kwargs)
                 else:
                     sample_name = row["Sample Name"]
                 json = self._row_to_json(
@@ -120,19 +123,16 @@ class StudyEntries(list):
                 super().append(json)
                 if self._self_identifier == "Study":
                     if sample_name in self._by_sample_name:
-                        error_mask = "Duplicate Sample Name '{}' in studies"
-                        error = error_mask.format(sample_name)
-                        raise GeneFabISAException(
-                            "Duplicate Sample Name in studies",
-                            sample_name=sample_name,
-                        )
+                        msg = "Duplicate 'Sample Name' in Study tab"
+                        _kw = dict(sample_name=sample_name, **status_kwargs)
+                        raise GeneFabISAException(msg, **_kw)
                     else:
                         self._by_sample_name[sample_name] = json
  
     def _abort_lookup(self):
         """Prevents ambiguous lookup through `self._by_sample_name` in inherited classes"""
-        error_mask = "Unique look up by sample name within {} not allowed"
-        raise GeneFabISAException(error_mask.format(type(self).__name__))
+        msg = "Unique lookup by sample name not allowed for type"
+        raise GeneFabConfigurationException(msg, type=type(self).__name__)
  
     def _row_to_json(self, row, name, status_kwargs):
         """Convert single row of table to nested JSON"""
@@ -150,10 +150,13 @@ class StudyEntries(list):
                 else: # e.g. "Characteristics[Age]"
                     qualifiable = self._INPLACE_add_metadatalike(
                         json, field, subfield, value, protocol_ref,
+                        status_kwargs,
                     )
             else: # qualify entry at pointer with second-level field
                 if qualifiable is None:
-                    raise GeneFabISAException("Qualifier before main field")
+                    msg = "Qualifier before main field"
+                    _kw = {field: value, **status_kwargs}
+                    raise GeneFabISAException(msg, **_kw)
                 else:
                     self._INPLACE_qualify(
                         qualifiable, field, subfield, value,
@@ -188,13 +191,14 @@ class StudyEntries(list):
         qualifiable = json[field][-1]
         return qualifiable
  
-    def _INPLACE_add_metadatalike(self, json, field, subfield, value, protocol_ref):
+    def _INPLACE_add_metadatalike(self, json, field, subfield, value, protocol_ref, status_kwargs):
         """Add metadatalike to json (e.g. 'Characteristics' -> 'Age'), qualify with 'Protocol REF', point to resulting field"""
         if field not in json:
             json[field] = {}
         if subfield in json[field]:
-            error = "Duplicate '{}[{}]'".format(field, subfield)
-            raise GeneFabISAException(error)
+            msg = "Duplicate field[subfield]"
+            _kw = dict(field=field, subfield=subfield, **status_kwargs)
+            raise GeneFabISAException(msg, **_kw)
         else: # make {"Characteristics": {"Age": {"": "36"}}}
             json[field][subfield] = {"": value}
             qualifiable = json[field][subfield]
@@ -204,11 +208,11 @@ class StudyEntries(list):
  
     def _INPLACE_qualify(self, qualifiable, field, subfield, value, status_kwargs):
         """Add qualifier to field at pointer (qualifiable)"""
-        if field == "Comment": # make {"Comment": {"mood": "cheerful"}}
+        if field == "Comment": # make {"Comment": {"mood": "cheerful"}} etc
             if "Comment" not in qualifiable:
                 qualifiable["Comment"] = {"": nan}
             qualifiable["Comment"][subfield or ""] = value
-        else: # make {"Unit": "percent"}
+        else: # make {"Unit": "percent"} etc
             if subfield:
                 update_status(
                     **status_kwargs, status="warning",
@@ -228,10 +232,11 @@ class IsaFromZip():
  
     def __init__(self, data, status_kwargs=None):
         """Unpack ZIP from URL and delegate to sub-parsers"""
-        self.raw = self._ingest_raw_isa(data, status_kwargs or {})
-        self.investigation = Investigation(self.raw.investigation)
-        self.studies = StudyEntries(self.raw.studies, status_kwargs or {})
-        self.assays = AssayEntries(self.raw.assays, status_kwargs or {})
+        _status_kws = status_kwargs or {}
+        self.raw = self._ingest_raw_isa(data, _status_kws)
+        self.investigation = Investigation(self.raw.investigation, _status_kws)
+        self.studies = StudyEntries(self.raw.studies, _status_kws)
+        self.assays = AssayEntries(self.raw.assays, _status_kws)
  
     def _ingest_raw_isa(self, data, status_kwargs):
         """Unpack ZIP from URL and delegate to top-level parsers"""

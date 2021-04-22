@@ -134,7 +134,7 @@ class GeneLabAdapter(Adapter):
             _id = glds_json[0]["_id"]
         except (AssertionError, IndexError, KeyError, TypeError):
             raise GeneFabJSONException(
-                "Malformed GLDS JSON", accession,
+                "Malformed GLDS JSON", accession=accession,
                 url=url, object_type=type(glds_json).__name__,
                 length=getattr(glds_json, "__len__", lambda: None)(),
                 target="[0]['_id']",
@@ -145,7 +145,7 @@ class GeneLabAdapter(Adapter):
             assert isinstance(filelisting_json, list)
         except AssertionError:
             raise GeneFabJSONException(
-                "Malformed 'filelistings' JSON", accession, _id=_id,
+                "Malformed 'filelistings' JSON", accession=accession, _id=_id,
                 url=url, object_type=type(filelisting_json).__name__,
                 expected_type="list",
             )

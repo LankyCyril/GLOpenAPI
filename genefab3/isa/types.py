@@ -21,7 +21,8 @@ class Dataset():
         }
         if len(isa_files) != 1:
             msg = "File entries for Dataset must contain exactly one ISA file"
-            raise GeneFabFileException(msg, accession, filenames=set(isa_files))
+            _kw = dict(accession=accession, filenames=set(isa_files))
+            raise GeneFabFileException(msg, **_kw)
         else:
             isa_name, isa_desc = next(iter(isa_files.items()))
             urls = isa_desc.get("urls", ())
@@ -109,7 +110,7 @@ class Sample(dict):
         elif len(matching_study_sample_names) > 1:
             raise GeneFabISAException(
                 "Multiple Study 'Sample Name' entries match Assay entry",
-                self.dataset, assay_sample_name=self.name,
+                accession=self.dataset.accession, assay_sample_name=self.name,
                 matching_study_sample_names=matching_study_sample_names,
             )
  
@@ -133,18 +134,18 @@ class Sample(dict):
             return entry[key][subkey]
         except (TypeError, KeyError):
             msg = "Could not retrieve value of `key.subkey` from Assay entry"
-            raise GeneFabISAException(msg, self.dataset, key=key, subkey=subkey)
+            _kw = dict(accession=self.dataset.accession, key=key, subkey=subkey)
+            raise GeneFabISAException(msg, **_kw)
  
     def _get_unique_primary_value(self, entry, key):
         """Check validity / uniqueness of `key[*].''` in entry and return its value"""
         values = {branch[""] for branch in entry.get(key, {}) if ("" in branch)}
+        _kw = dict(accession=self.dataset.accession, assay_name=self.assay_name)
         if len(values) == 0:
             msg = "Could not retrieve any value of `key` from Assay entry"
-            _kw = dict(assay_name=self.assay_name, key=key)
-            raise GeneFabISAException(msg, self.dataset, **_kw)
+            raise GeneFabISAException(msg, **_kw, key=key)
         elif len(values) > 1:
             msg = "Ambiguous values of `key` for one Assay entry"
-            _kw = dict(assay_name=self.assay_name, key=key, values=values)
-            raise GeneFabISAException(msg, self.dataset, **_kw)
+            raise GeneFabISAException(msg, **_kw, key=key, values=values)
         else:
             return values.pop()

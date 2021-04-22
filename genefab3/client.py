@@ -24,8 +24,8 @@ class GeneFabClient():
             )
             self.sqlite_dbs = self._get_validated_sqlite_dbs(**sqlite_params)
         except TypeError as e:
-            msg = f"During GeneFabClient() initialization, {e}"
-            raise GeneFabConfigurationException(msg)
+            msg = "During GeneFabClient() initialization, exception occurred"
+            raise GeneFabConfigurationException(msg, error=repr(e))
         else:
             self.adapter = AdapterClass()
             self.routes = RoutesClass(
@@ -75,13 +75,14 @@ class GeneFabClient():
         """Check target SQLite3 files are specified correctly, convert to namespace for dot-syntax lookup"""
         if len({blobs, tables, cache}) != 3:
             msg = "SQL databases must all be distinct to avoid name conflicts"
-            raise GeneFabConfigurationException(msg)
+            _kw = dict(blobs=blobs, tables=tables, cache=cache)
+            raise GeneFabConfigurationException(msg, **_kw)
         elif (not isinstance(blobs, str)) or (not isinstance(tables, str)):
-            msg = "SQL databases `blobs` and `tables` must be file paths"
-            raise GeneFabConfigurationException(msg)
+            msg = "SQL databases must be file paths"
+            raise GeneFabConfigurationException(msg, blobs=blobs, tables=tables)
         elif (not isinstance(cache, str)) and (cache is not None):
-            msg = "SQL database `cache` must be a file path or None"
-            raise GeneFabConfigurationException(msg)
+            msg = "SQL database must be a file path or None"
+            raise GeneFabConfigurationException(msg, cache=cache)
         else:
             sqlite_dbs = SimpleNamespace(
                 blobs=blobs, tables=tables, cache=cache,
@@ -92,8 +93,8 @@ class GeneFabClient():
                         with connect(filename):
                             pass
                     except OperationalError:
-                        msg = f"SQL database `{name}` not reachable"
-                        raise GeneFabConfigurationException(msg)
+                        msg = "SQL database not reachable"
+                        raise GeneFabConfigurationException(msg, name=filename)
             return sqlite_dbs
  
     def _init_routes(self):
@@ -127,5 +128,5 @@ class GeneFabClient():
                 )
                 CacherThread(**cacher_thread_params).start()
             except TypeError as e:
-                msg = f"Incorrect `cacher_params` for GeneFabClient(): {e}"
-                raise GeneFabConfigurationException(msg)
+                msg = "Incorrect cacher_params for GeneFabClient()"
+                raise GeneFabConfigurationException(msg, error=repr(e))

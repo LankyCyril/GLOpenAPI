@@ -149,14 +149,14 @@ class KeyValueParsers():
         """Interpret single key-value pair if it gives rise to database query"""
         if not fields:
             msg = "Category requires a subfield to be specified"
-            raise GeneFabParserException(msg, category=category, **{arg: value})
+            raise GeneFabParserException(msg, **{arg: value}, category=category)
         elif constrain_to and (fields[0] not in constrain_to):
             msg = "Unrecognized field in argument"
-            raise GeneFabParserException(msg, field=fields[0], **{arg: value})
+            raise GeneFabParserException(msg, **{arg: value}, field=fields[0])
         elif len(fields) > fields_depth:
             msg = "Too many nested fields in argument"
             _kw = {"max_dots": fields_depth}
-            raise GeneFabParserException(msg, **_kw, **{arg: value})
+            raise GeneFabParserException(msg, **{arg: value}, **_kw)
         else:
             _dot_postfix = KeyValueParsers._infer_postfix(dot_postfix, fields)
             lookup_key, projection_key = arg + _dot_postfix, arg

@@ -76,7 +76,7 @@ class CacheableRenderer():
     def dispatch_renderer(self, obj, context, default_format, indent=None):
         """Render `obj` according to its type and passed kwargs"""
         if obj is None:
-            raise GeneFabConfigurationException("Route returned no data")
+            raise GeneFabConfigurationException("Route returned no object")
         else:
             for types, fmt_to_renderer in TYPE_RENDERERS.items():
                 if isinstance(obj, types):
