@@ -3,7 +3,7 @@ from flask import Response
 from genefab3.api.renderers import SimpleRenderers, PlaintextDataFrameRenderers
 from genefab3.api.renderers import BrowserDataFrameRenderers
 from genefab3.common.types import AnnotationDataFrame, DataDataFrame
-from pandas import DataFrame, Index
+from pandas import DataFrame
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabFormatException
 from typing import Union
