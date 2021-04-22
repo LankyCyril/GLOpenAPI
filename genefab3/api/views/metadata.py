@@ -14,7 +14,7 @@ def get_raw_metadata_dataframe(mongo_collections, *, locale, context, id_fields)
         id_fields=id_fields,
     )
     try:
-        dataframe = blackjack_normalize(cursor, max_depth=3)
+        dataframe = blackjack_normalize(cursor, max_level=2)
     except MongoOperationError as e:
         errmsg = getattr(e, "details", {}).get("errmsg", "").lower()
         has_index = ("id" in mongo_collections.metadata.index_information())

@@ -110,15 +110,15 @@ class BranchTracerLevel(defaultdict):
             self[True] = True # create a non-descendable element
 
 
-def blackjack_items(e, max_depth, head, marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple, join=".".join, cache=OrderedDict()):
+def blackjack_items(e, max_level, head, marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple, join=".".join, cache=OrderedDict()):
     """Quickly iterate flattened dictionary key-value pairs of known schema in pure Python, with LRU caching"""
-    ck = marsh(e, 4), max_depth, head
+    ck = marsh(e, 4), max_level, head
     if ck not in cache:
         if len(cache) >= 65536:
             cache.popitem(0)
         if isinstance(e, dict):
-            if len(head) < max_depth:
-                cache[ck] = sum((tuple(blackjack_items(v, max_depth, head+(k,)))
+            if len(head) <= max_level:
+                cache[ck] = sum((tuple(blackjack_items(v, max_level, head+(k,)))
                     for k, v in e.items()), ())
             else:
                 cache[ck] = ((join(head), e.get("", e)),)
@@ -127,6 +127,6 @@ def blackjack_items(e, max_depth, head, marsh=marsh, len=len, isinstance=isinsta
     yield from cache[ck]
 
 
-def blackjack_normalize(cursor, max_depth=3, dict=dict, blackjack_items=blackjack_items):
+def blackjack_normalize(cursor, max_level=2, dict=dict, blackjack_items=blackjack_items):
     """Quickly flatten iterable of dictionaries of known schema in pure Python"""
-    return DataFrame(dict(blackjack_items(e, max_depth, ())) for e in cursor)
+    return DataFrame(dict(blackjack_items(e, max_level, ())) for e in cursor)
