@@ -5,18 +5,14 @@ from json import dumps
 
 def raw(obj, context=None, indent=None):
     """Display objects of various types in 'raw' format"""
-    if isinstance(obj, str):
-        return Response(obj, mimetype="text/plain")
-    else:
-        return Response(obj, mimetype="application")
+    mimetype = "text/plain" if isinstance(obj, str) else "application"
+    return Response(obj, mimetype=mimetype)
 
 
 def html(obj, context=None, indent=None):
     """Display HTML code"""
-    if isinstance(obj, str):
-        return Response(obj, mimetype="text/html")
-    else:
-        return Response(obj.decode(), mimetype="text/html")
+    content = obj.decode() if isinstance(obj, bytes) else obj
+    return Response(content, mimetype="text/html")
 
 
 def _json_default(o):
