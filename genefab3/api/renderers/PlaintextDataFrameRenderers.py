@@ -1,6 +1,6 @@
 from re import sub, MULTILINE
 from genefab3.common.exceptions import GeneFabFormatException
-from pandas import Series
+from genefab3.common.utils import as_is
 from flask import Response
 from functools import partial
 from genefab3.common.types import DataDataFrame
@@ -29,9 +29,8 @@ def cls(obj, context=None, continuous=None, space_formatter=lambda s: sub(r'\s',
             else:
                 continuous = False
     if continuous is False:
-        space_fmt = space_formatter or (lambda s: s)
-        classes = obj[target].unique()
-        class2id = Series(index=classes, data=range(len(classes)))
+        space_fmt, classes = (space_formatter or as_is), obj[target].unique()
+        class2id = {c: i for i, c in enumerate(classes)}
         _data = [
             [sample_count, len(classes), 1],
             ["# "+space_fmt(classes[0])] + [space_fmt(c) for c in classes[1:]],
