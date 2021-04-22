@@ -45,10 +45,6 @@ class Dataset():
             yield Sample(self, assay_entry)
 
 
-class Assay():
-    pass
-
-
 class Sample(dict):
     """Represents a single Sample entry generated from Assay, Study, general Investigation entries"""
  

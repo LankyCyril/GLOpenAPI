@@ -5,14 +5,11 @@ from genefab3.common.logger import log_to_mongo_collection
 
 class GeneFabException(Exception):
     def __init__(self, message="Error", accession_or_object=None, explicit_assay_name=None, **kwargs):
-        from genefab3.isa.types import Dataset, Assay
+        from genefab3.isa.types import Dataset
         args = [message]
         if isinstance(accession_or_object, Dataset):
             self.accession = accession_or_object.accession
             self.assay_name = None
-        elif isinstance(accession_or_object, Assay):
-            self.accession = accession_or_object.dataset.accession
-            self.assay_name = accession_or_object.name
         elif accession_or_object is None:
             self.accession, self.assay_name = None, None
         else:
