@@ -139,7 +139,7 @@ def get_formatted_data(descriptor, sqlite_db, CachedFile, adapter, _kws):
     return data
 
 
-def combine_objects(objects):
+def combine_objects(objects, context, limit=None):
     """Combine objects and post-process"""
     if len(objects) == 0:
         return None
@@ -150,7 +150,9 @@ def combine_objects(objects):
     else:
         raise NotImplementedError("Merging non-dataframe data objects")
     if isinstance(combined, OndemandSQLiteDataFrame):
-        data = combined.get() # TODO: get() arguments
+        data = combined.get( # TODO: get() arguments
+            limit=1 if (context.schema == "1") else limit,
+        )
         if data.index.name is None:
             data.index.name = "index" # best we can do
         data.reset_index(inplace=True, col_level=-1, col_fill="*")
@@ -159,7 +161,7 @@ def combine_objects(objects):
         return combined
 
 
-def combined_data(descriptors, sqlite_dbs, adapter):
+def combined_data(descriptors, context, sqlite_dbs, adapter):
     """Patch through to cached data for each file and combine them"""
     if len(descriptors) > 1:
         msg, _kw = validate_joinable_files(descriptors)
@@ -179,7 +181,7 @@ def combined_data(descriptors, sqlite_dbs, adapter):
         sqlite_db, CachedFile, _kws = sqlite_dbs.blobs, CachedBinaryFile, {}
     else:
         raise NotImplementedError(f"Joining data of types {types}")
-    data = combine_objects([
+    data = combine_objects(context=context, objects=[
         get_formatted_data(d, sqlite_db, CachedFile, adapter, _kws)
         for d in natsorted(
             descriptors, key=lambda d: (d.get("accession"), d.get("assay")),
@@ -205,4 +207,4 @@ def get(mongo_collections, *, locale, context, sqlite_dbs, adapter):
     elif context.format == "raw":
         return file_redirect(descriptors)
     else:
-        return combined_data(descriptors, sqlite_dbs, adapter)
+        return combined_data(descriptors, context, sqlite_dbs, adapter)
