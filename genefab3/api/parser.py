@@ -1,5 +1,4 @@
 from functools import lru_cache, partial
-from re import search, sub, escape
 from flask import request
 from urllib.request import quote
 from json import dumps
@@ -7,6 +6,7 @@ from genefab3.db.mongo.utils import is_safe_token, is_regex
 from genefab3.common.exceptions import GeneFabParserException
 from genefab3.common.utils import EmptyIterator, BranchTracer
 from genefab3.common.exceptions import GeneFabConfigurationException
+from re import search
 
 
 CONTEXT_ARGUMENTS = {"debug": "0", "format": None, "schema": "0"}
@@ -40,11 +40,9 @@ class Context():
     def __init__(self, flask_app):
         """Parse request components"""
         self.app_name = flask_app.name
-        url_root = escape(request.url_root.strip("/")) # TODO why escape this
-        base_url = request.base_url.strip("/") # but not this?
-        self.url_root = request.url_root
+        self.url_root = request.url_root.rstrip("/")
         self.full_path = request.full_path
-        self.view = sub(url_root, "", base_url).strip("/")
+        self.view = request.path.strip("/")
         self.complete_kwargs = request.args.to_dict(flat=False)
         self.query, self.unwind = {"$and": []}, set()
         self.projection = {"id.accession": True, "id.assay": True}
