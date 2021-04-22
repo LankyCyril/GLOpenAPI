@@ -8,7 +8,7 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from json import dumps
 
 
-def cls(obj, context=None, continuous=None, space_sub=lambda s: sub(r'\s', "", s), indent=None):
+def cls(obj, context=None, continuous=None, space_formatter=lambda s: sub(r'\s', "_", s), indent=None):
     """Display presumed annotation/factor dataframe in plaintext CLS format"""
     if getattr(obj, "cls_valid", None) is not True:
         msg = "Exactly one target assay/study metadata field must be present"
@@ -29,18 +29,19 @@ def cls(obj, context=None, continuous=None, space_sub=lambda s: sub(r'\s', "", s
             else:
                 continuous = False
     if continuous is False:
-        _sub, classes = space_sub or (lambda s: s), obj[target].unique()
+        space_fmt = space_formatter or (lambda s: s)
+        classes = obj[target].unique()
         class2id = Series(index=classes, data=range(len(classes)))
         _data = [
             [sample_count, len(classes), 1],
-            ["# "+_sub(classes[0])] + [_sub(c) for c in classes[1:]],
+            ["# "+space_fmt(classes[0])] + [space_fmt(c) for c in classes[1:]],
             [class2id[v] for v in obj[target]]
         ]
     content = "\n".join(["\t".join([str(f) for f in fs]) for fs in _data])
     return Response(content, mimetype="text/plain")
 
 
-def gct(obj, context=None, indent=None):
+def gct(obj, context=None, indent=None, level_formatter="/".join):
     """Display presumed data dataframe in plaintext GCT format"""
     if (not isinstance(obj, DataDataFrame)) or (len(obj.datatypes) == 0):
         msg = "No datatype information associated with retrieved data"
@@ -57,7 +58,7 @@ def gct(obj, context=None, indent=None):
         content = (
             "#1.2\n{}\t{}\n".format(obj.shape[0], obj.shape[1]-1) +
             "Name\tDescription\t" +
-            "\t".join("/".join(levels) for levels in obj.columns[1:]) +
+            "\t".join(level_formatter(levels) for levels in obj.columns[1:]) +
             "\n" + sub(r'^(.+?\t)', r'\1\1', text, flags=MULTILINE)
         )
         return Response(content, mimetype="text/plain")
