@@ -4,7 +4,7 @@ from genefab3.client import GeneFabClient
 from genefab3_genelab_adapter import GeneLabAdapter
 from genefab3.api.routes import DefaultRoutes
 
-flask_app = Flask("genefab3")
+flask_app = Flask("NASA GeneLab Data API")
 
 genefab3_client = GeneFabClient(
     AdapterClass=GeneLabAdapter,

@@ -103,7 +103,7 @@ def get_view_dependent_links(context):
 def twolevel(obj, context, indent=None, frozen=0, squash_preheader=False):
     """Display dataframe with two-level columns using SlickGrid"""
     _assert_type(obj, nlevels=2)
-    title_postfix = f"{context.view.capitalize()} {context.complete_kwargs}"
+    title_postfix = f"{context.view} {context.complete_kwargs}"
     GeneFabLogger().info("HTML: converting DataFrame into interactive table")
     columndata = dumps(obj.columns.to_list(), separators=(",", ":"))
     rowdata = obj.to_json(orient="values")
