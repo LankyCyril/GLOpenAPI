@@ -3,7 +3,7 @@ from flask import Response
 from genefab3.api.renderers import SimpleRenderers, PlaintextDataFrameRenderers
 from genefab3.api.renderers import BrowserDataFrameRenderers
 from genefab3.common.types import AnnotationDataFrame, DataDataFrame
-from pandas import DataFrame
+from pandas import DataFrame, Index
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabFormatException
 from typing import Union
@@ -73,6 +73,14 @@ class CacheableRenderer():
             default_format, cacheable = "raw", False
         return return_types, default_format, cacheable
  
+    def _schemify(self, obj):
+        """Reduce passed `obj` to representation of column types"""
+        if isinstance(obj, DataFrame):
+            return type(obj)(obj.dtypes.astype(str).to_frame().T)
+        else:
+            msg = "Argument 'schema' is not valid for requested data type"
+            raise GeneFabFormatException(msg, type=type(obj).__name__)
+ 
     def dispatch_renderer(self, obj, context, default_format, indent=None):
         """Render `obj` according to its type and passed kwargs"""
         if obj is None:
@@ -111,6 +119,8 @@ class CacheableRenderer():
                     response_cache, response = None, None
                 if response is None:
                     obj = method(*args, context=context, **kwargs)
+                    if context.schema == "1":
+                        obj = self._schemify(obj)
                     _kw = dict(context=context, default_format=default_format)
                     response = self.dispatch_renderer(obj, **_kw)
                     if response.status_code // 100 == 2: # TODO exact
