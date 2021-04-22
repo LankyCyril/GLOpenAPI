@@ -123,7 +123,7 @@ class CacheableRenderer():
                         obj = self._schemify(obj)
                     _kw = dict(context=context, default_format=default_format)
                     response = self.dispatch_renderer(obj, **_kw)
-                    if response.status_code // 100 == 2: # TODO exact
+                    if response.status_code == 200:
                         if response_cache is not None:
                             response_cache.put(context, obj, response)
             return response
