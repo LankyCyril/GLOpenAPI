@@ -63,13 +63,26 @@ class AnnotationDataFrame(DataFrame):
     def accessions(self):
         col = ("id", "accession")
         return set(self[col].drop_duplicates()) if col in self else set()
+    @property
+    def metadata_columns(self):
+        return [c for c in self.columns if c[0] not in {"id", "file"}]
+    @property
+    def cls_valid(self):
+        return len(self.metadata_columns) == 1
 
 
 class DataDataFrame(DataFrame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._metadata.extend(["datatypes", "gct_valid"])
+        self._metadata.append("datatypes")
         self.datatypes = set()
     @property
     def accessions(self):
-        return set(self.columns[1:].get_level_values(0))
+        return set(self.columns[1:].get_level_values(0)) # TODO: check if has index at this stage
+    @property
+    def gct_valid(self):
+        return (len(self.datatypes) == 1) and (next(iter(self.datatypes)) in {
+            # TODO: move to adapter, accommodate logic
+            "processed microarray data", "normalized counts",
+            "unnormalized counts",
+        })

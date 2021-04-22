@@ -13,11 +13,6 @@ from genefab3.common.exceptions import GeneFabDatabaseException
 
 TECH_TYPE_LOCATOR = "investigation.study assays", "study assay technology type"
 
-GCT_DATATYPES = { # TODO: move to adapter, accommodate logic
-    "processed microarray data", "normalized counts",
-    "unnormalized counts",
-}
-
 
 def get_file_descriptors(mongo_collections, *, locale, context):
     """Return DataFrame of file descriptors that match user query"""
@@ -191,7 +186,6 @@ def combined_data(descriptors, sqlite_dbs, adapter):
     ])
     _dtp = getset("file", "datatype")
     data.datatypes = _dtp
-    data.gct_valid = (len(_dtp) == 1) and (next(iter(_dtp)) in GCT_DATATYPES)
     return data
 
 

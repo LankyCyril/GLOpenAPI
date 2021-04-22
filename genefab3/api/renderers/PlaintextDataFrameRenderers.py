@@ -10,11 +10,12 @@ from json import dumps
 
 def cls(obj, context=None, continuous=None, space_sub=lambda s: sub(r'\s', "", s), indent=None):
     """Display presumed annotation/factor dataframe in plaintext CLS format"""
-    columns = [c for c in obj.columns if c[0] not in {"id", "file"}]
-    if len(columns) != 1:
+    if getattr(obj, "cls_valid", None) is not True:
         msg = "Exactly one target assay/study metadata field must be present"
-        raise GeneFabFormatException(msg, target_columns=columns, format="cls")
-    target, sample_count = columns[0], obj.shape[0]
+        _kw = dict(target_columns=getattr(obj, "metadata_columns", []))
+        raise GeneFabFormatException(msg, **_kw, format="cls")
+    else:
+        target, sample_count = obj.metadata_columns[0], obj.shape[0]
     if (continuous is None) or (continuous is True):
         try:
             _data = [

@@ -1,4 +1,4 @@
-from pandas import DataFrame
+from pandas import DataFrame, MultiIndex
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import lru_cache
 from pathlib import Path
@@ -88,12 +88,12 @@ SQUASHED_PREHEADER_CSS = """
 """
 
 
-def get_view_dependent_links(context):
+def get_view_dependent_links(obj, context):
     """Add CLS/GCT links to samples and data views, respectively"""
-    if context.view == "samples":
+    if getattr(obj, "cls_valid", None) is True:
         url = build_url(context, drop={"format"}) + "format=cls"
         return f", <a style='color:#D10' href='{url}'>cls</a>"
-    elif context.view == "data":
+    elif getattr(obj, "gct_valid", None) is True:
         url = build_url(context, drop={"format"}) + "format=gct"
         return f", <a style='color:#D10' href='{url}'>gct</a>"
     else:
@@ -117,7 +117,7 @@ def twolevel(obj, context, indent=None, frozen=0, squash_preheader=False):
         "$CSVLINK": build_url(context, drop={"format"}) + "format=csv",
         "$TSVLINK": build_url(context, drop={"format"}) + "format=tsv",
         "$JSONLINK": build_url(context, drop={"format"}) + "format=json",
-        "$VIEWDEPENDENTLINKS": get_view_dependent_links(context),
+        "$VIEWDEPENDENTLINKS": get_view_dependent_links(obj, context),
         "$ASSAYSVIEW": build_url(context, "assays"),
         "$SAMPLESVIEW": build_url(context, "samples"),
         "$DATAVIEW": build_url(context, "data"),
@@ -133,9 +133,7 @@ def twolevel(obj, context, indent=None, frozen=0, squash_preheader=False):
 def threelevel(obj, context, indent=None):
     """Squash two top levels of dataframe columns and display as two-level"""
     _assert_type(obj, nlevels=3)
-    squashed_names = (f"{l0}<br>{l1}" for l0, l1, _ in obj.columns)
-    renamer = lambda *a: next(squashed_names)
-    return twolevel(
-        obj.droplevel(0, axis=1).rename(renamer, axis=1, level=0),
-        context=context, squash_preheader=True,
-    )
+    obj.columns = MultiIndex.from_tuples((
+        (f"{a}<br>{b}", c) for (a, b, c) in obj.columns
+    ))
+    return twolevel(obj, context=context, squash_preheader=True)
