@@ -197,6 +197,46 @@ class SQLiteIndexName(str): pass
 
 
 class OndemandSQLiteDataFrame():
+ 
+    @staticmethod
+    def concat(objs, axis=1):
+        """Concatenate OndemandSQLiteDataFrame objects without evaluation"""
+        _t, _t_s = "OndemandSQLiteDataFrame", "OndemandSQLiteDataFrame_Single"
+        if not all(isinstance(o, OndemandSQLiteDataFrame_Single) for o in objs):
+            raise TypeError(f"{_t}.concat() on non-{_t_s} objects")
+        elif axis != 1:
+            raise ValueError(f"{_t}.concat(..., axis={axis}) makes no sense")
+        elif len(set(obj.sqlite_db for obj in objs)) != 1:
+            msg = f"Concatenating {_t} objects from different database files"
+            raise ValueError(msg)
+        elif len(set(obj.index.name for obj in objs)) != 1:
+            msg = f"Concatenating {_t} objects with differing index names"
+            raise ValueError(msg)
+        elif len(set(obj.columns.nlevels for obj in objs)) != 1:
+            msg = f"Concatenating {_t} objects with differing column `nlevels`"
+            raise ValueError(msg)
+        else:
+            column_dispatcher = OrderedDict()
+            for obj in objs:
+                for n, p in obj._column_dispatcher.items():
+                    if n in column_dispatcher:
+                        if not isinstance(n, SQLiteIndexName):
+                            e = f"duplicate column name: {n}"
+                            msg = f"Cannot merge multiple {_t} objects with {e}"
+                            raise IndexError(msg)
+                    else:
+                        column_dispatcher[n] = p
+            if objs[0].columns.nlevels == 1:
+                _mkindex = Index
+            else:
+                _mkindex = MultiIndex.from_tuples
+            columns = _mkindex(sum((obj.columns.to_list() for obj in objs), []))
+            return OndemandSQLiteDataFrame_Single(
+                objs[0].sqlite_db, column_dispatcher, columns,
+            )
+
+
+class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
     """DataDataFrame to be retrieved from SQLite, possibly from multiple tables, including parts of same tabular file"""
  
     def __init__(self, sqlite_db, column_dispatcher, columns=None):
@@ -243,13 +283,16 @@ class OndemandSQLiteDataFrame():
             m = f"Expected axis has {c} elements, new values have {v} elements"
             raise ValueError(f"Length mismatch: {m}")
  
-    def get(self, *, rows=None, columns=None, limit=None, offset=0):
-        """Interpret arguments in order to retrieve data as DataDataFrame by running SQL queries"""
+    def __validate_get_arguments(self, rows, offset, limit):
+        """Validate arguments to OndemandSQLiteDataFrame_Single.get()"""
         if (offset != 0) and (limit is None):
             msg = "OndemandSQLiteDataFrame: `offset` without `limit`"
             raise GeneFabDatabaseException(msg, table=self.name)
         if rows is not None:
             raise NotImplementedError("Slicing by row names")
+ 
+    def __make_inverse_column_dispatcher(self, columns):
+        """Validate arguments and make `columns`, `part_to_column`"""
         if columns is not None:
             _cs = set(columns)
             if len(_cs) != len(columns):
@@ -265,31 +308,43 @@ class OndemandSQLiteDataFrame():
         for column in (self._raw_columns if columns is None else columns):
             part = self._column_dispatcher[column]
             part_to_column.setdefault(part, []).append(column)
+        return columns, part_to_column
+ 
+    def get(self, *, rows=None, columns=None, limit=None, offset=0):
+        """Interpret arguments in order to retrieve data as DataDataFrame by running SQL queries"""
+        self.__validate_get_arguments(rows, offset, limit)
+        columns, part_to_column = self.__make_inverse_column_dispatcher(columns)
         if len(part_to_column) == 0:
             return Placeholders.EmptyDataDataFrame()
         else:
             args = rows, part_to_column, columns, limit, offset
             return self.__retrieve_natural_join(*args)
  
-    def __retrieve_natural_join(self, rows, part_to_column, columns, limit, offset):
-        """Retrieve data as DataFrame by running SQL queries"""
+    def __make_natural_join_query(self, rows, part_to_column, columns, limit, offset):
+        """Generate SQL query for multipart NATURAL JOIN"""
         joined = " NATURAL JOIN ".join(f"`{p}`" for p in part_to_column)
         first_table = next(iter(part_to_column))
         targets = ",".join((
             f"`{first_table}`.`{self.index.name}`",
             *(f"`{c}`" for c in columns),
         ))
+        _n, _m = len(columns), len(part_to_column)
+        _tt = "\n\t".join(("", *part_to_column))
+        msg = f"retrieving {_n} columns from {_m} table(s):{_tt}"
+        GeneFabLogger().info(f"{self.name}; {msg}")
+        if limit is None:
+            return f"SELECT {targets} FROM {joined}"
+        else:
+            _limits = f"LIMIT {limit} OFFSET {offset}"
+            return f"SELECT {targets} FROM {joined} {_limits}"
+ 
+    def __retrieve_natural_join(self, rows, part_to_column, columns, limit, offset):
+        """Retrieve data as DataFrame by running SQL queries"""
+        query = self.__make_natural_join_query(
+            rows, part_to_column, columns, limit, offset,
+        )
         with closing(connect(self.sqlite_db)) as connection:
-            _n, _m = len(columns), len(part_to_column)
-            _tt = "\n\t".join(("", *part_to_column))
-            msg = f"retrieving {_n} columns from {_m} table(s):{_tt}"
-            GeneFabLogger().info(f"{self.name}; {msg}")
             try:
-                if limit is None:
-                    query = f"SELECT {targets} FROM {joined}"
-                else:
-                    _limits = f"LIMIT {limit} OFFSET {offset}"
-                    query = f"SELECT {targets} FROM {joined} {_limits}"
                 data = read_sql(query, connection, index_col=self.index.name)
             except OperationalError:
                 msg = "No data found"
@@ -299,40 +354,3 @@ class OndemandSQLiteDataFrame():
                 GeneFabLogger().info(f"{self.name}; {msg}")
                 data.columns = self.columns
                 return DataDataFrame(data)
- 
-    @staticmethod
-    def concat(objs, axis=1):
-        """Concatenate OndemandSQLiteDataFrame objects without evaluation"""
-        _t = "OndemandSQLiteDataFrame"
-        if axis != 1:
-            raise ValueError(f"{_t}.concat(..., axis={axis}) makes no sense")
-        elif not all(isinstance(obj, OndemandSQLiteDataFrame) for obj in objs):
-            raise TypeError(f"{_t}.concat() on non-{_t} objects")
-        elif len(set(obj.sqlite_db for obj in objs)) != 1:
-            msg = f"Concatenating {_t} objects from different database files"
-            raise ValueError(msg)
-        elif len(set(obj.index.name for obj in objs)) != 1:
-            msg = f"Concatenating {_t} objects with differing index names"
-            raise ValueError(msg)
-        elif len(set(obj.columns.nlevels for obj in objs)) != 1:
-            msg = f"Concatenating {_t} objects with differing column `nlevels`"
-            raise ValueError(msg)
-        else:
-            column_dispatcher = OrderedDict()
-            for obj in objs:
-                for n, p in obj._column_dispatcher.items():
-                    if n in column_dispatcher:
-                        if not isinstance(n, SQLiteIndexName):
-                            e = f"duplicate column name: {n}"
-                            msg = f"Cannot merge multiple {_t} objects with {e}"
-                            raise IndexError(msg)
-                    else:
-                        column_dispatcher[n] = p
-            if objs[0].columns.nlevels == 1:
-                _mkindex = Index
-            else:
-                _mkindex = MultiIndex.from_tuples
-            columns = _mkindex(sum((obj.columns.to_list() for obj in objs), []))
-            return OndemandSQLiteDataFrame(
-                objs[0].sqlite_db, column_dispatcher, columns,
-            )

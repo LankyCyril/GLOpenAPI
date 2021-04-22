@@ -216,10 +216,10 @@ class SQLiteObject():
             msg = "No data found"
             raise GeneFabDatabaseException(msg, signature=self.__signature)
         else:
-            from genefab3.db.sql.types import OndemandSQLiteDataFrame
-            return postprocess_function(
-                OndemandSQLiteDataFrame(self.__sqlite_db, column_dispatcher),
-            )
+            from genefab3.db.sql.types import OndemandSQLiteDataFrame_Single
+            return postprocess_function(OndemandSQLiteDataFrame_Single(
+                self.__sqlite_db, column_dispatcher,
+            ))
  
     def __retrieve(self):
         """Retrieve target table or table field from database"""
