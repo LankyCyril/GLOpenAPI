@@ -78,7 +78,7 @@ class DataDataFrame(DataFrame):
         self.datatypes = set()
     @property
     def accessions(self):
-        return set(self.columns[1:].get_level_values(0)) # TODO: check if has index at this stage
+        return set(self.columns[1:].get_level_values(0))
     @property
     def gct_valid(self):
         return (len(self.datatypes) == 1) and (next(iter(self.datatypes)) in {
