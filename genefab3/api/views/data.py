@@ -96,13 +96,29 @@ def INPLACE_process_dataframe(dataframe, *, mongo_collections, descriptor, best_
     all_sample_names = natsorted(match_sample_names_to_file_descriptor(
         mongo_collections.metadata, descriptor,
     ))
-    column_order, harmonized_column_order = harmonize_columns(
-        dataframe, descriptor, all_sample_names, best_sample_name_matches,
-    )
-    if not (dataframe.columns == column_order).all():
-        for column in column_order: # reorder columns in-place
-            dataframe[column] = dataframe.pop(column)
-    dataframe.columns = harmonized_column_order
+    if descriptor["file"].get("index_subset") == "sample name":
+        if descriptor["file"].get("column_subset") == "sample name":
+            msg = "Processing data with both index_subset and column_subset"
+            raise NotImplementedError(msg)
+        else:
+            index_order, harmonized_index_order = harmonize_columns(
+                dataframe.T, descriptor, all_sample_names,
+                best_sample_name_matches,
+            )
+            if not (dataframe.index == index_order).all():
+                for ix in index_order: # reorder rows in-place:
+                    row = dataframe.loc[ix]
+                    dataframe.drop(index=ix, inplace=True)
+                    dataframe.loc[ix] = row
+            dataframe.index = harmonized_index_order
+    else:
+        column_order, harmonized_column_order = harmonize_columns(
+            dataframe, descriptor, all_sample_names, best_sample_name_matches,
+        )
+        if not (dataframe.columns == column_order).all():
+            for column in column_order: # reorder columns in-place
+                dataframe[column] = dataframe.pop(column)
+        dataframe.columns = harmonized_column_order
 
 
 def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, adapter, _kws):

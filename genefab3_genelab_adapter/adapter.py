@@ -60,11 +60,11 @@ KNOWN_DATATYPES = {
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_contrasts\.csv$':
         datatype("differential expression contrasts"),
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table\.csv$':
-        tabletype("visualization table", internal=True,
-            condition=is_expression_profiling),
+        tabletype("visualization table",
+            internal=True, condition=is_expression_profiling),
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table\.csv$':
-        tabletype("pca", index_name="sample name", internal=True,
-            condition=is_expression_profiling),
+        tabletype("pca", index_name="sample name", index_subset="sample name",
+            internal=True, condition=is_expression_profiling),
 }
 
 
