@@ -43,7 +43,7 @@ def get_metadata_assays(mongo_collections):
     for entry in mongo_collections.metadata.distinct("id"):
         metadata_assays[entry["accession"]].add(entry["assay"])
     return {
-        k: {**{v: True for v in natsorted(metadata_assays[k])}, "": True}
+        k: {**{f"/{v}": True for v in natsorted(metadata_assays[k])}, "": True}
         for k in natsorted(metadata_assays)
     }
 

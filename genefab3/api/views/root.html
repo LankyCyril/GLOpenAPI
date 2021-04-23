@@ -75,10 +75,13 @@ var metadata = {
 };
 
 function trimmed_option(key) {
-    if (key.length <= 64)
-        return key;
+    var strkey = key.toString()
+    if (strkey[0] === "/")
+        strkey = strkey.substring(1)
+    if (strkey.length <= 64)
+        return strkey;
     else
-        return key.substring(0, 61) + "...";
+        return strkey.substring(0, 61) + "...";
 }
 
 function refresh_all_dropdowns() {
@@ -253,6 +256,9 @@ function generate_url() {
         $(".meta-" + TARGETS[i]).each(function () {
             if ($(this).children("input[type=checkbox]").prop("checked")) {
                 $(this).find(".key-level").each(function () {
+                    var this_val = $(this).val().toString();
+                    if (this_val[0] === "/")
+                        url = url.replace(/\.+$/g, "");
                     url += escape($(this).val()) + ".";
                 });
                 var keyunion_level_dropdowns = $(this).find(".keyunion-level");

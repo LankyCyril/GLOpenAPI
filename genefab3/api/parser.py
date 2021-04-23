@@ -119,19 +119,17 @@ class Context():
 
 class KeyValueParsers():
  
-    def kvp_assay(arg, category, fields, value, fields_depth=1, constrain_to=None, mix_separator="."):
+    def kvp_assay(arg, category, fields, value, fields_depth=1, constrain_to=None, mix_separator="/"):
         """Interpret single key-value pair for dataset / assay constraint"""
         if (not fields) and value: # mixed syntax: 'id=GLDS-1|GLDS-2.assay-B'
             query, projection_keys = {"$or": []}, ()
             for expr in value.split("|"):
-                if expr.count(mix_separator) == 0:
-                    query["$or"].append({f"{category}.accession": expr})
-                else:
-                    accession, assay_name = expr.split(mix_separator, 1)
-                    query["$or"].append({
-                        f"{category}.accession": accession,
-                        f"{category}.assay": assay_name,
-                    })
+                query["$or"].append({
+                    f"{category}.{field}": part for field, part in zip(
+                        ["accession", "assay", "sample name"],
+                        expr.split(mix_separator, 2),
+                    )
+                })
             yield query, projection_keys
         else: # standard syntax: 'id', 'id.accession', 'id.assay=assayname', ...
             yield from KeyValueParsers.kvp_generic(
