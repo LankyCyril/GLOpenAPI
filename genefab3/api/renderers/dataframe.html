@@ -223,8 +223,9 @@ grid.onSort.subscribe(function(e, args) {
                 ((v1 === "NaN") || (v1 === null) || (v1 === "null"))
                 ? (((v2 === "NaN") || (v2 === null) || (v2 === "null")) ? 0 : -1)
                 : (((v2 === "NaN") || (v2 === null) || (v2 === "null"))
-                    ? 1
-                    : v1.localeCompare(v2, undefined, {numeric: true})
+                    ? 1 : v1.toString().localeCompare(
+                        v2, undefined, {numeric: true}
+                    )
                 )
             );
             if (ans != 0) return ans;
