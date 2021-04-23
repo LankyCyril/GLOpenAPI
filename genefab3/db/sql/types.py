@@ -200,6 +200,21 @@ class SQLiteIndexName(str): pass
 
 class OndemandSQLiteDataFrame():
  
+    @property
+    def columns(self): return self._columns
+    @columns.setter
+    def columns(self, value):
+        if isinstance(value, Index):
+            all_levels, last_level = value, value.get_level_values(-1)
+        else:
+            all_levels, last_level = Index(value), value
+        if set(last_level) <= set(self._raw_columns):
+            self._raw_columns, self._columns = list(last_level), all_levels
+        else:
+            msg = f"Setting foreign column(s) to OndemandSQLiteDataFrame"
+            foreign = sorted(set(last_level) - set(self._raw_columns))
+            raise GeneFabFileException(msg, columns=foreign)
+ 
     @staticmethod
     def concat(objs, axis=1):
         """Concatenate OndemandSQLiteDataFrame objects without evaluation"""
@@ -260,7 +275,7 @@ def _make_view(connection, query):
 class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
     """DataDataFrame to be retrieved from SQLite, possibly from multiple parts of same tabular file"""
  
-    def __init__(self, sqlite_db, column_dispatcher, columns=None):
+    def __init__(self, sqlite_db, column_dispatcher):
         """Interpret `column_dispatcher`"""
         self.sqlite_db = sqlite_db
         self._column_dispatcher = column_dispatcher
@@ -283,26 +298,7 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
             _kw = dict(table=self.name, index_names=_index_names)
             raise GeneFabDatabaseException(msg, **_kw)
         self.index = Index([], name=_index_names.pop())
-        if columns is None:
-            self._columns = Index(self._raw_columns, name=None)
-        else:
-            r, c = len(self._raw_columns), len(columns)
-            if r == c:
-                self._columns = columns
-            else:
-                m = f"Passed `columns` have {c} elements, data has {r} columns"
-                raise ValueError(f"Length mismatch: {m}")
- 
-    @property
-    def columns(self): return self._columns
-    @columns.setter
-    def columns(self, value):
-        c, v = len(self._columns), len(value)
-        if c == v:
-            self._columns = value
-        else:
-            m = f"Expected axis has {c} elements, new values have {v} elements"
-            raise ValueError(f"Length mismatch: {m}")
+        self._columns = Index(self._raw_columns, name=None)
  
     def __make_inverse_column_dispatcher(self, columns):
         """Validate arguments and make `columns`, `part_to_column`"""
@@ -400,19 +396,9 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
             self._columns = _mkindex(
                 sum((obj.columns.to_list() for obj in objs), []),
             )
+            self._raw_columns = self._columns.get_level_values(-1)
             names = ", ".join(str(obj.name) for obj in objs)
             self.name = f"FullOuterJoin({names})"
- 
-    @property
-    def columns(self): return self._columns
-    @columns.setter
-    def columns(self, value): # TODO: move to parent class for both?
-        c, v = len(self._columns), len(value)
-        if c == v:
-            self._columns = value
-        else:
-            m = f"Expected axis has {c} elements, new values have {v} elements"
-            raise ValueError(f"Length mismatch: {m}")
  
     def get(self, *, rows=None, columns=None, limit=None, offset=0):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
