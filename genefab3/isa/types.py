@@ -72,6 +72,13 @@ class Sample(dict):
         self["Id"]["Sample Name"] = self._get_unique_primary_value(
             assay_entry, "Sample Name",
         )
+        # validate names:
+        for attr in "accession", "study_name", "assay_name", "sample_name":
+            value = getattr(self, attr)
+            if isinstance(value, str):
+                if {"$", "/"} & set(value):
+                    msg = "Forbidden characters ('$', '/') in sample attribute"
+                    raise GeneFabISAException(msg, **{f"self.{attr}": value})
         # associate with assay and study metadata:
         self._INPLACE_extend_with_assay_metadata(assay_entry)
         self._INPLACE_extend_with_study_metadata()
