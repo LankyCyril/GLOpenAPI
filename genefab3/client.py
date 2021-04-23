@@ -111,7 +111,7 @@ class GeneFabClient():
         """Intercept all exceptions and deliver an HTTP error page with or without traceback depending on debug state"""
         self.flask_app.errorhandler(Exception)(partial(
             exception_catcher, collection=self.mongo_collections.log,
-            include_traceback=is_debug(),
+            debug=is_debug(),
         ))
  
     def loop(self):

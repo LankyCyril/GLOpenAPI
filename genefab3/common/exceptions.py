@@ -9,7 +9,9 @@ class GeneFabException(Exception):
     def __init__(self, message="Error", accession=None, suggestion=None, **kwargs):
         self.accession, self.suggestion = accession, suggestion
         self.kwargs = kwargs
-        args = [message, *(f'{k}={repr(v)}' for k, v in kwargs.items())]
+        args = [message, *(
+            f'{k}={repr(v)}' for k, v in kwargs.items() if k != "_debug"
+        )]
         super().__init__(*args)
     def __str__(self):
         if len(self.args) == 0:
@@ -36,7 +38,7 @@ class GeneFabParserException(GeneFabException):
     code, reason = 400, "BAD REQUEST"
 
 
-def interpret_exception(e):
+def interpret_exception(e, debug=False):
     exc_type, exc_value, exc_tb = exc_info()
     if isinstance(e, NotImplementedError):
         code, reason = 501, "Not Implemented"
@@ -47,7 +49,10 @@ def interpret_exception(e):
         code=code, reason=reason,
         exception_type=exc_type.__name__, exception_value=str(exc_value),
         args=[] if isinstance(e, GeneFabException) else getattr(e, "args", []),
-        kwargs=getattr(e, "kwargs", {}),
+        kwargs={
+            k: v for k, v in getattr(e, "kwargs", {}).items()
+            if (debug or (k != "_debug"))
+        },
     )
     if hasattr(e, "accession") and e.accession:
         info["accession"] = e.accession
@@ -56,15 +61,15 @@ def interpret_exception(e):
     return info, format_tb(exc_tb)
 
 
-def exception_catcher(e, collection, include_traceback=False):
-    info, traceback_lines = interpret_exception(e)
+def exception_catcher(e, collection, debug=False):
+    info, traceback_lines = interpret_exception(e, debug=debug)
     if collection:
         log_to_mongo_collection(
             collection, info["exception_type"], info["exception_value"],
             stack=traceback_lines, is_exception=True,
             args=getattr(e, "args", []),
         )
-    if include_traceback:
+    if debug:
         tb_preface = f"Traceback (most recent call last):\n"
         traceback = "".join(traceback_lines)
         print(tb_preface, traceback, repr(e), sep="", file=stderr)

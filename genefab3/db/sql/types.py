@@ -2,9 +2,9 @@ from genefab3.db.sql.objects import SQLiteObject, validate_no_backtick
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.utils import as_is
 from collections import OrderedDict
+from genefab3.common.logger import GeneFabLogger
 from urllib.request import urlopen
 from urllib.error import URLError
-from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabDataManagerException
 from shutil import copyfileobj
 from tempfile import TemporaryDirectory
@@ -14,11 +14,12 @@ from pandas import read_csv, read_sql, Index, MultiIndex
 from pandas.errors import ParserError as PandasParserError
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDatabaseException
+from contextlib import contextmanager, closing, ExitStack
+from uuid import uuid3, uuid4
+from sqlite3 import OperationalError, connect
 from genefab3.api.renderers import Placeholders
 from genefab3.common.types import DataDataFrame
-from contextlib import closing, contextmanager
-from sqlite3 import connect, OperationalError
-from uuid import uuid3, uuid4
+from pandas.io.sql import DatabaseError as PandasDatabaseError
 
 
 class SQLiteBlob(SQLiteObject):
@@ -203,42 +204,61 @@ class OndemandSQLiteDataFrame():
     def concat(objs, axis=1):
         """Concatenate OndemandSQLiteDataFrame objects without evaluation"""
         _t, _t_s = "OndemandSQLiteDataFrame", "OndemandSQLiteDataFrame_Single"
-        if not all(isinstance(o, OndemandSQLiteDataFrame_Single) for o in objs):
+        _Single = OndemandSQLiteDataFrame_Single
+        if len(objs) == 1:
+            return objs[0]
+        elif not all(isinstance(o, _Single) for o in objs):
             raise TypeError(f"{_t}.concat() on non-{_t_s} objects")
         elif axis != 1:
             raise ValueError(f"{_t}.concat(..., axis={axis}) makes no sense")
         elif len(set(obj.sqlite_db for obj in objs)) != 1:
             msg = f"Concatenating {_t} objects from different database files"
             raise ValueError(msg)
-        elif len(set(obj.index.name for obj in objs)) != 1:
-            msg = f"Concatenating {_t} objects with differing index names"
-            raise ValueError(msg)
-        elif len(set(obj.columns.nlevels for obj in objs)) != 1:
-            msg = f"Concatenating {_t} objects with differing column `nlevels`"
-            raise ValueError(msg)
         else:
-            column_dispatcher = OrderedDict()
-            for obj in objs:
-                for n, p in obj._column_dispatcher.items():
-                    if n in column_dispatcher:
-                        if not isinstance(n, SQLiteIndexName):
-                            e = f"duplicate column name: {n}"
-                            msg = f"Cannot merge multiple {_t} objects with {e}"
-                            raise IndexError(msg)
-                    else:
-                        column_dispatcher[n] = p
-            if objs[0].columns.nlevels == 1:
-                _mkindex = Index
-            else:
-                _mkindex = MultiIndex.from_tuples
-            columns = _mkindex(sum((obj.columns.to_list() for obj in objs), []))
-            return OndemandSQLiteDataFrame_Single(
-                objs[0].sqlite_db, column_dispatcher, columns,
-            )
+            sqlite_db = objs[0].sqlite_db
+            return OndemandSQLiteDataFrame_OuterJoined(sqlite_db, objs)
+
+
+def _make_query_filter(table, rows, limit, offset):
+    """Validate arguments to OndemandSQLiteDataFrame_Single.get()"""
+    if (offset != 0) and (limit is None):
+        msg = "OndemandSQLiteDataFrame: `offset` without `limit`"
+        raise GeneFabDatabaseException(msg, table=table)
+    if rows is not None:
+        raise NotImplementedError("Slicing by row names")
+    if limit is None:
+        return ""
+    else:
+        return f"LIMIT {limit} OFFSET {offset}"
+
+
+@contextmanager
+def _make_view(connection, query):
+    """Context manager temporarily creating an SQLite view from `query`"""
+    viewname = uuid3(uuid4(), query).hex
+    try:
+        connection.cursor().execute(f"CREATE VIEW `{viewname}` as {query}")
+    except OperationalError:
+        msg = "Failed to create temporary view"
+        _kw = dict(viewname=viewname, query=query)
+        raise GeneFabDatabaseException(msg, **_kw)
+    else:
+        query_repr = repr(query.lstrip()[:100] + "...")
+        msg = f"Created temporary SQLite view {viewname} from {query_repr}"
+        GeneFabLogger().info(msg)
+        yield viewname
+    try:
+        connection.cursor().execute(f"DROP VIEW `{viewname}`")
+    except OperationalError:
+        msg = f"Failed to drop temporary view {viewname}"
+        GeneFabLogger().error(msg)
+    else:
+        msg = f"Dropped temporary SQLite view {viewname}"
+        GeneFabLogger().info(msg)
 
 
 class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
-    """DataDataFrame to be retrieved from SQLite, possibly from multiple tables, including parts of same tabular file"""
+    """DataDataFrame to be retrieved from SQLite, possibly from multiple parts of same tabular file"""
  
     def __init__(self, sqlite_db, column_dispatcher, columns=None):
         """Interpret `column_dispatcher`"""
@@ -284,14 +304,6 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
             m = f"Expected axis has {c} elements, new values have {v} elements"
             raise ValueError(f"Length mismatch: {m}")
  
-    def __validate_get_arguments(self, rows, offset, limit):
-        """Validate arguments to OndemandSQLiteDataFrame_Single.get()"""
-        if (offset != 0) and (limit is None):
-            msg = "OndemandSQLiteDataFrame: `offset` without `limit`"
-            raise GeneFabDatabaseException(msg, table=self.name)
-        if rows is not None:
-            raise NotImplementedError("Slicing by row names")
- 
     def __make_inverse_column_dispatcher(self, columns):
         """Validate arguments and make `columns`, `part_to_column`"""
         if columns is not None:
@@ -311,8 +323,9 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
             part_to_column.setdefault(part, []).append(column)
         return columns, part_to_column
  
-    def __make_natural_join_query(self, rows, part_to_column, columns, limit, offset):
+    def __make_natural_join_query(self, rows, part_to_column, columns, limit=None, offset=0):
         """Generate SQL query for multipart NATURAL JOIN"""
+        query_filter = _make_query_filter(self.name, rows, limit, offset)
         joined = " NATURAL JOIN ".join(f"`{p}`" for p in part_to_column)
         first_table = next(iter(part_to_column))
         targets = ",".join((
@@ -323,15 +336,10 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
         _tt = "\n\t".join(("", *part_to_column))
         msg = f"retrieving {_n} columns from {_m} table(s):{_tt}"
         GeneFabLogger().info(f"{self.name}; {msg}")
-        if limit is None:
-            return f"SELECT {targets} FROM {joined}"
-        else:
-            _limits = f"LIMIT {limit} OFFSET {offset}"
-            return f"SELECT {targets} FROM {joined} {_limits}"
+        return f"SELECT {targets} FROM {joined} {query_filter}"
  
     def get(self, *, rows=None, columns=None, limit=None, offset=0):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
-        self.__validate_get_arguments(rows, offset, limit)
         columns, part_to_column = self.__make_inverse_column_dispatcher(columns)
         if len(part_to_column) == 0:
             return Placeholders.EmptyDataDataFrame()
@@ -352,28 +360,94 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
                     return DataDataFrame(data)
  
     @contextmanager
-    def view(self, *, connection, rows=None, columns=None, limit=None, offset=0):
+    def view(self, *, connection, rows=None, columns=None):
         """Interpret arguments and temporarily expose requested data as SQL view"""
-        self.__validate_get_arguments(rows, offset, limit)
         columns, part_to_column = self.__make_inverse_column_dispatcher(columns)
         if len(part_to_column) == 0:
             yield None
         else:
-            args = rows, part_to_column, columns, limit, offset
+            args = rows, part_to_column, columns, None, 0
             join_query = self.__make_natural_join_query(*args)
-            viewname = uuid3(uuid4(), str(self.name)).hex
-            query = f"CREATE VIEW `{viewname}` AS {join_query}"
             try:
-                connection.cursor().execute(query)
-            except OperationalError:
-                msg = "No data found"
-                raise GeneFabDatabaseException(msg, table=self.name)
+                with _make_view(connection, join_query) as viewname:
+                    yield viewname, columns
+            except (OperationalError, GeneFabDatabaseException):
+                raise GeneFabDatabaseException("No data found", table=self.name)
+
+
+class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
+    """DataDataFrame to be retrieved from SQLite, full outer joined from multiple views"""
+            #return OndemandSQLiteDataFrame_OuterJoined(sqlite_db, columns)
+ 
+    def __init__(self, sqlite_db, objs):
+        _t = "OndemandSQLiteDataFrame"
+        self.sqlite_db, self.objs = sqlite_db, objs
+        if len(objs) < 2:
+            raise ValueError(f"{type(self).__name__}: no objects to join")
+        elif len(set(obj.index.name for obj in objs)) != 1:
+            msg = f"Concatenating {_t} objects with differing index names"
+            raise ValueError(msg)
+        else:
+            self.index = Index([], name=objs[0].index.name)
+        if len(set(obj.columns.nlevels for obj in objs)) != 1:
+            msg = f"Concatenating {_t} objects with differing column `nlevels`"
+            raise ValueError(msg)
+        else:
+            if objs[0].columns.nlevels == 1:
+                _mkindex = Index
             else:
-                msg = f"created temporary SQLite view {viewname}"
+                _mkindex = MultiIndex.from_tuples
+            self._columns = _mkindex(
+                sum((obj.columns.to_list() for obj in objs), []),
+            )
+            names = ", ".join(str(obj.name) for obj in objs)
+            self.name = f"FullOuterJoin({names})"
+ 
+    @property
+    def columns(self): return self._columns
+    @columns.setter
+    def columns(self, value): # TODO: move to parent class for both?
+        c, v = len(self._columns), len(value)
+        if c == v:
+            self._columns = value
+        else:
+            m = f"Expected axis has {c} elements, new values have {v} elements"
+            raise ValueError(f"Length mismatch: {m}")
+ 
+    def get(self, *, rows=None, columns=None, limit=None, offset=0):
+        """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
+        query_filter = _make_query_filter(self.name, rows, limit, offset)
+        with closing(connect(self.sqlite_db)) as connection, ExitStack() as _st:
+            _kw = dict(connection=connection, rows=rows, columns=columns)
+            object_views = [_st.enter_context(o.view(**_kw)) for o in self.objs]
+            left_view, left_columns = object_views[0]
+            for right_view, right_columns in object_views[1:]:
+                merged_columns = left_columns + right_columns
+                targets = ",".join((
+                    f"`{self.index.name}`", *(f"`{c}`" for c in merged_columns),
+                ))
+                condition = f"""`{left_view}`.`{self.index.name}` ==
+                    `{right_view}`.`{self.index.name}`"""
+                query = f"""SELECT `{left_view}`.{targets} FROM
+                        `{left_view}` LEFT JOIN `{right_view}` ON {condition}
+                    UNION SELECT `{right_view}`.{targets} FROM
+                        `{right_view}` LEFT JOIN `{left_view}` ON {condition}
+                        WHERE `{left_view}`.`{self.index.name}` IS NULL"""
+                merged_view = _st.enter_context(_make_view(connection, query))
+                left_view, left_columns = merged_view, merged_columns
+            query = f"SELECT * FROM `{merged_view}` {query_filter}"
+            try:
+                data = read_sql(query, connection, index_col=self.index.name)
+            except OperationalError:
+                _st.close()
+                raise GeneFabDatabaseException("No data found", table=self.name)
+            except PandasDatabaseError:
+                _st.close()
+                msg = "Bad SQL query when joining tables"
+                _kw = dict(table=self.name, _debug=query)
+                raise GeneFabConfigurationException(msg, **_kw)
+            else:
+                msg = f"retrieved from SQLite as pandas DataFrame"
                 GeneFabLogger().info(f"{self.name}; {msg}")
-                yield viewname
-                try:
-                    connection.cursor().execute(f"DROP VIEW `{viewname}`")
-                except OperationalError:
-                    msg = f"Failed to drop temporary view {viewname}"
-                    GeneFabLogger().error(f"{self.name}; {msg}")
+                data.columns = self.columns
+                return DataDataFrame(data)
