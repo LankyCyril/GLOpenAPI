@@ -30,7 +30,7 @@ def get_file_descriptors(mongo_collections, *, locale, context):
                     "technology type": "$"+".".join(TECH_TYPE_LOCATOR),
                     "file": "$file",
                 },
-                "sample name": {"$addToSet": "$id.sample name"},
+                "sample name": {"$addToSet": "$id.sample name"}, # TODO: $push instead to preserve order?
             }},
             {"$addFields": {"_id.sample name": "$sample name"}},
             {"$replaceRoot": {"newRoot": "$_id"}},
@@ -122,6 +122,7 @@ def get_formatted_data(descriptor, sqlite_db, CachedFile, adapter, _kws):
     identifier = f"{accession}/File/{assay}/{name}"
     if "INPLACE_process" in _kws:
         _kws = {**_kws, "INPLACE_process": partial(
+            # TODO: we need to pass ALL sample names here, not just queried
             INPLACE_process_dataframe, descriptor=descriptor,
             best_sample_name_matches=adapter.best_sample_name_matches,
         )}
@@ -132,6 +133,7 @@ def get_formatted_data(descriptor, sqlite_db, CachedFile, adapter, _kws):
         sqlite_db=sqlite_db, **_kws,
     )
     data = file.data
+    # TODO: we need to subset to queried sample names HERE instead
     if isinstance(data, OndemandSQLiteDataFrame):
         data.columns = MultiIndex.from_tuples((
             (accession, assay, column) for column in data.columns
