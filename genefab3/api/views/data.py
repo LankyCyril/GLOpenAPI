@@ -189,8 +189,8 @@ def combined_data(descriptors, context, mongo_collections, sqlite_dbs, adapter):
             descriptors, key=lambda d: (d.get("accession"), d.get("assay")),
         )
     ])
-    _dtp = getset("file", "datatype")
-    data.datatypes = _dtp
+    data.datatypes = getset("file", "datatype")
+    data.gct_validity_set = getset("file", "gct_valid")
     return data
 
 

@@ -74,15 +74,14 @@ class AnnotationDataFrame(DataFrame):
 class DataDataFrame(DataFrame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._metadata.append("datatypes")
-        self.datatypes = set()
+        self._metadata.extend(["datatypes", "gct_validity_set"])
+        self.datatypes, self.gct_validity_set = set(), set()
     @property
     def accessions(self):
         return set(self.columns[1:].get_level_values(0))
     @property
     def gct_valid(self):
-        return (len(self.datatypes) == 1) and (next(iter(self.datatypes)) in {
-            # TODO: move to adapter, accommodate logic
-            "processed microarray data", "normalized counts",
-            "unnormalized counts",
-        })
+        return (
+            (len(self.datatypes) == 1) and
+            self.gct_validity_set and all(self.gct_validity_set)
+        )

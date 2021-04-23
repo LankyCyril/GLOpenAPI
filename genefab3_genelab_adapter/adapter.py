@@ -47,12 +47,14 @@ KNOWN_DATATYPES = {
     r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.rda$':
         datatype("processed microarray data (rda)"),
     r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.txt$':
-        tabletype("processed microarray data", column_subset="sample name"),
+        tabletype("processed microarray data",
+            column_subset="sample name", gct_valid=True),
     r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Normalized_Counts\.csv$':
-        tabletype("normalized counts", column_subset="sample name"),
+        tabletype("normalized counts",
+            column_subset="sample name", gct_valid=True),
     r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Unnormalized_Counts\.csv$':
-        tabletype("unnormalized counts", column_subset="sample name",
-            joinable=True),
+        tabletype("unnormalized counts", joinable=True,
+            column_subset="sample name", gct_valid=True),
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression\.csv$':
         tabletype("differential expression"),
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_contrasts\.csv$':
