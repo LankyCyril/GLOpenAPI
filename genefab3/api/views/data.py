@@ -125,7 +125,9 @@ def INPLACE_process_dataframe(dataframe, *, mongo_collections, descriptor, best_
     column_order, harmonized_column_order = harmonize_columns(
         dataframe, descriptor, all_sample_names, best_sample_name_matches,
     )
-    dataframe = dataframe[column_order]
+    if not (dataframe.columns == column_order).all():
+        for column in column_order: # reorder columns in-place
+            dataframe[column] = dataframe.pop(column)
     dataframe.columns = harmonized_column_order
 
 
