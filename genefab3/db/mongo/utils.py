@@ -123,3 +123,23 @@ def retrieve_by_context(collection, *, locale, context, id_fields=(), postproces
     ]
     collation={"locale": locale, "numericOrdering": True}
     return collection.aggregate(pipeline, collation=collation), full_projection
+
+
+def match_sample_names_to_file_descriptor(collection, descriptor):
+    """Retrieve all sample names associated with given filename under given accession and assay"""
+    try:
+        return {
+            entry["id"]["sample name"]
+            for entry in collection.aggregate([
+                {"$unwind": "$file"},
+                {"$match": {
+                    "id.accession": descriptor["accession"],
+                    "id.assay": descriptor["assay"],
+                    "file.filename": descriptor["file"]["filename"],
+                }},
+                {"$project": {"_id": False, "id.sample name": True}},
+            ])
+        }
+    except (KeyError, TypeError, IndexError):
+        msg = "File descriptor missing 'accession', 'assay', or 'filename'"
+        raise GeneFabDatabaseException(msg, descriptor=descriptor)
