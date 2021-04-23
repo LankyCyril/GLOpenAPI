@@ -11,6 +11,7 @@ from functools import partial, reduce
 from operator import getitem
 from collections import defaultdict, OrderedDict
 from marshal import dumps as marsh
+from numpy import generic as NumpyGenericType
 
 
 as_is = lambda _:_
@@ -130,3 +131,13 @@ def blackjack_items(e, max_level, head, marsh=marsh, len=len, isinstance=isinsta
 def blackjack_normalize(cursor, max_level=2, dict=dict, blackjack_items=blackjack_items):
     """Quickly flatten iterable of dictionaries of known schema in pure Python"""
     return DataFrame(dict(blackjack_items(e, max_level, ())) for e in cursor)
+
+
+def json_permissive_default(o):
+    """Serialize numpy entries as native types, sets as informative strings, other unserializable entries as their type names"""
+    if isinstance(o, NumpyGenericType):
+        return o.item()
+    elif isinstance(o, set):
+        return f"<set>{list(o)}"
+    else:
+        return str(type(o))

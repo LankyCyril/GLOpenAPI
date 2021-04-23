@@ -2,6 +2,7 @@ from sys import exc_info, stderr
 from traceback import format_tb
 from genefab3.common.logger import log_to_mongo_collection
 from json import dumps
+from functools import partial
 from flask import Response
 
 
@@ -69,11 +70,13 @@ def exception_catcher(e, collection, debug=False):
             stack=traceback_lines, is_exception=True,
             args=getattr(e, "args", []),
         )
+    from genefab3.common.utils import json_permissive_default
+    dumps_permissive = partial(dumps, default=json_permissive_default)
     if debug:
         tb_preface = f"Traceback (most recent call last):\n"
         traceback = "".join(traceback_lines)
         print(tb_preface, traceback, repr(e), sep="", file=stderr)
-        content = dumps(info, indent=4) + "\n\n" + traceback
+        content = dumps_permissive(info, indent=4) + "\n\n" + traceback
     else:
-        content = dumps(info, indent=4)
+        content = dumps_permissive(info, indent=4)
     return Response(content, mimetype="application/json"), info["code"]
