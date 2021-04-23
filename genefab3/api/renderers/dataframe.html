@@ -14,7 +14,7 @@
             min-height: 22pt; max-height: 22pt; height: 22pt;
             background: #CDF; padding: 2pt !important;
             line-height: 1.1;
-            overflow: hidden; text-overflow: ellipsis; white-space: nowrap
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         }
         #sorting_popup {
             position: absolute; top: 0; right: 0;
@@ -28,7 +28,7 @@
         #info {
             margin: 10pt auto; min-width: 3in; max-width: 50%;
             max-height: 90%; overflow: auto;
-            padding: 2pt; background: #CDF; border: 1pt solid black
+            padding: 2pt; background: #CDF; border: 1pt solid black;
         }
         #info tt {background: #EEE; border: 1px solid gray; padding: 1pt}
         #noscript {padding: 2pt !important}
@@ -41,15 +41,26 @@
         }
         #crosshair-h {width: 100%}
         #crosshair-v {height: 100%}
-        .slick-header-column {background: #DDD; font-weight: 600; border: .5pt solid black !important}
+        .slick-header-column {
+            background: #DDD; font-weight: 600;
+            border: .5pt solid black !important;
+        }
         $SQUASH_PREHEADER
-        .slick-cell {line-height: 1.65; background: #FFFFFF99; border: .25pt solid black}
+        .slick-cell {
+            line-height: 1.65; background: #FFFFFF99; border: .25pt solid black;
+        }
         .slick-cell.frozen {font-weight: 600}
         .slick-row.odd {background: #E8E8E8}
         a {text-decoration: none; color: black; cursor: pointer}
         a:hover {text-decoration: underline; color: blue}
-        a.filter:hover:after {content: " \229e"; display: inline-block; white-space: pre; text-decoration: none; color: #D10;}
-        a.file:hover:after {content: " \21e9"; display: inline-block; white-space: pre; text-decoration: none; color: #D10; font-weight: 600}
+        a.filter:hover:after {
+            content: " \229e"; display: inline-block; white-space: pre;
+            text-decoration: none; color: #D10;
+        }
+        a.file:hover:after {
+            content: " \21e9"; display: inline-block; white-space: pre;
+            text-decoration: none; color: #D10; font-weight: 600;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/6pac-slickgrid/2.4.27/lib/jquery.event.drag-2.3.0.min.js"></script>
@@ -72,7 +83,9 @@
         <a style="color:#D10" href="$SAMPLESVIEW">samples</a>,
         <a style="color:#D10" href="$DATAVIEW">data</a>.
     </div>
-    <div id="sorting_popup" style="display: none">CUSTOM SORTING<br>click to reset</div>
+    <div id="sorting_popup" style="display: none">
+        CUSTOM SORTING<br>click to reset
+    </div>
     <div id="grid" class="fullpage">
         <div id="noscript">
             Loading data in an interactive viewer...<br>
