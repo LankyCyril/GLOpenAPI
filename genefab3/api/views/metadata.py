@@ -1,4 +1,4 @@
-from genefab3.db.mongo.utils import retrieve_by_context
+from genefab3.db.mongo.utils import aggregate_entries_by_context
 from genefab3.common.utils import blackjack_normalize
 from pandas import MultiIndex, isnull
 from pymongo.errors import OperationFailure as MongoOperationError
@@ -9,7 +9,7 @@ from genefab3.common.types import AnnotationDataFrame
 
 def get_raw_metadata_dataframe(mongo_collections, *, locale, context, id_fields):
     """Get target metadata as a single-level dataframe, numerically sorted by id fields"""
-    cursor, full_projection = retrieve_by_context(
+    cursor, full_projection = aggregate_entries_by_context(
         mongo_collections.metadata, locale=locale, context=context,
         id_fields=id_fields,
     )

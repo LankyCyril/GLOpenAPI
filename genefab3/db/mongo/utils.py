@@ -110,7 +110,7 @@ def run_mongo_transaction(action, collection, *, query=None, data=None, document
         )
 
 
-def retrieve_by_context(collection, *, locale, context, id_fields=(), postprocess=()):
+def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), postprocess=()):
     """Run .find() or .aggregate() based on query, projection"""
     full_projection = {**context.projection, **{"id."+f: 1 for f in id_fields}}
     sort_by_too = ["id."+f for f in id_fields if "id."+f not in context.sort_by]
@@ -123,6 +123,28 @@ def retrieve_by_context(collection, *, locale, context, id_fields=(), postproces
     ]
     collation={"locale": locale, "numericOrdering": True}
     return collection.aggregate(pipeline, collation=collation), full_projection
+
+
+def aggregate_file_descriptors_by_context(collection, *, locale, context, tech_type_locator="investigation.study assays.study assay technology type"):
+    """Return DataFrame of file descriptors that match user query"""
+    context.projection["file"] = True
+    context.update(tech_type_locator, auto_reduce=True)
+    return aggregate_entries_by_context(
+        collection, locale=locale, context=context,
+        id_fields=["accession", "assay", "sample name"], postprocess=[
+            {"$group": {
+                "_id": {
+                    "accession": "$id.accession",
+                    "assay": "$id.assay",
+                    "technology type": "${tech_type_locator}",
+                    "file": "$file",
+                },
+                "sample name": {"$push": "$id.sample name"},
+            }},
+            {"$addFields": {"_id.sample name": "$sample name"}},
+            {"$replaceRoot": {"newRoot": "$_id"}},
+        ],
+    )
 
 
 def match_sample_names_to_file_descriptor(collection, descriptor):

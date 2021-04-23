@@ -1,4 +1,4 @@
-from genefab3.db.mongo.utils import retrieve_by_context
+from genefab3.db.mongo.utils import aggregate_file_descriptors_by_context
 from genefab3.db.mongo.utils import match_sample_names_to_file_descriptor
 from functools import lru_cache, reduce, partial
 from genefab3.common.utils import pick_reachable_url
@@ -11,32 +11,6 @@ from genefab3.db.sql.types import CachedTableFile, CachedBinaryFile
 from natsort import natsorted
 from genefab3.common.exceptions import GeneFabDatabaseException
 from urllib.error import HTTPError
-
-
-TECH_TYPE_LOCATOR = "investigation.study assays", "study assay technology type"
-
-
-def get_file_descriptors(mongo_collections, *, locale, context):
-    """Return DataFrame of file descriptors that match user query"""
-    context.projection["file"] = True
-    context.update(".".join(TECH_TYPE_LOCATOR), auto_reduce=True)
-    descriptors, _ = retrieve_by_context(
-        mongo_collections.metadata, locale=locale, context=context,
-        id_fields=["accession", "assay", "sample name"], postprocess=[
-            {"$group": {
-                "_id": {
-                    "accession": "$id.accession",
-                    "assay": "$id.assay",
-                    "technology type": "$"+".".join(TECH_TYPE_LOCATOR),
-                    "file": "$file",
-                },
-                "sample name": {"$push": "$id.sample name"},
-            }},
-            {"$addFields": {"_id.sample name": "$sample name"}},
-            {"$replaceRoot": {"newRoot": "$_id"}},
-        ],
-    )
-    return list(descriptors)
 
 
 def validate_joinable_files(descriptors):
@@ -222,9 +196,10 @@ def combined_data(descriptors, context, mongo_collections, sqlite_dbs, adapter):
 
 def get(mongo_collections, *, locale, context, sqlite_dbs, adapter):
     """Return data corresponding to search parameters; merged if multiple underlying files are same type and joinable"""
-    descriptors = get_file_descriptors(
-        mongo_collections, locale=locale, context=context,
+    cursor, _ = aggregate_file_descriptors_by_context(
+        mongo_collections.metadata, locale=locale, context=context,
     )
+    descriptors = list(cursor)
     for d in descriptors:
         if ("file" not in d) or ("filename" not in d["file"]):
             msg = "File information missing for entry"
