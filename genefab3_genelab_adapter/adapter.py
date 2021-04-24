@@ -115,6 +115,11 @@ def format_file_entry(row):
 
 class GeneLabAdapter(Adapter):
  
+    def get_favicon_urls(self):
+        return [
+            "https://genelab-data.ndc.nasa.gov/genelab/img/meatball-favicon.ico"
+        ]
+ 
     def get_accessions(self):
         """Return list of dataset accessions available through genelab.nasa.gov/genelabAPIs"""
         try:

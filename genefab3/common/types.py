@@ -15,6 +15,9 @@ class Adapter():
                 _kw = dict(adapter=type(self).__name__, method=method_name)
                 raise GeneFabConfigurationException(msg, **_kw)
  
+    def get_favicon_urls(self):
+        return []
+ 
     def best_sample_name_matches(self, name, names, return_positions=False):
         """Fallback sample name identity test"""
         if return_positions:

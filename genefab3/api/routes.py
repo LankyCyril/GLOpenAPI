@@ -1,4 +1,5 @@
 from genefab3.common.types import Routes, AnnotationDataFrame, DataDataFrame
+from genefab3.db.sql.types import CachedBinaryFile
 from genefab3.api import views
 from pandas import DataFrame
 from typing import Union
@@ -10,7 +11,15 @@ class DefaultRoutes(Routes):
  
     @Routes.register_endpoint("/favicon.<imgtype>")
     def favicon(self, imgtype, context=None) -> bytes:
-        return b''
+        if self.adapter.get_favicon_urls():
+            ico_file = CachedBinaryFile(
+                name="favicon.ico", identifier="RESOURCE/favicon.ico",
+                sqlite_db=self.sqlite_dbs.blobs, timestamp=0,
+                urls=self.adapter.get_favicon_urls(),
+            )
+            return ico_file.data
+        else:
+            return b''
  
     @Routes.register_endpoint("/")
     def root(self, context) -> str:
