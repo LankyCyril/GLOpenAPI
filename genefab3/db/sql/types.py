@@ -366,7 +366,7 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
             join_query = self.__make_natural_join_query(*args)
             try:
                 with _make_view(connection, join_query) as viewname:
-                    yield viewname, columns
+                    yield viewname, columns, None
             except (OperationalError, GeneFabDatabaseException):
                 raise GeneFabDatabaseException("No data found", table=self.name)
 
@@ -400,14 +400,16 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
             names = ", ".join(str(obj.name) for obj in objs)
             self.name = f"FullOuterJoin({names})"
  
-    def get(self, *, rows=None, columns=None, limit=None, offset=0):
+    @contextmanager
+    def view(self, *, connection, rows=None, columns=None):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
-        query_filter = _make_query_filter(self.name, rows, limit, offset)
-        with closing(connect(self.sqlite_db)) as connection, ExitStack() as _st:
+        with ExitStack() as viewstack:
             _kw = dict(connection=connection, rows=rows, columns=columns)
-            object_views = [_st.enter_context(o.view(**_kw)) for o in self.objs]
-            left_view, left_columns = object_views[0]
-            for right_view, right_columns in object_views[1:]:
+            object_views = [
+                viewstack.enter_context(o.view(**_kw)) for o in self.objs
+            ]
+            left_view, left_columns, _ = object_views[0]
+            for right_view, right_columns, _ in object_views[1:]:
                 merged_columns = left_columns + right_columns
                 targets = ",".join((
                     f"`{self.index.name}`", *(f"`{c}`" for c in merged_columns),
@@ -419,21 +421,35 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
                     UNION SELECT `{right_view}`.{targets} FROM
                         `{right_view}` LEFT JOIN `{left_view}` ON {condition}
                         WHERE `{left_view}`.`{self.index.name}` IS NULL"""
-                merged_view = _st.enter_context(_make_view(connection, query))
+                merged_view = viewstack.enter_context(
+                    _make_view(connection, query),
+                )
                 left_view, left_columns = merged_view, merged_columns
-            query = f"SELECT * FROM `{merged_view}` {query_filter}"
-            try:
-                data = read_sql(query, connection, index_col=self.index.name)
-            except OperationalError:
-                _st.close()
-                raise GeneFabDatabaseException("No data found", table=self.name)
-            except PandasDatabaseError:
-                _st.close()
-                msg = "Bad SQL query when joining tables"
-                _kw = dict(table=self.name, _debug=query)
-                raise GeneFabConfigurationException(msg, **_kw)
-            else:
-                msg = f"retrieved from SQLite as pandas DataFrame"
-                GeneFabLogger().info(f"{self.name}; {msg}")
-                data.columns = self.columns
-                return DataDataFrame(data)
+            yield merged_view, merged_columns, viewstack
+ 
+    def get(self, *, rows=None, columns=None, limit=None, offset=0):
+        """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
+        query_filter = _make_query_filter(self.name, rows, limit, offset)
+        with closing(connect(self.sqlite_db)) as connection:
+            _kw = dict(connection=connection, rows=rows, columns=columns)
+            with self.view(**_kw) as (merged_view, merged_columns, viewstack):
+                try:
+                    q = f"SELECT * FROM `{merged_view}` {query_filter}"
+                    data = read_sql(q, connection, index_col=self.index.name)
+                except OperationalError:
+                    viewstack.close()
+                    msg = "No data found"
+                    raise GeneFabDatabaseException(msg, table=self.name)
+                except PandasDatabaseError:
+                    viewstack.close()
+                    msg = "Bad SQL query when joining tables"
+                    _kw = dict(table=self.name, _debug=q)
+                    raise GeneFabConfigurationException(msg, **_kw)
+                except:
+                    viewstack.close()
+                    raise
+                else:
+                    msg = f"retrieved from SQLite as pandas DataFrame"
+                    GeneFabLogger().info(f"{self.name}; {msg}")
+                    data.columns = self.columns
+                    return DataDataFrame(data)
