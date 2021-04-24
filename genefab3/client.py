@@ -1,16 +1,14 @@
 from pymongo import MongoClient
-from numpy import base_repr
-from datetime import datetime
 from socket import create_connection, error as SocketError
 from genefab3.common.exceptions import GeneFabConfigurationException
 from sqlite3 import connect, OperationalError
 from types import SimpleNamespace
+from genefab3.common.utils import timestamp36, is_debug, copy_and_drop
 from flask_compress import Compress
 from genefab3.api.renderer import CacheableRenderer
 from genefab3.common.logger import GeneFabLogger, MongoDBLogger
 from functools import partial
 from genefab3.common.exceptions import exception_catcher
-from genefab3.common.utils import is_debug, copy_and_drop
 from genefab3.db.cacher import CacherThread
 
 
@@ -47,8 +45,7 @@ class GeneFabClient():
  
     def _get_mongo_db_connection(self, *, db_name, client_params=None, collection_names=None, locale="en_US", units_formatter=None, test_timeout=10):
         """Check MongoDB server is running, connect to database `db_name`"""
-        _ts_36 = base_repr(int(datetime.now().timestamp() * (10**6)), 36)
-        self._mongo_appname = f"genefab3 {_ts_36}"
+        self._mongo_appname = f"genefab3 {timestamp36()}"
         _kw = dict(**(client_params or {}), appname=self._mongo_appname)
         self._mongo_client = MongoClient(**_kw)
         try:

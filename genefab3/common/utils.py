@@ -1,4 +1,8 @@
+from numpy import generic as NumpyGenericType, base_repr
+from datetime import datetime
 from os import environ
+from base64 import b64encode
+from uuid import uuid3, uuid4
 from contextlib import contextmanager
 from requests import head as request_head
 from urllib.request import urlopen
@@ -11,19 +15,20 @@ from functools import partial, reduce
 from operator import getitem
 from collections import defaultdict, OrderedDict
 from marshal import dumps as marsh
-from numpy import generic as NumpyGenericType
 
 
+timestamp36 = lambda: base_repr(int(datetime.now().timestamp() * (10**6)), 36)
 as_is = lambda _:_
 EmptyIterator = lambda *a, **k: []
 
 
-def is_debug():
+def is_debug(markers={"development", "staging", "stage", "debug", "debugging"}):
     """Determine if app is running in debug mode"""
-    return (
-        environ.get("FLASK_ENV", None)
-        in {"development", "staging", "stage", "debug", "debugging"}
-    )
+    return environ.get("FLASK_ENV", None) in markers
+
+
+def random_string(seed=""):
+    return b64encode(uuid3(uuid4(), seed).bytes, b'_-').decode().rstrip("=")
 
 
 @contextmanager
@@ -145,7 +150,5 @@ def validate_no_special_character(identifier, desc, c):
     else:
         msg = f"{repr(c)} in {desc} name"
         raise GeneFabConfigurationException(msg, **{desc: identifier})
-
-
 validate_no_backtick = partial(validate_no_special_character, c="`")
 validate_no_doublequote = partial(validate_no_special_character, c='"')

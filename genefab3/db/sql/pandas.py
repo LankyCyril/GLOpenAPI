@@ -1,9 +1,8 @@
-from genefab3.common.utils import validate_no_backtick
+from genefab3.common.utils import validate_no_backtick, random_string
 from pandas import Index, MultiIndex, read_sql
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDatabaseException
 from contextlib import contextmanager, closing, ExitStack
-from uuid import uuid3, uuid4
 from sqlite3 import OperationalError, connect
 from genefab3.common.logger import GeneFabLogger
 from collections import OrderedDict
@@ -68,7 +67,7 @@ def _make_query_filter(table, rows, limit, offset):
 @contextmanager
 def _make_view(connection, query):
     """Context manager temporarily creating an SQLite view from `query`"""
-    viewname = uuid3(uuid4(), query).hex
+    viewname = random_string(seed=query)
     try:
         connection.cursor().execute(f"CREATE VIEW `{viewname}` as {query}")
     except OperationalError:
