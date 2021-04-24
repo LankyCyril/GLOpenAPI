@@ -14,8 +14,9 @@ from genefab3.db.mongo.status import drop_status, update_status
 class CacherThread(Thread):
     """Lives in background and keeps local metadata cache, metadata index, and response cache up to date"""
  
-    def __init__(self, *, adapter, mongo_collections, locale, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter):
+    def __init__(self, *, adapter, mongo_collections, mongo_appname, locale, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter):
         """Prepare background thread that iteratively watches for changes to datasets"""
+        self._id = "CacherThread("+mongo_appname.replace("genefab3 ", "")+")"
         self.adapter = adapter
         self.mongo_collections, self.locale = mongo_collections, locale
         self.sqlite_dbs = sqlite_dbs
@@ -24,8 +25,7 @@ class CacherThread(Thread):
         self.units_formatter = units_formatter
         self.response_cache = ResponseCache(self.sqlite_dbs)
         self.status_kwargs = dict(
-            collection=self.mongo_collections.status,
-            logger=GeneFabLogger(),
+            collection=self.mongo_collections.status, logger=GeneFabLogger(),
         )
         super().__init__()
  
@@ -35,7 +35,7 @@ class CacherThread(Thread):
             ensure_info_index(self.mongo_collections, self.locale)
             accessions, success = self.recache_metadata()
             if success:
-                update_metadata_value_lookup(self.mongo_collections)
+                update_metadata_value_lookup(self.mongo_collections, self._id)
                 accessions_to_drop = (
                     accessions["updated"] | accessions["dropped"] |
                     accessions["failed"]
@@ -49,23 +49,21 @@ class CacherThread(Thread):
                 delay = self.metadata_update_interval
             else:
                 delay = self.metadata_retry_delay
-            GeneFabLogger().info(f"CacherThread: Sleeping for {delay} seconds")
+            GeneFabLogger().info(f"{self._id}: Sleeping for {delay} seconds")
             sleep(delay)
  
     def recache_metadata(self):
         """Instantiate each available dataset; if contents changed, dataset automatically updates db.metadata"""
-        GeneFabLogger().info("CacherThread: Checking metadata cache")
+        GeneFabLogger().info(f"{self._id}: Checking metadata cache")
         try:
+            _cached = self.mongo_collections.metadata.distinct("id.accession")
             accessions = OrderedDict(
-                cached=set(
-                    self.mongo_collections.metadata.distinct("id.accession"),
-                ),
-                live=set(self.adapter.get_accessions()),
+                cached=set(_cached), live=set(self.adapter.get_accessions()),
                 fresh=set(), updated=set(), stale=set(),
                 dropped=set(), failed=set(),
             )
         except Exception as e:
-            GeneFabLogger().error(f"CacherThread: {repr(e)}")
+            GeneFabLogger().error(f"{self._id}: {repr(e)}")
             return None, False
         def _iterate():
             for a in accessions["cached"] - accessions["live"]:
@@ -77,16 +75,14 @@ class CacherThread(Thread):
             accessions[key].add(accession)
             _kws = dict(
                 **self.status_kwargs, status=key, accession=accession,
-                info=f"CacherThread: {accession} {report}", error=error,
+                info=f"{self._id}: {accession} {report}", error=error,
             )
             if key in {"dropped", "failed"}:
                 drop_status(**_kws)
             update_status(**_kws)
-        GeneFabLogger().info(
-            "CacherThread, datasets: " + ", ".join(
-                f"{k}={len(v)}" for k, v in accessions.items()
-            ),
-        )
+        GeneFabLogger().info(f"{self._id}, datasets: " + ", ".join(
+            f"{k}={len(v)}" for k, v in accessions.items()
+        ))
         return accessions, True
  
     def drop_single_dataset_metadata(self, accession):
@@ -107,11 +103,9 @@ class CacherThread(Thread):
                 has_samples = True
                 if "Study" not in sample:
                     update_status(
-                        **self.status_kwargs, status="warning",
-                        warning="Study entry missing",
-                        accession=dataset.accession,
-                        assay_name=sample.assay_name,
-                        sample_name=sample.name,
+                        **self.status_kwargs, accession=dataset.accession,
+                        status="warning", warning="Study entry missing",
+                        assay_name=sample.assay_name, sample_name=sample.name,
                     )
             if not has_samples:
                 update_status(
@@ -145,8 +139,7 @@ class CacherThread(Thread):
                 status = "stale"
                 report = f"failed to retrieve ({repr(e)}), kept stale"
             else:
-                status = "failed"
-                report = f"failed to retrieve ({repr(e)})"
+                status, report = "failed", f"failed to retrieve ({repr(e)})"
             return status, report, e
         if dataset is not None:
             self.drop_single_dataset_metadata(accession)

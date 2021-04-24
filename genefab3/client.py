@@ -1,4 +1,6 @@
 from pymongo import MongoClient
+from numpy import base_repr
+from datetime import datetime
 from socket import create_connection, error as SocketError
 from genefab3.common.exceptions import GeneFabConfigurationException
 from sqlite3 import connect, OperationalError
@@ -8,7 +10,7 @@ from genefab3.api.renderer import CacheableRenderer
 from genefab3.common.logger import GeneFabLogger, MongoDBLogger
 from functools import partial
 from genefab3.common.exceptions import exception_catcher
-from genefab3.common.utils import is_debug, is_flask_reloaded
+from genefab3.common.utils import is_debug
 from genefab3.db.cacher import CacherThread
 
 
@@ -45,9 +47,14 @@ class GeneFabClient():
  
     def _get_mongo_db_connection(self, *, db_name, client_params=None, collection_names=None, locale="en_US", units_formatter=None, test_timeout=10):
         """Check MongoDB server is running, connect to database `db_name`"""
-        mongo_client = MongoClient(**(client_params or {}))
+        self._mongo_appname = "genefab3 " + base_repr(
+            int(datetime.now().timestamp() * 1000000), 36,
+        )
+        self._mongo_client = MongoClient(
+            **(client_params or {}), appname=self._mongo_appname,
+        )
         try:
-            host_and_port = (mongo_client.HOST, mongo_client.PORT)
+            host_and_port = (self._mongo_client.HOST, self._mongo_client.PORT)
             with create_connection(host_and_port, timeout=test_timeout):
                 pass
         except SocketError as e:
@@ -66,7 +73,7 @@ class GeneFabClient():
             raise GeneFabConfigurationException(msg, names=parsed_cnames)
         else:
             mongo_collections = SimpleNamespace(**{
-                kind: (mongo_client[db_name][cname] if cname else None)
+                kind: (self._mongo_client[db_name][cname] if cname else None)
                 for kind, cname in parsed_cnames.items()
             })
         return mongo_collections, locale, units_formatter
@@ -84,10 +91,8 @@ class GeneFabClient():
             msg = "SQL database must be a file path or None"
             raise GeneFabConfigurationException(msg, cache=cache)
         else:
-            sqlite_dbs = SimpleNamespace(
-                blobs=blobs, tables=tables, cache=cache,
-            )
-            for name, filename in sqlite_dbs.__dict__.items():
+            dbs = SimpleNamespace(blobs=blobs, tables=tables, cache=cache)
+            for name, filename in dbs.__dict__.items():
                 if filename:
                     try:
                         with connect(filename):
@@ -95,7 +100,7 @@ class GeneFabClient():
                     except OperationalError:
                         msg = "SQL database not reachable"
                         raise GeneFabConfigurationException(msg, name=filename)
-            return sqlite_dbs
+            return dbs
  
     def _init_routes(self):
         """Route Response-generating methods to Flask endpoints"""
@@ -109,22 +114,44 @@ class GeneFabClient():
  
     def _init_error_handlers(self):
         """Intercept all exceptions and deliver an HTTP error page with or without traceback depending on debug state"""
-        self.flask_app.errorhandler(Exception)(partial(
-            exception_catcher, collection=self.mongo_collections.log,
-            debug=is_debug(),
+        self.flask_app.errorhandler(Exception)(partial(exception_catcher,
+            collection=self.mongo_collections.log, debug=is_debug(),
         ))
+ 
+    def _ok_to_loop(self):
+        """Check if no other instances of genefab3 are talking to MongoDB database"""
+        if self.cacher_params.get("enabled") is False:
+            msg = "CacherThread disabled by client parameter, NOT LOOPING"
+            GeneFabLogger().info(f"{self._mongo_appname}: {msg}")
+            return False
+        else:
+            query = {"$currentOp": {"allUsers": True, "idleConnections": True}}
+            projection = {"$project": {"appName": True}}
+            others = {
+                e.get("appName").replace("genefab3 ", "")
+                for e in self._mongo_client.admin.aggregate([query, projection])
+                if (e.get("appName") != self._mongo_appname) and
+                   (e.get("appName", "").startswith("genefab3"))
+            }
+            if not others:
+                msg = "No other instances found, STARTING LOOP"
+                GeneFabLogger().info(f"{self._mongo_appname}: {msg}")
+                return True
+            else:
+                msg = f"Found other instances ({others}), NOT LOOPING this one"
+                GeneFabLogger().info(f"{self._mongo_appname}: {msg}")
+                return False
  
     def loop(self):
         """Start background cacher thread"""
-        if self.cacher_params.get("enabled", 1) and (not is_flask_reloaded()):
+        if self._ok_to_loop():
             try:
                 cacher_thread_params = dict(
                     adapter=self.adapter,
                     mongo_collections=self.mongo_collections,
-                    locale=self.locale,
+                    mongo_appname=self._mongo_appname, locale=self.locale,
                     units_formatter=self.units_formatter,
-                    sqlite_dbs=self.sqlite_dbs,
-                    **self.cacher_params,
+                    sqlite_dbs=self.sqlite_dbs, **self.cacher_params,
                 )
                 CacherThread(**cacher_thread_params).start()
             except TypeError as e:

@@ -74,11 +74,11 @@ def INPLACE_update_metadata_value_lookup_values(index, mongo_collections):
                 index[isa_category][subkey][next_level_key] = vals
 
 
-def update_metadata_value_lookup(mongo_collections, template=METADATA_AUX_TEMPLATE):
+def update_metadata_value_lookup(mongo_collections, cacher_id, template=METADATA_AUX_TEMPLATE):
     """Collect existing keys and values for lookups"""
     logger = GeneFabLogger()
-    msgmask = "CacherThread: reindexing metadata lookup records ('{}')"
-    logger.info(msgmask.format(mongo_collections.metadata_aux.name))
+    msgmask = "{}: reindexing metadata lookup records ('{}')"
+    logger.info(msgmask.format(cacher_id, mongo_collections.metadata_aux.name))
     index = deepcopy(template)
     INPLACE_update_metadata_value_lookup_keys(index, mongo_collections)
     INPLACE_update_metadata_value_lookup_values(index, mongo_collections)
@@ -89,5 +89,5 @@ def update_metadata_value_lookup(mongo_collections, template=METADATA_AUX_TEMPLA
                 query={"isa_category": isa_category, "subkey": subkey},
                 data={"content": index[isa_category][subkey]},
             )
-    msgmask = "CacherThread: finished reindexing metadata lookup records ('{}')"
-    logger.info(msgmask.format(mongo_collections.metadata_aux.name))
+    msgmask = "{}: finished reindexing metadata lookup records ('{}')"
+    logger.info(msgmask.format(cacher_id, mongo_collections.metadata_aux.name))
