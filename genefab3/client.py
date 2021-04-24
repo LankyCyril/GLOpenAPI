@@ -47,12 +47,10 @@ class GeneFabClient():
  
     def _get_mongo_db_connection(self, *, db_name, client_params=None, collection_names=None, locale="en_US", units_formatter=None, test_timeout=10):
         """Check MongoDB server is running, connect to database `db_name`"""
-        self._mongo_appname = "genefab3 " + base_repr(
-            int(datetime.now().timestamp() * 1000000), 36,
-        )
-        self._mongo_client = MongoClient(
-            **(client_params or {}), appname=self._mongo_appname,
-        )
+        _ts_36 = base_repr(int(datetime.now().timestamp() * 1000000), 36)
+        self._mongo_appname = f"genefab3 {_ts_36}"
+        _kw = dict(**(client_params or {}), appname=self._mongo_appname)
+        self._mongo_client = MongoClient(**_kw)
         try:
             host_and_port = (self._mongo_client.HOST, self._mongo_client.PORT)
             with create_connection(host_and_port, timeout=test_timeout):
@@ -91,16 +89,14 @@ class GeneFabClient():
             msg = "SQL database must be a file path or None"
             raise GeneFabConfigurationException(msg, cache=cache)
         else:
-            dbs = SimpleNamespace(blobs=blobs, tables=tables, cache=cache)
-            for name, filename in dbs.__dict__.items():
-                if filename:
-                    try:
-                        with connect(filename):
-                            pass
-                    except OperationalError:
-                        msg = "SQL database not reachable"
-                        raise GeneFabConfigurationException(msg, name=filename)
-            return dbs
+            sqlite_dbs = dict(blobs=blobs, tables=tables, cache=cache)
+            for name, filename in ((n, f) for n, f in sqlite_dbs.items() if f):
+                try:
+                    connect(filename).close()
+                except OperationalError:
+                    msg = "SQL database not reachable"
+                    raise GeneFabConfigurationException(msg, name=filename)
+            return SimpleNamespace(**sqlite_dbs)
  
     def _init_routes(self):
         """Route Response-generating methods to Flask endpoints"""
@@ -114,9 +110,8 @@ class GeneFabClient():
  
     def _init_error_handlers(self):
         """Intercept all exceptions and deliver an HTTP error page with or without traceback depending on debug state"""
-        self.flask_app.errorhandler(Exception)(partial(exception_catcher,
-            collection=self.mongo_collections.log, debug=is_debug(),
-        ))
+        _k = dict(collection=self.mongo_collections.log, debug=is_debug())
+        self.flask_app.errorhandler(Exception)(partial(exception_catcher, **_k))
  
     def _ok_to_loop(self):
         """Check if no other instances of genefab3 are talking to MongoDB database"""
@@ -127,20 +122,18 @@ class GeneFabClient():
         else:
             query = {"$currentOp": {"allUsers": True, "idleConnections": True}}
             projection = {"$project": {"appName": True}}
-            others = {
-                e.get("appName").replace("genefab3 ", "")
-                for e in self._mongo_client.admin.aggregate([query, projection])
-                if (e.get("appName") != self._mongo_appname) and
-                   (e.get("appName", "").startswith("genefab3"))
-            }
-            if not others:
+            for e in self._mongo_client.admin.aggregate([query, projection]):
+                other = e.get("appName", "")
+                if other.startswith("genefab3"):
+                    if other != self._mongo_appname:
+                        msg = (f"Found other instance ({other}), " +
+                            "NOT LOOPING current instance")
+                        GeneFabLogger().info(f"{self._mongo_appname}: {msg}")
+                        return False
+            else:
                 msg = "No other instances found, STARTING LOOP"
                 GeneFabLogger().info(f"{self._mongo_appname}: {msg}")
                 return True
-            else:
-                msg = f"Found other instances ({others}), NOT LOOPING this one"
-                GeneFabLogger().info(f"{self._mongo_appname}: {msg}")
-                return False
  
     def loop(self):
         """Start background cacher thread"""
