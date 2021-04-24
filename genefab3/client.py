@@ -47,7 +47,7 @@ class GeneFabClient():
  
     def _get_mongo_db_connection(self, *, db_name, client_params=None, collection_names=None, locale="en_US", units_formatter=None, test_timeout=10):
         """Check MongoDB server is running, connect to database `db_name`"""
-        _ts_36 = base_repr(int(datetime.now().timestamp() * 1000000), 36)
+        _ts_36 = base_repr(int(datetime.now().timestamp() * (10**6)), 36)
         self._mongo_appname = f"genefab3 {_ts_36}"
         _kw = dict(**(client_params or {}), appname=self._mongo_appname)
         self._mongo_client = MongoClient(**_kw)
@@ -125,7 +125,7 @@ class GeneFabClient():
             for e in self._mongo_client.admin.aggregate([query, projection]):
                 other = e.get("appName", "")
                 if other.startswith("genefab3"):
-                    if other != self._mongo_appname:
+                    if other < self._mongo_appname:
                         msg = (f"Found other instance ({other}), " +
                             "NOT LOOPING current instance")
                         GeneFabLogger().info(f"{self._mongo_appname}: {msg}")
