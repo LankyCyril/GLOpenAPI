@@ -37,20 +37,20 @@ class ResponseCache():
     def __init__(self, sqlite_dbs, maxsize=24*1024*1024*1024):
         self.sqlite_dbs, self.maxsize = sqlite_dbs, maxsize
         self.logger = GeneFabLogger()
-        if sqlite_dbs.cache is not None:
+        if sqlite_dbs.response_cache is not None:
             # if not path.exists(response_cache): # TODO: auto_vacuum
             #     with closing(connect(response_cache)) as sql_connection:
             #         sql_connection.cursor().execute("PRAGMA auto_vacuum = 1")
-            with closing(connect(sqlite_dbs.cache)) as connection:
+            with closing(connect(sqlite_dbs.response_cache)) as connection:
                 for table, schema in RESPONSE_CACHE_SCHEMAS.items():
                     query = f"CREATE TABLE IF NOT EXISTS `{table}` {schema}"
                     connection.cursor().execute(query)
         else:
-            self.logger.warning("Not using LRU response SQL cache")
+            self.logger.warning("LRU response SQL cache DISABLED by client")
  
     def put(self, context, obj, response):
         """Store response object blob in response_cache table, if possible"""
-        if self.sqlite_dbs.cache is None:
+        if self.sqlite_dbs.response_cache is None:
             return
         _logi, _loge = self.logger.info, self.logger.error
         api_path = quote(context.full_path)
@@ -66,7 +66,7 @@ class ResponseCache():
             WHERE `accession` == {} AND `context_identity` == "{}" """.format
         make_insert_accession_entry_command = """INSERT INTO `accessions_used`
             (accession, context_identity) VALUES ({}, "{}")""".format
-        with closing(connect(self.sqlite_dbs.cache)) as connection:
+        with closing(connect(self.sqlite_dbs.response_cache)) as connection:
             try:
                 cursor = connection.cursor()
                 cursor.execute(delete_blob_command)
@@ -82,14 +82,32 @@ class ResponseCache():
                 connection.commit()
                 _logi(f"LRU response cache: stored {context.identity}")
  
-    def drop(self, accession):
-        """Drop responses for given accession"""
-        if self.sqlite_dbs.cache is None:
+    def drop_all(self):
+        """Drop all cached responses"""
+        if self.sqlite_dbs.response_cache is None:
             return
-        with closing(connect(self.sqlite_dbs.cache)) as connection:
+        with closing(connect(self.sqlite_dbs.response_cache)) as connection:
             try:
                 cursor = connection.cursor()
-                acc_repr = sane_sql_repr(accession)
+                cursor.execute("DELETE FROM `accessions_used`")
+                cursor.execute("DELETE FROM `response_cache`")
+            except OperationalError as e:
+                connection.rollback()
+                msg = "Could not drop all cached Flask responses: %s"
+                GeneFabLogger().error(msg, repr(e))
+            else:
+                connection.commit()
+                GeneFabLogger().info("Dropped all cached Flask responses")
+ 
+    def drop(self, accession):
+        """Drop responses for given accession"""
+        _logi, _loge = self.logger.info, self.logger.error
+        if self.sqlite_dbs.response_cache is None:
+            return
+        with closing(connect(self.sqlite_dbs.response_cache)) as connection:
+            try:
+                cursor = connection.cursor()
+                acc_repr = sane_sql_repr(accession, _loge)
                 query = f"""SELECT `context_identity` FROM `accessions_used`
                     WHERE `accession` == {acc_repr}"""
                 identity_entries = cursor.execute(query).fetchall()
@@ -102,27 +120,27 @@ class ResponseCache():
             except OperationalError as e:
                 connection.rollback()
                 msg = "Could not drop cached Flask responses for %s: %s"
-                GeneFabLogger().error(msg, accession, repr(e))
+                _loge(msg, accession, repr(e))
             else:
                 connection.commit()
                 msg = "Dropped %s cached Flask responses for %s"
-                GeneFabLogger().info(msg, len(identity_entries), accession)
+                _logi(msg, len(identity_entries), accession)
  
     def shrink(self, to=None):
         """Drop oldest cached responses to keep file size on disk under `to` or `self.maxsize`"""
-        if self.sqlite_dbs.cache is None:
+        if self.sqlite_dbs.response_cache is None:
             return
         msg = "Shrinking Flask response cache not implemented yet" # TODO
         self.logger.warning(msg)
  
     def get(self, context):
         """Retrieve cached response object blob from response_cache table if possible; otherwise return None"""
-        if self.sqlite_dbs.cache is None:
+        if self.sqlite_dbs.response_cache is None:
             return
         query = f"""SELECT `response`, `mimetype` FROM `response_cache`
             WHERE `context_identity` == "{context.identity}" LIMIT 1"""
         try:
-            with closing(connect(self.sqlite_dbs.cache)) as connection:
+            with closing(connect(self.sqlite_dbs.response_cache)) as connection:
                 row = connection.cursor().execute(query).fetchone()
         except OperationalError:
             row = None

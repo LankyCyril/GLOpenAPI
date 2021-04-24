@@ -24,9 +24,7 @@ class CacherThread(Thread):
         self.metadata_retry_delay = metadata_retry_delay
         self.units_formatter = units_formatter
         self.response_cache = ResponseCache(self.sqlite_dbs)
-        self.status_kwargs = dict(
-            collection=self.mongo_collections.status, logger=GeneFabLogger(),
-        )
+        self.status_kwargs = dict(collection=self.mongo_collections.status)
         super().__init__()
  
     def run(self):
@@ -36,15 +34,11 @@ class CacherThread(Thread):
             accessions, success = self.recache_metadata()
             if success:
                 update_metadata_value_lookup(self.mongo_collections, self._id)
-                accessions_to_drop = (
-                    accessions["updated"] | accessions["dropped"] |
-                    accessions["failed"]
-                )
-                # FIXME: actually, this whole logic is wrong
-                # TODO: if datasets are only REMOVED from the database, stick to this logic (drop cache that involves these datasets)
-                # TODO: if anything at all is ADDED or UPDATED in the database, we have to drop the whole cache!!!
-                for accession in accessions_to_drop:
-                    self.response_cache.drop(accession)
+                if accessions["updated"]:
+                    self.response_cache.drop_all()
+                else:
+                    for acc in accessions["failed"] | accessions["dropped"]:
+                        self.response_cache.drop(acc)
                 self.response_cache.shrink()
                 delay = self.metadata_update_interval
             else:

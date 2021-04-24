@@ -76,27 +76,27 @@ class GeneFabClient():
             })
         return mongo_collections, locale, units_formatter
  
-    def _get_validated_sqlite_dbs(self, *, blobs, tables, cache=None):
+    def _get_validated_sqlite_dbs(self, *, blobs, tables, response_cache=None):
         """Check target SQLite3 files are specified correctly, convert to namespace for dot-syntax lookup"""
-        if len({blobs, tables, cache}) != 3:
+        dbs = dict(blobs=blobs, tables=tables, response_cache=response_cache)
+        if len({blobs, tables, response_cache}) != 3:
             msg = "SQL databases must all be distinct to avoid name conflicts"
-            _kw = dict(blobs=blobs, tables=tables, cache=cache)
-            raise GeneFabConfigurationException(msg, **_kw)
+            raise GeneFabConfigurationException(msg, **dbs)
         elif (not isinstance(blobs, str)) or (not isinstance(tables, str)):
             msg = "SQL databases must be file paths"
             raise GeneFabConfigurationException(msg, blobs=blobs, tables=tables)
-        elif (not isinstance(cache, str)) and (cache is not None):
-            msg = "SQL database must be a file path or None"
-            raise GeneFabConfigurationException(msg, cache=cache)
+        elif (not isinstance(response_cache, str)) and response_cache:
+            msg = "SQL database must be a file path or None/False"
+            _kw = dict(response_cache=response_cache)
+            raise GeneFabConfigurationException(msg, **_kw)
         else:
-            sqlite_dbs = dict(blobs=blobs, tables=tables, cache=cache)
-            for name, filename in ((n, f) for n, f in sqlite_dbs.items() if f):
+            for name, filename in ((n, f) for n, f in dbs.items() if f):
                 try:
                     connect(filename).close()
                 except OperationalError:
                     msg = "SQL database not reachable"
                     raise GeneFabConfigurationException(msg, name=filename)
-            return SimpleNamespace(**sqlite_dbs)
+            return SimpleNamespace(**dbs)
  
     def _init_routes(self):
         """Route Response-generating methods to Flask endpoints"""
