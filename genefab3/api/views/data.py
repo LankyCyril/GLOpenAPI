@@ -6,8 +6,8 @@ from flask import redirect, Response
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDataManagerException
 from pandas import MultiIndex
-from genefab3.db.sql.types import OndemandSQLiteDataFrame
-from genefab3.db.sql.types import CachedTableFile, CachedBinaryFile
+from genefab3.db.sql.pandas import OndemandSQLiteDataFrame
+from genefab3.db.sql.files import CachedTableFile, CachedBinaryFile
 from natsort import natsorted
 from genefab3.common.exceptions import GeneFabDatabaseException
 from urllib.error import HTTPError

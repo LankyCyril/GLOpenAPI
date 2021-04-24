@@ -1,5 +1,5 @@
 from genefab3.common.types import Routes, AnnotationDataFrame, DataDataFrame
-from genefab3.db.sql.types import CachedBinaryFile
+from genefab3.db.sql.files import CachedBinaryFile
 from genefab3.api import views
 from pandas import DataFrame
 from typing import Union

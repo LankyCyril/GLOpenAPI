@@ -1,13 +1,15 @@
 from genefab3.common.utils import iterate_terminal_leaves, as_is
+from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
 from genefab3.common.exceptions import GeneFabConfigurationException
-from functools import partial
 from copy import deepcopy
 from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
 from genefab3.common.logger import GeneFabLogger
 from pandas import DataFrame
 from collections.abc import Callable
+from genefab3.db.sql.pandas import SQLiteIndexName
 from collections import OrderedDict
+from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
 from genefab3.common.exceptions import GeneFabDatabaseException
 from pandas.io.sql import DatabaseError
 from itertools import count
@@ -22,19 +24,6 @@ def is_singular_spec(spec):
             return (sum(1 for _ in iterate_terminal_leaves(spec)) == 1)
     except ValueError:
         return False
-
-
-def validate_no_special_character(identifier, desc, c):
-    """Pass through `identifier` if contains no `c`, raise GeneFabConfigurationException otherwise"""
-    if (not isinstance(identifier, str)) or (c not in identifier):
-        return identifier
-    else:
-        msg = f"{repr(c)} in {desc} name"
-        raise GeneFabConfigurationException(msg, **{desc: identifier})
-
-
-validate_no_backtick = partial(validate_no_special_character, c="`")
-validate_no_doublequote = partial(validate_no_special_character, c='"')
 
 
 class SQLiteObject():
@@ -195,7 +184,6 @@ class SQLiteObject():
  
     def __retrieve_table(self, table, postprocess_function=as_is):
         """Create an OndemandSQLiteDataFrame object dispatching columns to table parts"""
-        from genefab3.db.sql.types import SQLiteIndexName
         column_dispatcher = OrderedDict()
         with closing(connect(self.__sqlite_db)) as connection:
             for i in count():
@@ -216,7 +204,6 @@ class SQLiteObject():
             msg = "No data found"
             raise GeneFabDatabaseException(msg, signature=self.__signature)
         else:
-            from genefab3.db.sql.types import OndemandSQLiteDataFrame_Single
             return postprocess_function(OndemandSQLiteDataFrame_Single(
                 self.__sqlite_db, column_dispatcher,
             ))
@@ -274,3 +261,71 @@ class SQLiteObject():
         else:
             self.changed = False
         return self.__retrieve()
+
+
+class SQLiteBlob(SQLiteObject):
+    """Represents an SQLiteObject initialized with a spec suitable for a binary blob"""
+ 
+    def __init__(self, data_getter, sqlite_db, table, identifier, timestamp, compressor, decompressor):
+        if not table.startswith("BLOBS:"):
+            msg = "Table name for SQLiteBlob must start with 'BLOBS:'"
+            _kw = dict(table=table, identifier=identifier)
+            raise GeneFabConfigurationException(msg, **_kw)
+        SQLiteObject.__init__(
+            self, sqlite_db, signature={"identifier": identifier},
+            table_schemas={
+                table: {
+                    "identifier": "TEXT",
+                    "timestamp": "INTEGER",
+                    "blob": "BLOB",
+                },
+            },
+            trigger={
+                table: {
+                    "timestamp": lambda val: (val is None) or (timestamp > val),
+                },
+            },
+            update={
+                table: [{
+                    "identifier": lambda: identifier,
+                    "timestamp": lambda: timestamp,
+                    "blob": lambda: (compressor or as_is)(data_getter()),
+                }],
+            },
+            retrieve={table: {"blob": decompressor or as_is}},
+        )
+
+
+class SQLiteTable(SQLiteObject):
+    """Represents an SQLiteObject initialized with a spec suitable for a generic table"""
+ 
+    def __init__(self, data_getter, sqlite_db, table, aux_table, identifier, timestamp, maxpartwidth=1000):
+        if not table.startswith("TABLE:"):
+            msg = "Table name for SQLiteTable must start with 'TABLE:'"
+            _kw = dict(table=table, identifier=identifier)
+            raise GeneFabConfigurationException(msg, **_kw)
+        if not aux_table.startswith("AUX:"):
+            msg = "Aux table name for SQLiteTable must start with 'AUX:'"
+            _kw = dict(aux_table=aux_table, identifier=identifier)
+            raise GeneFabConfigurationException(msg, **_kw)
+        self.maxpartwidth = maxpartwidth
+        SQLiteObject.__init__(
+            self, sqlite_db, signature={"identifier": identifier},
+            table_schemas={
+                table: None,
+                aux_table: {"identifier": "TEXT", "timestamp": "INTEGER"},
+            },
+            trigger={
+                aux_table: {
+                    "timestamp": lambda val: (val is None) or (timestamp > val),
+                },
+            },
+            update=OrderedDict((
+                (table, [data_getter]),
+                (aux_table, [{
+                    "identifier": lambda: identifier,
+                    "timestamp": lambda: timestamp,
+                }]),
+            )),
+            retrieve={table: as_is},
+        )

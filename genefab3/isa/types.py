@@ -1,6 +1,6 @@
 from genefab3.common.types import Adapter
 from genefab3.common.exceptions import GeneFabDataManagerException
-from genefab3.db.sql.types import CachedBinaryFile
+from genefab3.db.sql.files import CachedBinaryFile
 from genefab3.isa.parser import IsaFromZip
 from genefab3.common.utils import deepcopy_and_drop, copy_and_drop
 from genefab3.common.exceptions import GeneFabISAException
