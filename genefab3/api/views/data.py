@@ -218,7 +218,10 @@ def get(mongo_collections, *, locale, context, sqlite_dbs, adapter):
     )
     descriptors = list(cursor)
     for d in descriptors:
-        if ("file" not in d) or ("filename" not in d["file"]):
+        if ("file" in d) and (not isinstance(d["file"], dict)):
+            msg = "Query did not result in an unambiguous target file"
+            raise GeneFabDatabaseException(msg, debug_info=d)
+        elif ("file" not in d) or ("filename" not in d["file"]):
             msg = "File information missing for entry"
             raise GeneFabDatabaseException(msg, entry=d)
     if not len(descriptors):
