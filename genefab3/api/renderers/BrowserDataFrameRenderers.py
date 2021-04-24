@@ -41,11 +41,11 @@ def get_browser_glds_formatter(context, i):
     return f"columns[{i}].formatter = columns[{i}].defaultFormatter = {_fr};"
 
 
-def get_browser_assay_formatter(context, i):
+def get_browser_mixed_id_formatter(context, i, head):
     """Get SlickGrid formatter for column 'assay name'"""
     url = build_url(context, drop={"id"})
     _fr = f"""function(r,c,v,d,x){{return "<a class='filter' "+
-        "href='{url}id="+data[r][0]+"/"+escape(v)+"'>"+v+"</a>";}}"""
+        "href='{url}id="+{head}+"/"+escape(v)+"'>"+v+"</a>";}}"""
     return f"columns[{i}].formatter = columns[{i}].defaultFormatter = {_fr};"
 
 
@@ -73,7 +73,11 @@ def iterate_formatters(obj, context):
             if target == "accession":
                 yield get_browser_glds_formatter(context, i)
             elif target == "assay":
-                yield get_browser_assay_formatter(context, i)
+                head = "data[r][0]"
+                yield get_browser_mixed_id_formatter(context, i, head)
+            elif target == "sample name":
+                head = 'data[r][0]+"/"+data[r][1]'
+                yield get_browser_mixed_id_formatter(context, i, head)
         elif (key, target, context.view) == ("file", "filename", "samples"):
             yield get_browser_file_formatter(context, i)
         else:
