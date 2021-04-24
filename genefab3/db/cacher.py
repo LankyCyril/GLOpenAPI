@@ -7,7 +7,7 @@ from time import sleep
 from collections import OrderedDict
 from genefab3.db.mongo.types import ValueCheckedRecord
 from genefab3.isa.types import Dataset
-from genefab3.db.mongo.utils import run_mongo_transaction, harmonize_document
+from genefab3.db.mongo.utils import run_mongo_action, harmonize_document
 from genefab3.db.mongo.status import drop_status, update_status
 
 
@@ -87,35 +87,44 @@ class CacherThread(Thread):
  
     def drop_single_dataset_metadata(self, accession):
         """Drop all metadata entries associated with `accession` from `self.mongo_collections.metadata`"""
-        run_mongo_transaction(
-            "delete_many", self.mongo_collections.metadata,
-            query={"id.accession": accession},
-        )
+        collection = self.mongo_collections.metadata
+        with collection.database.client.start_session() as session:
+            with session.start_transaction():
+                run_mongo_action(
+                    "delete_many", collection,
+                    query={"id.accession": accession},
+                )
         return "dropped", "removed from database", None
  
     def recache_single_dataset_samples(self, dataset):
         """Insert per-sample documents into MongoDB, return exception on error"""
-        try:
-            has_samples = False
-            for sample in dataset.samples:
-                document = harmonize_document(sample, self.units_formatter)
-                self.mongo_collections.metadata.insert_one(document)
-                has_samples = True
-                if "Study" not in sample:
-                    update_status(
-                        **self.status_kwargs, accession=dataset.accession,
-                        status="warning", warning="Study entry missing",
-                        assay_name=sample.assay_name, sample_name=sample.name,
-                    )
-            if not has_samples:
-                update_status(
-                    **self.status_kwargs, status="warning",
-                    warning="No samples", accession=dataset.accession,
-                )
-        except Exception as e:
-            return e
-        else:
-            return None
+        collection = self.mongo_collections.metadata
+        with collection.database.client.start_session() as session:
+            with session.start_transaction():
+                try:
+                    has_samples = False
+                    for sample in dataset.samples:
+                        collection.insert_one(harmonize_document(
+                            sample, self.units_formatter,
+                        ))
+                        has_samples = True
+                        if "Study" not in sample:
+                            update_status(
+                                **self.status_kwargs, status="warning",
+                                warning="Study entry missing",
+                                accession=dataset.accession,
+                                assay_name=sample.assay_name,
+                                sample_name=sample.name,
+                            )
+                    if not has_samples:
+                        update_status(
+                            **self.status_kwargs, status="warning",
+                            warning="No samples", accession=dataset.accession,
+                        )
+                except Exception as e:
+                    return e
+                else:
+                    return None
  
     def recache_single_dataset_metadata(self, accession, has_cache):
         """Check if dataset changed, update metadata cached in `self.mongo_collections.metadata`, report with result/errors"""

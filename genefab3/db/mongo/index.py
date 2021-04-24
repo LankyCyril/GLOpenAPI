@@ -1,7 +1,7 @@
 from genefab3.common.logger import GeneFabLogger
 from pymongo import ASCENDING
 from copy import deepcopy
-from genefab3.db.mongo.utils import run_mongo_transaction
+from genefab3.db.mongo.utils import run_mongo_action
 
 
 INFO_SUBKEYS = ["accession", "assay", "sample name"]
@@ -82,12 +82,15 @@ def update_metadata_value_lookup(mongo_collections, cacher_id, template=METADATA
     index = deepcopy(template)
     INPLACE_update_metadata_value_lookup_keys(index, mongo_collections)
     INPLACE_update_metadata_value_lookup_values(index, mongo_collections)
-    for isa_category in index:
-        for subkey in index[isa_category]:
-            run_mongo_transaction(
-                action="replace", collection=mongo_collections.metadata_aux,
-                query={"isa_category": isa_category, "subkey": subkey},
-                data={"content": index[isa_category][subkey]},
-            )
+    collection = mongo_collections.metadata_aux
+    with collection.database.client.start_session() as session:
+        with session.start_transaction():
+            for isa_category in index:
+                for subkey in index[isa_category]:
+                    run_mongo_action(
+                        action="replace", collection=collection,
+                        query={"isa_category": isa_category, "subkey": subkey},
+                        data={"content": index[isa_category][subkey]},
+                    )
     msgmask = "{}: finished reindexing metadata lookup records ('{}')"
     logger.info(msgmask.format(cacher_id, mongo_collections.metadata_aux.name))

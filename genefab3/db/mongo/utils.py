@@ -71,35 +71,33 @@ def harmonize_document(query, units_formatter=None, lowercase=True, dropna=True,
         return {}
 
 
-def run_mongo_transaction(action, collection, *, query=None, data=None, documents=None):
-    """Shortcut to replace/delete/insert all matching instances in one transaction"""
+def run_mongo_action(action, collection, *, query=None, data=None, documents=None):
+    """Shortcut to replace/delete/insert all matching instances"""
     error_message, unused_arguments = None, None
-    with collection.database.client.start_session() as session:
-        with session.start_transaction():
-            if action == "replace":
-                if (query is not None) and (data is not None):
-                    collection.delete_many(query)
-                    collection.insert_one({**query, **data})
-                    if documents is not None:
-                        unused_arguments = "`documents`"
-                else:
-                    error_message = "no `query` and/or `data` specified"
-            elif action == "delete_many":
-                if query is not None:
-                    collection.delete_many(query)
-                    if (data is not None) or (documents is not None):
-                        unused_arguments = "`data`, `documents`"
-                else:
-                    error_message = "no `query` specified"
-            elif action == "insert_many":
-                if documents is not None:
-                    collection.insert_many(documents)
-                    if (query is not None) or (data is not None):
-                        unused_arguments = "`query`, `data`"
-                else:
-                    error_message = "no `documents` specified"
-            else:
-                error_message = "unsupported action"
+    if action == "replace":
+        if (query is not None) and (data is not None):
+            collection.delete_many(query)
+            collection.insert_one({**query, **data})
+            if documents is not None:
+                unused_arguments = "`documents`"
+        else:
+            error_message = "no `query` and/or `data` specified"
+    elif action == "delete_many":
+        if query is not None:
+            collection.delete_many(query)
+            if (data is not None) or (documents is not None):
+                unused_arguments = "`data`, `documents`"
+        else:
+            error_message = "no `query` specified"
+    elif action == "insert_many":
+        if documents is not None:
+            collection.insert_many(documents)
+            if (query is not None) or (data is not None):
+                unused_arguments = "`query`, `data`"
+        else:
+            error_message = "no `documents` specified"
+    else:
+        error_message = "unsupported action"
     if unused_arguments:
         message = "run_mongo_transaction('%s'): %s unused in this action"
         GeneFabLogger().warning(message, action, unused_arguments)

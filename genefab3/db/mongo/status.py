@@ -1,4 +1,4 @@
-from genefab3.db.mongo.utils import run_mongo_transaction
+from genefab3.db.mongo.utils import run_mongo_action
 from datetime import datetime
 
 
@@ -15,9 +15,7 @@ def log_status(logger, status, info, warning, error, query):
 def drop_status(collection, logger=None, accession=None, status=None, info=None, warning=None, error=None, **kwargs):
     """Drop all references to accession from `collection`"""
     query = {"accession": accession}
-    run_mongo_transaction(
-        action="delete_many", collection=collection, query=query,
-    )
+    run_mongo_action(action="delete_many", collection=collection, query=query)
     if logger is not None:
         log_status(logger, status, info, warning, error, query)
 
@@ -33,7 +31,7 @@ def update_status(collection, logger=None, report_type=None, accession=None, ass
         "error": None if (error is None) else type(error).__name__,
         "args": getattr(error, "args", []), "kwargs": kwargs,
     }
-    run_mongo_transaction(
+    run_mongo_action(
         action="replace", collection=collection, query=query,
         data={"report timestamp": int(datetime.now().timestamp())},
     )

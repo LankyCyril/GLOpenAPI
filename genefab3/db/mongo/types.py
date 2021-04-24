@@ -4,7 +4,7 @@ from base64 import encodebytes
 from zlib import compress
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.logger import GeneFabLogger
-from genefab3.db.mongo.utils import run_mongo_transaction
+from genefab3.db.mongo.utils import run_mongo_action
 
 
 def safe_default_one_way_encode(f):
@@ -45,7 +45,9 @@ class ValueCheckedRecord():
                         n_stale_entries += 1
                 if (n_stale_entries != 0) or self.changed:
                     GeneFabLogger().info(f"Record updated: {identifier}")
-                    run_mongo_transaction(
-                        "replace", collection, query=identifier,
-                        data={"base64value": self.base64value},
-                    )
+                    with collection.database.client.start_session() as session:
+                        with session.start_transaction():
+                            run_mongo_action(
+                                "replace", collection, query=identifier,
+                                data={"base64value": self.base64value},
+                            )
