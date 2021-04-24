@@ -41,7 +41,7 @@ def get_metadata_assays(mongo_collections):
     """Generate JSON for documentation section 'meta-assay'"""
     metadata_assays = defaultdict(set)
     for entry in mongo_collections.metadata.distinct("id"):
-        metadata_assays[entry["accession"]].add(entry["assay"])
+        metadata_assays[entry["accession"]].add(entry["assay name"])
     return {
         k: {**{f"/{v}": True for v in natsorted(metadata_assays[k])}, "": True}
         for k in natsorted(metadata_assays)

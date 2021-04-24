@@ -72,7 +72,7 @@ def iterate_formatters(obj, context):
         if key == "id":
             if target == "accession":
                 yield get_browser_glds_formatter(context, i)
-            elif target == "assay":
+            elif target == "assay name":
                 head = "data[r][0]"
                 yield get_browser_mixed_id_formatter(context, i, head)
             elif target == "sample name":

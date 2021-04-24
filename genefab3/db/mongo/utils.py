@@ -131,11 +131,11 @@ def aggregate_file_descriptors_by_context(collection, *, locale, context, tech_t
     context.update(tech_type_locator, auto_reduce=True)
     return aggregate_entries_by_context(
         collection, locale=locale, context=context,
-        id_fields=["accession", "assay", "sample name"], postprocess=[
+        id_fields=["accession", "assay name", "sample name"], postprocess=[
             {"$group": {
                 "_id": {
                     "accession": "$id.accession",
-                    "assay": "$id.assay",
+                    "assay name": "$id.assay name",
                     "technology type": "${tech_type_locator}",
                     "file": "$file",
                 },
@@ -148,7 +148,7 @@ def aggregate_file_descriptors_by_context(collection, *, locale, context, tech_t
 
 
 def match_sample_names_to_file_descriptor(collection, descriptor):
-    """Retrieve all sample names associated with given filename under given accession and assay"""
+    """Retrieve all sample names associated with given filename under given accession and assay name"""
     try:
         return {
             entry["id"]["sample name"]
@@ -156,12 +156,12 @@ def match_sample_names_to_file_descriptor(collection, descriptor):
                 {"$unwind": "$file"},
                 {"$match": {
                     "id.accession": descriptor["accession"],
-                    "id.assay": descriptor["assay"],
+                    "id.assay name": descriptor["assay name"],
                     "file.filename": descriptor["file"]["filename"],
                 }},
                 {"$project": {"_id": False, "id.sample name": True}},
             ])
         }
     except (KeyError, TypeError, IndexError):
-        msg = "File descriptor missing 'accession', 'assay', or 'filename'"
+        msg = "File descriptor missing 'accession', 'assay name', or 'filename'"
         raise GeneFabDatabaseException(msg, descriptor=descriptor)

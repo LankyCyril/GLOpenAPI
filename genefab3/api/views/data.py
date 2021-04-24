@@ -124,13 +124,14 @@ def INPLACE_process_dataframe(dataframe, *, mongo_collections, descriptor, best_
 def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, adapter, _kws):
     """Instantiate and initialize CachedFile object; post-process its data; select only the columns in passed annotation"""
     try:
-        accession, assay = descriptor["accession"], descriptor["assay"]
+        accession = descriptor["accession"]
+        assay_name = descriptor["assay name"]
         filename = descriptor["file"]["filename"]
     except (KeyError, TypeError, IndexError):
-        msg = "File descriptor missing 'accession', 'assay', or 'filename'"
+        msg = "File descriptor missing 'accession', 'assay name', or 'filename'"
         raise GeneFabDatabaseException(msg, descriptor=descriptor)
     else:
-        identifier = f"{accession}/File/{assay}/{filename}"
+        identifier = f"{accession}/File/{assay_name}/{filename}"
     if "INPLACE_process" in _kws:
         _kws = {**_kws, "INPLACE_process": partial(
             INPLACE_process_dataframe, descriptor=descriptor,
@@ -150,7 +151,8 @@ def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, ada
             adapter.best_sample_name_matches,
         )
         data.columns = MultiIndex.from_tuples((
-            (accession, assay, column) for column in harmonized_column_order
+            (accession, assay_name, column)
+            for column in harmonized_column_order
         ))
     return data
 
@@ -200,7 +202,8 @@ def combined_data(descriptors, context, mongo_collections, sqlite_dbs, adapter):
             descriptor, mongo_collections, sqlite_db, CachedFile, adapter, _kws,
         )
         for descriptor in natsorted(
-            descriptors, key=lambda d: (d.get("accession"), d.get("assay")),
+            descriptors,
+            key=lambda d: (d.get("accession"), d.get("assay name")),
         )
     ])
     data.datatypes = getset("file", "datatype")

@@ -55,9 +55,9 @@ class Sample(dict):
     @property
     def sample_name(self): return self.name
     @property
-    def study_name(self): return self.get("Id", {}).get("Study")
+    def study_name(self): return self.get("Id", {}).get("Study Name")
     @property
-    def assay_name(self): return self.get("Id", {}).get("Assay")
+    def assay_name(self): return self.get("Id", {}).get("Assay Name")
     @property
     def accession(self): return self.get("Id", {}).get("Accession")
  
@@ -65,8 +65,8 @@ class Sample(dict):
         """Represents a single Sample entry generated from Assay, Study, general Investigation entries"""
         self.dataset, self["Id"] = dataset, {"Accession": dataset.accession}
         # associate with assay name:
-        self["Id"]["Assay"] = self._get_subkey_value(
-            assay_entry, "Id", "Assay",
+        self["Id"]["Assay Name"] = self._get_subkey_value(
+            assay_entry, "Id", "Assay Name",
         )
         # associate with sample name:
         self["Id"]["Sample Name"] = self._get_unique_primary_value(
@@ -108,8 +108,8 @@ class Sample(dict):
             study_entry = self.dataset.isa.studies._by_sample_name[
                 matching_study_sample_names.pop()
             ]
-            self["Id"]["Study"] = self._get_subkey_value(
-                study_entry, "Id", "Study",
+            self["Id"]["Study Name"] = self._get_subkey_value(
+                study_entry, "Id", "Study Name",
             )
             self["Study"] = deepcopy_and_drop(study_entry, {"Id"})
             self["Investigation"]["Study"] = (

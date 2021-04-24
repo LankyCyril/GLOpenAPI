@@ -14,7 +14,7 @@ CONTEXT_ARGUMENTS = {"debug": "0", "format": None, "schema": "0"}
 KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
     "id": partial(KeyValueParsers.kvp_assay,
         category="id", fields_depth=1,
-        constrain_to={"accession", "assay", "sample name", "study", None},
+        constrain_to={"accession", "assay name", "sample name", "study name"},
     ),
     "investigation": partial(KeyValueParsers.kvp_generic,
         category="investigation", fields_depth=2, dot_postfix=None,
@@ -45,8 +45,8 @@ class Context():
         self.view = request.path.strip("/")
         self.complete_kwargs = request.args.to_dict(flat=False)
         self.query, self.unwind = {"$and": []}, set()
-        self.projection = {"id.accession": True, "id.assay": True}
-        self.sort_by = ["id.accession", "id.assay"]
+        self.projection = {"id.accession": True, "id.assay name": True}
+        self.sort_by = ["id.accession", "id.assay name"]
         self.processed_args = {
             arg for arg, values in request.args.lists()
             if self.update(arg, values, auto_reduce=False)
@@ -121,17 +121,17 @@ class KeyValueParsers():
  
     def kvp_assay(arg, category, fields, value, fields_depth=1, constrain_to=None, mix_separator="/"):
         """Interpret single key-value pair for dataset / assay constraint"""
-        if (not fields) and value: # mixed syntax: 'id=GLDS-1|GLDS-2.assay-B'
+        if (not fields) and value: # mixed syntax: 'id=GLDS-1|GLDS-2/assay-B'
             query, projection_keys = {"$or": []}, ()
             for expr in value.split("|"):
                 query["$or"].append({
                     f"{category}.{field}": part for field, part in zip(
-                        ["accession", "assay", "sample name"],
+                        ["accession", "assay name", "sample name"],
                         expr.split(mix_separator, 2),
                     )
                 })
             yield query, projection_keys
-        else: # standard syntax: 'id', 'id.accession', 'id.assay=assayname', ...
+        else: # standard syntax: 'id', 'id.accession', 'id.assay name=name', ...
             yield from KeyValueParsers.kvp_generic(
                 arg=arg, fields_depth=fields_depth, constrain_to=constrain_to,
                 category=category, fields=fields, value=value, dot_postfix=None,
