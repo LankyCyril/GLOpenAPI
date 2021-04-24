@@ -1,9 +1,10 @@
+from contextlib import closing
+from sqlite3 import connect, Binary, OperationalError
+from os import access, W_OK
 from genefab3.common.utils import iterate_terminal_leaves, as_is
 from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
 from genefab3.common.exceptions import GeneFabConfigurationException
 from copy import deepcopy
-from contextlib import closing
-from sqlite3 import connect, Binary, OperationalError
 from genefab3.common.logger import GeneFabLogger
 from pandas import DataFrame
 from collections.abc import Callable
@@ -13,6 +14,17 @@ from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
 from genefab3.common.exceptions import GeneFabDatabaseException
 from pandas.io.sql import DatabaseError
 from itertools import count
+
+
+def is_sqlite_file_ready(filename):
+    """Make sure `filename` is reachable and writable, set auto_vacuum to 1 (FULL)"""
+    try:
+        with closing(connect(filename)) as connection:
+            connection.cursor().execute("PRAGMA auto_vacuum = 1")
+    except (OSError, FileNotFoundError, OperationalError):
+        return False
+    else: # if not writable, but already on auto_vacuum = 1, won't have thrown
+        return access(filename, W_OK)
 
 
 def is_singular_spec(spec):

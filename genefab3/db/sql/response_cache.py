@@ -38,9 +38,6 @@ class ResponseCache():
         self.sqlite_dbs, self.maxsize = sqlite_dbs, maxsize
         self.logger = GeneFabLogger()
         if sqlite_dbs.response_cache is not None:
-            # if not path.exists(response_cache): # TODO: auto_vacuum
-            #     with closing(connect(response_cache)) as sql_connection:
-            #         sql_connection.cursor().execute("PRAGMA auto_vacuum = 1")
             with closing(connect(sqlite_dbs.response_cache)) as connection:
                 for table, schema in RESPONSE_CACHE_SCHEMAS.items():
                     query = f"CREATE TABLE IF NOT EXISTS `{table}` {schema}"
