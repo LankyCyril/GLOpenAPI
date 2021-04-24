@@ -50,12 +50,11 @@ class CacherThread(Thread):
         """Instantiate each available dataset; if contents changed, dataset automatically updates db.metadata"""
         GeneFabLogger().info(f"{self._id}: Checking metadata cache")
         try:
-            _cached = self.mongo_collections.metadata.distinct("id.accession")
-            # TODO FIXME: union with accessions from LRU cache
+            collection = self.mongo_collections.metadata
             accessions = OrderedDict(
-                cached=set(_cached), live=set(self.adapter.get_accessions()),
-                fresh=set(), updated=set(), stale=set(),
-                dropped=set(), failed=set(),
+                cached=set(collection.distinct("id.accession")),
+                live=set(self.adapter.get_accessions()), fresh=set(),
+                updated=set(), stale=set(), dropped=set(), failed=set(),
             )
         except Exception as e:
             GeneFabLogger().error(f"{self._id}: {repr(e)}")
@@ -70,7 +69,7 @@ class CacherThread(Thread):
             accessions[key].add(accession)
             _kws = dict(
                 **self.status_kwargs, status=key, accession=accession,
-                info=f"{self._id}: {accession} {report}", error=error,
+                info=f"CacherThread: {accession} {report}", error=error,
             )
             if key in {"dropped", "failed"}:
                 drop_status(**_kws)
@@ -129,7 +128,7 @@ class CacherThread(Thread):
                 collection=self.mongo_collections.records,
                 value=self.adapter.get_files_by_accession(accession),
             )
-            if files.changed:
+            if files.changed or (not has_cache):
                 best_sample_name_matches=self.adapter.best_sample_name_matches
                 dataset = Dataset(
                     accession, files.value, self.sqlite_dbs.blobs,
@@ -145,8 +144,7 @@ class CacherThread(Thread):
             else:
                 status, report = "failed", f"failed to retrieve ({repr(e)})"
             return status, report, e
-        # TODO FIXME if (dataset is None) and CACHED -- drop!
-        if dataset is not None:
+        if dataset is not None: # files have changed OR needs to be re-inserted
             self.drop_single_dataset_metadata(accession)
             e = self.recache_single_dataset_samples(dataset)
             if e is not None:
@@ -154,5 +152,5 @@ class CacherThread(Thread):
                 return "failed", f"failed to parse ({repr(e)})", e
             else:
                 return "updated", "updated", None
-        else:
+        else: # files have not changed
             return "fresh", "no action (fresh)", None
