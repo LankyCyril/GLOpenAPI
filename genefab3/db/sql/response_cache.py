@@ -5,6 +5,7 @@ from genefab3.common.logger import GeneFabLogger
 from urllib.request import quote
 from datetime import datetime
 from zlib import compress, decompress, error as ZlibError
+from os import path
 from flask import Response
 
 
@@ -79,6 +80,49 @@ class ResponseCache():
                 connection.commit()
                 _logi(f"LRU response cache: stored {context.identity}")
  
+    def shrink(self, to=None, max_iter=100, max_skids=20, _logger=GeneFabLogger()):
+        """Drop oldest cached responses to keep file size on disk under `to` or `self.maxsize`"""
+        target_size = min(to, self.maxsize) if to else self.maxsize
+        if self.sqlite_dbs.response_cache is None:
+            return
+        elif path.getsize(self.sqlite_dbs.response_cache) <= target_size:
+            return
+        n_dropped, n_skids = 0, 0
+        for _ in range(max_iter):
+            current_size = path.getsize(self.sqlite_dbs.response_cache)
+            with closing(connect(self.sqlite_dbs.response_cache)) as connection:
+                query_oldest = f"""SELECT `context_identity`,`timestamp`
+                    FROM `response_cache` WHERE `timestamp` ==
+                    (SELECT MIN(`timestamp`) FROM `response_cache`) LIMIT 1"""
+                try:
+                    cursor = connection.cursor()
+                    entries = cursor.execute(query_oldest).fetchall()
+                    if len(entries) and (len(entries[0]) == 2):
+                        context_identity, timestamp = entries[0]
+                    else:
+                        break
+                    cursor.execute(f"""DELETE FROM `accessions_used`
+                        WHERE `context_identity` == "{context_identity}" """)
+                    cursor.execute(f"""DELETE FROM `response_cache`
+                        WHERE `context_identity` == "{context_identity}" """)
+                except OperationalError:
+                    connection.rollback()
+                else:
+                    connection.commit()
+                    n_dropped += 1
+            new_size = path.getsize(self.sqlite_dbs.response_cache)
+            if new_size >= current_size:
+                n_skids += 1
+            if (n_skids >= max_skids) or (new_size <= target_size):
+                break
+        if n_dropped:
+            _logger.info(f"Shrunk response cache by {n_dropped} entries")
+        else:
+            _logger.warning(f"Could not drop response cache entries to shrink")
+        if n_skids:
+            msg = f"Response cache file did not shrink {n_skids} times"
+            _logger.warning(msg)
+ 
     def drop_all(self):
         """Drop all cached responses"""
         if self.sqlite_dbs.response_cache is None:
@@ -122,13 +166,6 @@ class ResponseCache():
                 connection.commit()
                 msg = "Dropped %s cached Flask responses for %s"
                 _logi(msg, len(identity_entries), accession)
- 
-    def shrink(self, to=None):
-        """Drop oldest cached responses to keep file size on disk under `to` or `self.maxsize`"""
-        if self.sqlite_dbs.response_cache is None:
-            return
-        msg = "Shrinking Flask response cache not implemented yet" # TODO
-        self.logger.warning(msg)
  
     def get(self, context):
         """Retrieve cached response object blob from response_cache table if possible; otherwise return None"""
