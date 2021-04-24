@@ -11,7 +11,7 @@ class GeneFabException(Exception):
         self.accession, self.suggestion = accession, suggestion
         self.kwargs = kwargs
         args = [message, *(
-            f'{k}={repr(v)}' for k, v in kwargs.items() if k != "_debug"
+            f'{k}={repr(v)}' for k, v in kwargs.items() if k != "debug_info"
         )]
         super().__init__(*args)
     def __str__(self):
@@ -52,7 +52,7 @@ def interpret_exception(e, debug=False):
         args=[] if isinstance(e, GeneFabException) else getattr(e, "args", []),
         kwargs={
             k: v for k, v in getattr(e, "kwargs", {}).items()
-            if (debug or (k != "_debug"))
+            if (debug or (k != "debug_info"))
         },
     )
     if hasattr(e, "accession") and e.accession:

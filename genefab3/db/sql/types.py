@@ -443,7 +443,7 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
                 except PandasDatabaseError:
                     viewstack.close()
                     msg = "Bad SQL query when joining tables"
-                    _kw = dict(table=self.name, _debug=q)
+                    _kw = dict(table=self.name, debug_info=q)
                     raise GeneFabConfigurationException(msg, **_kw)
                 except:
                     viewstack.close()
