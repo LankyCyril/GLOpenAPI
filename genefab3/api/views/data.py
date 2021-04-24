@@ -166,9 +166,7 @@ def combine_objects(objects, context, limit=None):
     else:
         raise NotImplementedError("Merging non-dataframe data objects")
     if isinstance(combined, OndemandSQLiteDataFrame):
-        data = combined.get( # TODO: get() arguments
-            limit=1 if (context.schema == "1") else limit,
-        )
+        data = combined.get() # TODO: get() arguments, speedups for schema=1
         if data.index.name is None:
             data.index.name = "index" # best we can do
         data.reset_index(inplace=True, col_level=-1, col_fill="*")
