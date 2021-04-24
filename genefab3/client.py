@@ -10,7 +10,7 @@ from genefab3.api.renderer import CacheableRenderer
 from genefab3.common.logger import GeneFabLogger, MongoDBLogger
 from functools import partial
 from genefab3.common.exceptions import exception_catcher
-from genefab3.common.utils import is_debug
+from genefab3.common.utils import is_debug, copy_and_drop
 from genefab3.db.cacher import CacherThread
 
 
@@ -144,7 +144,8 @@ class GeneFabClient():
                     mongo_collections=self.mongo_collections,
                     mongo_appname=self._mongo_appname, locale=self.locale,
                     units_formatter=self.units_formatter,
-                    sqlite_dbs=self.sqlite_dbs, **self.cacher_params,
+                    sqlite_dbs=self.sqlite_dbs,
+                    **copy_and_drop(self.cacher_params, {"enabled"}),
                 )
                 CacherThread(**cacher_thread_params).start()
             except TypeError as e:

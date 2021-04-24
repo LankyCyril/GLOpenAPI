@@ -14,7 +14,7 @@ from genefab3.db.mongo.status import drop_status, update_status
 class CacherThread(Thread):
     """Lives in background and keeps local metadata cache, metadata index, and response cache up to date"""
  
-    def __init__(self, *, adapter, mongo_collections, mongo_appname, locale, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter, **kwargs):
+    def __init__(self, *, adapter, mongo_collections, mongo_appname, locale, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter):
         """Prepare background thread that iteratively watches for changes to datasets"""
         self._id = "CacherThread("+mongo_appname.replace("genefab3 ", "")+")"
         self.adapter = adapter
