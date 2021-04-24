@@ -51,6 +51,7 @@ class CacherThread(Thread):
         GeneFabLogger().info(f"{self._id}: Checking metadata cache")
         try:
             _cached = self.mongo_collections.metadata.distinct("id.accession")
+            # TODO FIXME: union with accessions from LRU cache
             accessions = OrderedDict(
                 cached=set(_cached), live=set(self.adapter.get_accessions()),
                 fresh=set(), updated=set(), stale=set(),
@@ -144,6 +145,7 @@ class CacherThread(Thread):
             else:
                 status, report = "failed", f"failed to retrieve ({repr(e)})"
             return status, report, e
+        # TODO FIXME if (dataset is None) and CACHED -- drop!
         if dataset is not None:
             self.drop_single_dataset_metadata(accession)
             e = self.recache_single_dataset_samples(dataset)
