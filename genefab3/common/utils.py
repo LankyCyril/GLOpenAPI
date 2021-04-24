@@ -26,11 +26,6 @@ def is_debug():
     )
 
 
-def is_flask_reloaded():
-    """https://stackoverflow.com/a/9476701/590676"""
-    return (environ.get("WERKZEUG_RUN_MAIN", None) == "true")
-
-
 @contextmanager
 def pick_reachable_url(urls, name=None):
     """Iterate `urls` and get the first reachable URL"""
