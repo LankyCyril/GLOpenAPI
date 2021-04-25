@@ -69,7 +69,7 @@ class CacherThread(Thread):
             accessions[key].add(accession)
             _kws = dict(
                 **self.status_kwargs, status=key, accession=accession,
-                info=f"CacherThread; {accession} {report}", error=error,
+                prefix=self._id, info=f"{accession} {report}", error=error,
             )
             if key in {"dropped", "failed"}:
                 drop_status(**_kws)
