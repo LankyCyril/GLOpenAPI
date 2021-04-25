@@ -1,5 +1,6 @@
 from numpy import generic as NumpyGenericType, base_repr
 from datetime import datetime
+from copy import deepcopy
 from os import environ
 from base64 import b64encode
 from uuid import uuid3, uuid4
@@ -8,7 +9,6 @@ from requests import head as request_head
 from urllib.request import urlopen
 from urllib.error import URLError
 from re import compile, escape
-from copy import deepcopy
 from pandas import DataFrame
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import partial, reduce
@@ -20,6 +20,10 @@ from marshal import dumps as marsh
 timestamp36 = lambda: base_repr(int(datetime.now().timestamp() * (10**6)), 36)
 as_is = lambda _:_
 EmptyIterator = lambda *a, **k: []
+
+copy_except = lambda d, *kk: {k: v for k, v in d.items() if k not in kk}
+deepcopy_except = lambda d, *kk: deepcopy({k: d[k] for k in d if k not in kk})
+deepcopy_keys = lambda d, *kk: deepcopy({k: d[k] for k in kk})
 
 
 def is_debug(markers={"development", "staging", "stage", "debug", "debugging"}):
@@ -59,20 +63,6 @@ def map_replace(string, mappings, compile=compile, join=r'|'.join, escape=escape
     """Perform multiple replacements in one go"""
     pattern = compile(join(map(escape, mappings.keys())))
     return pattern.sub(lambda m: mappings[m.group()], string)
-
-
-def copy_and_drop(d, drop):
-    """Shallowcopy dictionary `d`, delete `d[key] for key in drop`"""
-    return {k: v for k, v in d.items() if k not in drop}
-
-
-def deepcopy_and_drop(d, drop):
-    """Deepcopy dictionary `d`, delete `d[key] for key in drop`"""
-    d_copy = deepcopy(d)
-    for key in drop:
-        if key in d_copy:
-            del d_copy[key]
-    return d_copy
 
 
 def iterate_terminal_leaves(d, step_tracker=1, max_steps=256, isinstance=isinstance, dict=dict, enumerate=enumerate):

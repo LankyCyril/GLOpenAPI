@@ -2,7 +2,7 @@ from genefab3.common.types import Adapter
 from genefab3.common.exceptions import GeneFabDataManagerException
 from genefab3.db.sql.files import CachedBinaryFile
 from genefab3.isa.parser import IsaFromZip
-from genefab3.common.utils import deepcopy_and_drop, copy_and_drop
+from genefab3.common.utils import deepcopy_except, copy_except
 from genefab3.common.exceptions import GeneFabISAException
 from genefab3.common.utils import iterate_terminal_leaf_elements
 
@@ -86,7 +86,7 @@ class Sample(dict):
  
     def _INPLACE_extend_with_assay_metadata(self, assay_entry):
         """Populate with Assay tab annotation, Investigation Study Assays entry"""
-        self["Assay"] = deepcopy_and_drop(assay_entry, {"Id"})
+        self["Assay"] = deepcopy_except(assay_entry, "Id")
         self["Investigation"] = {
             k: v for k, v in self.dataset.isa.investigation.items()
             if (isinstance(v, list) or k == "Investigation")
@@ -111,7 +111,7 @@ class Sample(dict):
             self["Id"]["Study Name"] = self._get_subkey_value(
                 study_entry, "Id", "Study Name",
             )
-            self["Study"] = deepcopy_and_drop(study_entry, {"Id"})
+            self["Study"] = deepcopy_except(study_entry, "Id")
             self["Investigation"]["Study"] = (
                 self.dataset.isa.investigation["Study"].get(self.study_name, {})
             )
@@ -128,7 +128,7 @@ class Sample(dict):
         _sdf = self.dataset.files
         _no_condition = lambda *_: True
         self["File"] = [
-            {**copy_and_drop(_sdf[f], {"condition"}), "filename": f} for f in {
+            {**copy_except(_sdf[f], "condition"), "filename": f} for f in {
                 filename for filename, filedata in _sdf.items() if (
                     (filedata.get("internal") or (filename in isa_elements)) and
                     filedata.get("condition", _no_condition)(self, filename)

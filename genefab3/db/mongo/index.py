@@ -1,7 +1,7 @@
 from genefab3.api.parser import KEYVALUE_PARSER_DISPATCHER
 from genefab3.common.logger import GeneFabLogger
 from pymongo import ASCENDING
-from genefab3.common.utils import deepcopy_and_drop
+from genefab3.common.utils import deepcopy_keys
 from genefab3.db.mongo.utils import run_mongo_action
 
 
@@ -58,11 +58,11 @@ def INPLACE_update_metadata_value_lookup_values(index, mongo_collections):
                 index[isa_category][subkey][next_level_key] = vals
 
 
-def update_metadata_value_lookup(mongo_collections, cacher_id, _logger=GeneFabLogger()):
+def update_metadata_value_lookup(mongo_collections, cacher_id, keys=("investigation", "study", "assay"), _logger=GeneFabLogger()):
     """Collect existing keys and values for lookups"""
     msgmask = "{}:\n\treindexing metadata lookup records ('{}')"
     _logger.info(msgmask.format(cacher_id, mongo_collections.metadata_aux.name))
-    index = deepcopy_and_drop(METADATA_AUX_TEMPLATE, {"id", "file"})
+    index = deepcopy_keys(METADATA_AUX_TEMPLATE, *keys)
     INPLACE_update_metadata_value_lookup_keys(index, mongo_collections)
     INPLACE_update_metadata_value_lookup_values(index, mongo_collections)
     collection = mongo_collections.metadata_aux

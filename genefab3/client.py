@@ -2,7 +2,7 @@ from pymongo import MongoClient
 from socket import create_connection, error as SocketError
 from genefab3.common.exceptions import GeneFabConfigurationException
 from types import SimpleNamespace
-from genefab3.common.utils import timestamp36, is_debug, copy_and_drop
+from genefab3.common.utils import timestamp36, is_debug, copy_except
 from flask_compress import Compress
 from genefab3.db.sql.core import is_sqlite_file_ready
 from genefab3.api.renderer import CacheableRenderer
@@ -141,7 +141,7 @@ class GeneFabClient():
                     mongo_appname=self._mongo_appname, locale=self.locale,
                     units_formatter=self.units_formatter,
                     sqlite_dbs=self.sqlite_dbs,
-                    **copy_and_drop(self.cacher_params, {"enabled"}),
+                    **copy_except(self.cacher_params, "enabled"),
                 )
                 CacherThread(**cacher_thread_params).start()
             except TypeError as e:
