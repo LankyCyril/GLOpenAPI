@@ -40,10 +40,9 @@ class Context():
     def __init__(self, flask_app):
         """Parse request components"""
         self.app_name = flask_app.name
-        self.url_root = request.url_root.rstrip("/")
-        self.full_path = request.full_path
-        self.view = request.path.strip("/")
         self.complete_kwargs = request.args.to_dict(flat=False)
+        self.url_root = request.url_root.rstrip("/")
+        self.view, self.full_path = request.path.strip("/"), request.full_path
         self.query, self.unwind = {"$and": []}, set()
         self.projection = {"id.accession": True, "id.assay name": True}
         self.sort_by = ["id.accession", "id.assay name"]

@@ -7,13 +7,11 @@ from flask import Response
 
 
 class GeneFabException(Exception):
-    def __init__(self, message="Error", accession=None, suggestion=None, **kwargs):
-        self.accession, self.suggestion = accession, suggestion
-        self.kwargs = kwargs
-        args = [message, *(
+    def __init__(self, message="Error", suggestion=None, **kwargs):
+        self.kwargs, self.suggestion = kwargs, suggestion
+        super().__init__(message, *(
             f'{k}={repr(v)}' for k, v in kwargs.items() if k != "debug_info"
-        )]
-        super().__init__(*args)
+        ))
     def __str__(self):
         if len(self.args) == 0:
             return "Error"
@@ -55,8 +53,6 @@ def interpret_exception(e, debug=False):
             if (debug or (k != "debug_info"))
         },
     )
-    if hasattr(e, "accession") and e.accession:
-        info["accession"] = e.accession
     if hasattr(e, "suggestion") and e.suggestion:
         info["suggestion"] = e.suggestion
     return info, format_tb(exc_tb)

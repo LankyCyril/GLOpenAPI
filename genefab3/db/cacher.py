@@ -16,7 +16,7 @@ class CacherThread(Thread):
  
     def __init__(self, *, adapter, mongo_collections, mongo_appname, locale, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter):
         """Prepare background thread that iteratively watches for changes to datasets"""
-        self._id = "CacherThread("+mongo_appname.replace("genefab3 ", "")+")"
+        self._id = mongo_appname.replace("GeneFab3", "CacherThread")
         self.adapter = adapter
         self.mongo_collections, self.locale = mongo_collections, locale
         self.sqlite_dbs = sqlite_dbs
@@ -43,12 +43,12 @@ class CacherThread(Thread):
                 delay = self.metadata_update_interval
             else:
                 delay = self.metadata_retry_delay
-            GeneFabLogger().info(f"{self._id}: Sleeping for {delay} seconds")
+            GeneFabLogger().info(f"{self._id}:\n\tSleeping for {delay} seconds")
             sleep(delay)
  
     def recache_metadata(self):
         """Instantiate each available dataset; if contents changed, dataset automatically updates db.metadata"""
-        GeneFabLogger().info(f"{self._id}: Checking metadata cache")
+        GeneFabLogger().info(f"{self._id}:\n\tChecking metadata cache")
         try:
             collection = self.mongo_collections.metadata
             accessions = OrderedDict(
@@ -57,7 +57,7 @@ class CacherThread(Thread):
                 updated=set(), stale=set(), dropped=set(), failed=set(),
             )
         except Exception as e:
-            GeneFabLogger().error(f"{self._id}: {repr(e)}")
+            GeneFabLogger().error(f"{self._id}:\n\t{repr(e)}")
             return None, False
         def _iterate():
             for a in accessions["cached"] - accessions["live"]:
@@ -69,12 +69,12 @@ class CacherThread(Thread):
             accessions[key].add(accession)
             _kws = dict(
                 **self.status_kwargs, status=key, accession=accession,
-                info=f"CacherThread: {accession} {report}", error=error,
+                info=f"CacherThread; {accession} {report}", error=error,
             )
             if key in {"dropped", "failed"}:
                 drop_status(**_kws)
             update_status(**_kws)
-        GeneFabLogger().info(f"{self._id}, datasets: " + ", ".join(
+        GeneFabLogger().info(f"{self._id}, datasets:\n\t" + ", ".join(
             f"{k}={len(v)}" for k, v in accessions.items()
         ))
         return accessions, True

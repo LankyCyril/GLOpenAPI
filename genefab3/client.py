@@ -45,7 +45,7 @@ class GeneFabClient():
  
     def _get_mongo_db_connection(self, *, db_name, client_params=None, collection_names=None, locale="en_US", units_formatter=None, test_timeout=10):
         """Check MongoDB server is running, connect to database `db_name`"""
-        self._mongo_appname = f"genefab3 {timestamp36()}"
+        self._mongo_appname = f"GeneFab3({timestamp36()})"
         _kw = dict(**(client_params or {}), appname=self._mongo_appname)
         self._mongo_client = MongoClient(**_kw)
         try:
@@ -113,22 +113,22 @@ class GeneFabClient():
         """Check if no other instances of genefab3 are talking to MongoDB database"""
         if self.cacher_params.get("enabled") is False:
             msg = "CacherThread disabled by client parameter, NOT LOOPING"
-            GeneFabLogger().info(f"{self._mongo_appname}: {msg}")
+            GeneFabLogger().info(f"{self._mongo_appname}:\n\t{msg}")
             return False
         else:
             query = {"$currentOp": {"allUsers": True, "idleConnections": True}}
             projection = {"$project": {"appName": True}}
             for e in self._mongo_client.admin.aggregate([query, projection]):
                 other = e.get("appName", "")
-                if other.startswith("genefab3"):
+                if other.startswith("GeneFab3"):
                     if other < self._mongo_appname:
-                        msg = (f"Found other instance ({other}), " +
+                        msg = (f"Found other instance {other}, " +
                             "NOT LOOPING current instance")
-                        GeneFabLogger().info(f"{self._mongo_appname}: {msg}")
+                        GeneFabLogger().info(f"{self._mongo_appname}:\n\t{msg}")
                         return False
             else:
                 msg = "No other instances found, STARTING LOOP"
-                GeneFabLogger().info(f"{self._mongo_appname}: {msg}")
+                GeneFabLogger().info(f"{self._mongo_appname}:\n\t{msg}")
                 return True
  
     def loop(self):

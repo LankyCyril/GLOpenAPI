@@ -1,9 +1,9 @@
 from hashlib import md5
+from genefab3.common.logger import GeneFabLogger
 from json import dumps
 from base64 import encodebytes
 from zlib import compress
 from genefab3.common.exceptions import GeneFabConfigurationException
-from genefab3.common.logger import GeneFabLogger
 from genefab3.db.mongo.utils import run_mongo_action
 
 
@@ -16,7 +16,7 @@ def safe_default_one_way_encode(f):
 class ValueCheckedRecord():
     """Universal wrapper for cached objects; defined by identifier and value; re-cached if value has changed"""
  
-    def __init__(self, identifier, collection, value):
+    def __init__(self, identifier, collection, value, _logger=GeneFabLogger()):
         """Match existing documents by base64-encoded `value`, update if changed, report state in self.changed"""
         if not isinstance(identifier, dict):
             msg = "ValueCheckedRecord(): `identifier` is not a dictionary"
@@ -44,7 +44,7 @@ class ValueCheckedRecord():
                     else:
                         n_stale_entries += 1
                 if (n_stale_entries != 0) or self.changed:
-                    GeneFabLogger().info(f"Record updated: {identifier}")
+                    _logger.info(f"ValueCheckedRecord updated:\n\t{identifier}")
                     with collection.database.client.start_session() as session:
                         with session.start_transaction():
                             run_mongo_action(

@@ -1,4 +1,3 @@
-from functools import lru_cache
 from genefab3.api.parser import KEYVALUE_PARSER_DISPATCHER
 from genefab3.common.logger import GeneFabLogger
 from pymongo import ASCENDING
@@ -6,26 +5,25 @@ from genefab3.common.utils import deepcopy_and_drop
 from genefab3.db.mongo.utils import run_mongo_action
 
 
-METADATA_AUX_TEMPLATE = lru_cache(maxsize=1)(lambda: {
+METADATA_AUX_TEMPLATE = {
     category: {f: "true" for f in parser.keywords["constrain_to"]}
     for category, parser in KEYVALUE_PARSER_DISPATCHER().items()
     if getattr(parser, "keywords", {}).get("constrain_to")
-})
+}
 
 
-def ensure_info_index(mongo_collections, locale):
+def ensure_info_index(mongo_collections, locale, _logger=GeneFabLogger()):
     """Index `id.*` for sorting"""
     if "id" not in mongo_collections.metadata.index_information():
-        logger = GeneFabLogger()
         msgmask = "Generating index for metadata collection ('{}'), key 'id'"
-        id_fields = METADATA_AUX_TEMPLATE()["id"].keys()
-        logger.info(msgmask.format(mongo_collections.metadata.name))
+        id_fields = METADATA_AUX_TEMPLATE["id"].keys()
+        _logger.info(msgmask.format(mongo_collections.metadata.name))
         mongo_collections.metadata.create_index(
             name="id", keys=[(f"id.{f}", ASCENDING) for f in id_fields],
             collation={"locale": locale, "numericOrdering": True},
         )
         msgmask = "Index generated for metadata collection ('{}'), key 'id'"
-        logger.info(msgmask.format(mongo_collections.metadata.name))
+        _logger.info(msgmask.format(mongo_collections.metadata.name))
 
 
 def INPLACE_update_metadata_value_lookup_keys(index, mongo_collections, final_key_blacklist={"comment"}):
@@ -60,12 +58,11 @@ def INPLACE_update_metadata_value_lookup_values(index, mongo_collections):
                 index[isa_category][subkey][next_level_key] = vals
 
 
-def update_metadata_value_lookup(mongo_collections, cacher_id):
+def update_metadata_value_lookup(mongo_collections, cacher_id, _logger=GeneFabLogger()):
     """Collect existing keys and values for lookups"""
-    logger = GeneFabLogger()
-    msgmask = "{}: reindexing metadata lookup records ('{}')"
-    logger.info(msgmask.format(cacher_id, mongo_collections.metadata_aux.name))
-    index = deepcopy_and_drop(METADATA_AUX_TEMPLATE(), {"id", "file"})
+    msgmask = "{}:\n\treindexing metadata lookup records ('{}')"
+    _logger.info(msgmask.format(cacher_id, mongo_collections.metadata_aux.name))
+    index = deepcopy_and_drop(METADATA_AUX_TEMPLATE, {"id", "file"})
     INPLACE_update_metadata_value_lookup_keys(index, mongo_collections)
     INPLACE_update_metadata_value_lookup_values(index, mongo_collections)
     collection = mongo_collections.metadata_aux
@@ -78,5 +75,5 @@ def update_metadata_value_lookup(mongo_collections, cacher_id):
                         query={"isa_category": isa_category, "subkey": subkey},
                         data={"content": index[isa_category][subkey]},
                     )
-    msgmask = "{}: finished reindexing metadata lookup records ('{}')"
-    logger.info(msgmask.format(cacher_id, mongo_collections.metadata_aux.name))
+    msgmask = "{}:\n\tfinished reindexing metadata lookup records ('{}')"
+    _logger.info(msgmask.format(cacher_id, mongo_collections.metadata_aux.name))

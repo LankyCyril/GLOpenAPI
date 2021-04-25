@@ -9,7 +9,7 @@ def log_status(status, info, warning, error, query):
     log_kind = _lookup.get(status, "info")
     getattr(GeneFabLogger(), log_kind)(
         "; ".join([str(_msg) for _msg in (info, warning, error) if _msg]) +
-        " (" + repr(query) + ")"
+        ":\n\t" + repr({k: v for k, v in query.items() if v})
     )
 
 
