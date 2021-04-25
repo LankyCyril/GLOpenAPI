@@ -5,7 +5,7 @@ from datetime import datetime
 
 def log_status(status, info, warning, error, query):
     """Write log entry for status update"""
-    _lookup = dict(failed="error", dropped="error", warning="warning")
+    _lookup = dict(failed="error", stale="warning", warning="warning")
     log_kind = _lookup.get(status, "info")
     getattr(GeneFabLogger(), log_kind)(
         "; ".join([str(_msg) for _msg in (info, warning, error) if _msg]) +
