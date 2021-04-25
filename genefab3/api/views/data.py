@@ -157,6 +157,22 @@ def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, ada
     return data
 
 
+def INPLACE_constrain_columns(sqlite_dataframe, data_columns):
+    """Constrain OndemandSQLiteDataFrame to specified columns"""
+    joined_columns_dispatch = {"/".join(c): c for c in sqlite_dataframe.columns}
+    last_level_dispatch = {c[-1]: c for c in sqlite_dataframe.columns}
+    constrained_columns = []
+    for c in data_columns:
+        if ("/" in c) and (c in joined_columns_dispatch):
+            constrained_columns.append(joined_columns_dispatch[c])
+        elif c in last_level_dispatch:
+            constrained_columns.append(last_level_dispatch[c])
+        else:
+            msg = "Requested column not in table"
+            raise GeneFabFileException(msg, column=c)
+    sqlite_dataframe.columns = MultiIndex.from_tuples(constrained_columns)
+
+
 def combine_objects(objects, context, limit=None):
     """Combine objects and post-process"""
     if len(objects) == 0:
@@ -166,13 +182,22 @@ def combine_objects(objects, context, limit=None):
     elif all(isinstance(obj, OndemandSQLiteDataFrame) for obj in objects):
         combined = OndemandSQLiteDataFrame.concat(objects, axis=1)
     else:
-        raise NotImplementedError("Merging non-dataframe data objects")
+        raise NotImplementedError("Merging non-table data objects")
     if isinstance(combined, OndemandSQLiteDataFrame):
-        data = combined.get() # TODO: get() arguments, speedups for schema=1
+        if context.data_columns:
+            INPLACE_constrain_columns(combined, context.data_columns)
+        data = combined.get( # TODO: speedups for schema=1
+            #where=context.data_comparisons,
+        )
         if data.index.name is None:
             data.index.name = "index" # best we can do
         data.reset_index(inplace=True, col_level=-1, col_fill="*")
         return data
+    elif context.data_columns or context.data_comparisons:
+        raise GeneFabFileException(
+            "Column operations on non-table data objects are not supported",
+            columns=context.data_columns, comparisons=context.data_comparisons,
+        )
     else:
         return combined
 
