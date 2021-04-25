@@ -193,16 +193,14 @@ class KeyValueParsers():
             msg, v = "Constraint requires a subfield to be specified", value
             raise GeneFabParserException(msg, **{arg: v}, constraint=category)
         else:
-            columns, comparisons = [], []
-            expression = f"{fields[0]}={value}" if value else fields[0]
-        if not ({"<", "=", ">"} & set(expression)):
-            columns.append(expression)
+            expr = f"{'.'.join(fields)}={value}" if value else ".".join(fields)
+        if not ({"<", "=", ">"} & set(expr)):
+            yield None, (), [expr], ()
         else:
-            match = search(r'^([^<>=]+)(<|<=|=|==|>=|>)([^<>=]*)$', expression)
+            match = search(r'^([^<>=]+)(<|<=|=|==|>=|>)([^<>=]*)$', expr)
             if match:
                 name, op, value = match.groups()
-                comparisons.append(f"`{name}` {op} {value}")
+                yield None, (), (), [f"`{name}` {op} {value}"]
             else:
                 msg = "Unparseable expression"
-                raise GeneFabParserException(msg, expression=expression)
-        yield None, (), columns, comparisons
+                raise GeneFabParserException(msg, expression=expr)
