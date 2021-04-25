@@ -1,4 +1,5 @@
 from genefab3.common.logger import GeneFabLogger
+from pymongo.collection import Collection
 from genefab3.db.mongo.utils import run_mongo_action
 from datetime import datetime
 
@@ -8,8 +9,7 @@ def log_status(prefix, status, info, warning, error, query):
     _lookup = dict(failed="error", stale="warning", warning="warning")
     log_kind = _lookup.get(status, "info")
     getattr(GeneFabLogger(), log_kind)(
-        prefix + "; " +
-        "; ".join([str(_msg) for _msg in (info, warning, error) if _msg]) +
+        "; ".join([str(m) for m in (prefix, info, warning, error) if m]) +
         ":\n\t" + repr({k: v for k, v in query.items() if v})
     )
 

@@ -1,8 +1,10 @@
+from genefab3.common.utils import copy_except
 from genefab3.common.exceptions import GeneFabISAException
 from re import search, sub
 from collections import defaultdict
 from genefab3.common.exceptions import GeneFabConfigurationException
 from numpy import nan
+from pandas import isnull, read_csv
 from genefab3.db.mongo.status import update_status
 from types import SimpleNamespace
 from zipfile import ZipFile
@@ -10,7 +12,6 @@ from io import BytesIO, StringIO
 from os import path
 from logging import getLogger, CRITICAL
 from isatools.isatab import load_investigation
-from pandas import read_csv
 from pandas.errors import ParserError
 
 
@@ -40,8 +41,8 @@ class Investigation(dict):
                             super().__setitem__(real_name, json[target])
                     except (TypeError, IndexError, KeyError):
                         msg = "Unexpected structure of field"
-                        _kw = dict(field=real_name, **status_kwargs)
-                        raise GeneFabISAException(msg, **_kw)
+                        _kw = copy_except(status_kwargs, "collection")
+                        raise GeneFabISAException(msg, field=real_name, **_kw)
                 elif target and pattern:
                     try:
                         super().__setitem__(real_name, {
@@ -50,8 +51,8 @@ class Investigation(dict):
                         })
                     except (TypeError, AttributeError, IndexError, KeyError):
                         msg = "Could not break up field by name"
-                        _kw = dict(field=real_name, **status_kwargs)
-                        raise GeneFabISAException(msg, **_kw)
+                        _kw = copy_except(status_kwargs, "collection")
+                        raise GeneFabISAException(msg, field=real_name, **_kw)
                 else:
                     super().__setitem__(real_name, json)
 
@@ -117,17 +118,25 @@ class StudyEntries(list):
                     raise GeneFabISAException(msg, **status_kwargs)
                 else:
                     sample_name = row["Sample Name"]
-                json = self._row_to_json(
-                    row, name, {**status_kwargs, "sample_name": sample_name},
-                )
-                super().append(json)
-                if self._self_identifier == "Study":
-                    if sample_name in self._by_sample_name:
-                        msg = "Duplicate 'Sample Name' in Study tab"
-                        _kw = dict(sample_name=sample_name, **status_kwargs)
-                        raise GeneFabISAException(msg, **_kw)
-                    else:
-                        self._by_sample_name[sample_name] = json
+                if not isnull(sample_name):
+                    json = self._row_to_json(
+                        row, name,
+                        {**status_kwargs, "sample_name": sample_name},
+                    )
+                    super().append(json)
+                    if self._self_identifier == "Study":
+                        if sample_name in self._by_sample_name:
+                            msg = "Duplicate 'Sample Name' in Study tab"
+                            _kw = copy_except(status_kwargs, "collection")
+                            _kkw = dict(sample_name=sample_name, **_kw)
+                            raise GeneFabISAException(msg, **_kkw)
+                        else:
+                            self._by_sample_name[sample_name] = json
+                else:
+                    update_status(
+                        **status_kwargs, status="warning",
+                        warning="Null 'Sample Name'", tab=self._self_identifier,
+                    )
  
     def _abort_lookup(self):
         """Prevents ambiguous lookup through `self._by_sample_name` in inherited classes"""
@@ -155,8 +164,8 @@ class StudyEntries(list):
             else: # qualify entry at pointer with second-level field
                 if qualifiable is None:
                     msg = "Qualifier before main field"
-                    _kw = {field: value, **status_kwargs}
-                    raise GeneFabISAException(msg, **_kw)
+                    _kw = copy_except(status_kwargs, "collection")
+                    raise GeneFabISAException(msg, field=value, **_kw)
                 else:
                     self._INPLACE_qualify(
                         qualifiable, field, subfield, value,
@@ -197,8 +206,8 @@ class StudyEntries(list):
             json[field] = {}
         if subfield in json[field]:
             msg = "Duplicate field[subfield]"
-            _kw = dict(field=field, subfield=subfield, **status_kwargs)
-            raise GeneFabISAException(msg, **_kw)
+            _k = copy_except(status_kwargs, "collection")
+            raise GeneFabISAException(msg, field=field, subfield=subfield, **_k)
         else: # make {"Characteristics": {"Age": {"": "36"}}}
             json[field][subfield] = {"": value}
             qualifiable = json[field][subfield]
@@ -260,7 +269,8 @@ class IsaFromZip():
         for tab, value in raw.__dict__.items():
             if not value:
                 msg = "Missing ISA tab"
-                raise GeneFabISAException(msg, tab=tab, **status_kwargs)
+                _kw = copy_except(status_kwargs, "collection")
+                raise GeneFabISAException(msg, tab=tab, **_kw)
         return raw
  
     def _read_investigation(self, handle):
