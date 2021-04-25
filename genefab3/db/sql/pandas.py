@@ -162,7 +162,7 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
                     return DataDataFrame(data)
  
     @contextmanager
-    def view(self, *, connection):
+    def view(self, connection):
         """Interpret arguments and temporarily expose requested data as SQL view"""
         part_to_column = self._inverse_column_dispatcher
         if len(part_to_column) == 0:
@@ -206,7 +206,7 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
             self.name = f"FullOuterJoin({names})"
  
     @contextmanager
-    def view(self, *, connection):
+    def view(self, connection):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
         with ExitStack() as stack:
             object_views = [
