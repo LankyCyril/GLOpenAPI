@@ -211,8 +211,9 @@ def combined_data(descriptors, context, mongo_collections, sqlite_dbs, adapter):
         reduce(lambda d, k: d.get(k, {}), keys, d) or None for d in descriptors
     ))
     if getset("file", "cacheable") != {True}:
-        msg = "Cannot combine these data as they were not marked cacheable"
-        raise NotImplementedError(msg)
+        msg = "Data marked as non-cacheable, cannot be returned in this format"
+        sug = "Use 'format=raw'"
+        raise GeneFabFileException(msg, suggestion=sug, format=context.format)
     types = getset("file", "type")
     if types == {"table"}:
         sqlite_db, CachedFile = sqlite_dbs.tables, CachedTableFile
