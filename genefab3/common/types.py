@@ -1,7 +1,8 @@
-from functools import wraps
 from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
+from functools import wraps
 from pandas import DataFrame
+from numpy import dtype
 
 
 class Adapter():
@@ -16,10 +17,11 @@ class Adapter():
                 raise GeneFabConfigurationException(msg, **_kw)
  
     def get_favicon_urls(self):
+        """List favicon URLs, of which the first reachable one will be used (fallback behavior)"""
         return []
  
     def best_sample_name_matches(self, name, names, return_positions=False):
-        """Fallback sample name identity test"""
+        """Test sample name identity (fallback behavior)"""
         if return_positions:
             positions_and_matches = [
                 (p, ns) for p, ns in enumerate(names) if ns == name
@@ -61,7 +63,29 @@ class Routes():
                 yield method.endpoint, method
 
 
-class AnnotationDataFrame(DataFrame):
+class GeneFabDataFrame(DataFrame):
+    @property
+    def schema(self):
+        """Represent each column as {type}[({min})..({max})|{has_nans}]"""
+        def _column_schema(column):
+            if column.dtype in (dtype("int64"), dtype("float64")):
+                _t, _min, _max = str(column.dtype)[:-2], None, None
+                if _t == "float":
+                    _dropna = column.dropna()
+                    _int = _dropna.astype(int)
+                    if (_dropna == _int).all():
+                        _t, _min, _max = "int", _int.min(), _int.max()
+                if (_min is None) or (_max is None):
+                    _min, _max = column.min(), column.max()
+                _nan = "|NaN" if column.isnull().any() else ""
+                return f"{_t}[({_min})..({_max}){_nan}]"
+            else:
+                _t = "bool" if column.dtype is dtype("bool") else "str"
+                return f"{_t}[..|NaN]" if column.isnull().any() else f"{_t}[..]"
+        return type(self)(self.apply(_column_schema).to_frame().T)
+
+
+class AnnotationDataFrame(GeneFabDataFrame):
     @property
     def accessions(self):
         col = ("id", "accession")
@@ -74,7 +98,7 @@ class AnnotationDataFrame(DataFrame):
         return len(self.metadata_columns) == 1
 
 
-class DataDataFrame(DataFrame):
+class DataDataFrame(GeneFabDataFrame):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._metadata.extend(["datatypes", "gct_validity_set"])

@@ -75,10 +75,10 @@ class CacheableRenderer():
  
     def _schemify(self, obj):
         """Reduce passed `obj` to representation of column types"""
-        if isinstance(obj, DataFrame):
-            return type(obj)(obj.dtypes.astype(str).to_frame().T)
+        if hasattr(obj, "schema"):
+            return obj.schema
         else:
-            msg = "Argument 'schema' is not valid for requested data type"
+            msg = "Argument 'schema' is not valid for requested data"
             raise GeneFabFormatException(msg, type=type(obj).__name__)
  
     def dispatch_renderer(self, obj, context, default_format, indent=None):
