@@ -1,48 +1,34 @@
+from functools import lru_cache
+from genefab3.api.parser import KEYVALUE_PARSER_DISPATCHER
 from genefab3.common.logger import GeneFabLogger
 from pymongo import ASCENDING
-from copy import deepcopy
+from genefab3.common.utils import deepcopy_and_drop
 from genefab3.db.mongo.utils import run_mongo_action
 
 
-INFO_SUBKEYS = ["accession", "assay", "sample name"]
-
-METADATA_AUX_TEMPLATE = {
-# TODO: infer this template from keywords of partials in genefab3.api.parser
-    "investigation": {
-        "study": "true",
-        "study assays": "true",
-        "investigation": "true",
-    },
-    "study": {
-        "characteristics": "true",
-        "factor value": "true",
-        "parameter value": "true",
-    },
-    "assay": {
-        "characteristics": "true",
-        "factor value": "true",
-        "parameter value": "true",
-    },
-}
-
-FINAL_INDEX_KEY_BLACKLIST = {"comment"}
+METADATA_AUX_TEMPLATE = lru_cache(maxsize=1)(lambda: {
+    category: {f: "true" for f in parser.keywords["constrain_to"]}
+    for category, parser in KEYVALUE_PARSER_DISPATCHER().items()
+    if getattr(parser, "keywords", {}).get("constrain_to")
+})
 
 
-def ensure_info_index(mongo_collections, locale, subkeys=INFO_SUBKEYS):
+def ensure_info_index(mongo_collections, locale):
     """Index `id.*` for sorting"""
     if "id" not in mongo_collections.metadata.index_information():
         logger = GeneFabLogger()
         msgmask = "Generating index for metadata collection ('{}'), key 'id'"
+        id_fields = METADATA_AUX_TEMPLATE()["id"].keys()
         logger.info(msgmask.format(mongo_collections.metadata.name))
         mongo_collections.metadata.create_index(
-            name="id", keys=[(f"id.{key}", ASCENDING) for key in subkeys],
+            name="id", keys=[(f"id.{f}", ASCENDING) for f in id_fields],
             collation={"locale": locale, "numericOrdering": True},
         )
         msgmask = "Index generated for metadata collection ('{}'), key 'id'"
         logger.info(msgmask.format(mongo_collections.metadata.name))
 
 
-def INPLACE_update_metadata_value_lookup_keys(index, mongo_collections, final_key_blacklist=FINAL_INDEX_KEY_BLACKLIST):
+def INPLACE_update_metadata_value_lookup_keys(index, mongo_collections, final_key_blacklist={"comment"}):
     """Populate JSON with all possible metadata keys, also for documentation section 'meta-existence'"""
     for isa_category in index:
         for subkey in index[isa_category]:
@@ -74,12 +60,12 @@ def INPLACE_update_metadata_value_lookup_values(index, mongo_collections):
                 index[isa_category][subkey][next_level_key] = vals
 
 
-def update_metadata_value_lookup(mongo_collections, cacher_id, template=METADATA_AUX_TEMPLATE):
+def update_metadata_value_lookup(mongo_collections, cacher_id):
     """Collect existing keys and values for lookups"""
     logger = GeneFabLogger()
     msgmask = "{}: reindexing metadata lookup records ('{}')"
     logger.info(msgmask.format(cacher_id, mongo_collections.metadata_aux.name))
-    index = deepcopy(template)
+    index = deepcopy_and_drop(METADATA_AUX_TEMPLATE(), {"id", "file"})
     INPLACE_update_metadata_value_lookup_keys(index, mongo_collections)
     INPLACE_update_metadata_value_lookup_values(index, mongo_collections)
     collection = mongo_collections.metadata_aux

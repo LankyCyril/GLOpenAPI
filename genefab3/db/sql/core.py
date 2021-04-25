@@ -59,7 +59,7 @@ class SQLiteObject():
             except ValueError:
                 msg = "SQLiteObject(): Bad signature"
                 raise GeneFabConfigurationException(msg, signature=signature)
-        if sqlite_db is not None: # TODO: auto_vacuum
+        if sqlite_db is not None:
             for table, schema in table_schemas.items():
                 if schema is not None:
                     self.__ensure_table(table, schema)
