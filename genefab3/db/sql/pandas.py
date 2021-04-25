@@ -179,7 +179,6 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
 
 class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
     """DataDataFrame to be retrieved from SQLite, full outer joined from multiple views"""
-            #return OndemandSQLiteDataFrame_OuterJoined(sqlite_db, columns)
  
     def __init__(self, sqlite_db, objs):
         _t = "OndemandSQLiteDataFrame"
