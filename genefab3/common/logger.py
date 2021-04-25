@@ -30,7 +30,6 @@ class MongoDBLogger(Handler):
     def emit(self, record):
         if self.collection:
             log_to_mongo_collection(
-                self.collection,
-                et=record.levelname, ev=record.getMessage(),
+                self.collection, et=record.levelname, ev=record.getMessage(),
                 stack=record.stack_info, is_exception=False,
             )

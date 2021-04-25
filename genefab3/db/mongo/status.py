@@ -1,5 +1,4 @@
 from genefab3.common.logger import GeneFabLogger
-from pymongo.collection import Collection
 from genefab3.db.mongo.utils import run_mongo_action
 from datetime import datetime
 
@@ -7,8 +6,7 @@ from datetime import datetime
 def log_status(prefix, status, info, warning, error, query):
     """Write log entry for status update"""
     _lookup = dict(failed="error", stale="warning", warning="warning")
-    log_kind = _lookup.get(status, "info")
-    getattr(GeneFabLogger(), log_kind)(
+    getattr(GeneFabLogger(), _lookup.get(status, "info"))(
         "; ".join([str(m) for m in (prefix, info, warning, error) if m]) +
         ":\n\t" + repr({k: v for k, v in query.items() if v})
     )

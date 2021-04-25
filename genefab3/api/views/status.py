@@ -17,16 +17,14 @@ def get(mongo_collections, context):
         msg = "Metadata queries are not valid for view"
         raise GeneFabParserException(msg, view="status")
     else:
-        status_json = mongo_collections.status.find(
-            {}, {"_id": False, **{c: True for c in STATUS_COLUMNS}},
-        )
+        projection = {"_id": False, **{c: True for c in STATUS_COLUMNS}}
+        status_json = mongo_collections.status.find({}, projection)
     status_df = blackjack_normalize(list(status_json), max_level=0).sort_values(
         by=["report timestamp", "report type"], ascending=[False, True],
     )
     status_df = status_df[[c for c in STATUS_COLUMNS if c in status_df]]
-    status_df["report timestamp"] = status_df["report timestamp"].apply(
-        lambda t: datetime.utcfromtimestamp(t).isoformat() + "Z"
-    )
+    _iso = lambda t: datetime.utcfromtimestamp(t).isoformat() + "Z"
+    status_df["report timestamp"] = status_df["report timestamp"].apply(_iso)
     astype_args = status_df[["args", "kwargs"]].astype(str)
     astype_args[astype_args.isin({"[]", "{}", "()"})] = nan
     status_df[["args", "kwargs"]] = astype_args
