@@ -73,7 +73,7 @@ class Sample(dict):
             assay_entry, "Sample Name",
         )
         # validate names:
-        for attr in "accession", "study_name", "assay_name", "sample_name":
+        for attr in "accession", "assay_name":
             value = getattr(self, attr)
             if isinstance(value, str):
                 if {"$", "/"} & set(value):
