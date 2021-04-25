@@ -31,6 +31,8 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
     "file": partial(KeyValueParsers.kvp_generic,
         category="file", fields_depth=1, constrain_to={"datatype", "filename"},
     ),
+    "column": partial(KeyValueParsers.kvp_column, category="column"),
+    "c": partial(KeyValueParsers.kvp_column, category="column"),
 })
 
 
@@ -46,6 +48,7 @@ class Context():
         self.query, self.unwind = {"$and": []}, set()
         self.projection = {"id.accession": True, "id.assay name": True}
         self.sort_by = ["id.accession", "id.assay name"]
+        self.data_columns, self.data_comparisons = [], []
         self.processed_args = {
             arg for arg, values in request.args.lists()
             if self.update(arg, values, auto_reduce=False)
@@ -58,6 +61,8 @@ class Context():
         self.identity = quote(dumps(sort_keys=True, separators=(",", ":"), obj={
             "?": self.view, "query": self.query, "sort_by": self.sort_by,
             "unwind": sorted(self.unwind), "projection": self.projection,
+            "data_columns": sorted(self.data_columns),
+            "data_comparisons": sorted(self.data_comparisons),
             "format": self.format, "schema": self.schema, "debug": self.debug,
         }))
  
@@ -78,14 +83,21 @@ class Context():
                     raise GeneFabParserException("Forbidden value", arg=value)
                 else:
                     yield from parser(arg=arg, fields=fields, value=value)
-        n_iterations = None
-        for n_iterations, (query, projection_keys) in enumerate(_it(), 1):
+        n_iter, _en_it = None, enumerate(_it(), 1)
+        for n_iter, (query, projection_keys, columns, comparisons) in _en_it:
+            self.projection.update({k: True for k in projection_keys})
             if query:
                 self.query["$and"].append(query)
-            self.projection.update({k: True for k in projection_keys})
+            if columns or comparisons:
+                if self.view == "data":
+                    self.data_columns.extend(columns)
+                    self.data_comparisons.extend(comparisons)
+                else:
+                    msg = "Column queries are only valid for /data/"
+                    raise GeneFabParserException(msg)
         if auto_reduce:
             self.reduce_projection()
-        return n_iterations
+        return n_iter
  
     def update_special_fields(self):
         """Automatically adjust projection and unwind pipeline for special fields ('file')"""
@@ -129,7 +141,7 @@ class KeyValueParsers():
                         expr.split(mix_separator, 2),
                     )
                 })
-            yield query, projection_keys
+            yield query, projection_keys, None, None
         else: # standard syntax: 'id', 'id.accession', 'id.assay name=name', ...
             yield from KeyValueParsers.kvp_generic(
                 arg=arg, fields_depth=fields_depth, constrain_to=constrain_to,
@@ -173,4 +185,24 @@ class KeyValueParsers():
                 _pfx = "." if (block_match.group()[-1] == ".") else ""
                 lookup_keys = {k+_pfx for k in projection_keys}
                 query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
-        yield query, projection_keys
+        yield query, projection_keys, None, None
+ 
+    def kvp_column(arg, category, fields, value):
+        """Interpret data table constraint"""
+        if not fields:
+            msg, v = "Constraint requires a subfield to be specified", value
+            raise GeneFabParserException(msg, **{arg: v}, constraint=category)
+        else:
+            columns, comparisons = [], []
+            expression = f"{fields[0]}={value}" if value else fields[0]
+        if not ({"<", "=", ">"} & set(expression)):
+            columns.append(expression)
+        else:
+            match = search(r'^([^<>=]+)(<|<=|=|==|>=|>)([^<>=]*)$', expression)
+            if match:
+                name, op, value = match.groups()
+                comparisons.append(f"`{name}` {op} {value}")
+            else:
+                msg = "Unparseable expression"
+                raise GeneFabParserException(msg, expression=expression)
+        yield None, (), columns, comparisons
