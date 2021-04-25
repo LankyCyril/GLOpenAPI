@@ -186,9 +186,8 @@ def combine_objects(objects, context, limit=None):
     if isinstance(combined, OndemandSQLiteDataFrame):
         if context.data_columns:
             INPLACE_constrain_columns(combined, context.data_columns)
-        data = combined.get( # TODO: speedups for schema=1
-            #where=context.data_comparisons,
-        )
+        # TODO: speedups for schema=1
+        data = combined.get(where=context.data_comparisons)
         if data.index.name is None:
             data.index.name = "index" # best we can do
         data.reset_index(inplace=True, col_level=-1, col_fill="*")
