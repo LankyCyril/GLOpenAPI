@@ -117,47 +117,40 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
         self.index = Index([], name=_index_names.pop())
         self._columns = Index(self._raw_columns, name=None)
  
-    def __make_inverse_column_dispatcher(self, columns):
-        """Validate arguments and make `columns`, `part_to_column`"""
-        if columns is not None:
-            _cs = set(columns)
-            if len(_cs) != len(columns):
-                raise IndexError(f"Slicing by duplicate column name")
-            elif self.index.name in _cs:
-                raise IndexError(f"Requesting index as if it were a column")
-        else:
-            columns = self._raw_columns
+    @property
+    def _inverse_column_dispatcher(self):
+        """Make dictionary {table_part -> [col, col, col, ...]}"""
         part_to_column = OrderedDict({
             # get index column from part containing first requested column:
-            self._column_dispatcher[columns[0]]: [self.index.name],
+            self._column_dispatcher[self._raw_columns[0]]: [self.index.name],
         })
-        for column in (self._raw_columns if columns is None else columns):
+        for column in self._raw_columns:
             part = self._column_dispatcher[column]
             part_to_column.setdefault(part, []).append(column)
-        return columns, part_to_column
+        return part_to_column
  
-    def __make_natural_join_query(self, rows, part_to_column, columns, limit=None, offset=0):
+    def __make_natural_join_query(self, part_to_column, rows, limit=None, offset=0):
         """Generate SQL query for multipart NATURAL JOIN"""
         query_filter = _make_query_filter(self.name, rows, limit, offset)
         joined = " NATURAL JOIN ".join(f"`{p}`" for p in part_to_column)
         first_table = next(iter(part_to_column))
         targets = ",".join((
             f"`{first_table}`.`{self.index.name}`",
-            *(f"`{c}`" for c in columns),
+            *(f"`{c}`" for c in self._raw_columns),
         ))
-        _n, _m = len(columns), len(part_to_column)
+        _n, _m = len(self._raw_columns), len(part_to_column)
         _tt = "\n\t".join(("", *part_to_column))
         msg = f"retrieving {_n} columns from {_m} table(s):{_tt}"
         GeneFabLogger().info(f"{self.name}; {msg}")
         return f"SELECT {targets} FROM {joined} {query_filter}"
  
-    def get(self, *, rows=None, columns=None, limit=None, offset=0):
+    def get(self, *, rows=None, limit=None, offset=0):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
-        columns, part_to_column = self.__make_inverse_column_dispatcher(columns)
+        part_to_column = self._inverse_column_dispatcher
         if len(part_to_column) == 0:
             return Placeholders.EmptyDataDataFrame()
         else:
-            args = rows, part_to_column, columns, limit, offset
+            args = part_to_column, rows, limit, offset
             query = self.__make_natural_join_query(*args)
             with closing(connect(self.sqlite_db)) as connection:
                 try:
@@ -173,17 +166,17 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
                     return DataDataFrame(data)
  
     @contextmanager
-    def view(self, *, connection, rows=None, columns=None):
+    def view(self, *, connection, rows=None):
         """Interpret arguments and temporarily expose requested data as SQL view"""
-        columns, part_to_column = self.__make_inverse_column_dispatcher(columns)
+        part_to_column = self._inverse_column_dispatcher
         if len(part_to_column) == 0:
             yield None
         else:
-            args = rows, part_to_column, columns, None, 0
+            args = part_to_column, rows, None, 0
             join_query = self.__make_natural_join_query(*args)
             try:
                 with _make_view(connection, join_query) as viewname:
-                    yield viewname, columns, None
+                    yield viewname, self._raw_columns, None
             except (OperationalError, GeneFabDatabaseException):
                 raise GeneFabDatabaseException("No data found", table=self.name)
 
@@ -218,10 +211,10 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
             self.name = f"FullOuterJoin({names})"
  
     @contextmanager
-    def view(self, *, connection, rows=None, columns=None):
+    def view(self, *, connection, rows=None):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
         with ExitStack() as viewstack:
-            _kw = dict(connection=connection, rows=rows, columns=columns)
+            _kw = dict(connection=connection, rows=rows)
             object_views = [
                 viewstack.enter_context(o.view(**_kw)) for o in self.objs
             ]
@@ -244,11 +237,11 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
                 left_view, left_columns = merged_view, merged_columns
             yield merged_view, merged_columns, viewstack
  
-    def get(self, *, rows=None, columns=None, limit=None, offset=0):
+    def get(self, *, rows=None, limit=None, offset=0):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
         query_filter = _make_query_filter(self.name, rows, limit, offset)
         with closing(connect(self.sqlite_db)) as connection:
-            _kw = dict(connection=connection, rows=rows, columns=columns)
+            _kw = dict(connection=connection, rows=rows)
             with self.view(**_kw) as (merged_view, merged_columns, viewstack):
                 try:
                     q = f"SELECT * FROM `{merged_view}` {query_filter}"
