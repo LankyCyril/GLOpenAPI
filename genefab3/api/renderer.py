@@ -50,9 +50,11 @@ TYPE_RENDERERS = OrderedDict((
 class CacheableRenderer():
     """Renders objects returned by routes, and keeps them in LRU cache by `context.identity`"""
  
-    def __init__(self, sqlite_dbs, flask_app):
+    def __init__(self, genefab3_client):
         """Initialize object renderer and LRU cacher"""
-        self.sqlite_dbs, self.flask_app = sqlite_dbs, flask_app
+        self.genefab3_client = genefab3_client
+        self.sqlite_dbs = genefab3_client.sqlite_dbs
+        self.flask_app = genefab3_client.flask_app
  
     def _infer_types(self, method):
         """Infer return types, default format, and cacheability based on type hints of method"""
@@ -126,5 +128,7 @@ class CacheableRenderer():
                     if response.status_code == 200:
                         if response_cache is not None:
                             response_cache.put(context, obj, response)
+            if not self.genefab3_client.cacher_thread.isAlive():
+                self.genefab3_client.mongo_client.close()
             return response
         return wrapper
