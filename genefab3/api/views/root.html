@@ -33,7 +33,7 @@
                 width: 480pt; min-width: 480pt; max-width: 90vw; resize: both;
                 word-break: break-all; word-wrap: break-word; overflow-y: auto;
             }
-            code {font-family: "Oxygen", monospace; font-size: 12pt; background-color: #EEE; white-space: nowrap}
+            code {font-family: "Oxygen", monospace; font-size: 12pt; color: #44B !important; background-color: #EEE; white-space: nowrap}
             code b {font-family: "Oxygen", monospace; font-size: 12pt; font-weight: 500; color: #44B}
             #url tt {font-family: "Oxygen", monospace; font-size: 13pt; background: transparent}
             #url tt.base_url, #url tt.pale {color: #AAA;}
@@ -446,6 +446,25 @@ $(document).ready(function() {
             <p>This API provides the means to query the GeneLab database for annotation and data
             associated with datasets, assays, and samples hosted by GeneLab,
             and represents results as tables and/or JSON records.</p>
+            <p>Each queriable metadata entry represents a single sample from a single assay and dataset;
+            each entry contains nested fields under multiple categories.</p>
+            <p>The <code>"id"</code> category contains fields <code>"accession", "assay name", "sample name"</code>.</p>
+            <p>The <code>"file"</code> category contains fields <code>"filename", "datatype"</code> and
+            contains the information about the files associated with a given sample.</p>
+            <p>Finally, the categories <code>"investigation", "study", "assay"</code> are organized according to the
+            <a href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab model</a>,
+            and subsequently contain the following fields, each of which may contain further nested subfields:
+            <ul>
+                <li>investigation.study</li>
+                <li>investigation.study assays</li>
+                <li>investigation.investigation</li>
+                <li>study.characteristics</li>
+                <li>study.factor value</li>
+                <li>study.parameter value</li>
+                <li>assay.characteristics</li>
+                <li>assay.factor value</li>
+                <li>assay.parameter value</li>
+            </ul></p>
             <p>Request URLs are formed by combining an arbitrary number of queries, described below.</p>
         </div>
         <div id='selectors'>
@@ -472,7 +491,38 @@ $(document).ready(function() {
                     table data is returned in formats 'csv', 'tsv', 'json', 'browser' (see below);
                     raw file data is returned if the requested format is 'raw' and a single file
                     matches the rest of the query.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%<b>/samples</b>/...</code>
+                    <i>Example:</i>&nbsp;&nbsp;<a href="%URL_ROOT%/samples"><code><b>/samples/</b></code></a>
+                </div>
+            </div>
+            <div>
+                <div><b>Retrieval of entries from specific<strong>datasets and/or assays</strong>:</b></div><br>
+                <div class='interactive' style='display:none'>
+                    <div id='meta-assay-list' class='list'>
+                        <div class='meta-assay list-item'>
+                            <input type='checkbox'>
+                            <em class='remover'>&amp;</em>
+                            <em class='key included-key'>id=</em>
+                            <select class='key-level level-0'></select>
+                            <em>.</em>
+                            <select class='key-level level-1'></select>
+                        </div>
+                    </div>
+                    <div>
+                        <input type='checkbox' class='always-disabled' disabled>
+                        <a class='meta-assay add'>OR</a>
+                    </div>
+                </div>
+                <div class='description on-newline'>
+                    <p>This part of the URL, as well as all following parts, can be specified any number of times
+                    (including zero times).</p>
+                    <p>The search can be constrained to only the samples from
+                    specific datasets (<code>id.accession=ACCESSION</code>) and/or assays
+                    (<code>id.assay name=ASSAY</code>)</p>
+                    <p>As a shorthand, it is also possible to pass a mixed query, where accessions and assay names
+                    are separated by a forward slash, and multiple accessions / assay names are joined by a vertical pipe
+                    (<code>id=ACCESSION_1/ASSAY_1A|ACCESSION_2</code>)</p>
+                    <i>Example:</i>&nbsp;&nbsp;<a href="%URL_ROOT%/samples/?id.accession=GLDS-38"><code>/samples/?<b>id.accession=GLDS-38</b></code></a><br>
+                    <i>Example:</i>&nbsp;&nbsp;<a href="%URL_ROOT%/samples/?id=GLDS-38/proteomics|GLDS-276"><code>/samples/?<b>id=GLDS-38/proteomics|GLDS-276</b></code></a>
                 </div>
             </div>
             <div>
@@ -493,27 +543,12 @@ $(document).ready(function() {
                     </div>
                 </div>
                 <div class='description on-newline'>
-                    <p>This part of the URL, as well as all following parts, can be specified any number of times
-                    (including zero times; however, at least one query overall must be specified).</p>
-                    <p>The database is organized according to the
-                    <a href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab model</a>,
-                    and can be queried by the content of the following ISA categories:
-                        <ul>
-                            <li>investigation.study</li>
-                            <li>investigation.study assays</li>
-                            <li>investigation.investigation</li>
-                            <li>study.characteristics</li>
-                            <li>study.factor value</li>
-                            <li>study.parameter value</li>
-                            <li>assay.characteristics</li>
-                            <li>assay.factor value</li>
-                            <li>assay.parameter value</li>
-                        </ul>
-                    Querying directly by any of these categories will constrain the results
+                    <p>Information on all values under a given <a href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab</a>
+                    category can be retrieved: querying directly by any of these categories will constrain the results
                     to only the datasets, assays, and samples that have this category annotated.</p>
                     <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
                     the values of fields in the category will be reported in table columns.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>study.factor value</b></code>
+                    <i>Example:</i>&nbsp;&nbsp;<a href="%URL_ROOT%/samples/?study.factor value"><code>/samples/?<b>study.factor value</b></code></a>
                 </div>
             </div>
             <div>
@@ -544,7 +579,7 @@ $(document).ready(function() {
                     have this field annotated.</p>
                     <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
                     the values of this field will be reported in table columns.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>study.factor value.spaceflight</b></code>
+                    <i>Example:</i>&nbsp;&nbsp;<a href="%URL_ROOT%/samples/?study.factor value.spaceflight"><code>/samples/?<b>study.factor value.spaceflight</b></code></a>
                 </div>
             </div>
             <div>
@@ -576,34 +611,8 @@ $(document).ready(function() {
                     annotated with a specific value of an ISA field.</p>
                     <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
                     the values of this field will be reported in table columns.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>study.characteristics.genotype=WT</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>study.characteristics.genotype=WT|TK6</b></code><br>
-                </div>
-            </div>
-            <div>
-                <div><b>Subset entries to <strong>datasets and/or assays</strong>:</b></div><br>
-                <div class='interactive' style='display:none'>
-                    <div id='meta-assay-list' class='list'>
-                        <div class='meta-assay list-item'>
-                            <input type='checkbox'>
-                            <em class='remover'>&amp;</em>
-                            <em class='key included-key'>id=</em>
-                            <select class='key-level level-0'></select>
-                            <em>.</em>
-                            <select class='key-level level-1'></select>
-                        </div>
-                    </div>
-                    <div>
-                        <input type='checkbox' class='always-disabled' disabled>
-                        <a class='meta-assay add'>OR</a>
-                    </div>
-                </div>
-                <div class='description on-newline'>
-                    <p>The search can be constrained to only the samples from
-                    specific datasets (<code>id=ACCESSION</code>) and/or assays
-                    (<code>id=ACCESSION.ASSAY</code>)</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?study.characteristics&<b>id=GLDS-38</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?study.characteristics&<b>id=GLDS-38.proteomics|GLDS-276</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<a href="%URL_ROOT%/samples/?study.characteristics.genotype=WT"><code>/samples/?<b>study.characteristics.genotype=WT</b></code></a><br>
+                    <i>Example:</i>&nbsp;&nbsp;<a href="%URL_ROOT%/samples/?study.characteristics.genotype=WT|TK6"><code>/samples/?<b>study.characteristics.genotype=WT|TK6</b></code></a>
                 </div>
             </div>
             <div>
@@ -651,10 +660,11 @@ $(document).ready(function() {
                     by specifying these datatypes in the query (<code>file.datatype=pca</code>).</p>
                     <p>Finally, the query can be constrained by specifying a full file name
                     of interest or a regular expression pattern enclosed in forward slashes.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>file.datatype</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>file.datatype=differential expression</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>file.datatype=visualization table|pca</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>file.filename=/trimmed\.fastq\.gz$/</b></code><br>
+                    <i>Examples:</i><br>
+                    <a href="%URL_ROOT%/samples/?file.datatype"><code>/samples/?<b>file.datatype</b></code></a><br>
+                    <a href="%URL_ROOT%/samples/?file.datatype=differential expression"><code>/samples/?<b>file.datatype=differential expression</b></code></a><br>
+                    <a href="%URL_ROOT%/samples/?file.datatype=visualization table|pca"><code>/samples/?<b>file.datatype=visualization table|pca</b></code></a><br>
+                    <a href="%URL_ROOT%/samples/?file.filename=/trimmed\.fastq\.gz$/"><code>/samples/?<b>file.filename=/trimmed\.fastq\.gz$/</b></code></a>
                 </div>
             </div>
             <div>
@@ -693,10 +703,15 @@ $(document).ready(function() {
                     <p>The <code>raw</code> format is <i><u>not</u></i> supported for tabular data,
                     and instead exists as the only suitable format for requesting non-tabular data.
                     Note that currently it only resolves successfully if exactly one data file matches the query.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?study.factor value.spaceflight&<b>format=browser</b></code>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?study.factor value.spaceflight&<b>format=json</b></code>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&<b>format=tsv</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&<b>format=raw</b></code><br>
+                    <i>Examples:</i><br>
+                    <a href="%URL_ROOT%/samples/?study.factor value.spaceflight&format=browser">
+                        <code>/samples/?study.factor value.spaceflight&<b>format=browser</b></code></a><br>
+                    <a href="%URL_ROOT%/samples/?study.factor value.spaceflight&format=json">
+                        <code>/samples/?study.factor value.spaceflight&<b>format=json</b></code></a><br>
+                    <a href="%URL_ROOT%/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&format=tsv">
+                        <code>/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&<b>format=tsv</b></code></a><br>
+                    <a href="%URL_ROOT%/data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&format=raw">
+                        <code>/data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&<b>format=raw</b></code></a>
                 </div>
             </div>
             <!--DEBUG <div>
