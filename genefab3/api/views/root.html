@@ -472,7 +472,7 @@ $(document).ready(function() {
                     table data is returned in formats 'csv', 'tsv', 'json', 'browser' (see below);
                     raw file data is returned if the requested format is 'raw' and a single file
                     matches the rest of the query.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%<b>samples</b>/...</code>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%<b>/samples</b>/...</code>
                 </div>
             </div>
             <div>
@@ -513,7 +513,7 @@ $(document).ready(function() {
                     to only the datasets, assays, and samples that have this category annotated.</p>
                     <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
                     the values of fields in the category will be reported in table columns.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>study.factor value</b></code>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>study.factor value</b></code>
                 </div>
             </div>
             <div>
@@ -544,7 +544,7 @@ $(document).ready(function() {
                     have this field annotated.</p>
                     <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
                     the values of this field will be reported in table columns.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>study.factor value.spaceflight</b></code>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>study.factor value.spaceflight</b></code>
                 </div>
             </div>
             <div>
@@ -576,8 +576,8 @@ $(document).ready(function() {
                     annotated with a specific value of an ISA field.</p>
                     <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
                     the values of this field will be reported in table columns.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>study.characteristics.genotype=WT</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>study.characteristics.genotype=WT|TK6</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>study.characteristics.genotype=WT</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>study.characteristics.genotype=WT|TK6</b></code><br>
                 </div>
             </div>
             <div>
@@ -602,8 +602,8 @@ $(document).ready(function() {
                     <p>The search can be constrained to only the samples from
                     specific datasets (<code>id=ACCESSION</code>) and/or assays
                     (<code>id=ACCESSION.ASSAY</code>)</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.characteristics&<b>id=GLDS-38</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.characteristics&<b>id=GLDS-38.proteomics|GLDS-276</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?study.characteristics&<b>id=GLDS-38</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?study.characteristics&<b>id=GLDS-38.proteomics|GLDS-276</b></code><br>
                 </div>
             </div>
             <div>
@@ -651,10 +651,10 @@ $(document).ready(function() {
                     by specifying these datatypes in the query (<code>file.datatype=pca</code>).</p>
                     <p>Finally, the query can be constrained by specifying a full file name
                     of interest or a regular expression pattern enclosed in forward slashes.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>file.datatype</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>file.datatype=differential expression</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>file.datatype=visualization table|pca</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?<b>file.filename=/trimmed\.fastq\.gz$/</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>file.datatype</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>file.datatype=differential expression</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>file.datatype=visualization table|pca</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?<b>file.filename=/trimmed\.fastq\.gz$/</b></code><br>
                 </div>
             </div>
             <div>
@@ -693,10 +693,10 @@ $(document).ready(function() {
                     <p>The <code>raw</code> format is <i><u>not</u></i> supported for tabular data,
                     and instead exists as the only suitable format for requesting non-tabular data.
                     Note that currently it only resolves successfully if exactly one data file matches the query.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.factor value.spaceflight&<b>format=browser</b></code>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.factor value.spaceflight&<b>format=json</b></code>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&<b>format=tsv</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&<b>format=raw</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?study.factor value.spaceflight&<b>format=browser</b></code>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/samples/?study.factor value.spaceflight&<b>format=json</b></code>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&<b>format=tsv</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%/data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&<b>format=raw</b></code><br>
                 </div>
             </div>
             <!--DEBUG <div>
