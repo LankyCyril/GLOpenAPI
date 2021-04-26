@@ -141,13 +141,14 @@ class SQLiteObject():
                         partname,
                     )
                     dataframe.iloc[:,bound:bound+self.maxpartwidth].to_sql(
-                        partname, connection, index=True, if_exists="replace",
+                        partname, connection, index=True,
+                        if_exists="replace", chunksize=1000,
                     )
             except (OperationalError, DatabaseError) as e:
                 connection.rollback()
-                GeneFabLogger().error(f"pandas.to_sql() error: {repr(e)}")
                 msg = "Failed to insert SQLite table"
-                raise GeneFabDatabaseException(msg, signature=self.__signature)
+                _kw = dict(signature=self.__signature, error=str(e))
+                raise GeneFabDatabaseException(msg, **_kw)
             else:
                 GeneFabLogger().info(
                     "All tables inserted for SQLiteObject (%s == %s):\n\t%s",
