@@ -1,32 +1,20 @@
 from pandas import DataFrame, MultiIndex
+from genefab3.common.types import AnnotationDataFrame, DataDataFrame
 from itertools import cycle
-from genefab3.common.utils import set_attributes
 
 
-def generic_dataframe(*level_values):
+def EmptyDataFrame(DataFrameType=DataFrame, *level_values):
     """Return an empty dataframe with specificed column names"""
     maxlen = max(map(len, level_values))
-    cyclers = [
-        cycle(values) if (len(values) < maxlen) else iter(values)
-        for values in level_values
-    ]
-    return DataFrame(columns=MultiIndex.from_tuples(zip(*cyclers)))
+    cyclers = [cycle(v) if (len(v) < maxlen) else iter(v) for v in level_values]
+    return DataFrameType(columns=MultiIndex.from_tuples(zip(*cyclers)))
 
 
-def metadata_dataframe(*, include=(), genefab_type="annotation"):
+def EmptyAnnotationDataFrame(*, id_fields):
     """Return an empty dataframe that matches metadata format"""
-    dataframe = generic_dataframe(
-        ["info"], [
-            "accession", "assay",
-            *(c.lstrip("info.").strip(".") for c in include),
-        ],
-    )
-    set_attributes(dataframe, genefab_type=genefab_type)
-    return dataframe
+    return EmptyDataFrame(AnnotationDataFrame, ["id"], id_fields)
 
 
-def data_dataframe(*, genefab_type="datatable"):
+def EmptyDataDataFrame():
     """Return an empty dataframe that matches data format"""
-    dataframe = generic_dataframe(["info"], ["info"], ["entry"])
-    set_attributes(dataframe, genefab_type=genefab_type)
-    return dataframe
+    return EmptyDataFrame(DataDataFrame, ["*"], ["*"], ["index"])

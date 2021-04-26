@@ -1,38 +1,51 @@
-from genefab3.common.types import Routes
+from genefab3.common.types import Routes, AnnotationDataFrame, DataDataFrame
+from genefab3.db.sql.files import CachedBinaryFile
 from genefab3.api import views
+from pandas import DataFrame
+from typing import Union
+from flask import Response
 
 
 class DefaultRoutes(Routes):
     """Defines standard endpoints"""
  
-    @Routes.register_endpoint(endpoint="/favicon.<imgtype>", fmt="raw", cache=False)
-    def favicon(self, imgtype, context=None):
-        return ""
+    @Routes.register_endpoint("/favicon.<imgtype>")
+    def favicon(self, imgtype, context=None) -> bytes:
+        if self.adapter.get_favicon_urls():
+            ico_file = CachedBinaryFile(
+                name="favicon.ico", identifier="RESOURCE/favicon.ico",
+                sqlite_db=self.sqlite_dbs.blobs, timestamp=0,
+                urls=self.adapter.get_favicon_urls(),
+            )
+            return ico_file.data
+        else:
+            return b''
  
-    @Routes.register_endpoint(endpoint="/", fmt="html", cache=False)
-    def root(self, context):
+    @Routes.register_endpoint("/")
+    def root(self, context) -> str:
         return views.root.get(self.mongo_collections, context=context)
  
-    @Routes.register_endpoint(cache=False)
-    def status(self, context=None):
-        return views.status.get(self.mongo_collections)
+    @Routes.register_endpoint()
+    def status(self, context=None) -> DataFrame:
+        return views.status.get(self.mongo_collections, context=context)
  
     @Routes.register_endpoint()
-    def assays(self, context):
+    def assays(self, context) -> AnnotationDataFrame:
         return views.metadata.get(
             self.mongo_collections, locale=self.locale, context=context,
-            include=(), aggregate=True,
+            id_fields=["accession", "assay name"], aggregate=True,
         )
  
     @Routes.register_endpoint()
-    def samples(self, context):
+    def samples(self, context) -> AnnotationDataFrame:
         return views.metadata.get(
             self.mongo_collections, locale=self.locale, context=context,
-            include={"info.sample name"}, aggregate=False,
+            id_fields=["accession", "assay name", "sample name"],
+            aggregate=False,
         )
  
     @Routes.register_endpoint()
-    def data(self, context):
+    def data(self, context) -> Union[DataDataFrame, Response]:
         return views.data.get(
             self.mongo_collections, locale=self.locale, context=context,
             sqlite_dbs=self.sqlite_dbs, adapter=self.adapter,

@@ -2,9 +2,8 @@ from collections import defaultdict
 from natsort import natsorted
 from functools import lru_cache
 from pathlib import Path
-from genefab3.common.utils import map_replace
+from genefab3.common.utils import map_replace, is_debug
 from json import dumps
-from genefab3.api.utils import is_debug
 
 
 def get_metadata_equals_json(mongo_collections):
@@ -41,10 +40,10 @@ def get_metadata_wildcards(existence_json):
 def get_metadata_assays(mongo_collections):
     """Generate JSON for documentation section 'meta-assay'"""
     metadata_assays = defaultdict(set)
-    for entry in mongo_collections.metadata.distinct("info"):
-        metadata_assays[entry["accession"]].add(entry["assay"])
+    for entry in mongo_collections.metadata.distinct("id"):
+        metadata_assays[entry["accession"]].add(entry["assay name"])
     return {
-        k: {**{v: True for v in natsorted(metadata_assays[k])}, "": True}
+        k: {**{f"/{v}": True for v in natsorted(metadata_assays[k])}, "": True}
         for k in natsorted(metadata_assays)
     }
 
@@ -72,14 +71,16 @@ def get(mongo_collections, context):
     wildcards = get_metadata_wildcards(existence_json)
     metadata_assays = get_metadata_assays(mongo_collections)
     metadata_datatypes = get_metadata_datatypes(mongo_collections)
-    dumps_sorted = lambda j: dumps(j, sort_keys=True)
+    dumps_as_is = lambda j: dumps(j, separators=(",", ":"))
+    dumps_sorted = lambda j: dumps(j, separators=(",", ":"), sort_keys=True)
     return map_replace(
         _get_root_html(), {
+            "%APPNAME%": context.app_name,
             "%URL_ROOT%": context.url_root,
             "/* METADATA_WILDCARDS */": dumps_sorted(wildcards),
             "/* METADATA_EXISTENCE */": dumps_sorted(existence_json),
             "/* METADATA_EQUALS */": dumps_sorted(equals_json),
-            "/* METADATA_ASSAYS */": dumps(metadata_assays),
+            "/* METADATA_ASSAYS */": dumps_as_is(metadata_assays),
             "/* METADATA_DATATYPES */": dumps_sorted(metadata_datatypes),
             "<!--DEBUG ": "" if is_debug() else "<!--",
             " DEBUG-->": "" if is_debug() else "-->",

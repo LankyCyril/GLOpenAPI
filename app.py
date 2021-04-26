@@ -4,7 +4,7 @@ from genefab3.client import GeneFabClient
 from genefab3_genelab_adapter import GeneLabAdapter
 from genefab3.api.routes import DefaultRoutes
 
-flask_app = Flask("genefab3")
+flask_app = Flask("NASA GeneLab Data API")
 
 genefab3_client = GeneFabClient(
     AdapterClass=GeneLabAdapter,
@@ -18,7 +18,7 @@ genefab3_client = GeneFabClient(
     sqlite_params=dict(
         blobs="./.genefab3.sqlite3/blobs.db",
         tables="./.genefab3.sqlite3/tables.db",
-        cache=None,
+        response_cache="./.genefab3.sqlite3/response-cache.db",
     ),
     cacher_params=dict(
         enabled=False,

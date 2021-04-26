@@ -1,40 +1,16 @@
-from genefab3.db.mongo.utils import retrieve_by_context
+from genefab3.db.mongo.utils import aggregate_file_descriptors_by_context
+from genefab3.db.mongo.utils import match_sample_names_to_file_descriptor
 from functools import lru_cache, reduce, partial
-from genefab3.common.utils import pick_reachable_url, set_attributes
+from genefab3.common.utils import pick_reachable_url
 from flask import redirect, Response
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDataManagerException
-from pandas import DataFrame, MultiIndex, concat
-from genefab3.common.logger import GeneFabLogger
-from genefab3.db.sql.types import CachedTableFile, CachedBinaryFile
+from pandas import MultiIndex
+from genefab3.db.sql.pandas import OndemandSQLiteDataFrame
+from genefab3.db.sql.files import CachedTableFile, CachedBinaryFile
 from natsort import natsorted
 from genefab3.common.exceptions import GeneFabDatabaseException
-
-
-TECH_TYPE_LOCATOR = "investigation.study assays", "study assay technology type"
-
-
-def get_file_descriptors(mongo_collections, *, locale, context):
-    """Return DataFrame of file descriptors that match user query"""
-    context.projection["file"] = True
-    context.update(".".join(TECH_TYPE_LOCATOR))
-    descriptors, _ = retrieve_by_context(
-        mongo_collections.metadata, locale=locale, context=context,
-        include={"info.sample name"}, postprocess=[
-            {"$group": {
-                "_id": {
-                    "accession": "$info.accession",
-                    "assay": "$info.assay",
-                    "technology type": "$"+".".join(TECH_TYPE_LOCATOR),
-                    "file": "$file",
-                },
-                "sample name": {"$addToSet": "$info.sample name"},
-            }},
-            {"$addFields": {"_id.sample name": "$sample name"}},
-            {"$replaceRoot": {"newRoot": "$_id"}},
-        ],
-    )
-    return list(descriptors)
+from urllib.error import HTTPError
 
 
 def validate_joinable_files(descriptors):
@@ -78,78 +54,154 @@ def file_redirect(descriptors):
         )
 
 
-def INPLACE_process_dataframe(dataframe, *, descriptor, best_sample_name_matches):
-    """Harmonize index name, column names, reorder sample columns to match annotation"""
-    if not dataframe.index.name:
-        dataframe.index.name = descriptor["file"].get("index_name", "index")
-    sample_names = natsorted(descriptor.get("sample name", ()))
-    harmonized_columns, harmonized_positions = [], []
+def harmonize_columns(dataframe, descriptor, sample_names, best_sample_name_matches):
+    """Match sample names to columns, infer correct order of original columns based on order of sample_names"""
+    harmonized_column_order, harmonized_positions = [], []
+    include_nomatch = (descriptor["file"].get("column_subset") != "sample name")
     for i, c in enumerate(dataframe.columns):
         hcs, ps = best_sample_name_matches(
             c, sample_names, return_positions=True,
         )
         if len(hcs) == 0:
-            harmonized_columns.append(c)
+            if include_nomatch:
+                harmonized_column_order.append(c)
+            else:
+                harmonized_column_order.append(None)
         elif len(hcs) == 1:
-            harmonized_columns.append(hcs[0])
+            harmonized_column_order.append(hcs[0])
             harmonized_positions.append((ps[0], i))
         else:
             msg = "Column name matches multiple sample names"
             filename = descriptor["file"].get("filename")
             _kws = dict(filename=filename, column=c, sample_names=hcs)
             raise GeneFabDataManagerException(msg, **_kws)
-    if descriptor.get("column_subset") == "sample name":
-        if len(harmonized_positions) != len(sample_names):
-            msg = "Data columns do not match sample names 1-to-1"
-            _kws_a = dict(filename=descriptor["file"].get("filename"))
-            _kws_b = dict(columns=harmonized_columns, sample_names=sample_names)
-            raise GeneFabDataManagerException(msg, **_kws_a, **_kws_b)
-    unordered = harmonized_columns[:]
+    harmonized_unordered = harmonized_column_order[:]
+    original_unordered = list(dataframe.columns)
+    column_order = original_unordered[:]
     current_positions = [i for p, i in harmonized_positions]
     target_positions = [i for p, i in sorted(harmonized_positions)]
     for cp, tp in zip(current_positions, target_positions):
-        harmonized_columns[tp] = unordered[cp]
-    dataframe.columns = harmonized_columns
+        harmonized_column_order[tp] = harmonized_unordered[cp]
+        column_order[tp] = original_unordered[cp]
+    return (
+        [c for c in column_order if c is not None],
+        [c for c in harmonized_column_order if c is not None],
+    )
 
 
-def get_formatted_data(descriptor, sqlite_db, CachedFile, adapter, _kws):
-    """Instantiate and initialize CachedFile object; post-process its data"""
-    accession = descriptor.get("accession", "NO_ACCESSION")
-    assay = descriptor.get("assay", "NO_ASSAY")
-    name = descriptor["file"]["filename"]
-    identifier = f"{accession}/File/{assay}/{name}"
+def INPLACE_process_dataframe(dataframe, *, mongo_collections, descriptor, best_sample_name_matches):
+    """Harmonize index name, column names, reorder sample columns to match all associated sample names in database"""
+    if not dataframe.index.name:
+        dataframe.index.name = descriptor["file"].get("index_name", "index")
+    all_sample_names = natsorted(match_sample_names_to_file_descriptor(
+        mongo_collections.metadata, descriptor,
+    ))
+    if descriptor["file"].get("index_subset") == "sample name":
+        if descriptor["file"].get("column_subset") == "sample name":
+            msg = "Processing data with both index_subset and column_subset"
+            raise NotImplementedError(msg)
+        else:
+            index_order, harmonized_index_order = harmonize_columns(
+                dataframe.T, descriptor, all_sample_names,
+                best_sample_name_matches,
+            )
+            if not (dataframe.index == index_order).all():
+                for ix in index_order: # reorder rows in-place:
+                    row = dataframe.loc[ix]
+                    dataframe.drop(index=ix, inplace=True)
+                    dataframe.loc[ix] = row
+            dataframe.index = harmonized_index_order
+    else:
+        column_order, harmonized_column_order = harmonize_columns(
+            dataframe, descriptor, all_sample_names, best_sample_name_matches,
+        )
+        if not (dataframe.columns == column_order).all():
+            for column in column_order: # reorder columns in-place
+                dataframe[column] = dataframe.pop(column)
+        dataframe.columns = harmonized_column_order
+
+
+def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, adapter, _kws):
+    """Instantiate and initialize CachedFile object; post-process its data; select only the columns in passed annotation"""
+    try:
+        accession = descriptor["accession"]
+        assay_name = descriptor["assay name"]
+        filename = descriptor["file"]["filename"]
+    except (KeyError, TypeError, IndexError):
+        msg = "File descriptor missing 'accession', 'assay name', or 'filename'"
+        raise GeneFabDatabaseException(msg, descriptor=descriptor)
+    else:
+        identifier = f"{accession}/File/{assay_name}/{filename}"
     if "INPLACE_process" in _kws:
         _kws = {**_kws, "INPLACE_process": partial(
             INPLACE_process_dataframe, descriptor=descriptor,
             best_sample_name_matches=adapter.best_sample_name_matches,
+            mongo_collections=mongo_collections,
         )}
     file = CachedFile(
         identifier=identifier,
-        name=name, urls=descriptor["file"].get("urls", ()),
+        name=filename, urls=descriptor["file"].get("urls", ()),
         timestamp=descriptor["file"].get("timestamp", -1),
         sqlite_db=sqlite_db, **_kws,
     )
     data = file.data
-    if isinstance(data, DataFrame):
+    if isinstance(data, OndemandSQLiteDataFrame):
+        _, harmonized_column_order = harmonize_columns(
+            data, descriptor, natsorted(descriptor["sample name"]),
+            adapter.best_sample_name_matches,
+        )
         data.columns = MultiIndex.from_tuples((
-            (accession, assay, column) for column in data.columns
+            (accession, assay_name, column)
+            for column in harmonized_column_order
         ))
     return data
 
 
-def combine_dataframes(dataframes):
-    """Combine dataframes in-memory; this faster than sqlite3"""
-    # wesmckinney.com/blog/high-performance-database-joins-with-pandas-dataframe-more-benchmarks
-    dataframe = concat(dataframes, axis=1, sort=False)
-    if dataframe.index.name is None: # happens if original index names differed
-        dataframe.index.name = "index" # best we can do
-    GeneFabLogger().info("Merging dataframes in-memory")
-    dataframe.reset_index(inplace=True, col_level=-1, col_fill="*")
-    set_attributes(dataframe, genefab_type="datatable")
-    return dataframe
+def INPLACE_constrain_columns(sqlite_dataframe, data_columns):
+    """Constrain OndemandSQLiteDataFrame to specified columns"""
+    joined_columns_dispatch = {"/".join(c): c for c in sqlite_dataframe.columns}
+    last_level_dispatch = {c[-1]: c for c in sqlite_dataframe.columns}
+    constrained_columns = []
+    for c in data_columns:
+        if ("/" in c) and (c in joined_columns_dispatch):
+            constrained_columns.append(joined_columns_dispatch[c])
+        elif c in last_level_dispatch:
+            constrained_columns.append(last_level_dispatch[c])
+        else:
+            msg = "Requested column not in table"
+            raise GeneFabFileException(msg, column=c)
+    sqlite_dataframe.columns = MultiIndex.from_tuples(constrained_columns)
 
 
-def combined_data(descriptors, sqlite_dbs, adapter):
+def combine_objects(objects, context, limit=None):
+    """Combine objects and post-process"""
+    if len(objects) == 0:
+        return None
+    elif len(objects) == 1:
+        combined = objects[0]
+    elif all(isinstance(obj, OndemandSQLiteDataFrame) for obj in objects):
+        combined = OndemandSQLiteDataFrame.concat(objects, axis=1)
+    else:
+        raise NotImplementedError("Merging non-table data objects")
+    if isinstance(combined, OndemandSQLiteDataFrame):
+        if context.data_columns:
+            INPLACE_constrain_columns(combined, context.data_columns)
+        # TODO: speedups for schema=1
+        data = combined.get(where=context.data_comparisons)
+        if data.index.name is None:
+            data.index.name = "index" # best we can do
+        data.reset_index(inplace=True, col_level=-1, col_fill="*")
+        return data
+    elif context.data_columns or context.data_comparisons:
+        raise GeneFabFileException(
+            "Column operations on non-table data objects are not supported",
+            columns=context.data_columns, comparisons=context.data_comparisons,
+        )
+    else:
+        return combined
+
+
+def combined_data(descriptors, context, mongo_collections, sqlite_dbs, adapter):
     """Patch through to cached data for each file and combine them"""
     if len(descriptors) > 1:
         msg, _kw = validate_joinable_files(descriptors)
@@ -159,43 +211,53 @@ def combined_data(descriptors, sqlite_dbs, adapter):
         reduce(lambda d, k: d.get(k, {}), keys, d) or None for d in descriptors
     ))
     if getset("file", "cacheable") != {True}:
-        msg = "Cannot combine these data as they were not marked cacheable"
-        raise NotImplementedError(msg)
+        msg = "Data marked as non-cacheable, cannot be returned in this format"
+        sug = "Use 'format=raw'"
+        raise GeneFabFileException(msg, suggestion=sug, format=context.format)
     types = getset("file", "type")
     if types == {"table"}:
         sqlite_db, CachedFile = sqlite_dbs.tables, CachedTableFile
         _kws = dict(index_col=0, INPLACE_process=True)
-        combine = combine_dataframes
     elif len(types) == 1:
         sqlite_db, CachedFile, _kws = sqlite_dbs.blobs, CachedBinaryFile, {}
-        combine = next
     else:
         raise NotImplementedError(f"Joining data of types {types}")
-    data = combine(
-        get_formatted_data(d, sqlite_db, CachedFile, adapter, _kws)
-        for d in natsorted(
-            descriptors, key=lambda d: (d.get("accession"), d.get("assay")),
+    data = combine_objects(context=context, objects=[
+        get_formatted_data(
+            descriptor, mongo_collections, sqlite_db, CachedFile, adapter, _kws,
         )
-    )
-    set_attributes(
-        data, datatypes=getset("file", "datatype"),
-        accessions=getset("accession"),
-    )
-    return data
+        for descriptor in natsorted(
+            descriptors,
+            key=lambda d: (d.get("accession"), d.get("assay name")),
+        )
+    ])
+    if data is None:
+        raise GeneFabDatabaseException("No data found in database")
+    else:
+        data.datatypes = getset("file", "datatype")
+        data.gct_validity_set = getset("file", "gct_valid")
+        return data
 
 
 def get(mongo_collections, *, locale, context, sqlite_dbs, adapter):
     """Return data corresponding to search parameters; merged if multiple underlying files are same type and joinable"""
-    descriptors = get_file_descriptors(
-        mongo_collections, locale=locale, context=context,
+    cursor, _ = aggregate_file_descriptors_by_context(
+        mongo_collections.metadata, locale=locale, context=context,
     )
+    descriptors = list(cursor)
     for d in descriptors:
-        if ("file" not in d) or ("filename" not in d["file"]):
+        if ("file" in d) and (not isinstance(d["file"], dict)):
+            msg = "Query did not result in an unambiguous target file"
+            raise GeneFabDatabaseException(msg, debug_info=d)
+        elif ("file" not in d) or ("filename" not in d["file"]):
             msg = "File information missing for entry"
             raise GeneFabDatabaseException(msg, entry=d)
     if not len(descriptors):
-        raise FileNotFoundError("No file found matching specified constraints")
+        msg = "No file found matching specified constraints"
+        raise HTTPError(context.full_path, 404, msg, hdrs=None, fp=None)
     elif context.format == "raw":
         return file_redirect(descriptors)
     else:
-        return combined_data(descriptors, sqlite_dbs, adapter)
+        return combined_data(
+            descriptors, context, mongo_collections, sqlite_dbs, adapter,
+        )

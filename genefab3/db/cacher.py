@@ -7,15 +7,16 @@ from time import sleep
 from collections import OrderedDict
 from genefab3.db.mongo.types import ValueCheckedRecord
 from genefab3.isa.types import Dataset
-from genefab3.db.mongo.utils import run_mongo_transaction, harmonize_document
+from genefab3.db.mongo.utils import run_mongo_action, harmonize_document
 from genefab3.db.mongo.status import drop_status, update_status
 
 
 class CacherThread(Thread):
     """Lives in background and keeps local metadata cache, metadata index, and response cache up to date"""
  
-    def __init__(self, *, adapter, mongo_collections, locale, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter):
+    def __init__(self, *, adapter, mongo_collections, mongo_appname, locale, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter):
         """Prepare background thread that iteratively watches for changes to datasets"""
+        self._id = mongo_appname.replace("GeneFab3", "CacherThread")
         self.adapter = adapter
         self.mongo_collections, self.locale = mongo_collections, locale
         self.sqlite_dbs = sqlite_dbs
@@ -23,10 +24,7 @@ class CacherThread(Thread):
         self.metadata_retry_delay = metadata_retry_delay
         self.units_formatter = units_formatter
         self.response_cache = ResponseCache(self.sqlite_dbs)
-        self.status_kwargs = dict(
-            collection=self.mongo_collections.status,
-            logger=GeneFabLogger(),
-        )
+        self.status_kwargs = dict(collection=self.mongo_collections.status)
         super().__init__()
  
     def run(self):
@@ -35,36 +33,31 @@ class CacherThread(Thread):
             ensure_info_index(self.mongo_collections, self.locale)
             accessions, success = self.recache_metadata()
             if success:
-                update_metadata_value_lookup(self.mongo_collections)
-                accessions_to_drop = (
-                    accessions["updated"] | accessions["dropped"] |
-                    accessions["failed"]
-                )
-                for accession in accessions_to_drop:
-                    self.response_cache.drop(accession)
+                update_metadata_value_lookup(self.mongo_collections, self._id)
+                if accessions["updated"]:
+                    self.response_cache.drop_all()
+                else:
+                    for acc in accessions["failed"] | accessions["dropped"]:
+                        self.response_cache.drop(acc)
                 self.response_cache.shrink()
                 delay = self.metadata_update_interval
             else:
                 delay = self.metadata_retry_delay
-            GeneFabLogger().info(
-                f"CacherThread: Sleeping for {delay} seconds",
-            )
+            GeneFabLogger().info(f"{self._id}:\n\tSleeping for {delay} seconds")
             sleep(delay)
  
     def recache_metadata(self):
         """Instantiate each available dataset; if contents changed, dataset automatically updates db.metadata"""
-        GeneFabLogger().info("CacherThread: Checking metadata cache")
+        GeneFabLogger().info(f"{self._id}:\n\tChecking metadata cache")
         try:
+            collection = self.mongo_collections.metadata
             accessions = OrderedDict(
-                cached=set(
-                    self.mongo_collections.metadata.distinct("info.accession"),
-                ),
-                live=set(self.adapter.get_accessions()),
-                fresh=set(), updated=set(), stale=set(),
-                dropped=set(), failed=set(),
+                cached=set(collection.distinct("id.accession")),
+                live=set(self.adapter.get_accessions()), fresh=set(),
+                updated=set(), stale=set(), dropped=set(), failed=set(),
             )
         except Exception as e:
-            GeneFabLogger().error(f"CacherThread: {repr(e)}")
+            GeneFabLogger().error(f"{self._id}:\n\t{repr(e)}")
             return None, False
         def _iterate():
             for a in accessions["cached"] - accessions["live"]:
@@ -76,51 +69,56 @@ class CacherThread(Thread):
             accessions[key].add(accession)
             _kws = dict(
                 **self.status_kwargs, status=key, accession=accession,
-                info=f"CacherThread: {accession} {report}", error=error,
+                prefix=self._id, info=f"{accession} {report}", error=error,
             )
             if key in {"dropped", "failed"}:
                 drop_status(**_kws)
             update_status(**_kws)
-        GeneFabLogger().info(
-            "CacherThread, datasets: " + ", ".join(
-                f"{k}={len(v)}" for k, v in accessions.items()
-            ),
-        )
+        GeneFabLogger().info(f"{self._id}, datasets:\n\t" + ", ".join(
+            f"{k}={len(v)}" for k, v in accessions.items()
+        ))
         return accessions, True
  
     def drop_single_dataset_metadata(self, accession):
         """Drop all metadata entries associated with `accession` from `self.mongo_collections.metadata`"""
-        run_mongo_transaction(
-            "delete_many", self.mongo_collections.metadata,
-            query={"info.accession": accession},
-        )
+        collection = self.mongo_collections.metadata
+        with collection.database.client.start_session() as session:
+            with session.start_transaction():
+                run_mongo_action(
+                    "delete_many", collection,
+                    query={"id.accession": accession},
+                )
         return "dropped", "removed from database", None
  
     def recache_single_dataset_samples(self, dataset):
         """Insert per-sample documents into MongoDB, return exception on error"""
-        try:
-            has_samples = False
-            for sample in dataset.samples:
-                document = harmonize_document(sample, self.units_formatter)
-                self.mongo_collections.metadata.insert_one(document)
-                has_samples = True
-                if "Study" not in sample:
-                    update_status(
-                        **self.status_kwargs, status="warning",
-                        warning="Study entry missing",
-                        accession=dataset.accession,
-                        assay_name=sample.assay_name,
-                        sample_name=sample.name,
-                    )
-            if not has_samples:
-                update_status(
-                    **self.status_kwargs, status="warning",
-                    warning="No samples", accession=dataset.accession,
-                )
-        except Exception as e:
-            return e
-        else:
-            return None
+        collection = self.mongo_collections.metadata
+        with collection.database.client.start_session() as session:
+            with session.start_transaction():
+                try:
+                    has_samples = False
+                    for sample in dataset.samples:
+                        collection.insert_one(harmonize_document(
+                            sample, self.units_formatter,
+                        ))
+                        has_samples = True
+                        if "Study" not in sample:
+                            update_status(
+                                **self.status_kwargs, status="warning",
+                                warning="Study entry missing",
+                                accession=dataset.accession,
+                                assay_name=sample.assay_name,
+                                sample_name=sample.name,
+                            )
+                    if not has_samples:
+                        update_status(
+                            **self.status_kwargs, status="warning",
+                            warning="No samples", accession=dataset.accession,
+                        )
+                except Exception as e:
+                    return e
+                else:
+                    return None
  
     def recache_single_dataset_metadata(self, accession, has_cache):
         """Check if dataset changed, update metadata cached in `self.mongo_collections.metadata`, report with result/errors"""
@@ -130,7 +128,7 @@ class CacherThread(Thread):
                 collection=self.mongo_collections.records,
                 value=self.adapter.get_files_by_accession(accession),
             )
-            if files.changed:
+            if files.changed or (not has_cache):
                 best_sample_name_matches=self.adapter.best_sample_name_matches
                 dataset = Dataset(
                     accession, files.value, self.sqlite_dbs.blobs,
@@ -144,10 +142,9 @@ class CacherThread(Thread):
                 status = "stale"
                 report = f"failed to retrieve ({repr(e)}), kept stale"
             else:
-                status = "failed"
-                report = f"failed to retrieve ({repr(e)})"
+                status, report = "failed", f"failed to retrieve ({repr(e)})"
             return status, report, e
-        if dataset is not None:
+        if dataset is not None: # files have changed OR needs to be re-inserted
             self.drop_single_dataset_metadata(accession)
             e = self.recache_single_dataset_samples(dataset)
             if e is not None:
@@ -155,5 +152,5 @@ class CacherThread(Thread):
                 return "failed", f"failed to parse ({repr(e)})", e
             else:
                 return "updated", "updated", None
-        else:
+        else: # files have not changed
             return "fresh", "no action (fresh)", None

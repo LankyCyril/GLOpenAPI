@@ -3,9 +3,9 @@
 <head>
     <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-    <title>GeneFab3</title><!--TITLEPOSTFIX-->
+    <title>$APPNAME</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/6pac-slickgrid/2.4.27/slick.grid.min.css" type="text/css"/>
-    <link href="https://fonts.googleapis.com/css2?family=Oxygen+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxygen+Mono&display=swap"/>
     <style>
         html, body {margin: 0; padding: 0; background: #FFF; overflow: auto}
         body {font-size: 10pt; font-family: "Oxygen Mono", monospace}
@@ -14,14 +14,21 @@
             min-height: 22pt; max-height: 22pt; height: 22pt;
             background: #CDF; padding: 2pt !important;
             line-height: 1.1;
-            overflow: hidden; text-overflow: ellipsis; white-space: nowrap
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        #sorting_popup {
+            position: absolute; top: 0; right: 0;
+            margin: 2pt !important; max-height: 18pt; height: 18pt;
+            padding: 1pt 2pt !important; line-height: 1.05; font-size: 9pt;
+            overflow: hidden; text-overflow: ellipsis;
+            background: #D10; color: white;
         }
         .fullpage{position: absolute; top: 25pt; left: 0; right: 0; bottom: 0}
         #grid {border: .25pt solid black}
         #info {
             margin: 10pt auto; min-width: 3in; max-width: 50%;
             max-height: 90%; overflow: auto;
-            padding: 2pt; background: #CDF; border: 1pt solid black
+            padding: 2pt; background: #CDF; border: 1pt solid black;
         }
         #info tt {background: #EEE; border: 1px solid gray; padding: 1pt}
         #noscript {padding: 2pt !important}
@@ -34,15 +41,26 @@
         }
         #crosshair-h {width: 100%}
         #crosshair-v {height: 100%}
-        .slick-header-column {background: #DDD; font-weight: 600; border: .5pt solid black !important}
-        /*SQUASH_PREHDR*/
-        .slick-cell {line-height: 1.65; background: #FFFFFF99; border: .25pt solid black}
+        .slick-header-column {
+            background: #DDD; font-weight: 600;
+            border: .5pt solid black !important;
+        }
+        $SQUASH_PREHEADER
+        .slick-cell {
+            line-height: 1.65; background: #FFFFFF99; border: .25pt solid black;
+        }
         .slick-cell.frozen {font-weight: 600}
         .slick-row.odd {background: #E8E8E8}
         a {text-decoration: none; color: black; cursor: pointer}
         a:hover {text-decoration: underline; color: blue}
-        a.filter:hover:after {content: " \229e"; display: inline-block; white-space: pre; text-decoration: none; color: #D10;}
-        a.file:hover:after {content: " \1f4e4"; display: inline-block; white-space: pre; text-decoration: none; color: #D10;}
+        a.filter:hover:after {
+            content: " \229e"; display: inline-block; white-space: pre;
+            text-decoration: none; color: #D10;
+        }
+        a.file:hover:after {
+            content: " \21e9"; display: inline-block; white-space: pre;
+            text-decoration: none; color: #D10; font-weight: 600;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/6pac-slickgrid/2.4.27/lib/jquery.event.drag-2.3.0.min.js"></script>
@@ -57,22 +75,25 @@
         Hover to highlight equal values.
         <a style="color:#D10" id="crosshair-toggle">Toggle crosshairs</a>.<br>
         <b>Download:</b> as
-        <a style="color:#D10" href="CSVLINK">csv</a>,
-        <a style="color:#D10" href="TSVLINK">tsv</a>,
-        <a style="color:#D10" href="JSONLINK">json</a><!--VIEWDEPENDENTLINKS-->.
+        <a style="color:#D10" href="$CSVLINK">csv</a>,
+        <a style="color:#D10" href="$TSVLINK">tsv</a>,
+        <a style="color:#D10" href="$JSONLINK">json</a>$VIEWDEPENDENTLINKS.
         <b>Switch view level:</b>
-        <a style="color:#D10" href="ASSAYSVIEW">assays</a>,
-        <a style="color:#D10" href="SAMPLESVIEW">samples</a>,
-        <a style="color:#D10" href="DATAVIEW">data</a>.
+        <a style="color:#D10" href="$ASSAYSVIEW">assays</a>,
+        <a style="color:#D10" href="$SAMPLESVIEW">samples</a>,
+        <a style="color:#D10" href="$DATAVIEW">data</a>.
+    </div>
+    <div id="sorting_popup" style="display: none">
+        CUSTOM SORTING<br>click to reset
     </div>
     <div id="grid" class="fullpage">
         <div id="noscript">
             Loading data in an interactive viewer...<br>
             The viewer requires JavaScript support.
             You may access the requested data non-interactively in
-            <a style="color:#D10" href="CSVLINK">csv</a>,
-            <a style="color:#D10" href="TSVLINK">tsv</a>, or
-            <a style="color:#D10" href="JSONLINK">json</a> formats.
+            <a style="color:#D10" href="$CSVLINK">csv</a>,
+            <a style="color:#D10" href="$TSVLINK">tsv</a>, or
+            <a style="color:#D10" href="$JSONLINK">json</a> formats.
         </div>
     </div>
     <div id="crosshair-h" class="crosshair"></div>
@@ -81,33 +102,47 @@
 
 <script>
 
-var data =
-// ROWDATA
-;
+var basic_formatter = function(r,c,v,d,x) {
+    return ((v === true) || (v === "True"))
+            ? "<font color=green>True</font>" : (
+                ((v === false) || (v === "False"))
+                ? "<font color='#FAA'>False</font>" : (
+                    ((v === null) || (v === "NaN"))
+                    ? "<i style='color:#BBB'>NaN</i>" : v ))
+};
 
-var columns = [
-// COLUMNDATA
-];
-
-for (var i = 0, l = columns.length; i < l; i++) {
-    var formatter = function(r,c,v,d,x) {
-        return (v == "True") ? "<font color=green>"+v+"</font>" : (
-               (v == "False") ? "<font color='#FAA'>"+v+"</font>" : (
-               (v == "NaN") ? "<i style='color:#BBB'>"+v+"</i>" : v))
+var columns = [], _rc = $COLUMNDATA;
+for (var i = _rc.length; i --> 0;)
+    columns[i] = {
+        id: i, field: i, columnGroup: _rc[i][0], name: _rc[i][1],
+        sortable: true, resizable: false, momentarilyFormattable: true,
+        formatter: basic_formatter, defaultFormatter: basic_formatter,
     };
-    columns[i].sortable = true;
-    columns[i].resizable = false;
-    columns[i].formatter = formatter;
-    columns[i].defaultFormatter = formatter;
-    columns[i].momentarilyFormattable = true;
+var data = $ROWDATA;
+
+var context_url = "$CONTEXTURL";
+var fr_assays = function(v, postfix) {
+    return ((v === null) || (v === "NaN"))
+        ? "<i style='color:#BBB'>NaN</i>"
+        : (((v === false) || (v === "False"))
+            ? "<font style='color:#FAA'>False</font>"
+            : "<a class='filter' style='color:green' href='" +
+              context_url + escape(postfix) + "'>True</a>");
 }
-// FORMATTERS
+var fr_samples = function(v, postfix) {
+    return ((v === null) || (v === "NaN"))
+        ? "<i style='color:#BBB'>NaN</i>"
+        : "<a class='filter' href='" +
+          context_url + escape(postfix) + "=" + escape(v) + "'>" + v + "</a>";
+}
+
+$FORMATTERS
 
 var options = {
     createPreHeaderPanel: true, showPreHeaderPanel: true,
     defaultColumnWidth: 120, multiColumnSort: true,
     enableTextSelectionOnCells: true, enableColumnReorder: false,
-    frozenColumn: // FROZENCOLUMN
+    frozenColumn: $FROZENCOLUMN,
 };
 options.defaultFrozenColumn = options.frozenColumn;
 
@@ -136,13 +171,13 @@ function render_header_groups(pre_header_panel, start, end) {
     }
 }
 
-for (var i = 0, cl = columns.length; i < cl; i++) {
+for (var i = columns.length; i --> 0;) {
     c = columns[i];
     var field = c.field;
     var longest = c.name;
-    for (var j = 0, dl = data.length; j < dl; j++) {
+    for (var j = data.length; j --> 0;) {
         var value = data[j][field];
-        if (value.length > longest.length)
+        if ((value !== null) && (value.toString().length > longest.length))
             longest = value;
     }
     var widthchecker = $("<span>"+longest+"&nbsp;&times;</span>").hide();
@@ -168,11 +203,11 @@ grid.onMouseEnter.subscribe(function (e, args) {
     var g = args.grid;
     var cell = g.getCellFromEvent(e);
     var r = cell.row, c = cell.cell;
-    for (var x = 0, l = columns.length; x < l; x++) {
+    for (var x = 0, cl = columns.length; x < cl; x++) {
         if (momentarily_formatted[x] === true) {
             momentarily_formatted[x] = false;
             columns[x].formatter = columns[x].defaultFormatter;
-            for (var y = 0, l = data.length; y < l; y++)
+            for (var y = 0, dl = data.length; y < dl; y++)
                 g.updateCell(y, x);
         }
     }
@@ -185,7 +220,7 @@ grid.onMouseEnter.subscribe(function (e, args) {
             return (v == value)
                 ? "<font style='background:#FF8'>"+fmt+"</font>" : fmt;
         }
-        for (var y = 0, l = data.length; y < l; y++)
+        for (var y = 0, dl = data.length; y < dl; y++)
             g.updateCell(y, c);
     }
 });
@@ -193,16 +228,17 @@ grid.onMouseEnter.subscribe(function (e, args) {
 grid.onSort.subscribe(function(e, args) {
     var sortcols = args.sortCols, g = args.grid;
     data.sort(function (r1, r2) {
-        for (var i = 0, l = sortcols.length; i < l; i++) {
+        for (var i = 0, sl = sortcols.length; i < sl; i++) {
             var f = sortcols[i].sortCol.field;
             var v1 = r1[f], v2 = r2[f];
             var sign = sortcols[i].sortAsc ? 1 : -1;
             var ans = sign * (
-                (v1 == "NaN")
-                ? ((v2 == "NaN") ? 0 : -1)
-                : ((v2 == "NaN")
-                    ? 1
-                    : v1.localeCompare(v2, undefined, {numeric: true})
+                ((v1 === "NaN") || (v1 === null))
+                ? (((v2 === "NaN") || (v2 === null)) ? 0 : -1)
+                : (((v2 === "NaN") || (v2 === null))
+                    ? 1 : v1.toString().localeCompare(
+                        v2, undefined, {numeric: true}
+                    )
                 )
             );
             if (ans != 0) return ans;

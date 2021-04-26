@@ -1,5 +1,6 @@
 from flask import request
 from datetime import datetime
+from functools import lru_cache
 from logging import getLogger, DEBUG, Handler
 
 
@@ -15,6 +16,7 @@ def log_to_mongo_collection(collection, et=None, ev=None, stack=None, is_excepti
     })
 
 
+@lru_cache(maxsize=None)
 def GeneFabLogger():
     logger = getLogger("genefab3")
     logger.setLevel(DEBUG)
@@ -28,7 +30,6 @@ class MongoDBLogger(Handler):
     def emit(self, record):
         if self.collection:
             log_to_mongo_collection(
-                self.collection,
-                et=record.levelname, ev=record.getMessage(),
+                self.collection, et=record.levelname, ev=record.getMessage(),
                 stack=record.stack_info, is_exception=False,
             )

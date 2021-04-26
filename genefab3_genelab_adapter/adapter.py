@@ -7,7 +7,6 @@ from urllib.parse import quote
 from re import search, sub
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.types import Adapter
-from genefab3.common.exceptions import GeneFabJSONException
 from warnings import catch_warnings, filterwarnings
 from dateutil.parser import UnknownTimezoneWarning
 from functools import lru_cache
@@ -48,22 +47,24 @@ KNOWN_DATATYPES = {
     r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.rda$':
         datatype("processed microarray data (rda)"),
     r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.txt$':
-        tabletype("processed microarray data", column_subset="sample name"),
+        tabletype("processed microarray data",
+            column_subset="sample name", gct_valid=True),
     r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Normalized_Counts\.csv$':
-        tabletype("normalized counts", column_subset="sample name"),
+        tabletype("normalized counts",
+            column_subset="sample name", gct_valid=True),
     r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Unnormalized_Counts\.csv$':
-        tabletype("unnormalized counts", column_subset="sample name",
-            joinable=True),
+        tabletype("unnormalized counts", joinable=True,
+            column_subset="sample name", gct_valid=True),
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression\.csv$':
         tabletype("differential expression"),
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_contrasts\.csv$':
         datatype("differential expression contrasts"),
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table\.csv$':
-        tabletype("visualization table", internal=True,
-            condition=is_expression_profiling),
+        tabletype("visualization table",
+            internal=True, condition=is_expression_profiling),
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table\.csv$':
-        tabletype("pca", index_name="sample name", internal=True,
-            condition=is_expression_profiling),
+        tabletype("pca", index_name="sample name", index_subset="sample name",
+            internal=True, condition=is_expression_profiling),
 }
 
 
@@ -114,6 +115,11 @@ def format_file_entry(row):
 
 class GeneLabAdapter(Adapter):
  
+    def get_favicon_urls(self):
+        return [
+            "https://genelab-data.ndc.nasa.gov/genelab/img/meatball-favicon.ico"
+        ]
+ 
     def get_accessions(self):
         """Return list of dataset accessions available through genelab.nasa.gov/genelabAPIs"""
         try:
@@ -123,7 +129,7 @@ class GeneLabAdapter(Adapter):
                 read_json(COLD_SEARCH_MASK.format(n_datasets))["hits"]["hits"]
             }
         except (KeyError, TypeError):
-            raise GeneFabJSONException("Malformed GeneLab search JSON")
+            raise GeneFabDataManagerException("Malformed GeneLab search JSON")
  
     def get_files_by_accession(self, accession):
         """Get dictionary of files for dataset available through genelab.nasa.gov/genelabAPIs"""
@@ -133,8 +139,8 @@ class GeneLabAdapter(Adapter):
             assert len(glds_json) == 1
             _id = glds_json[0]["_id"]
         except (AssertionError, IndexError, KeyError, TypeError):
-            raise GeneFabJSONException(
-                "Malformed GLDS JSON", accession,
+            raise GeneFabDataManagerException(
+                "Malformed GLDS JSON", accession=accession,
                 url=url, object_type=type(glds_json).__name__,
                 length=getattr(glds_json, "__len__", lambda: None)(),
                 target="[0]['_id']",
@@ -144,8 +150,8 @@ class GeneLabAdapter(Adapter):
             filelisting_json = read_json(url)
             assert isinstance(filelisting_json, list)
         except AssertionError:
-            raise GeneFabJSONException(
-                "Malformed 'filelistings' JSON", accession, _id=_id,
+            raise GeneFabDataManagerException(
+                "Malformed 'filelistings' JSON", accession=accession, _id=_id,
                 url=url, object_type=type(filelisting_json).__name__,
                 expected_type="list",
             )

@@ -1,14 +1,10 @@
-from pandas import isnull, DataFrame
+from pandas import isnull
 from re import sub, search
-from functools import partial, reduce, wraps
+from functools import partial
 from bson.errors import InvalidDocument as InvalidDocumentError
 from collections.abc import ValuesView
 from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabDatabaseException
-from genefab3.common.types import NestedDefaultDict
-from operator import getitem as gi_
-from collections import OrderedDict
-from marshal import dumps as marshals
 from pymongo import ASCENDING
 
 
@@ -75,35 +71,33 @@ def harmonize_document(query, units_formatter=None, lowercase=True, dropna=True,
         return {}
 
 
-def run_mongo_transaction(action, collection, *, query=None, data=None, documents=None):
-    """Shortcut to replace/delete/insert all matching instances in one transaction"""
+def run_mongo_action(action, collection, *, query=None, data=None, documents=None):
+    """Shortcut to replace/delete/insert all matching instances"""
     error_message, unused_arguments = None, None
-    with collection.database.client.start_session() as session:
-        with session.start_transaction():
-            if action == "replace":
-                if (query is not None) and (data is not None):
-                    collection.delete_many(query)
-                    collection.insert_one({**query, **data})
-                    if documents is not None:
-                        unused_arguments = "`documents`"
-                else:
-                    error_message = "no `query` and/or `data` specified"
-            elif action == "delete_many":
-                if query is not None:
-                    collection.delete_many(query)
-                    if (data is not None) or (documents is not None):
-                        unused_arguments = "`data`, `documents`"
-                else:
-                    error_message = "no `query` specified"
-            elif action == "insert_many":
-                if documents is not None:
-                    collection.insert_many(documents)
-                    if (query is not None) or (data is not None):
-                        unused_arguments = "`query`, `data`"
-                else:
-                    error_message = "no `documents` specified"
-            else:
-                error_message = "unsupported action"
+    if action == "replace":
+        if (query is not None) and (data is not None):
+            collection.delete_many(query)
+            collection.insert_one({**query, **data})
+            if documents is not None:
+                unused_arguments = "`documents`"
+        else:
+            error_message = "no `query` and/or `data` specified"
+    elif action == "delete_many":
+        if query is not None:
+            collection.delete_many(query)
+            if (data is not None) or (documents is not None):
+                unused_arguments = "`data`, `documents`"
+        else:
+            error_message = "no `query` specified"
+    elif action == "insert_many":
+        if documents is not None:
+            collection.insert_many(documents)
+            if (query is not None) or (data is not None):
+                unused_arguments = "`query`, `data`"
+        else:
+            error_message = "no `documents` specified"
+    else:
+        error_message = "unsupported action"
     if unused_arguments:
         message = "run_mongo_transaction('%s'): %s unused in this action"
         GeneFabLogger().warning(message, action, unused_arguments)
@@ -114,65 +108,58 @@ def run_mongo_transaction(action, collection, *, query=None, data=None, document
         )
 
 
-def reduce_projection(fp, longest=False):
-    """Drop longer OR shorter paths if they conflict with longer paths"""
-    d = NestedDefaultDict()
-    [reduce(gi_, k.split("."), d) for k in fp]
-    if longest:
-        return {k: v for k, v in fp.items() if not reduce(gi_, k.split("."), d)}
-    else:
-        for k in sorted(fp, reverse=True):
-            v = reduce(gi_, k.split("."), d)
-            v[True] = [v.clear() if v else None]
-        return {k: v for k, v in fp.items() if reduce(gi_, k.split("."), d)}
-
-
-def _iter_blackjack_items_cache(f):
-    """Custom lru_cache-like memoizer for `iter_blackjack_items` with hashing of simple dictionaries"""
-    cache = OrderedDict()
-    @wraps(f)
-    def wrapper(e, head=()):
-        k = marshals(e, 4), head
-        if k not in cache:
-            if len(cache) > 4096:
-                cache.popitem(last=False)
-            cache[k] = list(f(e, head))
-        return cache[k]
-    return wrapper
-
-
-@_iter_blackjack_items_cache
-def iter_blackjack_items(e, head=()):
-    """Quickly iterate flattened dictionary key-value pairs in pure Python"""
-    if isinstance(e, dict):
-        for k, v in e.items():
-            yield from iter_blackjack_items(v, head=head+(k,))
-    else:
-        yield ".".join(head), e
-
-
-def blackjack_normalize(cursor):
-    """Quickly flatten iterable of dictionaries in pure Python"""
-    return DataFrame(dict(iter_blackjack_items(e)) for e in cursor)
-
-
-def retrieve_by_context(collection, *, locale, context, include=(), postprocess=()):
+def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), postprocess=()):
     """Run .find() or .aggregate() based on query, projection"""
-    full_projection = {
-        "info.accession": True, "info.assay": True,
-        **context.projection, **{field: True for field in include},
-    }
-    collation = {"locale": locale, "numericOrdering": True}
-    pipeline = [
-        {"$sort": {
-            f: ASCENDING
-            for f in ["info.accession", "info.assay", *include]
-        }},
-        {"$unwind": "$file"},
+    full_projection = {**context.projection, **{"id."+f: 1 for f in id_fields}}
+    sort_by_too = ["id."+f for f in id_fields if "id."+f not in context.sort_by]
+    pipeline=[
+        {"$sort": {f: ASCENDING for f in (*context.sort_by, *sort_by_too)}},
+      *({"$unwind": f"${f}"} for f in context.unwind),
         {"$match": context.query},
         {"$project": {**full_projection, "_id": False}},
+        *postprocess,
     ]
-    cursor = collection.aggregate(
-        pipeline=[*pipeline, *postprocess], collation=collation,
+    collation={"locale": locale, "numericOrdering": True}
+    return collection.aggregate(pipeline, collation=collation), full_projection
+
+
+def aggregate_file_descriptors_by_context(collection, *, locale, context, tech_type_locator="investigation.study assays.study assay technology type"):
+    """Return DataFrame of file descriptors that match user query"""
+    context.projection["file"] = True
+    context.update(tech_type_locator, auto_reduce=True)
+    return aggregate_entries_by_context(
+        collection, locale=locale, context=context,
+        id_fields=["accession", "assay name", "sample name"], postprocess=[
+            {"$group": {
+                "_id": {
+                    "accession": "$id.accession",
+                    "assay name": "$id.assay name",
+                    "technology type": "${tech_type_locator}",
+                    "file": "$file",
+                },
+                "sample name": {"$push": "$id.sample name"},
+            }},
+            {"$addFields": {"_id.sample name": "$sample name"}},
+            {"$replaceRoot": {"newRoot": "$_id"}},
+        ],
     )
-    return cursor, full_projection
+
+
+def match_sample_names_to_file_descriptor(collection, descriptor):
+    """Retrieve all sample names associated with given filename under given accession and assay name"""
+    try:
+        return {
+            entry["id"]["sample name"]
+            for entry in collection.aggregate([
+                {"$unwind": "$file"},
+                {"$match": {
+                    "id.accession": descriptor["accession"],
+                    "id.assay name": descriptor["assay name"],
+                    "file.filename": descriptor["file"]["filename"],
+                }},
+                {"$project": {"_id": False, "id.sample name": True}},
+            ])
+        }
+    except (KeyError, TypeError, IndexError):
+        msg = "File descriptor missing 'accession', 'assay name', or 'filename'"
+        raise GeneFabDatabaseException(msg, descriptor=descriptor)

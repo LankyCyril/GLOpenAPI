@@ -4,7 +4,7 @@
         <meta charset='utf-8'>
         <meta http-equiv='X-UA-Compatible' content='IE=edge'/>
         <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
-        <title>NASA GeneLab Data API v3 Introduction</title>
+        <title>%APPNAME%</title>
         <link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Oxygen+Mono&family=Roboto:wght@300;500&display=swap'/>
         <style>
             * {font-size: 13pt; font-family: "Roboto", sans-serif; font-weight: 300}
@@ -75,10 +75,13 @@ var metadata = {
 };
 
 function trimmed_option(key) {
-    if (key.length <= 64)
-        return key;
+    var strkey = key.toString()
+    if (strkey[0] === "/")
+        strkey = strkey.substring(1)
+    if (strkey.length <= 64)
+        return strkey;
     else
-        return key.substring(0, 61) + "...";
+        return strkey.substring(0, 61) + "...";
 }
 
 function refresh_all_dropdowns() {
@@ -253,6 +256,9 @@ function generate_url() {
         $(".meta-" + TARGETS[i]).each(function () {
             if ($(this).children("input[type=checkbox]").prop("checked")) {
                 $(this).find(".key-level").each(function () {
+                    var this_val = $(this).val().toString();
+                    if (this_val[0] === "/")
+                        url = url.replace(/\.+$/g, "");
                     url += escape($(this).val()) + ".";
                 });
                 var keyunion_level_dropdowns = $(this).find(".keyunion-level");
@@ -581,7 +587,7 @@ $(document).ready(function() {
                         <div class='meta-assay list-item'>
                             <input type='checkbox'>
                             <em class='remover'>&amp;</em>
-                            <em class='key included-key'>from=</em>
+                            <em class='key included-key'>id=</em>
                             <select class='key-level level-0'></select>
                             <em>.</em>
                             <select class='key-level level-1'></select>
@@ -594,10 +600,10 @@ $(document).ready(function() {
                 </div>
                 <div class='description on-newline'>
                     <p>The search can be constrained to only the samples from
-                    specific datasets (<code>from=ACCESSION</code>) and/or assays
-                    (<code>from=ACCESSION.ASSAY</code>)</p>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.characteristics&<b>from=GLDS-38</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.characteristics&<b>from=GLDS-38.proteomics|GLDS-276</b></code><br>
+                    specific datasets (<code>id=ACCESSION</code>) and/or assays
+                    (<code>id=ACCESSION.ASSAY</code>)</p>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.characteristics&<b>id=GLDS-38</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.characteristics&<b>id=GLDS-38.proteomics|GLDS-276</b></code><br>
                 </div>
             </div>
             <div>
@@ -690,7 +696,7 @@ $(document).ready(function() {
                     <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.factor value.spaceflight&<b>format=browser</b></code>
                     <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%samples/?study.factor value.spaceflight&<b>format=json</b></code>
                     <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&<b>format=tsv</b></code><br>
-                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&from=GLDS-37&<b>format=raw</b></code><br>
+                    <i>Example:</i>&nbsp;&nbsp;<code>%URL_ROOT%data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&<b>format=raw</b></code><br>
                 </div>
             </div>
             <!--DEBUG <div>
