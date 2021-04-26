@@ -244,7 +244,7 @@ function decorate_url(url) {
 var TARGETS = [
     "wildcard", "existence", "equals", "assay",
     "file-filename-pseudo", "file-datatype-pseudo", "file-datatype",
-    "format", "debug",
+    "format", "schema", "debug",
 ];
 
 function generate_url() {
@@ -687,11 +687,24 @@ $(document).ready(function() {
                         </div>
                     </div>
                 </div>
+                <div class='interactive on-newline' style='display: none; margin-top: 0'>
+                    <div id='meta-schema-list' class='list'>
+                        <div class='meta-schema list-item'>
+                            <input type='checkbox'>
+                            <em class='key'>&amp;</em>
+                            <em class='key included-key'>schema=</em>
+                            <select class='value-level level-0' disabled>
+                                <option value='1' selected>1</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
                 <div class='description on-newline'>
                     <p>Data returned for the query can be formatted in multiple ways.</p>
                     <p>If an annotation table is requested (as produced by views &quot;assays&quot;, &quot;samples&quot;)
                     formats <code>csv</code>, <code>tsv</code>, <code>json</code> are recommended for programmatic use,
-                    and format <code>browser</code> for interactive inspection.
+                    and format <code>browser</code> for interactive inspection.<br>
+                    <code>schema=1</code> can be passed to output the schema of the tabular data instead.<br>
                     In cases where exactly one annotation column is present (such as a factor value, a characteristic, etc)
                     the <code>cls</code> format is also supported.</p>
                     <p>If data is requested (view &quot;data&quot;) and is expected to be tabular
