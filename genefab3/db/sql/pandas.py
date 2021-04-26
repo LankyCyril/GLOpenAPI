@@ -152,9 +152,15 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
                 try:
                     a, k = (query, connection), dict(index_col=self.index.name)
                     data = read_sql(*a, **k)
-                except OperationalError:
-                    msg = "No data found"
-                    raise GeneFabDatabaseException(msg, table=self.name)
+                except (OperationalError, PandasDatabaseError) as e:
+                    if "too many columns" in str(e).lower():
+                        msg = "Too many columns requested"
+                        sug = "Limit request to fewer than 2000 columns"
+                        _kw = dict(table=self.name, suggestion=sug)
+                        raise GeneFabDatabaseException(msg, **_kw)
+                    else:
+                        msg = "No data found"
+                        raise GeneFabDatabaseException(msg, table=self.name)
                 else:
                     msg = f"retrieved from SQLite as pandas DataFrame"
                     GeneFabLogger().info(f"{self.name}; {msg}")

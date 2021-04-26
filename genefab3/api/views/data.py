@@ -231,9 +231,12 @@ def combined_data(descriptors, context, mongo_collections, sqlite_dbs, adapter):
             key=lambda d: (d.get("accession"), d.get("assay name")),
         )
     ])
-    data.datatypes = getset("file", "datatype")
-    data.gct_validity_set = getset("file", "gct_valid")
-    return data
+    if data is None:
+        raise GeneFabDatabaseException("No data found in database")
+    else:
+        data.datatypes = getset("file", "datatype")
+        data.gct_validity_set = getset("file", "gct_valid")
+        return data
 
 
 def get(mongo_collections, *, locale, context, sqlite_dbs, adapter):
