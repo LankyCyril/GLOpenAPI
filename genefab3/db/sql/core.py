@@ -42,7 +42,12 @@ def is_singular_spec(spec):
 def mkinsert(pd_table, conn, keys, data_iter, name):
     """SQLite INSERT without variable names for simple table schemas"""
     for row in data_iter:
-        vals = ",".join("null" if isnull(v) else repr(v) for v in row)
+        vals = ",".join(
+            "null" if isnull(v) else (
+                str(int(v)) if isinstance(v, bool) else repr(v)
+            )
+            for v in row
+        )
         conn.execute(f"INSERT INTO `{name}` VALUES({vals})")
 
 
