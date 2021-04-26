@@ -2,11 +2,12 @@ from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
 from os import access, W_OK
 from genefab3.common.utils import iterate_terminal_leaves, as_is
+from pandas import isnull, DataFrame
 from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
 from genefab3.common.exceptions import GeneFabConfigurationException
 from copy import deepcopy
 from genefab3.common.logger import GeneFabLogger
-from pandas import DataFrame
+from functools import partial
 from collections.abc import Callable
 from genefab3.db.sql.pandas import SQLiteIndexName
 from collections import OrderedDict
@@ -36,6 +37,13 @@ def is_singular_spec(spec):
             return (sum(1 for _ in iterate_terminal_leaves(spec)) == 1)
     except ValueError:
         return False
+
+
+def mkinsert(pd_table, conn, keys, data_iter, name):
+    """SQLite INSERT without variable names for simple table schemas"""
+    for row in data_iter:
+        vals = ",".join("null" if isnull(v) else repr(v) for v in row)
+        conn.execute(f"INSERT INTO `{name}` VALUES({vals})")
 
 
 class SQLiteObject():
@@ -141,8 +149,8 @@ class SQLiteObject():
                         partname,
                     )
                     dataframe.iloc[:,bound:bound+self.maxpartwidth].to_sql(
-                        partname, connection, index=True,
-                        if_exists="replace", chunksize=1000,
+                        partname, connection, index=True, if_exists="replace",
+                        chunksize=1000, method=partial(mkinsert, name=partname),
                     )
             except (OperationalError, DatabaseError) as e:
                 connection.rollback()
