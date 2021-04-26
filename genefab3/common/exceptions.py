@@ -44,16 +44,14 @@ def interpret_exception(e, debug=False):
     else:
         code = getattr(e, "code", 400)
         reason = getattr(e, "reason", "BAD REQUEST")
+    kwargs = e.kwargs if isinstance(e, GeneFabException) else {}
     info = dict(
         code=code, reason=reason,
         exception_type=exc_type.__name__, exception_value=str(exc_value),
         args=[] if isinstance(e, GeneFabException) else getattr(e, "args", []),
-        kwargs={
-            k: v for k, v in getattr(e, "kwargs", {}).items()
-            if (debug or (k != "debug_info"))
-        },
+        kwargs={k: kwargs[k] for k in kwargs if (debug or (k != "debug_info"))},
     )
-    if hasattr(e, "suggestion") and e.suggestion:
+    if isinstance(e, GeneFabException) and getattr(e, "suggestion", None):
         info["suggestion"] = e.suggestion
     return info, format_tb(exc_tb)
 
