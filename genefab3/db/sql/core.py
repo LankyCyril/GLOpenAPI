@@ -2,11 +2,12 @@ from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
 from os import access, W_OK
 from genefab3.common.utils import iterate_terminal_leaves, as_is
+from pandas import isnull, DataFrame
 from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
 from genefab3.common.exceptions import GeneFabConfigurationException
 from copy import deepcopy
 from genefab3.common.logger import GeneFabLogger
-from pandas import DataFrame
+from functools import partial
 from collections.abc import Callable
 from genefab3.db.sql.pandas import SQLiteIndexName
 from collections import OrderedDict
@@ -36,6 +37,18 @@ def is_singular_spec(spec):
             return (sum(1 for _ in iterate_terminal_leaves(spec)) == 1)
     except ValueError:
         return False
+
+
+def mkinsert(pd_table, conn, keys, data_iter, name):
+    """SQLite INSERT without variable names for simple table schemas"""
+    for row in data_iter:
+        vals = ",".join(
+            "null" if isnull(v) else (
+                str(int(v)) if isinstance(v, bool) else repr(v)
+            )
+            for v in row
+        )
+        conn.execute(f"INSERT INTO `{name}` VALUES({vals})")
 
 
 class SQLiteObject():
@@ -106,10 +119,10 @@ class SQLiteObject():
             try:
                 connection.cursor().execute(delete_action)
                 connection.cursor().execute(insert_action, values)
-                msg = "Updated fields for SQLiteObject\n\t(%s == %s)"
+                msg = "Updated fields for SQLiteObject\n  (%s == %s)"
                 GeneFabLogger().info(msg, *logger_args)
             except OperationalError:
-                msg = "Could not update fields for SQLiteObject\n\t(%s == %s)"
+                msg = "Could not update fields for SQLiteObject\n  (%s == %s)"
                 GeneFabLogger().warning(msg, *logger_args)
                 connection.rollback()
             else:
@@ -136,20 +149,22 @@ class SQLiteObject():
                 for i, bound in enumerate(bounds):
                     partname = self.__make_table_part_name(table, i)
                     GeneFabLogger().info(
-                        "Creating table for SQLiteObject (%s == %s):\n\t%s",
+                        "Creating table for SQLiteObject (%s == %s):\n  %s",
                         self.__identifier_field, self.__identifier_value,
                         partname,
                     )
                     dataframe.iloc[:,bound:bound+self.maxpartwidth].to_sql(
                         partname, connection, index=True, if_exists="replace",
+                        chunksize=1000, method=partial(mkinsert, name=partname),
                     )
-            except (OperationalError, DatabaseError):
-                msg = "Failed to insert SQLite table"
+            except (OperationalError, DatabaseError) as e:
                 connection.rollback()
-                raise GeneFabDatabaseException(msg, signature=self.__signature)
+                msg = "Failed to insert SQLite table"
+                _kw = dict(signature=self.__signature, error=str(e))
+                raise GeneFabDatabaseException(msg, **_kw)
             else:
                 GeneFabLogger().info(
-                    "All tables inserted for SQLiteObject (%s == %s):\n\t%s",
+                    "All tables inserted for SQLiteObject (%s == %s):\n  %s",
                     self.__identifier_field, self.__identifier_value, partname,
                 )
                 connection.commit()
@@ -262,7 +277,7 @@ class SQLiteObject():
                     ret[0][0], "trigger_value",
                 )
             else:
-                m = "Conflicting trigger values for SQLiteObject\n\t(%s == %s)"
+                m = "Conflicting trigger values for SQLiteObject\n  (%s == %s)"
                 logger_args = self.__identifier_field, self.__identifier_value
                 GeneFabLogger().warning(m, *logger_args)
                 self.__drop_self_from(connection, table)

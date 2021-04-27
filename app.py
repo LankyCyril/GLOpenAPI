@@ -19,6 +19,7 @@ genefab3_client = GeneFabClient(
         blobs="./.genefab3.sqlite3/blobs.db",
         tables="./.genefab3.sqlite3/tables.db",
         response_cache="./.genefab3.sqlite3/response-cache.db",
+        response_cache_size=24*1024*1024*1024,
     ),
     cacher_params=dict(
         metadata_update_interval=1800,
@@ -34,5 +35,3 @@ genefab3_client = GeneFabClient(
         ),
     ),
 )
-
-genefab3_client.loop()

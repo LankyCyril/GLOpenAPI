@@ -135,7 +135,7 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
             *(f"`{c}`" for c in self._raw_columns),
         ))
         _n, _m = len(self._raw_columns), len(part_to_column)
-        _tt = "\n\t".join(("", *part_to_column))
+        _tt = "\n  ".join(("", *part_to_column))
         msg = f"retrieving {_n} columns from {_m} table(s):{_tt}"
         GeneFabLogger().info(f"{self.name}; {msg}")
         return f"SELECT {targets} FROM {joined} {query_filter}"

@@ -4,7 +4,7 @@ from re import search, sub
 from collections import defaultdict
 from genefab3.common.exceptions import GeneFabConfigurationException
 from numpy import nan
-from pandas import isnull, read_csv
+from pandas import isnull, read_csv, Series
 from genefab3.db.mongo.status import update_status
 from types import SimpleNamespace
 from zipfile import ZipFile
@@ -118,11 +118,16 @@ class StudyEntries(list):
                     raise GeneFabISAException(msg, **status_kwargs)
                 else:
                     sample_name = row["Sample Name"]
+                if isinstance(sample_name, Series):
+                    if len(set(sample_name)) > 1:
+                        _m = "entry has multiple 'Sample Name' values"
+                        msg = f"{self._self_identifier} {_m}"
+                        raise GeneFabISAException(msg, **status_kwargs)
+                    else:
+                        sample_name = sample_name.iloc[0]
                 if not isnull(sample_name):
-                    json = self._row_to_json(
-                        row, name,
-                        {**status_kwargs, "sample_name": sample_name},
-                    )
+                    _kw = {**status_kwargs, "sample_name": sample_name}
+                    json = self._row_to_json(row, name, _kw)
                     super().append(json)
                     if self._self_identifier == "Study":
                         if sample_name in self._by_sample_name:

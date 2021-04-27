@@ -32,16 +32,16 @@ class CachedBinaryFile(SQLiteBlob):
         """Download data from URL as-is"""
         self.url, data = None, None
         for url in urls:
-            msg = f"{self.name}; trying URL:\n\t{url}"
+            msg = f"{self.name}; trying URL:\n  {url}"
             GeneFabLogger().info(msg)
             try:
                 with urlopen(url) as response:
                     data = response.read()
             except URLError:
-                msg = f"{self.name}; tried URL and failed:\n\t{url}"
+                msg = f"{self.name}; tried URL and failed:\n  {url}"
                 GeneFabLogger().warning(msg)
             else:
-                msg = f"{self.name}; successfully fetched blob:\n\t{url}"
+                msg = f"{self.name}; successfully fetched blob:\n  {url}"
                 GeneFabLogger().info(msg)
                 self.url = url
                 return data
@@ -72,16 +72,16 @@ class CachedTableFile(SQLiteTable):
         """Try all URLs and push data into temporary file"""
         for url in urls:
             with open(tempfile, mode="wb") as handle:
-                msg = f"{self.name}; trying URL:\n\t{url}"
+                msg = f"{self.name}; trying URL:\n  {url}"
                 GeneFabLogger().info(msg)
                 try:
                     with urlopen(url) as response:
                         copyfileobj(response, handle)
                 except URLError:
-                    msg = f"{self.name}; tried URL and failed:\n\t{url}"
+                    msg = f"{self.name}; tried URL and failed:\n  {url}"
                     GeneFabLogger().warning(msg)
                 else:
-                    msg = f"{self.name}; successfully fetched data:\n\t{url}"
+                    msg = f"{self.name}; successfully fetched data:\n  {url}"
                     GeneFabLogger().info(msg)
                     return url
         else:
@@ -109,7 +109,7 @@ class CachedTableFile(SQLiteTable):
                 dataframe = read_csv(
                     tempfile, sep=sep, compression=compression, **pandas_kws,
                 )
-                msg = f"{self.name}; interpreted as table:\n\t{tempfile}"
+                msg = f"{self.name}; interpreted as table:\n  {tempfile}"
                 GeneFabLogger().info(msg)
                 INPLACE_process(dataframe)
                 return dataframe

@@ -87,6 +87,8 @@ class Context():
         for n_iter, (query, projection_keys, columns, comparisons) in _en_it:
             self.projection.update({k: True for k in projection_keys})
             if query:
+                if "$and" not in self.query:
+                    self.query["$and"] = []
                 self.query["$and"].append(query)
             if columns or comparisons:
                 if self.view == "data":
