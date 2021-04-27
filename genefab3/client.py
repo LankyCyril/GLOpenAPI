@@ -73,7 +73,7 @@ class GeneFabClient():
             })
         return mongo_collections, locale, units_formatter
  
-    def _get_validated_sqlite_dbs(self, *, blobs, tables, response_cache=None):
+    def _get_validated_sqlite_dbs(self, *, blobs, tables, response_cache=None, response_cache_size=24*1024*1024*1024):
         """Check target SQLite3 files are specified correctly, convert to namespace for dot-syntax lookup"""
         dbs = dict(blobs=blobs, tables=tables, response_cache=response_cache)
         if len({blobs, tables, response_cache}) != 3:
@@ -92,7 +92,9 @@ class GeneFabClient():
                     msg = "SQL database not reachable"
                     raise GeneFabConfigurationException(msg, name=fname)
             else:
-                return SimpleNamespace(**dbs)
+                return SimpleNamespace(
+                    **dbs, response_cache_size=response_cache_size,
+                )
  
     def _init_routes(self):
         """Route Response-generating methods to Flask endpoints"""

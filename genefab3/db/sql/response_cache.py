@@ -38,8 +38,8 @@ def sane_sql_repr(accession):
 class ResponseCache():
     """LRU response cache; responses are identified by context.identity, dropped if underlying (meta)data changed"""
  
-    def __init__(self, sqlite_dbs, maxsize=24*1024*1024*1024):
-        self.sqlite_dbs, self.maxsize = sqlite_dbs, maxsize
+    def __init__(self, sqlite_dbs):
+        self.sqlite_dbs = sqlite_dbs
         if sqlite_dbs.response_cache is not None:
             with closing(connect(sqlite_dbs.response_cache)) as connection:
                 for table, schema in RESPONSE_CACHE_SCHEMAS.items():
@@ -82,9 +82,9 @@ class ResponseCache():
                 connection.commit()
                 _logi(f"ResponseCache(), stored:\n\t{context.identity}")
  
-    def shrink(self, to=None, max_iter=100, max_skids=20):
-        """Drop oldest cached responses to keep file size on disk under `to` or `self.maxsize`"""
-        target_size = min(to, self.maxsize) if to else self.maxsize
+    def shrink(self, max_iter=100, max_skids=20):
+        """Drop oldest cached responses to keep file size on disk `self.sqlite_dbs.response_cache_size`"""
+        target_size = self.sqlite_dbs.response_cache_size
         if self.sqlite_dbs.response_cache is None:
             return
         elif path.getsize(self.sqlite_dbs.response_cache) <= target_size:
