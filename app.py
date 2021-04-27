@@ -35,5 +35,3 @@ genefab3_client = GeneFabClient(
         ),
     ),
 )
-
-genefab3_client.loop()
