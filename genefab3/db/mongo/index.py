@@ -60,7 +60,7 @@ def INPLACE_update_metadata_value_lookup_values(index, mongo_collections):
 
 def update_metadata_value_lookup(mongo_collections, cacher_id, keys=("investigation", "study", "assay"), _logger=GeneFabLogger()):
     """Collect existing keys and values for lookups"""
-    msgmask = "{}:\n\treindexing metadata lookup records ('{}')"
+    msgmask = "{}:\n  reindexing metadata lookup records ('{}')"
     _logger.info(msgmask.format(cacher_id, mongo_collections.metadata_aux.name))
     index = deepcopy_keys(METADATA_AUX_TEMPLATE, *keys)
     INPLACE_update_metadata_value_lookup_keys(index, mongo_collections)
@@ -75,5 +75,5 @@ def update_metadata_value_lookup(mongo_collections, cacher_id, keys=("investigat
                         query={"isa_category": isa_category, "subkey": subkey},
                         data={"content": index[isa_category][subkey]},
                     )
-    msgmask = "{}:\n\tfinished reindexing metadata lookup records ('{}')"
+    msgmask = "{}:\n  finished reindexing metadata lookup records ('{}')"
     _logger.info(msgmask.format(cacher_id, mongo_collections.metadata_aux.name))

@@ -8,7 +8,7 @@ def log_status(prefix, status, info, warning, error, query):
     _lookup = dict(failed="error", stale="warning", warning="warning")
     getattr(GeneFabLogger(), _lookup.get(status, "info"))(
         "; ".join([str(m) for m in (prefix, info, warning, error) if m]) +
-        ":\n\t" + repr({k: v for k, v in query.items() if v})
+        ":\n  " + repr({k: v for k, v in query.items() if v})
     )
 
 
