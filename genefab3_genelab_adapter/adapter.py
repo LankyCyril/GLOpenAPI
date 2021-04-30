@@ -3,21 +3,16 @@ from json import loads
 from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabDataManagerException
 from pandas import Timestamp, json_normalize
+from genefab3.common.types import Adapter
+from genefab3.common.utils import pick_reachable_url
+from types import SimpleNamespace
 from urllib.parse import quote
 from re import search, sub
 from genefab3.common.exceptions import GeneFabConfigurationException
-from genefab3.common.types import Adapter
 from warnings import catch_warnings, filterwarnings
 from dateutil.parser import UnknownTimezoneWarning
-from functools import lru_cache
+from functools import lru_cache, partial
 
-
-GENELAB_ROOT = "https://genelab-data.ndc.nasa.gov"
-COLD_API_ROOT = GENELAB_ROOT + "/genelab"
-COLD_SEARCH_MASK = COLD_API_ROOT + "/data/search/?term=GLDS&type=cgene&size={}"
-COLD_GLDS_MASK = COLD_API_ROOT + "/data/study/data/{}/"
-COLD_FILELISTINGS_MASK = COLD_API_ROOT + "/data/study/filelistings/{}"
-ALT_FILEPATH = "/genelab/static/media/dataset/"
 
 datatype = lambda t, **kw: dict(datatype=t, **kw)
 tabletype = lambda t, **kw: dict(datatype=t, **kw, cacheable=True, type="table")
@@ -90,32 +85,25 @@ def as_timestamp(dataframe, column, default=-1):
         return dataframe[column].apply(safe_timestamp)
 
 
-def format_file_entry(row):
-    """Format filelisting dataframe row to include URLs, timestamp, datatype, rules"""
-    filename = row["file_name"]
-    version_info = "?version={}".format(row["version"])
-    entry = {
-        "urls": [
-            GENELAB_ROOT + quote(row["remote_url"]) + version_info,
-            GENELAB_ROOT + ALT_FILEPATH + quote(filename) + version_info,
-        ],
-        "timestamp": row["timestamp"],
-    }
-    matched_patterns = set()
-    for pattern, metadata in KNOWN_DATATYPES.items():
-        if search(pattern, filename):
-            entry.update(metadata)
-            matched_patterns.add(pattern)
-    if len(matched_patterns) > 1:
-        msg = "File name matches more than one predefined pattern"
-        _kw = dict(filename=filename, patterns=sorted(matched_patterns))
-        raise GeneFabConfigurationException(msg, **_kw)
-    return entry
-
-
-class GeneLabAdapter(Adapter):
+class GeneLabAdapterBaseClass(Adapter):
  
-    def get_favicon_urls(self):
+    def __init__(self, root_urls):
+        with pick_reachable_url(root_urls) as genelab_root:
+            self.constants = SimpleNamespace(
+                GENELAB_ROOT=genelab_root,
+                COLD_SEARCH_MASK=(
+                    genelab_root +
+                    "/genelab/data/search/?term=GLDS&type=cgene&size={}"
+                ),
+                COLD_GLDS_MASK=genelab_root + "/genelab/data/study/data/{}/",
+                COLD_FILELISTINGS_MASK=(
+                    genelab_root + "/genelab/data/study/filelistings/{}"
+                ),
+                ALT_FILEPATH="/genelab/static/media/dataset/",
+            )
+        super().__init__()
+ 
+    def get_favicon_urls(self): # TODO: remove
         return [
             "https://genelab-data.ndc.nasa.gov/genelab/img/meatball-favicon.ico"
         ]
@@ -123,18 +111,41 @@ class GeneLabAdapter(Adapter):
     def get_accessions(self):
         """Return list of dataset accessions available through genelab.nasa.gov/genelabAPIs"""
         try:
-            n_datasets = read_json(COLD_SEARCH_MASK.format(0))["hits"]["total"]
-            return {
-                entry["_id"] for entry in
-                read_json(COLD_SEARCH_MASK.format(n_datasets))["hits"]["hits"]
-            }
+            n_datasets_url = self.constants.COLD_SEARCH_MASK.format(0)
+            n_datasets = read_json(n_datasets_url)["hits"]["total"]
+            datasets_url = self.constants.COLD_SEARCH_MASK.format(n_datasets)
+            return {e["_id"] for e in read_json(datasets_url)["hits"]["hits"]}
         except (KeyError, TypeError):
             raise GeneFabDataManagerException("Malformed GeneLab search JSON")
+ 
+    def _format_file_entry(self, row):
+        """Format filelisting dataframe row to include URLs, timestamp, datatype, rules"""
+        filename = row["file_name"]
+        version_info = "?version={}".format(row["version"])
+        entry = {
+            "urls": [
+                (self.constants.GENELAB_ROOT + quote(row["remote_url"]) +
+                    version_info),
+                (self.constants.GENELAB_ROOT + self.constants.ALT_FILEPATH +
+                    quote(filename) + version_info),
+            ],
+            "timestamp": row["timestamp"],
+        }
+        matched_patterns = set()
+        for pattern, metadata in KNOWN_DATATYPES.items():
+            if search(pattern, filename):
+                entry.update(metadata)
+                matched_patterns.add(pattern)
+        if len(matched_patterns) > 1:
+            msg = "File name matches more than one predefined pattern"
+            _kw = dict(filename=filename, patterns=sorted(matched_patterns))
+            raise GeneFabConfigurationException(msg, **_kw)
+        return entry
  
     def get_files_by_accession(self, accession):
         """Get dictionary of files for dataset available through genelab.nasa.gov/genelabAPIs"""
         try:
-            url = COLD_GLDS_MASK.format(accession)
+            url = self.constants.COLD_GLDS_MASK.format(accession)
             glds_json = read_json(url)
             assert len(glds_json) == 1
             _id = glds_json[0]["_id"]
@@ -146,7 +157,7 @@ class GeneLabAdapter(Adapter):
                 target="[0]['_id']",
             )
         try:
-            url = COLD_FILELISTINGS_MASK.format(_id)
+            url = self.constants.COLD_FILELISTINGS_MASK.format(_id)
             filelisting_json = read_json(url)
             assert isinstance(filelisting_json, list)
         except AssertionError:
@@ -163,7 +174,7 @@ class GeneLabAdapter(Adapter):
             files["date_modified"] = as_timestamp(files, "date_modified")
         files["timestamp"] = files[["date_created", "date_modified"]].max(axis=1)
         return {
-            row["file_name"]: format_file_entry(row)
+            row["file_name"]: self._format_file_entry(row)
             for _, row in files.sort_values(by="timestamp").iterrows()
         }
  
@@ -195,3 +206,16 @@ class GeneLabAdapter(Adapter):
             )
         else:
             return [ns for p, ns in positions_and_matches]
+
+
+GeneLabAdapter = partial(
+    GeneLabAdapterBaseClass, root_urls=["https://genelab-data.ndc.nasa.gov"],
+)
+
+
+StagingGeneLabAdapter = partial(
+    GeneLabAdapterBaseClass, root_urls=[
+        "https://genelab-webapps-stage-1.arc.nasa.gov",
+        "https://genelab-data.ndc.nasa.gov",
+    ],
+)

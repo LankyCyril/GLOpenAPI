@@ -1,1 +1,1 @@
-from .adapter import GeneLabAdapter
+from .adapter import GeneLabAdapter, StagingGeneLabAdapter
