@@ -103,11 +103,6 @@ class GeneLabAdapterBaseClass(Adapter):
             )
         super().__init__()
  
-    def get_favicon_urls(self): # TODO: remove
-        return [
-            "https://genelab-data.ndc.nasa.gov/genelab/img/meatball-favicon.ico"
-        ]
- 
     def get_accessions(self):
         """Return list of dataset accessions available through genelab.nasa.gov/genelabAPIs"""
         try:
