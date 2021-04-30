@@ -40,9 +40,12 @@ def pick_reachable_url(urls, name=None):
     """Iterate `urls` and get the first reachable URL"""
     def _pick():
         for url in urls:
-            with request_head(url, allow_redirects=True) as response:
-                if response.ok:
-                    return url
+            try:
+                with request_head(url, allow_redirects=True) as response:
+                    if response.ok:
+                        return url
+            except (URLError, OSError):
+                continue
         else:
             for url in urls:
                 try:

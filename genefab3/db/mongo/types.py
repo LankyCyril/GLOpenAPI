@@ -44,7 +44,7 @@ class ValueCheckedRecord():
                     else:
                         n_stale_entries += 1
                 if (n_stale_entries != 0) or self.changed:
-                    _logger.info(f"ValueCheckedRecord updated:\n\t{identifier}")
+                    _logger.info(f"ValueCheckedRecord updated:\n  {identifier}")
                     with collection.database.client.start_session() as session:
                         with session.start_transaction():
                             run_mongo_action(

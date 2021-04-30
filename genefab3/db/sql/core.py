@@ -119,10 +119,10 @@ class SQLiteObject():
             try:
                 connection.cursor().execute(delete_action)
                 connection.cursor().execute(insert_action, values)
-                msg = "Updated fields for SQLiteObject\n\t(%s == %s)"
+                msg = "Updated fields for SQLiteObject\n  (%s == %s)"
                 GeneFabLogger().info(msg, *logger_args)
             except OperationalError:
-                msg = "Could not update fields for SQLiteObject\n\t(%s == %s)"
+                msg = "Could not update fields for SQLiteObject\n  (%s == %s)"
                 GeneFabLogger().warning(msg, *logger_args)
                 connection.rollback()
             else:
@@ -149,7 +149,7 @@ class SQLiteObject():
                 for i, bound in enumerate(bounds):
                     partname = self.__make_table_part_name(table, i)
                     GeneFabLogger().info(
-                        "Creating table for SQLiteObject (%s == %s):\n\t%s",
+                        "Creating table for SQLiteObject (%s == %s):\n  %s",
                         self.__identifier_field, self.__identifier_value,
                         partname,
                     )
@@ -164,7 +164,7 @@ class SQLiteObject():
                 raise GeneFabDatabaseException(msg, **_kw)
             else:
                 GeneFabLogger().info(
-                    "All tables inserted for SQLiteObject (%s == %s):\n\t%s",
+                    "All tables inserted for SQLiteObject (%s == %s):\n  %s",
                     self.__identifier_field, self.__identifier_value, partname,
                 )
                 connection.commit()
@@ -277,7 +277,7 @@ class SQLiteObject():
                     ret[0][0], "trigger_value",
                 )
             else:
-                m = "Conflicting trigger values for SQLiteObject\n\t(%s == %s)"
+                m = "Conflicting trigger values for SQLiteObject\n  (%s == %s)"
                 logger_args = self.__identifier_field, self.__identifier_value
                 GeneFabLogger().warning(m, *logger_args)
                 self.__drop_self_from(connection, table)

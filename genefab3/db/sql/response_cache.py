@@ -31,22 +31,22 @@ def sane_sql_repr(accession):
         return f"'{accession}'"
     else:
         _r = repr(accession)
-        _loge(f"ResponseCache():\n\taccession contains '\"', \"'\": {_r}")
+        _loge(f"ResponseCache():\n  accession contains '\"', \"'\": {_r}")
         raise OperationalError
 
 
 class ResponseCache():
     """LRU response cache; responses are identified by context.identity, dropped if underlying (meta)data changed"""
  
-    def __init__(self, sqlite_dbs, maxsize=24*1024*1024*1024):
-        self.sqlite_dbs, self.maxsize = sqlite_dbs, maxsize
+    def __init__(self, sqlite_dbs):
+        self.sqlite_dbs = sqlite_dbs
         if sqlite_dbs.response_cache is not None:
             with closing(connect(sqlite_dbs.response_cache)) as connection:
                 for table, schema in RESPONSE_CACHE_SCHEMAS.items():
                     query = f"CREATE TABLE IF NOT EXISTS `{table}` {schema}"
                     connection.cursor().execute(query)
         else:
-            _logw("ResponseCache():\n\tLRU SQL cache DISABLED by client")
+            _logw("ResponseCache():\n  LRU SQL cache DISABLED by client")
  
     def put(self, context, obj, response):
         """Store response object blob in response_cache table, if possible"""
@@ -77,14 +77,14 @@ class ResponseCache():
             except OperationalError:
                 connection.rollback()
                 _cid = context.identity
-                _loge(f"ResponseCache(), could not store:\n\t{_cid}")
+                _loge(f"ResponseCache(), could not store:\n  {_cid}")
             else:
                 connection.commit()
-                _logi(f"ResponseCache(), stored:\n\t{context.identity}")
+                _logi(f"ResponseCache(), stored:\n  {context.identity}")
  
-    def shrink(self, to=None, max_iter=100, max_skids=20):
-        """Drop oldest cached responses to keep file size on disk under `to` or `self.maxsize`"""
-        target_size = min(to, self.maxsize) if to else self.maxsize
+    def shrink(self, max_iter=100, max_skids=20):
+        """Drop oldest cached responses to keep file size on disk `self.sqlite_dbs.response_cache_size`"""
+        target_size = self.sqlite_dbs.response_cache_size
         if self.sqlite_dbs.response_cache is None:
             return
         elif path.getsize(self.sqlite_dbs.response_cache) <= target_size:
@@ -118,11 +118,11 @@ class ResponseCache():
             if (n_skids >= max_skids) or (new_size <= target_size):
                 break
         if n_dropped:
-            _logi(f"ResponseCache():\n\tshrunk by {n_dropped} entries")
+            _logi(f"ResponseCache():\n  shrunk by {n_dropped} entries")
         else:
-            _logw(f"ResponseCache():\n\tcould not drop entries to shrink")
+            _logw(f"ResponseCache():\n  could not drop entries to shrink")
         if n_skids:
-            _logw(f"ResponseCache():\n\tfile did not shrink {n_skids} times")
+            _logw(f"ResponseCache():\n  file did not shrink {n_skids} times")
  
     def drop_all(self):
         """Drop all cached responses"""
@@ -135,10 +135,10 @@ class ResponseCache():
                 cursor.execute("DELETE FROM `response_cache`")
             except OperationalError as e:
                 connection.rollback()
-                _loge("ResponseCache().drop_all():\n\tfailed with %s", repr(e))
+                _loge("ResponseCache().drop_all():\n  failed with %s", repr(e))
             else:
                 connection.commit()
-                _logi("ResponseCache():\n\tdropped all cached Flask responses")
+                _logi("ResponseCache():\n  dropped all cached Flask responses")
  
     def drop(self, accession):
         """Drop responses for given accession"""
@@ -159,11 +159,11 @@ class ResponseCache():
                         WHERE `context_identity` == "{context_identity}" """)
             except OperationalError as e:
                 connection.rollback()
-                msg = "ResponseCache():\n\tcould not drop responses for %s: %s"
+                msg = "ResponseCache():\n  could not drop responses for %s: %s"
                 _loge(msg, accession, repr(e))
             else:
                 connection.commit()
-                msg = "ResponseCache():\n\tdropped %s cached response(s) for %s"
+                msg = "ResponseCache():\n  dropped %s cached response(s) for %s"
                 _logi(msg, len(identity_entries), accession)
  
     def get(self, context):
@@ -184,11 +184,11 @@ class ResponseCache():
                 )
             except ZlibError:
                 msg = "ResponseCache() could not decompress, staging deletion"
-                _logw(f"{msg}:\n\t{context.identity}")
+                _logw(f"{msg}:\n  {context.identity}")
                 return None
             else:
-                _logi(f"ResponseCache(), retrieved:\n\t{context.identity}")
+                _logi(f"ResponseCache(), retrieved:\n  {context.identity}")
                 return response
         else:
-            _logi(f"ResponseCache(), nothing yet for:\n\t{context.identity}")
+            _logi(f"ResponseCache(), nothing yet for:\n  {context.identity}")
             return None
