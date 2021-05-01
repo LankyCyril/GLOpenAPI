@@ -214,22 +214,22 @@ def combined_data(descriptors, context, mongo_collections, sqlite_dbs, adapter):
         msg = "Data marked as non-cacheable, cannot be returned in this format"
         sug = "Use 'format=raw'"
         raise GeneFabFileException(msg, suggestion=sug, format=context.format)
-    types = getset("file", "type")
-    if types == {"table"}:
-        sqlite_db, CachedFile = sqlite_dbs.tables, CachedTableFile
-        _kws = dict(index_col=0, INPLACE_process=True)
-    elif len(types) == 1:
-        sqlite_db, CachedFile, _kws = sqlite_dbs.blobs, CachedBinaryFile, {}
+    _types = getset("file", "type")
+    if _types == {"table"}:
+        sqlite_db, CachedFile = sqlite_dbs.tables["db"], CachedTableFile
+        maxdbsize = sqlite_dbs.tables["maxdbsize"]
+        _kws = dict(maxdbsize=maxdbsize, index_col=0, INPLACE_process=True)
+    elif len(_types) == 1:
+        sqlite_db, CachedFile = sqlite_dbs.blobs["db"], CachedBinaryFile
+        _kws = {}
     else:
-        raise NotImplementedError(f"Joining data of types {types}")
+        raise NotImplementedError(f"Joining data of types {_types}")
+    _sort_key = lambda d: (d.get("accession"), d.get("assay name"))
     data = combine_objects(context=context, objects=[
         get_formatted_data(
             descriptor, mongo_collections, sqlite_db, CachedFile, adapter, _kws,
         )
-        for descriptor in natsorted(
-            descriptors,
-            key=lambda d: (d.get("accession"), d.get("assay name")),
-        )
+        for descriptor in natsorted(descriptors, key=_sort_key)
     ])
     if data is None:
         raise GeneFabDatabaseException("No data found in database")

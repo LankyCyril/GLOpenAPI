@@ -73,28 +73,30 @@ class GeneFabClient():
             })
         return mongo_collections, locale, units_formatter
  
-    def _get_validated_sqlite_dbs(self, *, blobs, tables, response_cache=None, response_cache_size=24*1024*1024*1024):
+    def _get_validated_sqlite_dbs(self, *, blobs, tables, response_cache):
         """Check target SQLite3 files are specified correctly, convert to namespace for dot-syntax lookup"""
-        dbs = dict(blobs=blobs, tables=tables, response_cache=response_cache)
-        if len({blobs, tables, response_cache}) != 3:
+        sqlite_dbs = SimpleNamespace(
+            blobs=blobs, tables=tables, response_cache=response_cache,
+        )
+        if len({v.get("db") for v in sqlite_dbs.__dict__.values()}) != 3:
             msg = "SQL databases must all be distinct to avoid name conflicts"
-            raise GeneFabConfigurationException(msg, **dbs)
-        elif (not isinstance(blobs, str)) or (not isinstance(tables, str)):
-            msg = "SQL databases must be file paths"
-            raise GeneFabConfigurationException(msg, blobs=blobs, tables=tables)
-        elif (not isinstance(response_cache, str)) and response_cache:
-            msg = "SQL database must be a file path or None/False"
-            _kw = dict(response_cache=response_cache)
-            raise GeneFabConfigurationException(msg, **_kw)
+            raise GeneFabConfigurationException(msg, **sqlite_dbs.__dict__)
+        err_fmt = "SQL database `{}` must point to a file path{}".format
+        if not isinstance(blobs.get("db"), str):
+            raise GeneFabConfigurationException(err_fmt("blobs", ""), **blobs)
+        elif not isinstance(tables.get("db"), str):
+            raise GeneFabConfigurationException(err_fmt("tables", ""), **tables)
+        elif response_cache.get("db") is not None:
+            if not isinstance(response_cache.get("db"), str):
+                msg = err_fmt("response_cache", " or be None")
+                raise GeneFabConfigurationException(msg, **response_cache)
+        for name, descriptor in sqlite_dbs.__dict__.items():
+            fname = descriptor.get("db")
+            if (fname is not None) and (not is_sqlite_file_ready(fname)):
+                msg = "SQL database not reachable"
+                raise GeneFabConfigurationException(msg, name=fname)
         else:
-            for name, fname in dbs.items():
-                if (fname is not None) and (not is_sqlite_file_ready(fname)):
-                    msg = "SQL database not reachable"
-                    raise GeneFabConfigurationException(msg, name=fname)
-            else:
-                return SimpleNamespace(
-                    **dbs, response_cache_size=response_cache_size,
-                )
+            return sqlite_dbs
  
     def _init_routes(self):
         """Route Response-generating methods to Flask endpoints"""

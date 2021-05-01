@@ -39,9 +39,10 @@ class ResponseCache():
     """LRU response cache; responses are identified by context.identity, dropped if underlying (meta)data changed"""
  
     def __init__(self, sqlite_dbs):
-        self.sqlite_dbs = sqlite_dbs
-        if sqlite_dbs.response_cache is not None:
-            with closing(connect(sqlite_dbs.response_cache)) as connection:
+        self.sqlite_db = sqlite_dbs.response_cache["db"]
+        self.maxsize = sqlite_dbs.response_cache["maxsize"]
+        if self.sqlite_db is not None:
+            with closing(connect(self.sqlite_db)) as connection:
                 for table, schema in RESPONSE_CACHE_SCHEMAS.items():
                     query = f"CREATE TABLE IF NOT EXISTS `{table}` {schema}"
                     connection.cursor().execute(query)
@@ -50,7 +51,7 @@ class ResponseCache():
  
     def put(self, context, obj, response):
         """Store response object blob in response_cache table, if possible"""
-        if self.sqlite_dbs.response_cache is None:
+        if self.sqlite_db is None:
             return
         api_path = quote(context.full_path)
         blob = Binary(compress(response.get_data()))
@@ -65,7 +66,7 @@ class ResponseCache():
             WHERE `accession` == {} AND `context_identity` == "{}" """.format
         make_insert_accession_entry_command = """INSERT INTO `accessions_used`
             (accession, context_identity) VALUES ({}, "{}")""".format
-        with closing(connect(self.sqlite_dbs.response_cache)) as connection:
+        with closing(connect(self.sqlite_db)) as connection:
             try:
                 cursor = connection.cursor()
                 cursor.execute(delete_blob_command)
@@ -83,16 +84,16 @@ class ResponseCache():
                 _logi(f"ResponseCache(), stored:\n  {context.identity}")
  
     def shrink(self, max_iter=100, max_skids=20):
-        """Drop oldest cached responses to keep file size on disk `self.sqlite_dbs.response_cache_size`"""
-        target_size = self.sqlite_dbs.response_cache_size
-        if self.sqlite_dbs.response_cache is None:
+        """Drop oldest cached responses to keep file size on disk `self.maxsize`"""
+        target_size = self.maxsize # TODO make like in core
+        if self.sqlite_db is None:
             return
-        elif path.getsize(self.sqlite_dbs.response_cache) <= target_size:
+        elif path.getsize(self.sqlite_db) <= target_size:
             return
         n_dropped, n_skids = 0, 0
         for _ in range(max_iter):
-            current_size = path.getsize(self.sqlite_dbs.response_cache)
-            with closing(connect(self.sqlite_dbs.response_cache)) as connection:
+            current_size = path.getsize(self.sqlite_db)
+            with closing(connect(self.sqlite_db)) as connection:
                 query_oldest = f"""SELECT `context_identity`,`stored_at`
                     FROM `response_cache` WHERE `stored_at` ==
                     (SELECT MIN(`stored_at`) FROM `response_cache`) LIMIT 1"""
@@ -112,7 +113,7 @@ class ResponseCache():
                 else:
                     connection.commit()
                     n_dropped += 1
-            new_size = path.getsize(self.sqlite_dbs.response_cache)
+            new_size = path.getsize(self.sqlite_db)
             if new_size >= current_size:
                 n_skids += 1
             if (n_skids >= max_skids) or (new_size <= target_size):
@@ -126,9 +127,9 @@ class ResponseCache():
  
     def drop_all(self):
         """Drop all cached responses"""
-        if self.sqlite_dbs.response_cache is None:
+        if self.sqlite_db is None:
             return
-        with closing(connect(self.sqlite_dbs.response_cache)) as connection:
+        with closing(connect(self.sqlite_db)) as connection:
             try:
                 cursor = connection.cursor()
                 cursor.execute("DELETE FROM `accessions_used`")
@@ -142,9 +143,9 @@ class ResponseCache():
  
     def drop(self, accession):
         """Drop responses for given accession"""
-        if self.sqlite_dbs.response_cache is None:
+        if self.sqlite_db is None:
             return
-        with closing(connect(self.sqlite_dbs.response_cache)) as connection:
+        with closing(connect(self.sqlite_db)) as connection:
             try:
                 cursor = connection.cursor()
                 acc_repr = sane_sql_repr(accession)
@@ -168,12 +169,12 @@ class ResponseCache():
  
     def get(self, context):
         """Retrieve cached response object blob from response_cache table if possible; otherwise return None"""
-        if self.sqlite_dbs.response_cache is None:
+        if self.sqlite_db is None:
             return
         query = f"""SELECT `response`, `mimetype` FROM `response_cache`
             WHERE `context_identity` == "{context.identity}" LIMIT 1"""
         try:
-            with closing(connect(self.sqlite_dbs.response_cache)) as connection:
+            with closing(connect(self.sqlite_db)) as connection:
                 row = connection.cursor().execute(query).fetchone()
         except OperationalError:
             row = None

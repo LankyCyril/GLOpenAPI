@@ -14,7 +14,7 @@ class DefaultRoutes(Routes):
         if self.adapter.get_favicon_urls():
             ico_file = CachedBinaryFile(
                 name="favicon.ico", identifier="RESOURCE/favicon.ico",
-                sqlite_db=self.sqlite_dbs.blobs, timestamp=0,
+                sqlite_db=self.sqlite_dbs.blobs["db"], timestamp=0,
                 urls=self.adapter.get_favicon_urls(),
             )
             return ico_file.data

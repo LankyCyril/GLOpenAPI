@@ -131,7 +131,7 @@ class CacherThread(Thread):
             if files.changed or (not has_cache):
                 best_sample_name_matches=self.adapter.best_sample_name_matches
                 dataset = Dataset(
-                    accession, files.value, self.sqlite_dbs.blobs,
+                    accession, files.value, self.sqlite_dbs.blobs, # TODO make sure it understands sqlite_dbs
                     best_sample_name_matches=best_sample_name_matches,
                     status_kwargs=self.status_kwargs,
                 )
