@@ -117,6 +117,9 @@ class ResponseCache():
                 n_skids += (path.getsize(self.sqlite_db) >= current_size)
             else:
                 break
+        self._report_shrinkage(n_dropped, n_skids)
+ 
+    def _report_shrinkage(self, n_dropped, n_skids):
         if n_dropped:
             _logi(f"ResponseCache():\n  shrunk by {n_dropped} entries")
         else:

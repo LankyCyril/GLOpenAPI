@@ -2,6 +2,8 @@ from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
 from os import access, W_OK, path
 from genefab3.common.utils import iterate_terminal_leaves, as_is
+from itertools import count
+from genefab3.db.sql.pandas import SQLiteIndexName
 from pandas import isnull, DataFrame
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
@@ -12,8 +14,6 @@ from pandas.io.sql import DatabaseError
 from genefab3.common.exceptions import GeneFabDatabaseException
 from collections.abc import Callable
 from collections import OrderedDict
-from itertools import count
-from genefab3.db.sql.pandas import SQLiteIndexName
 from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
 from threading import Thread
 from datetime import datetime
@@ -41,16 +41,36 @@ def is_singular_spec(spec):
         return False
 
 
+def iterparts(table, connection, must_exist=True, partname_mask="{table}://{i}"):
+    """During an open connection, iterate all parts of `table` and their index and column names"""
+    for i in count():
+        partname = table if i == 0 else partname_mask.format(table=table, i=i)
+        if must_exist:
+            query = f"SELECT * FROM `{partname}` LIMIT 0"
+            try:
+                cursor = connection.cursor()
+                cursor.execute(query).fetchall()
+            except OperationalError:
+                break
+            else:
+                desc = cursor.description
+                index_name = SQLiteIndexName(desc[0][0])
+                columns = [c[0] for c in desc[1:]]
+                yield partname, index_name, columns
+        else:
+            yield partname, None, None
+
+
 def mkinsert(pd_table, conn, keys, data_iter, name):
     """SQLite INSERT without variable names for simple table schemas"""
     for row in data_iter:
-        vals = ",".join(
+        values = ",".join(
             "null" if isnull(v) else (
                 str(int(v)) if isinstance(v, bool) else repr(v)
             )
             for v in row
         )
-        conn.execute(f"INSERT INTO `{name}` VALUES({vals})")
+        conn.execute(f"INSERT INTO `{name}` VALUES({values})")
 
 
 class SQLiteObject():
@@ -130,9 +150,6 @@ class SQLiteObject():
             else:
                 connection.commit()
  
-    def __make_table_part_name(self, table, i):
-        return table if i == 0 else f"{table}://{i}"
- 
     def __update_table(self, table, spec):
         """Update table(s) in SQLite"""
         dataframe = spec()
@@ -148,8 +165,8 @@ class SQLiteObject():
         with closing(connect(self.sqlite_db)) as connection:
             try:
                 bounds = range(0, dataframe.shape[1], self.maxpartwidth)
-                for i, bound in enumerate(bounds):
-                    partname = self.__make_table_part_name(table, i)
+                part_iterator = iterparts(table, connection, must_exist=False)
+                for bound, (partname, *_) in zip(bounds, part_iterator):
                     GeneFabLogger().info(
                         "Creating table for SQLiteObject (%s == %s):\n  %s",
                         self.__identifier_field, self.__identifier_value,
@@ -215,20 +232,11 @@ class SQLiteObject():
         """Create an OndemandSQLiteDataFrame object dispatching columns to table parts"""
         column_dispatcher = OrderedDict()
         with closing(connect(self.sqlite_db)) as connection:
-            for i in count():
-                partname = self.__make_table_part_name(table, i)
-                query = f"SELECT * FROM `{partname}` LIMIT 0"
-                try:
-                    cursor = connection.cursor()
-                    cursor.execute(query).fetchall()
-                    desc = cursor.description
-                    index_name = SQLiteIndexName(desc[0][0])
-                    if index_name not in column_dispatcher:
-                        column_dispatcher[index_name] = partname
-                    for c in desc[1:]:
-                        column_dispatcher[c[0]] = partname
-                except OperationalError:
-                    break
+            for partname, index_name, columns in iterparts(table, connection):
+                if index_name not in column_dispatcher:
+                    column_dispatcher[index_name] = partname
+                for c in columns:
+                    column_dispatcher[c] = partname
         if not column_dispatcher:
             msg = "No data found"
             raise GeneFabDatabaseException(msg, signature=self.__signature)
@@ -258,10 +266,10 @@ class SQLiteObject():
         """Actions to be performed after request completion"""
         pass
  
-    def __conditional_update(self, table, trigger_field, trigger_function):
+    def __conditional_update(self, table_or_aux, trigger_field, trigger_function):
         """Check trigger fields and values and perform update if triggered"""
         with closing(connect(self.sqlite_db)) as connection:
-            query = f"""SELECT `{trigger_field}` FROM `{table}` WHERE
+            query = f"""SELECT `{trigger_field}` FROM `{table_or_aux}` WHERE
                 `{self.__identifier_field}` == "{self.__identifier_value}" """
             ret = connection.cursor().execute(query).fetchall()
             if len(ret) == 0:
@@ -274,7 +282,7 @@ class SQLiteObject():
                 m = "Conflicting trigger values for SQLiteObject\n  (%s == %s)"
                 logger_args = self.__identifier_field, self.__identifier_value
                 GeneFabLogger().warning(m, *logger_args)
-                self.__drop_self_from(connection, table)
+                self.__drop_self_from(connection, table_or_aux)
                 trigger_value = None
         if trigger_function(trigger_value):
             self.changed = True
@@ -290,16 +298,16 @@ class SQLiteObject():
             msg = "SQLiteObject(): Only one 'trigger' field can be specified"
             raise GeneFabConfigurationException(msg, signature=self.__signature)
         else:
-            table = validate_no_backtick(
-                next(iter(self.__trigger_spec)), "table",
+            table_or_aux = validate_no_backtick(
+                next(iter(self.__trigger_spec)), "table or aux_table",
             )
             trigger_field = validate_no_backtick(
-                next(iter(self.__trigger_spec[table])), "trigger_field",
+                next(iter(self.__trigger_spec[table_or_aux])), "trigger_field",
             )
-            trigger_function = self.__trigger_spec[table][trigger_field]
+            trigger_function = self.__trigger_spec[table_or_aux][trigger_field]
         updater_thread = Thread(
             target=partial(
-                self.__conditional_update, table=table,
+                self.__conditional_update, table_or_aux=table_or_aux,
                 trigger_field=trigger_field, trigger_function=trigger_function,
             ),
         )
@@ -393,17 +401,18 @@ class SQLiteTable(SQLiteObject):
         """Check size of underlying database file, drop oldest tables to keep file size under `self.maxdbsize`"""
         # TODO: this is a little unclean, because it hard-codes / repeats field names from specs in SQLiteTable.__init__(),
         # TODO  as well as repeating logic from genefab3.db.sql.response_cache ResponseCache.shrink()
-        msg = f"SQLiteTable():\n  {self.sqlite_db}"
+        desc = f"SQLiteTable():\n  {self.sqlite_db}"
         target_size = self.maxdbsize or float("inf")
-        _aux, n_dropped, n_skids = self.aux_table, 0, 0
+        n_dropped, n_skids = 0, 0
         for _ in range(max_iter):
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > target_size):
-                GeneFabLogger().info(f"{msg} is being shrunk")
+                GeneFabLogger().info(f"{desc} is being shrunk")
                 with closing(connect(self.sqlite_db)) as connection:
                     query_oldest = f"""SELECT `identifier`,`retrieved_at`
-                        FROM `{_aux}` WHERE `retrieved_at` ==
-                        (SELECT MIN(`retrieved_at`) FROM `{_aux}`) LIMIT 1"""
+                        FROM `{self.aux_table}` WHERE `retrieved_at` ==
+                        (SELECT MIN(`retrieved_at`) FROM `{self.aux_table}`)
+                        LIMIT 1"""
                     try:
                         cursor = connection.cursor()
                         entries = cursor.execute(query_oldest).fetchall()
@@ -411,9 +420,10 @@ class SQLiteTable(SQLiteObject):
                             identifier = entries[0][0]
                         else:
                             break
-                        cursor.execute(f"""DELETE FROM `{_aux}`
+                        cursor.execute(f"""DELETE FROM `{self.aux_table}`
                             WHERE `identifier` == "{identifier}" """)
-                        cursor.execute(f"DROP TABLE IF EXISTS `{identifier}`")
+                        for partname, *_ in iterparts(identifier, connection):
+                            cursor.execute(f"DROP TABLE IF EXISTS `{partname}`")
                     except OperationalError:
                         connection.rollback()
                         break
@@ -423,9 +433,12 @@ class SQLiteTable(SQLiteObject):
                 n_skids += (path.getsize(self.sqlite_db) >= current_size)
             else:
                 break
+        self._report_cleanup(desc, n_dropped, n_skids)
+ 
+    def _report_cleanup(self, desc, n_dropped, n_skids):
         if n_dropped:
-            GeneFabLogger().info(f"{msg} shrunk by {n_dropped} entries")
+            GeneFabLogger().info(f"{desc} shrunk by {n_dropped} entries")
         else:
-            GeneFabLogger().warning(f"{msg} could not be shrunk")
+            GeneFabLogger().warning(f"{desc} could not be shrunk")
         if n_skids:
-            GeneFabLogger().warning(f"{msg} did not shrink {n_skids} times")
+            GeneFabLogger().warning(f"{desc} did not shrink {n_skids} times")
