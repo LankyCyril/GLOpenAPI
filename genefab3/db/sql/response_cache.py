@@ -40,7 +40,7 @@ class ResponseCache():
  
     def __init__(self, sqlite_dbs):
         self.sqlite_db = sqlite_dbs.response_cache["db"]
-        self.maxsize = sqlite_dbs.response_cache["maxsize"]
+        self.maxdbsize = sqlite_dbs.response_cache["maxsize"]
         if self.sqlite_db is not None:
             with closing(connect(self.sqlite_db)) as connection:
                 for table, schema in RESPONSE_CACHE_SCHEMAS.items():
@@ -84,39 +84,38 @@ class ResponseCache():
                 _logi(f"ResponseCache(), stored:\n  {context.identity}")
  
     def shrink(self, max_iter=100, max_skids=20):
-        """Drop oldest cached responses to keep file size on disk `self.maxsize`"""
-        target_size = self.maxsize # TODO make like in core
+        """Drop oldest cached responses to keep file size on disk `self.maxdbsize`"""
         if self.sqlite_db is None:
             return
-        elif path.getsize(self.sqlite_db) <= target_size:
-            return
-        n_dropped, n_skids = 0, 0
+        target_size, n_dropped, n_skids = self.maxdbsize or float("inf"), 0, 0
         for _ in range(max_iter):
             current_size = path.getsize(self.sqlite_db)
-            with closing(connect(self.sqlite_db)) as connection:
-                query_oldest = f"""SELECT `context_identity`,`stored_at`
-                    FROM `response_cache` WHERE `stored_at` ==
-                    (SELECT MIN(`stored_at`) FROM `response_cache`) LIMIT 1"""
-                try:
-                    cursor = connection.cursor()
-                    entries = cursor.execute(query_oldest).fetchall()
-                    if len(entries) and (len(entries[0]) == 2):
-                        context_identity = entries[0][0]
-                    else:
+            if (n_skids < max_skids) and (current_size > target_size):
+                _logi(f"ResponseCache():\n  is being shrunk")
+                with closing(connect(self.sqlite_db)) as connection:
+                    query_oldest = f"""SELECT `context_identity`,`stored_at`
+                        FROM `response_cache` WHERE `stored_at` ==
+                        (SELECT MIN(`stored_at`) FROM `response_cache`) LIMIT 1
+                    """
+                    try:
+                        cursor = connection.cursor()
+                        entries = cursor.execute(query_oldest).fetchall()
+                        if len(entries) and (len(entries[0]) == 2):
+                            context_identity = entries[0][0]
+                        else:
+                            break
+                        cursor.execute(f"""DELETE FROM `accessions_used` WHERE
+                            `context_identity` == "{context_identity}" """)
+                        cursor.execute(f"""DELETE FROM `response_cache` WHERE
+                            `context_identity` == "{context_identity}" """)
+                    except OperationalError:
+                        connection.rollback()
                         break
-                    cursor.execute(f"""DELETE FROM `accessions_used`
-                        WHERE `context_identity` == "{context_identity}" """)
-                    cursor.execute(f"""DELETE FROM `response_cache`
-                        WHERE `context_identity` == "{context_identity}" """)
-                except OperationalError:
-                    connection.rollback()
-                else:
-                    connection.commit()
-                    n_dropped += 1
-            new_size = path.getsize(self.sqlite_db)
-            if new_size >= current_size:
-                n_skids += 1
-            if (n_skids >= max_skids) or (new_size <= target_size):
+                    else:
+                        connection.commit()
+                        n_dropped += 1
+                n_skids += (path.getsize(self.sqlite_db) >= current_size)
+            else:
                 break
         if n_dropped:
             _logi(f"ResponseCache():\n  shrunk by {n_dropped} entries")

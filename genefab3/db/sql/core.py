@@ -414,10 +414,13 @@ class SQLiteTable(SQLiteObject):
                         cursor.execute(f"DROP TABLE IF EXISTS `{identifier}`")
                     except OperationalError:
                         connection.rollback()
+                        break
                     else:
                         connection.commit()
                         n_dropped += 1
                 n_skids += (path.getsize(self.sqlite_db) >= current_size)
+            else:
+                break
         if n_dropped:
             GeneFabLogger().info(f"{msg} shrunk by {n_dropped} entries")
         else:

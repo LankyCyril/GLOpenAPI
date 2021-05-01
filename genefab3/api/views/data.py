@@ -217,7 +217,7 @@ def combined_data(descriptors, context, mongo_collections, sqlite_dbs, adapter):
     _types = getset("file", "type")
     if _types == {"table"}:
         sqlite_db, CachedFile = sqlite_dbs.tables["db"], CachedTableFile
-        maxdbsize = sqlite_dbs.tables["maxdbsize"]
+        maxdbsize = sqlite_dbs.tables["maxsize"]
         _kws = dict(maxdbsize=maxdbsize, index_col=0, INPLACE_process=True)
     elif len(_types) == 1:
         sqlite_db, CachedFile = sqlite_dbs.blobs["db"], CachedBinaryFile
