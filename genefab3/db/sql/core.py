@@ -395,7 +395,7 @@ class SQLiteTable(SQLiteObject):
         # TODO  as well as repeating logic from genefab3.db.sql.response_cache ResponseCache.shrink()
         msg = f"SQLiteTable():\n  {self.sqlite_db}"
         target_size = self.maxdbsize or float("inf")
-        _aux, n_dropped, n_skids, _aux = self.aux_table, 0, 0
+        _aux, n_dropped, n_skids = self.aux_table, 0, 0
         for _ in range(max_iter):
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > target_size):
