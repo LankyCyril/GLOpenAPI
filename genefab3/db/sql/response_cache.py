@@ -11,7 +11,7 @@ from flask import Response
 
 RESPONSE_CACHE_SCHEMAS = ImmutableDict({
     "response_cache": """(
-        `context_identity` TEXT, `api_path` TEXT, `timestamp` INTEGER,
+        `context_identity` TEXT, `api_path` TEXT, `stored_at` INTEGER,
         `response` BLOB, `nbytes` INTEGER, `mimetype` TEXT
     )""",
     "accessions_used": """(
@@ -54,12 +54,12 @@ class ResponseCache():
             return
         api_path = quote(context.full_path)
         blob = Binary(compress(response.get_data()))
-        timestamp = int(datetime.now().timestamp())
+        stored_at = int(datetime.now().timestamp())
         delete_blob_command = f"""DELETE FROM `response_cache`
             WHERE `context_identity` == "{context.identity}" """
         insert_blob_command = f"""INSERT INTO `response_cache`
-            (context_identity, api_path, timestamp, response, nbytes, mimetype)
-            VALUES ("{context.identity}", "{api_path}", {timestamp},
+            (context_identity, api_path, stored_at, response, nbytes, mimetype)
+            VALUES ("{context.identity}", "{api_path}", {stored_at},
                 ?, {blob.nbytes}, "{response.mimetype}")"""
         make_delete_accession_entry_command = """DELETE FROM `accessions_used`
             WHERE `accession` == {} AND `context_identity` == "{}" """.format
@@ -93,14 +93,14 @@ class ResponseCache():
         for _ in range(max_iter):
             current_size = path.getsize(self.sqlite_dbs.response_cache)
             with closing(connect(self.sqlite_dbs.response_cache)) as connection:
-                query_oldest = f"""SELECT `context_identity`,`timestamp`
-                    FROM `response_cache` WHERE `timestamp` ==
-                    (SELECT MIN(`timestamp`) FROM `response_cache`) LIMIT 1"""
+                query_oldest = f"""SELECT `context_identity`,`stored_at`
+                    FROM `response_cache` WHERE `stored_at` ==
+                    (SELECT MIN(`stored_at`) FROM `response_cache`) LIMIT 1"""
                 try:
                     cursor = connection.cursor()
                     entries = cursor.execute(query_oldest).fetchall()
                     if len(entries) and (len(entries[0]) == 2):
-                        context_identity, timestamp = entries[0]
+                        context_identity = entries[0][0]
                     else:
                         break
                     cursor.execute(f"""DELETE FROM `accessions_used`

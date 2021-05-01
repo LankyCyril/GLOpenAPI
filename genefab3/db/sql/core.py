@@ -16,6 +16,7 @@ from itertools import count
 from genefab3.db.sql.pandas import SQLiteIndexName
 from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
 from threading import Thread
+from datetime import datetime
 
 
 def is_sqlite_file_ready(filename):
@@ -320,6 +321,7 @@ class SQLiteBlob(SQLiteObject):
                 table: {
                     "identifier": "TEXT",
                     "timestamp": "INTEGER",
+                    "retrieved_at": "INTEGER",
                     "blob": "BLOB",
                 },
             },
@@ -332,6 +334,7 @@ class SQLiteBlob(SQLiteObject):
                 table: [{
                     "identifier": lambda: identifier,
                     "timestamp": lambda: timestamp,
+                    "retrieved_at": lambda: int(datetime.now().timestamp()),
                     "blob": lambda: (compressor or as_is)(data_getter()),
                 }],
             },
@@ -356,7 +359,11 @@ class SQLiteTable(SQLiteObject):
             self, sqlite_db, signature={"identifier": identifier},
             table_schemas={
                 table: None,
-                aux_table: {"identifier": "TEXT", "timestamp": "INTEGER"},
+                aux_table: {
+                    "identifier": "TEXT",
+                    "timestamp": "INTEGER",
+                    "retrieved_at": "INTEGER",
+                },
             },
             trigger={
                 aux_table: {
@@ -368,6 +375,7 @@ class SQLiteTable(SQLiteObject):
                 (aux_table, [{
                     "identifier": lambda: identifier,
                     "timestamp": lambda: timestamp,
+                    "retrieved_at": lambda: int(datetime.now().timestamp()),
                 }]),
             )),
             retrieve={table: as_is},
