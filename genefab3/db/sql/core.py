@@ -1,6 +1,6 @@
 from contextlib import closing
 from sqlite3 import connect, Binary, OperationalError
-from os import access, W_OK
+from os import access, W_OK, path
 from genefab3.common.utils import iterate_terminal_leaves, as_is
 from pandas import isnull, DataFrame
 from genefab3.common.exceptions import GeneFabConfigurationException
@@ -58,7 +58,7 @@ class SQLiteObject():
  
     def __init__(self, sqlite_db, signature, table_schemas, trigger, update, retrieve):
         """Parse the update/retrieve spec and the re-cache trigger condition; create tables if they do not exist"""
-        self.__sqlite_db, self.__table_schemas = sqlite_db, table_schemas
+        self.sqlite_db, self.__table_schemas = sqlite_db, table_schemas
         if len(signature) != 1:
             msg = "SQLiteObject(): Only one 'identifier' field can be specified"
             raise GeneFabConfigurationException(msg, signatures=signature)
@@ -92,7 +92,7 @@ class SQLiteObject():
  
     def __ensure_table(self, table, schema):
         """Create table with schema, provided as a dictionary"""
-        with closing(connect(self.__sqlite_db)) as connection:
+        with closing(connect(self.sqlite_db)) as connection:
             connection.cursor().execute(
                 "CREATE TABLE IF NOT EXISTS `{}` ({})".format(
                     validate_no_backtick(table, "table"), ", ".join(
@@ -116,7 +116,7 @@ class SQLiteObject():
             AND `{self.__identifier_field}` == "{self.__identifier_value}" """
         insert_action = f"""INSERT INTO `{table}` (`{"`, `".join(fields)}`)
             VALUES ({", ".join("?" for _ in fields)})"""
-        with closing(connect(self.__sqlite_db)) as connection:
+        with closing(connect(self.sqlite_db)) as connection:
             logger_args = self.__identifier_field, self.__identifier_value
             try:
                 connection.cursor().execute(delete_action)
@@ -145,7 +145,7 @@ class SQLiteObject():
         elif dataframe.columns.nlevels != 1:
             msg = "MultiIndex columns in cached DataFrame"
             raise NotImplementedError(msg)
-        with closing(connect(self.__sqlite_db)) as connection:
+        with closing(connect(self.sqlite_db)) as connection:
             try:
                 bounds = range(0, dataframe.shape[1], self.maxpartwidth)
                 for i, bound in enumerate(bounds):
@@ -197,7 +197,7 @@ class SQLiteObject():
  
     def __retrieve_field(self, table, field, postprocess_function):
         """Retrieve target table field from database"""
-        with closing(connect(self.__sqlite_db)) as connection:
+        with closing(connect(self.sqlite_db)) as connection:
             query = f"""SELECT `{field}` from `{table}` WHERE
                 `{self.__identifier_field}` == "{self.__identifier_value}" """
             ret = connection.cursor().execute(query).fetchall()
@@ -214,7 +214,7 @@ class SQLiteObject():
     def __retrieve_table(self, table, postprocess_function=as_is):
         """Create an OndemandSQLiteDataFrame object dispatching columns to table parts"""
         column_dispatcher = OrderedDict()
-        with closing(connect(self.__sqlite_db)) as connection:
+        with closing(connect(self.sqlite_db)) as connection:
             for i in count():
                 partname = self.__make_table_part_name(table, i)
                 query = f"SELECT * FROM `{partname}` LIMIT 0"
@@ -234,7 +234,7 @@ class SQLiteObject():
             raise GeneFabDatabaseException(msg, signature=self.__signature)
         else:
             return postprocess_function(OndemandSQLiteDataFrame_Single(
-                self.__sqlite_db, column_dispatcher,
+                self.sqlite_db, column_dispatcher,
             ))
  
     def __retrieve(self):
@@ -254,9 +254,13 @@ class SQLiteObject():
                 msg = "SQLiteObject: unsupported type of retrieve spec"
                 raise GeneFabConfigurationException(msg, type=type(spec))
  
+    def deferrable_cleanup(self):
+        """Actions to be performed after request completion"""
+        pass
+ 
     def __conditional_update(self, table, trigger_field, trigger_function):
         """Check trigger fields and values and perform update if triggered"""
-        with closing(connect(self.__sqlite_db)) as connection:
+        with closing(connect(self.sqlite_db)) as connection:
             query = f"""SELECT `{trigger_field}` FROM `{table}` WHERE
                 `{self.__identifier_field}` == "{self.__identifier_value}" """
             ret = connection.cursor().execute(query).fetchall()
@@ -277,6 +281,7 @@ class SQLiteObject():
             self.__update(trigger_field, trigger_value)
         else:
             self.changed = False
+        Thread(target=self.deferrable_cleanup).start()
  
     @property
     def data(self):
@@ -345,7 +350,7 @@ class SQLiteBlob(SQLiteObject):
 class SQLiteTable(SQLiteObject):
     """Represents an SQLiteObject initialized with a spec suitable for a generic table"""
  
-    def __init__(self, data_getter, sqlite_db, table, aux_table, identifier, timestamp, maxpartwidth=1000):
+    def __init__(self, data_getter, sqlite_db, table, aux_table, identifier, timestamp, maxpartwidth=1000, maxdbsize=None):
         if not table.startswith("TABLE:"):
             msg = "Table name for SQLiteTable must start with 'TABLE:'"
             _kw = dict(table=table, identifier=identifier)
@@ -354,7 +359,8 @@ class SQLiteTable(SQLiteObject):
             msg = "Aux table name for SQLiteTable must start with 'AUX:'"
             _kw = dict(aux_table=aux_table, identifier=identifier)
             raise GeneFabConfigurationException(msg, **_kw)
-        self.maxpartwidth = maxpartwidth
+        self.identifier, self.aux_table = identifier, aux_table
+        self.maxpartwidth, self.maxdbsize = maxpartwidth, maxdbsize
         SQLiteObject.__init__(
             self, sqlite_db, signature={"identifier": identifier},
             table_schemas={
@@ -380,3 +386,41 @@ class SQLiteTable(SQLiteObject):
             )),
             retrieve={table: as_is},
         )
+ 
+    def deferrable_cleanup(self, max_iter=100, max_skids=20):
+        """Check size of underlying database file, drop oldest tables to keep file size under `self.maxdbsize`"""
+        # TODO: this is a little unclean, because it hard-codes / repeats field names from specs in SQLiteTable.__init__(),
+        # TODO  as well as repeating logic from genefab3.db.sql.response_cache ResponseCache.shrink()
+        msg = f"SQLiteTable():\n  {self.sqlite_db}"
+        target_size = self.maxdbsize or float("inf")
+        _aux, n_dropped, n_skids, _aux = self.aux_table, 0, 0
+        for _ in range(max_iter):
+            current_size = path.getsize(self.sqlite_db)
+            if (n_skids < max_skids) and (current_size > target_size):
+                GeneFabLogger().info(f"{msg} is being shrunk")
+                with closing(connect(self.sqlite_db)) as connection:
+                    query_oldest = f"""SELECT `identifier`,`retrieved_at`
+                        FROM `{_aux}` WHERE `retrieved_at` ==
+                        (SELECT MIN(`retrieved_at`) FROM `{_aux}`) LIMIT 1"""
+                    try:
+                        cursor = connection.cursor()
+                        entries = cursor.execute(query_oldest).fetchall()
+                        if len(entries) and (len(entries[0]) == 2):
+                            identifier = entries[0][0]
+                        else:
+                            break
+                        cursor.execute(f"""DELETE FROM `{_aux}`
+                            WHERE `identifier` == "{identifier}" """)
+                        cursor.execute(f"DROP TABLE IF EXISTS `{identifier}`")
+                    except OperationalError:
+                        connection.rollback()
+                    else:
+                        connection.commit()
+                        n_dropped += 1
+                n_skids += (path.getsize(self.sqlite_db) >= current_size)
+        if n_dropped:
+            GeneFabLogger().info(f"{msg} shrunk by {n_dropped} entries")
+        else:
+            GeneFabLogger().warning(f"{msg} could not be shrunk")
+        if n_skids:
+            GeneFabLogger().warning(f"{msg} did not shrink {n_skids} times")
