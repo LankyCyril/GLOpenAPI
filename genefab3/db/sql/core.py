@@ -3,18 +3,19 @@ from sqlite3 import connect, Binary, OperationalError
 from os import access, W_OK
 from genefab3.common.utils import iterate_terminal_leaves, as_is
 from pandas import isnull, DataFrame
-from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
 from genefab3.common.exceptions import GeneFabConfigurationException
+from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
 from copy import deepcopy
 from genefab3.common.logger import GeneFabLogger
 from functools import partial
-from collections.abc import Callable
-from genefab3.db.sql.pandas import SQLiteIndexName
-from collections import OrderedDict
-from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
-from genefab3.common.exceptions import GeneFabDatabaseException
 from pandas.io.sql import DatabaseError
+from genefab3.common.exceptions import GeneFabDatabaseException
+from collections.abc import Callable
+from collections import OrderedDict
 from itertools import count
+from genefab3.db.sql.pandas import SQLiteIndexName
+from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
+from threading import Thread
 
 
 def is_sqlite_file_ready(filename):
@@ -252,20 +253,8 @@ class SQLiteObject():
                 msg = "SQLiteObject: unsupported type of retrieve spec"
                 raise GeneFabConfigurationException(msg, type=type(spec))
  
-    @property
-    def data(self):
-        """Main interface: returns data associated with this SQLiteObject; will have auto-updated itself in the process if necessary"""
-        if not is_singular_spec(self.__trigger_spec):
-            msg = "SQLiteObject(): Only one 'trigger' field can be specified"
-            raise GeneFabConfigurationException(msg, signature=self.__signature)
-        else:
-            table = validate_no_backtick(
-                next(iter(self.__trigger_spec)), "table",
-            )
-            trigger_field = validate_no_backtick(
-                next(iter(self.__trigger_spec[table])), "trigger_field",
-            )
-            trigger_function = self.__trigger_spec[table][trigger_field]
+    def __conditional_update(self, table, trigger_field, trigger_function):
+        """Check trigger fields and values and perform update if triggered"""
         with closing(connect(self.__sqlite_db)) as connection:
             query = f"""SELECT `{trigger_field}` FROM `{table}` WHERE
                 `{self.__identifier_field}` == "{self.__identifier_value}" """
@@ -287,6 +276,33 @@ class SQLiteObject():
             self.__update(trigger_field, trigger_value)
         else:
             self.changed = False
+ 
+    @property
+    def data(self):
+        """Main interface: returns data associated with this SQLiteObject; will have auto-updated itself in the process if necessary"""
+        if not is_singular_spec(self.__trigger_spec):
+            msg = "SQLiteObject(): Only one 'trigger' field can be specified"
+            raise GeneFabConfigurationException(msg, signature=self.__signature)
+        else:
+            table = validate_no_backtick(
+                next(iter(self.__trigger_spec)), "table",
+            )
+            trigger_field = validate_no_backtick(
+                next(iter(self.__trigger_spec[table])), "trigger_field",
+            )
+            trigger_function = self.__trigger_spec[table][trigger_field]
+        updater_thread = Thread(
+            target=partial(
+                self.__conditional_update, table=table,
+                trigger_field=trigger_field, trigger_function=trigger_function,
+            ),
+        )
+        # if user breaks connection, or httpd exceeds timeout,
+        # updater_thread will finish and cache regardless:
+        updater_thread.start()
+        # if connection persists until completion of self.__conditional_update,
+        # updater_thread will join here and retrieve data:
+        updater_thread.join()
         return self.__retrieve()
 
 
