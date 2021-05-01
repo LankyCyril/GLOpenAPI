@@ -315,11 +315,13 @@ class SQLiteObject():
 class SQLiteBlob(SQLiteObject):
     """Represents an SQLiteObject initialized with a spec suitable for a binary blob"""
  
-    def __init__(self, data_getter, sqlite_db, table, identifier, timestamp, compressor, decompressor):
+    def __init__(self, data_getter, sqlite_db, table, identifier, timestamp, compressor, decompressor, maxdbsize=None):
         if not table.startswith("BLOBS:"):
             msg = "Table name for SQLiteBlob must start with 'BLOBS:'"
             _kw = dict(table=table, identifier=identifier)
             raise GeneFabConfigurationException(msg, **_kw)
+        if maxdbsize is not None:
+            raise NotImplementedError("SQLiteBlob() with set `maxdbsize`")
         SQLiteObject.__init__(
             self, sqlite_db, signature={"identifier": identifier},
             table_schemas={
