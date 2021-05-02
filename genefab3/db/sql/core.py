@@ -441,12 +441,13 @@ class SQLiteTable(SQLiteObject):
                 n_skids += (path.getsize(self.sqlite_db) >= current_size)
             else:
                 break
-        self._report_cleanup(desc, n_dropped, n_skids)
+        is_too_big = (path.getsize(self.sqlite_db) > target_size)
+        self._report_cleanup(desc, n_dropped, is_too_big, n_skids)
  
-    def _report_cleanup(self, desc, n_dropped, n_skids):
+    def _report_cleanup(self, desc, n_dropped, is_too_big, n_skids):
         if n_dropped:
             GeneFabLogger().info(f"{desc} shrunk by {n_dropped} entries")
-        else:
+        elif is_too_big:
             GeneFabLogger().warning(f"{desc} could not be shrunk")
         if n_skids:
             GeneFabLogger().warning(f"{desc} did not shrink {n_skids} times")

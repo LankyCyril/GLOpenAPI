@@ -87,7 +87,8 @@ class ResponseCache():
         """Drop oldest cached responses to keep file size on disk `self.maxdbsize`"""
         if self.sqlite_db is None:
             return
-        target_size, n_dropped, n_skids = self.maxdbsize or float("inf"), 0, 0
+        n_dropped, n_skids = 0, 0
+        target_size = self.maxdbsize or float("inf")
         for _ in range(max_iter):
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > target_size):
@@ -117,12 +118,13 @@ class ResponseCache():
                 n_skids += (path.getsize(self.sqlite_db) >= current_size)
             else:
                 break
-        self._report_shrinkage(n_dropped, n_skids)
+        is_too_big = (path.getsize(self.sqlite_db) > target_size)
+        self._report_shrinkage(n_dropped, is_too_big, n_skids)
  
-    def _report_shrinkage(self, n_dropped, n_skids):
+    def _report_shrinkage(self, n_dropped, is_too_big, n_skids):
         if n_dropped:
             _logi(f"ResponseCache():\n  shrunk by {n_dropped} entries")
-        else:
+        elif is_too_big:
             _logw(f"ResponseCache():\n  could not drop entries to shrink")
         if n_skids:
             _logw(f"ResponseCache():\n  file did not shrink {n_skids} times")
