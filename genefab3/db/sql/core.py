@@ -4,12 +4,12 @@ from os import access, W_OK, path
 from genefab3.common.utils import iterate_terminal_leaves, as_is
 from itertools import count
 from genefab3.db.sql.pandas import SQLiteIndexName
+from functools import lru_cache, partial
 from pandas import isnull, DataFrame
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
 from copy import deepcopy
 from genefab3.common.logger import GeneFabLogger
-from functools import partial
 from pandas.io.sql import DatabaseError
 from genefab3.common.exceptions import GeneFabDatabaseException
 from collections.abc import Callable
@@ -62,15 +62,28 @@ def iterparts(table, connection, must_exist=True, partname_mask="{table}://{i}")
             yield partname, None, None
 
 
+@lru_cache(maxsize=16384)
+def format_sql_value(value):
+    """Format known singleton values according to how SQLite understands them"""
+    if isnull(value):
+        return "null"
+    elif isinstance(value, bool):
+        return str(int(value))
+    elif isinstance(value, float):
+        if value == float("inf"):
+            return "9e999"
+        elif value == -float("inf"):
+            return "-9e999"
+        else:
+            return repr(value)
+    else:
+        return repr(value)
+
+
 def mkinsert(pd_table, conn, keys, data_iter, name):
-    """SQLite INSERT without variable names for simple table schemas"""
+    """Non-parameterized SQLite INSERT for simple table schemas from trusted sources"""
     for row in data_iter:
-        values = ",".join(
-            "null" if isnull(v) else (
-                str(int(v)) if isinstance(v, bool) else repr(v)
-            )
-            for v in row
-        )
+        values = ",".join(format_sql_value(v) for v in row)
         conn.execute(f"INSERT INTO `{name}` VALUES({values})")
 
 
