@@ -3,6 +3,7 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import lru_cache
 from pathlib import Path
 from genefab3.common.logger import GeneFabLogger
+from genefab3.api.renderers.PlaintextDataFrameRenderers import get_index_and_columns
 from json import dumps
 from genefab3.common.types import AnnotationDataFrame
 from genefab3.common.utils import map_replace
@@ -104,13 +105,16 @@ def get_view_dependent_links(obj, context):
         return ""
 
 
-def twolevel(obj, context, indent=None, frozen=0, squash_preheader=False):
+def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader=False):
     """Display dataframe with two-level columns using SlickGrid"""
     _assert_type(obj, nlevels=2)
     title_postfix = f"{context.view} {context.complete_kwargs}"
     GeneFabLogger().info("HTML: converting DataFrame into interactive table")
-    columndata = dumps(obj.columns.to_list(), separators=(",", ":"))
-    rowdata = obj.to_json(orient="values")
+    columndata = dumps(
+        get_index_and_columns(obj, col_fill=col_fill).to_list(),
+        separators=(",", ":"),
+    )
+    rowdata = obj.reset_index().to_json(orient="values")
     if isinstance(obj, AnnotationDataFrame) and (context.view != "status"):
         formatters = iterate_formatters(obj, context)
     else:
@@ -137,7 +141,12 @@ def twolevel(obj, context, indent=None, frozen=0, squash_preheader=False):
 def threelevel(obj, context, indent=None):
     """Squash two top levels of dataframe columns and display as two-level"""
     _assert_type(obj, nlevels=3)
-    obj.columns = MultiIndex.from_tuples((
-        (f"{a}<br>{b}", c) for (a, b, c) in obj.columns
-    ))
-    return twolevel(obj, context=context, squash_preheader=True)
+    if len(obj.columns):
+        obj.columns = MultiIndex.from_tuples((
+            (f"{a}<br>{b}", c) for (a, b, c) in obj.columns
+        ))
+    else:
+        obj.columns = MultiIndex.from_tuples([("*", "*")])[:0]
+    return twolevel(
+        obj, context=context, col_fill="*<br>*", squash_preheader=True,
+    )

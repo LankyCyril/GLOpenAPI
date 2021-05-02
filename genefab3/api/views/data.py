@@ -188,9 +188,6 @@ def combine_objects(objects, context, limit=None):
             INPLACE_constrain_columns(combined, context.data_columns)
         # TODO: speedups for schema=1
         data = combined.get(where=context.data_comparisons)
-        if data.index.name is None:
-            data.index.name = "index" # best we can do
-        data.reset_index(inplace=True, col_level=-1, col_fill="*")
         return data
     elif context.data_columns or context.data_comparisons:
         raise GeneFabFileException(
