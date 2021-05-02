@@ -67,9 +67,10 @@ def get_browser_meta_formatter(context, i, head, target):
     return f"columns[{i}].formatter = columns[{i}].defaultFormatter = {_fr};"
 
 
-def iterate_formatters(obj, context):
+def iterate_formatters(index_and_columns, context):
     """Get SlickGrid formatters for columns"""
-    for i, (key, target) in enumerate(obj.columns):
+    for i, (key, target) in enumerate(index_and_columns):
+        print(i, key, target)
         if key == "id":
             if target == "accession":
                 yield get_browser_glds_formatter(context, i)
@@ -110,13 +111,11 @@ def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader
     _assert_type(obj, nlevels=2)
     title_postfix = f"{context.view} {context.complete_kwargs}"
     GeneFabLogger().info("HTML: converting DataFrame into interactive table")
-    columndata = dumps(
-        get_index_and_columns(obj, col_fill=col_fill).to_list(),
-        separators=(",", ":"),
-    )
+    index_and_columns = get_index_and_columns(obj, col_fill=col_fill)
+    columndata = dumps(index_and_columns.to_list(), separators=(",", ":"))
     rowdata = obj.reset_index().to_json(orient="values")
     if isinstance(obj, AnnotationDataFrame) and (context.view != "status"):
-        formatters = iterate_formatters(obj, context)
+        formatters = iterate_formatters(index_and_columns, context)
     else:
         formatters = []
     content = map_replace(_get_browser_html(), {
