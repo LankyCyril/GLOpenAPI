@@ -73,6 +73,13 @@ def mkinsert(pd_table, conn, keys, data_iter, name):
         conn.execute(f"INSERT INTO `{name}` VALUES({values})")
 
 
+def drop_all_parts(table, connection):
+    """During an open connection, drop all parts of `table`"""
+    cursor = connection.cursor()
+    for partname, *_ in iterparts(table, connection):
+        cursor.execute(f"DROP TABLE IF EXISTS `{partname}`")
+
+
 class SQLiteObject():
     """Universal wrapper for cached objects; defined by table schemas, the update/retrieve spec, and the re-cache trigger condition"""
  
@@ -163,24 +170,25 @@ class SQLiteObject():
             msg = "MultiIndex columns in cached DataFrame"
             raise NotImplementedError(msg)
         with closing(connect(self.sqlite_db)) as connection:
-            try:
-                bounds = range(0, dataframe.shape[1], self.maxpartwidth)
-                part_iterator = iterparts(table, connection, must_exist=False)
-                for bound, (partname, *_) in zip(bounds, part_iterator):
-                    GeneFabLogger().info(
-                        "Creating table for SQLiteObject (%s == %s):\n  %s",
-                        self.__identifier_field, self.__identifier_value,
-                        partname,
-                    )
+            bounds = range(0, dataframe.shape[1], self.maxpartwidth)
+            part_iterator = iterparts(table, connection, must_exist=False)
+            for bound, (partname, *_) in zip(bounds, part_iterator):
+                GeneFabLogger().info(
+                    "Creating table for SQLiteObject (%s == %s):\n  %s",
+                    self.__identifier_field, self.__identifier_value,
+                    partname,
+                )
+                try:
                     dataframe.iloc[:,bound:bound+self.maxpartwidth].to_sql(
                         partname, connection, index=True, if_exists="replace",
                         chunksize=1000, method=partial(mkinsert, name=partname),
                     )
-            except (OperationalError, DatabaseError) as e:
-                connection.rollback()
-                msg = "Failed to insert SQLite table"
-                _kw = dict(signature=self.__signature, error=str(e))
-                raise GeneFabDatabaseException(msg, **_kw)
+                except (OperationalError, DatabaseError) as e:
+                    drop_all_parts(table, connection)
+                    connection.rollback()
+                    msg = "Failed to insert SQLite table"
+                    _kw = dict(signature=self.__signature, error=str(e))
+                    raise GeneFabDatabaseException(msg, **_kw)
             else:
                 GeneFabLogger().info(
                     "All tables inserted for SQLiteObject (%s == %s):\n  %s",
@@ -422,8 +430,7 @@ class SQLiteTable(SQLiteObject):
                             break
                         cursor.execute(f"""DELETE FROM `{self.aux_table}`
                             WHERE `identifier` == "{identifier}" """)
-                        for partname, *_ in iterparts(identifier, connection):
-                            cursor.execute(f"DROP TABLE IF EXISTS `{partname}`")
+                        drop_all_parts(identifier, connection)
                     except OperationalError:
                         connection.rollback()
                         break
