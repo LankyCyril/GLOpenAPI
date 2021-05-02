@@ -15,6 +15,7 @@ from functools import partial, reduce
 from operator import getitem
 from collections import defaultdict, OrderedDict
 from marshal import dumps as marsh
+from threading import Thread
 
 
 timestamp36 = lambda: base_repr(int(datetime.now().timestamp() * (10**6)), 36)
@@ -145,3 +146,18 @@ def validate_no_special_character(identifier, desc, c):
         raise GeneFabConfigurationException(msg, **{desc: identifier})
 validate_no_backtick = partial(validate_no_special_character, c="`")
 validate_no_doublequote = partial(validate_no_special_character, c='"')
+
+
+class ExceptionPropagatingThread(Thread):
+    """Thread that raises errors in main thread on join()"""
+    def run(self):
+        self.exception = None
+        try:
+            super(ExceptionPropagatingThread, self).run()
+        except Exception as e:
+            self.exception = e
+            raise
+    def join(self):
+        super(ExceptionPropagatingThread, self).join()
+        if self.exception:
+            raise self.exception
