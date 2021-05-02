@@ -27,7 +27,10 @@ class DefaultRoutes(Routes):
  
     @Routes.register_endpoint()
     def status(self, context=None) -> DataFrame:
-        return views.status.get(self.mongo_collections, context=context)
+        return views.status.get(
+            self.mongo_collections, context=context,
+            genefab3_client=self.genefab3_client, sqlite_dbs=self.sqlite_dbs,
+        )
  
     @Routes.register_endpoint()
     def assays(self, context) -> AnnotationDataFrame:

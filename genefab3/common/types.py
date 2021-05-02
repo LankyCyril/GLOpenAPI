@@ -37,7 +37,8 @@ class Adapter():
 class Routes():
     """Base class for registered endpoints"""
  
-    def __init__(self, mongo_collections, *, locale, sqlite_dbs, adapter):
+    def __init__(self, genefab3_client, *, mongo_collections, locale, sqlite_dbs, adapter):
+        self.genefab3_client = genefab3_client
         self.mongo_collections, self.locale = mongo_collections, locale
         self.sqlite_dbs, self.adapter = sqlite_dbs, adapter
  
