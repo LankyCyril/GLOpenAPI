@@ -4,6 +4,7 @@ from pandas import MultiIndex
 from datetime import datetime
 from numpy import nan
 from itertools import chain, cycle
+from genefab3.api.views.metadata import INPLACE_set_id_as_index
 
 
 STATUS_COLUMNS = [
@@ -31,4 +32,5 @@ def get(mongo_collections, context):
     status_df.columns = MultiIndex.from_tuples(
         zip(chain(["id"]*3, cycle(["report"])), status_df.columns),
     )
+    INPLACE_set_id_as_index(status_df)
     return status_df
