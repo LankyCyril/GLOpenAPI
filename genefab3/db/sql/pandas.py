@@ -6,6 +6,7 @@ from contextlib import contextmanager, closing, ExitStack
 from sqlite3 import OperationalError, connect
 from genefab3.common.logger import GeneFabLogger
 from collections import OrderedDict
+from genefab3.common.hacks import apply_hack, speedup_data_schema
 from genefab3.api.renderers import Placeholders
 from genefab3.common.types import DataDataFrame
 from pandas.io.sql import DatabaseError as PandasDatabaseError
@@ -142,7 +143,8 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
         GeneFabLogger().info(f"{self.name}; {msg}")
         return f"SELECT {targets} FROM {joined} {query_filter}"
  
-    def get(self, *, where=None, limit=None, offset=0):
+    @apply_hack(speedup_data_schema)
+    def get(self, *, where=None, limit=None, offset=0, context=None):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
         part_to_column = self._inverse_column_dispatcher
         if len(part_to_column) == 0:
@@ -237,7 +239,8 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
                 left_view, left_columns = merged_view, merged_columns
             yield merged_view, merged_columns
  
-    def get(self, *, where=None, limit=None, offset=0):
+    @apply_hack(speedup_data_schema)
+    def get(self, *, where=None, limit=None, offset=0, context=None):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
         query_filter = _make_query_filter(self.name, where, limit, offset)
         with closing(connect(self.sqlite_db)) as connection:

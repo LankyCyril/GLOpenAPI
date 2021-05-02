@@ -70,7 +70,6 @@ def get_browser_meta_formatter(context, i, head, target):
 def iterate_formatters(index_and_columns, context):
     """Get SlickGrid formatters for columns"""
     for i, (key, target) in enumerate(index_and_columns):
-        print(i, key, target)
         if key == "id":
             if target == "accession":
                 yield get_browser_glds_formatter(context, i)
