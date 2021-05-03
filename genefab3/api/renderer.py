@@ -11,6 +11,7 @@ from functools import wraps
 from genefab3.api.parser import Context
 from copy import deepcopy
 from genefab3.db.sql.response_cache import ResponseCache
+from genefab3.common.utils import ExceptionPropagatingThread
 
 
 TYPE_RENDERERS = OrderedDict((
@@ -75,14 +76,6 @@ class CacheableRenderer():
             default_format, cacheable = "raw", False
         return return_types, default_format, cacheable
  
-    def _schemify(self, obj):
-        """Reduce passed `obj` to representation of column types"""
-        try:
-            return obj.schema
-        except AttributeError:
-            msg = "Argument 'schema' is not valid for requested data"
-            raise GeneFabFormatException(msg, type=type(obj).__name__)
- 
     def dispatch_renderer(self, obj, context, default_format, indent=None):
         """Render `obj` according to its type and passed kwargs"""
         if obj is None:
@@ -111,24 +104,34 @@ class CacheableRenderer():
                 obj = deepcopy(context.__dict__)
                 context.format = "json"
                 _kw = dict(context=context, indent=4, default_format="json")
-                response = self.dispatch_renderer(obj, **_kw)
+                container = [self.dispatch_renderer(obj, **_kw)]
             else:
                 return_types, default_format, cached = self._infer_types(method)
                 if cached:
                     response_cache = ResponseCache(self.sqlite_dbs)
                     response = response_cache.get(context)
+                    container = [response] if response else []
                 else:
-                    response_cache, response = None, None
-                if response is None:
-                    obj = method(*args, context=context, **kwargs)
-                    if context.schema == "1":
-                        obj = self._schemify(obj)
-                    _kw = dict(context=context, default_format=default_format)
-                    response = self.dispatch_renderer(obj, **_kw)
-                    if response.status_code == 200:
-                        if response_cache is not None:
-                            response_cache.put(context, obj, response)
+                    response_cache, container = None, []
+                if not container:
+                    def _call_and_cache():
+                        obj = method(*args, context=context, **kwargs)
+                        if context.schema == "1":
+                            try:
+                                obj = obj.schema
+                            except AttributeError:
+                                m = "'schema=1' is not valid for requested data"
+                                _kw = dict(type=type(obj).__name__)
+                                raise GeneFabFormatException(m, **_kw)
+                        k = dict(context=context, default_format=default_format)
+                        container.append(self.dispatch_renderer(obj, **k))
+                        if container[0].status_code == 200:
+                            if response_cache is not None:
+                                response_cache.put(context, obj, container[0])
+                    _thread = ExceptionPropagatingThread(target=_call_and_cache)
+                    _thread.start() # will complete even after timeout errors
+                    _thread.join() # will fill container if does not time out
             if not self.genefab3_client.cacher_thread.isAlive():
                 self.genefab3_client.mongo_client.close()
-            return response
+            return container.pop()
         return wrapper
