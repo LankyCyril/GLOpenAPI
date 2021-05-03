@@ -7,6 +7,7 @@ from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDataManagerException
 from pandas import MultiIndex
 from genefab3.db.sql.pandas import OndemandSQLiteDataFrame
+from genefab3.common.utils import ExceptionPropagatingThread
 from genefab3.db.sql.files import CachedTableFile, CachedBinaryFile
 from natsort import natsorted
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -169,8 +170,19 @@ def combine_objects(objects, context, limit=None):
         raise NotImplementedError("Merging non-table data objects")
     if isinstance(combined, OndemandSQLiteDataFrame):
         combined.constrain_columns(context=context)
-        data = combined.get(context=context)
-        return data
+        container = []
+        getter_thread = ExceptionPropagatingThread(
+            target=lambda: container.append(combined.get(context=context)),
+        )
+        # if user breaks connection, or httpd exceeds timeout,
+        # getter_thread will finish regardless AND plumb upwards through stack
+        # to get response cached in response_cache:
+        getter_thread.start()
+        # if connection persists until completion of combined.get(),
+        # getter_thread will join here and present result to user before
+        # caching in response_cache, and then will cache:
+        getter_thread.join()
+        return container.pop()
     elif context.data_columns or context.data_comparisons:
         raise GeneFabFileException(
             "Column operations on non-table data objects are not supported",
