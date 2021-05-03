@@ -45,8 +45,10 @@ def get_OSDF_Single_schema(self):
                         index_name = str(c)
                     if c in whitelist:
                         data[c] = [_min, _max, _nan]
-        except OperationalError:
-            raise GeneFabDatabaseException("No data found", table=self.name)
+        except OperationalError as e:
+            msg = "Data could not be retrieved"
+            _kw = dict(table=self.name, debug_info=repr(e))
+            raise GeneFabDatabaseException(msg, **_kw)
         else:
             dataframe = DataFrame(data)
             if (set(dataframe.columns) != whitelist):

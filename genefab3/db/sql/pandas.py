@@ -181,7 +181,7 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
                         _kw = dict(table=self.name, suggestion=sug)
                         raise GeneFabDatabaseException(msg, **_kw)
                     else:
-                        msg = "No data found"
+                        msg = "Data could not be retrieved"
                         raise GeneFabDatabaseException(msg, table=self.name)
                 else:
                     msg = f"retrieved from SQLite as pandas DataFrame"
@@ -202,7 +202,8 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
                 with mkselect(connection, join_query) as selectname:
                     yield selectname, self._raw_columns
             except (OperationalError, GeneFabDatabaseException):
-                raise GeneFabDatabaseException("No data found", table=self.name)
+                msg = "Data could not be retrieved"
+                raise GeneFabDatabaseException(msg, table=self.name)
 
 
 class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
@@ -272,7 +273,7 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
                     q = f"SELECT {targets} FROM `{merged_select}` {q_filter}"
                     data = read_sql(q, connection, index_col=self.index.name)
                 except OperationalError:
-                    msg = "No data found"
+                    msg = "Data could not be retrieved"
                     raise GeneFabDatabaseException(msg, table=self.name)
                 except PandasDatabaseError as e:
                     msg = "Bad SQL query when joining tables"
