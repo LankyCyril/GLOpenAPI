@@ -6,6 +6,7 @@ from pandas import DataFrame, merge
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.types import DataDataFrame
 from genefab3.common.exceptions import GeneFabFormatException
+from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabConfigurationException
 
 
@@ -68,7 +69,7 @@ def get_OSDF_OuterJoined_schema(self, *, context):
     ))
 
 
-def speedup_data_schema(get, self, *, context, limit=None, offset=0):
+def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
     """If context.schema == '1', replaces OndemandSQLiteDataFrame.get() with quick retrieval of just values informative schema"""
     if context.schema != "1":
         kwargs = dict(context=context, limit=limit, offset=offset)
@@ -80,6 +81,8 @@ def speedup_data_schema(get, self, *, context, limit=None, offset=0):
     else:
         from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
         from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_OuterJoined
+        msg = f"apply_hack(speed_up_data_schema) for {self.name}"
+        GeneFabLogger().info(msg)
         if isinstance(self, OndemandSQLiteDataFrame_Single):
             return get_OSDF_Single_schema(self)
         elif isinstance(self, OndemandSQLiteDataFrame_OuterJoined):

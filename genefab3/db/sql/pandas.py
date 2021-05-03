@@ -6,7 +6,7 @@ from contextlib import contextmanager, closing, ExitStack
 from sqlite3 import OperationalError, connect
 from genefab3.common.logger import GeneFabLogger
 from collections import OrderedDict
-from genefab3.common.hacks import apply_hack, speedup_data_schema
+from genefab3.common.hacks import apply_hack, speed_up_data_schema
 from genefab3.api.renderers import Placeholders
 from genefab3.common.types import DataDataFrame
 from pandas.io.sql import DatabaseError as PandasDatabaseError
@@ -160,7 +160,7 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
         GeneFabLogger().info(f"{self.name}; {msg}")
         return f"SELECT {targets} FROM {joined} {query_filter}"
  
-    @apply_hack(speedup_data_schema)
+    @apply_hack(speed_up_data_schema)
     def get(self, *, context, limit=None, offset=0):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
         part_to_column = self._inverse_column_dispatcher
@@ -257,7 +257,7 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
                 left_select, left_columns = merged_select, merged_columns
             yield merged_select, merged_columns
  
-    @apply_hack(speedup_data_schema)
+    @apply_hack(speed_up_data_schema)
     def get(self, *, context, limit=None, offset=0):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
         where = context.data_comparisons
