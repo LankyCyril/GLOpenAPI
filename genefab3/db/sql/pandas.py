@@ -33,6 +33,22 @@ class OndemandSQLiteDataFrame():
             foreign = sorted(set(last_level) - set(self._raw_columns))
             raise GeneFabFileException(msg, columns=foreign)
  
+    def constrain_columns(self, context):
+        """Constrain self.columns to specified columns, if any"""
+        if context.data_columns:
+            joined_columns_dispatch = {"/".join(c): c for c in self.columns}
+            last_level_dispatch = {c[-1]: c for c in self.columns}
+            constrained_columns = []
+            for c in context.data_columns:
+                if ("/" in c) and (c in joined_columns_dispatch):
+                    constrained_columns.append(joined_columns_dispatch[c])
+                elif c in last_level_dispatch:
+                    constrained_columns.append(last_level_dispatch[c])
+                else:
+                    msg = "Requested column not in table"
+                    raise GeneFabFileException(msg, column=c)
+            self.columns = MultiIndex.from_tuples(constrained_columns)
+ 
     @staticmethod
     def concat(objs, axis=1):
         """Concatenate OndemandSQLiteDataFrame objects without evaluation"""
@@ -249,7 +265,11 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
         with closing(connect(self.sqlite_db)) as connection:
             with self.view(connection) as (merged_view, merged_columns):
                 try:
-                    q = f"SELECT * FROM `{merged_view}` {query_filter}"
+                    targets = ",".join((
+                        f"`{self.index.name}`",
+                        *(f"`{c}`" for c in self._raw_columns),
+                    ))
+                    q = f"SELECT {targets} FROM `{merged_view}` {query_filter}"
                     data = read_sql(q, connection, index_col=self.index.name)
                 except OperationalError:
                     msg = "No data found"

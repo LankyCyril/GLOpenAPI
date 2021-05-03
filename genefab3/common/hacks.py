@@ -73,9 +73,9 @@ def speedup_data_schema(get, self, *, context, limit=None, offset=0):
     if context.schema != "1":
         kwargs = dict(context=context, limit=limit, offset=offset)
         return get(self, **kwargs)
-    elif context.data_comparisons or limit or offset:
+    elif context.data_comparisons or context.data_columns or limit or offset:
         msg = "Table manipulation is not supported when requesting schema"
-        sug = "Remove comparisons and/or row slicing from query"
+        sug = "Remove comparisons and/or column, row slicing from query"
         raise GeneFabFormatException(msg, suggestion=sug)
     else:
         from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
