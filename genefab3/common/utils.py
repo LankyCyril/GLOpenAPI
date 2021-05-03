@@ -32,7 +32,7 @@ def is_debug(markers={"development", "staging", "stage", "debug", "debugging"}):
     return environ.get("FLASK_ENV", None) in markers
 
 
-def random_string(seed=""):
+def random_unique_string(seed=""):
     return b64encode(uuid3(uuid4(), seed).bytes, b'_-').decode().rstrip("=")
 
 

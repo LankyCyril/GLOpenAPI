@@ -1,4 +1,4 @@
-from genefab3.common.utils import validate_no_backtick, random_string
+from genefab3.common.utils import validate_no_backtick, random_unique_string
 from pandas import Index, MultiIndex, read_sql
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -79,29 +79,29 @@ def _make_query_filter(table, where, limit, offset):
 
 
 @contextmanager
-def _make_view(connection, query):
-    """Context manager temporarily creating an SQLite view from `query`"""
-    viewname = random_string(seed=query)
+def mkselect(connection, query, kind="TABLE"):
+    """Context manager temporarily creating an SQLite view or table from `query`"""
+    selectname = random_unique_string(seed=query)
     try:
-        connection.cursor().execute(f"CREATE VIEW `{viewname}` as {query}")
+        connection.cursor().execute(f"CREATE {kind} `{selectname}` as {query}")
     except OperationalError:
-        msg = "Failed to create temporary view"
-        _kw = dict(viewname=viewname, debug_info=query)
+        msg = f"Failed to create temporary {kind}"
+        _kw = dict(name=selectname, debug_info=query)
         raise GeneFabDatabaseException(msg, **_kw)
     else:
         query_repr = repr(query.lstrip()[:100] + "...")
-        msg = f"Created temporary SQLite view {viewname} from {query_repr}"
+        msg = f"Created temporary SQLite {kind} {selectname} from {query_repr}"
         GeneFabLogger().info(msg)
         try:
-            yield viewname
+            yield selectname
         finally:
             try:
-                connection.cursor().execute(f"DROP VIEW `{viewname}`")
+                connection.cursor().execute(f"DROP {kind} `{selectname}`")
             except OperationalError:
-                msg = f"Failed to drop temporary view {viewname}"
+                msg = f"Failed to drop temporary {kind} {selectname}"
                 GeneFabLogger().error(msg)
             else:
-                msg = f"Dropped temporary SQLite view {viewname}"
+                msg = f"Dropped temporary SQLite {kind} {selectname}"
                 GeneFabLogger().info(msg)
 
 
@@ -190,8 +190,8 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
                     return DataDataFrame(data)
  
     @contextmanager
-    def view(self, connection):
-        """Interpret arguments and temporarily expose requested data as SQL view"""
+    def select(self, connection):
+        """Interpret arguments and temporarily expose requested data as SQL view or table"""
         part_to_column = self._inverse_column_dispatcher
         if len(part_to_column) == 0:
             yield None
@@ -199,14 +199,14 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
             args = part_to_column, None, None, 0
             join_query = self.__make_natural_join_query(*args)
             try:
-                with _make_view(connection, join_query) as viewname:
-                    yield viewname, self._raw_columns
+                with mkselect(connection, join_query) as selectname:
+                    yield selectname, self._raw_columns
             except (OperationalError, GeneFabDatabaseException):
                 raise GeneFabDatabaseException("No data found", table=self.name)
 
 
 class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
-    """DataDataFrame to be retrieved from SQLite, full outer joined from multiple views"""
+    """DataDataFrame to be retrieved from SQLite, full outer joined from multiple views or tables"""
  
     def __init__(self, sqlite_db, objs):
         _t = "OndemandSQLiteDataFrame"
@@ -234,42 +234,42 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
             self.name = f"FullOuterJoin({names})"
  
     @contextmanager
-    def view(self, connection):
-        """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
+    def select(self, connection):
+        """Interpret arguments and temporarily expose requested data as SQL view or table"""
         with ExitStack() as stack:
-            object_views = [
-                stack.enter_context(o.view(connection)) for o in self.objs
+            object_selects = [
+                stack.enter_context(o.select(connection)) for o in self.objs
             ]
-            left_view, left_columns = object_views[0]
-            for right_view, right_columns in object_views[1:]:
+            left_select, left_columns = object_selects[0]
+            for right_select, right_columns in object_selects[1:]:
                 merged_columns = left_columns + right_columns
                 targets = ",".join((
                     f"`{self.index.name}`", *(f"`{c}`" for c in merged_columns),
                 ))
-                condition = f"""`{left_view}`.`{self.index.name}` ==
-                    `{right_view}`.`{self.index.name}`"""
-                query = f"""SELECT `{left_view}`.{targets} FROM
-                        `{left_view}` LEFT JOIN `{right_view}` ON {condition}
-                    UNION SELECT `{right_view}`.{targets} FROM
-                        `{right_view}` LEFT JOIN `{left_view}` ON {condition}
-                        WHERE `{left_view}`.`{self.index.name}` IS NULL"""
-                merged_view = stack.enter_context(_make_view(connection, query))
-                left_view, left_columns = merged_view, merged_columns
-            yield merged_view, merged_columns
+                condition = f"""`{left_select}`.`{self.index.name}` ==
+                    `{right_select}`.`{self.index.name}`"""
+                query = f"""SELECT `{left_select}`.{targets} FROM
+                       `{left_select}` LEFT JOIN `{right_select}` ON {condition}
+                    UNION SELECT `{right_select}`.{targets} FROM
+                       `{right_select}` LEFT JOIN `{left_select}` ON {condition}
+                       WHERE `{left_select}`.`{self.index.name}` IS NULL"""
+                merged_select = stack.enter_context(mkselect(connection, query))
+                left_select, left_columns = merged_select, merged_columns
+            yield merged_select, merged_columns
  
     @apply_hack(speedup_data_schema)
     def get(self, *, context, limit=None, offset=0):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
         where = context.data_comparisons
-        query_filter = _make_query_filter(self.name, where, limit, offset)
+        q_filter = _make_query_filter(self.name, where, limit, offset)
         with closing(connect(self.sqlite_db)) as connection:
-            with self.view(connection) as (merged_view, merged_columns):
+            with self.select(connection) as (merged_select, merged_columns):
                 try:
                     targets = ",".join((
                         f"`{self.index.name}`",
                         *(f"`{c}`" for c in self._raw_columns),
                     ))
-                    q = f"SELECT {targets} FROM `{merged_view}` {query_filter}"
+                    q = f"SELECT {targets} FROM `{merged_select}` {q_filter}"
                     data = read_sql(q, connection, index_col=self.index.name)
                 except OperationalError:
                     msg = "No data found"
