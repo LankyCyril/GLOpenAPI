@@ -186,8 +186,7 @@ def combine_objects(objects, context, limit=None):
     if isinstance(combined, OndemandSQLiteDataFrame):
         if context.data_columns:
             INPLACE_constrain_columns(combined, context.data_columns)
-        # TODO: speedups for schema=1
-        data = combined.get(where=context.data_comparisons, context=context)
+        data = combined.get(context=context)
         return data
     elif context.data_columns or context.data_comparisons:
         raise GeneFabFileException(

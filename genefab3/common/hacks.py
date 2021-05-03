@@ -68,12 +68,12 @@ def get_OSDF_OuterJoined_schema(self, *, context):
     ))
 
 
-def speedup_data_schema(get, self, *, where=None, limit=None, offset=0, context=None):
+def speedup_data_schema(get, self, *, context, limit=None, offset=0):
     """If context.schema == '1', replaces OndemandSQLiteDataFrame.get() with quick retrieval of just values informative schema"""
     if context.schema != "1":
-        kwargs = dict(where=where, limit=limit, offset=offset, context=context)
+        kwargs = dict(context=context, limit=limit, offset=offset)
         return get(self, **kwargs)
-    elif where or limit or offset:
+    elif context.data_comparisons or limit or offset:
         msg = "Table manipulation is not supported when requesting schema"
         sug = "Remove comparisons and/or row slicing from query"
         raise GeneFabFormatException(msg, suggestion=sug)

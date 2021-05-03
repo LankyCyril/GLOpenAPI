@@ -145,12 +145,13 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
         return f"SELECT {targets} FROM {joined} {query_filter}"
  
     @apply_hack(speedup_data_schema)
-    def get(self, *, where=None, limit=None, offset=0, context=None):
+    def get(self, *, context, limit=None, offset=0):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
         part_to_column = self._inverse_column_dispatcher
         if len(part_to_column) == 0:
             return Placeholders.EmptyDataDataFrame()
         else:
+            where = context.data_comparisons
             args = part_to_column, where, limit, offset
             query = self.__make_natural_join_query(*args)
             with closing(connect(self.sqlite_db)) as connection:
@@ -241,8 +242,9 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
             yield merged_view, merged_columns
  
     @apply_hack(speedup_data_schema)
-    def get(self, *, where=None, limit=None, offset=0, context=None):
+    def get(self, *, context, limit=None, offset=0):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
+        where = context.data_comparisons
         query_filter = _make_query_filter(self.name, where, limit, offset)
         with closing(connect(self.sqlite_db)) as connection:
             with self.view(connection) as (merged_view, merged_columns):
