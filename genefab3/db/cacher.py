@@ -5,6 +5,7 @@ from genefab3.db.mongo.index import ensure_info_index
 from genefab3.db.mongo.index import update_metadata_value_lookup
 from time import sleep
 from collections import OrderedDict
+from genefab3.db.mongo.utils import iterate_mongo_connections
 from genefab3.db.mongo.types import ValueCheckedRecord
 from genefab3.isa.types import Dataset
 from genefab3.db.mongo.utils import run_mongo_action, harmonize_document
@@ -14,8 +15,9 @@ from genefab3.db.mongo.status import drop_status, update_status
 class CacherThread(Thread):
     """Lives in background and keeps local metadata cache, metadata index, and response cache up to date"""
  
-    def __init__(self, *, adapter, mongo_collections, mongo_appname, locale, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter):
+    def __init__(self, *, genefab3_client, adapter, mongo_collections, mongo_appname, locale, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter):
         """Prepare background thread that iteratively watches for changes to datasets"""
+        self.genefab3_client = genefab3_client
         self._id = mongo_appname.replace("GeneFab3", "CacherThread")
         self.adapter = adapter
         self.mongo_collections, self.locale = mongo_collections, locale
@@ -74,6 +76,10 @@ class CacherThread(Thread):
             if key in {"dropped", "failed"}:
                 drop_status(**_kws)
             update_status(**_kws)
+            mongo_client = self.genefab3_client.mongo_client
+            n_apps = sum(1 for _ in iterate_mongo_connections(mongo_client))
+            msg = f"Total number of active MongoDB connections: {n_apps}"
+            GeneFabLogger().info(msg)
         GeneFabLogger().info(f"{self._id}, datasets:\n  " + ", ".join(
             f"{k}={len(v)}" for k, v in accessions.items()
         ))
@@ -131,7 +137,7 @@ class CacherThread(Thread):
             if files.changed or (not has_cache):
                 best_sample_name_matches=self.adapter.best_sample_name_matches
                 dataset = Dataset(
-                    accession, files.value, self.sqlite_dbs.blobs,
+                    accession, files.value, self.sqlite_dbs,
                     best_sample_name_matches=best_sample_name_matches,
                     status_kwargs=self.status_kwargs,
                 )

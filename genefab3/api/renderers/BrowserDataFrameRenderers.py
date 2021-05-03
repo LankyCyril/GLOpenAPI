@@ -3,6 +3,7 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import lru_cache
 from pathlib import Path
 from genefab3.common.logger import GeneFabLogger
+from genefab3.api.renderers.PlaintextDataFrameRenderers import get_index_and_columns
 from json import dumps
 from genefab3.common.types import AnnotationDataFrame
 from genefab3.common.utils import map_replace
@@ -66,9 +67,9 @@ def get_browser_meta_formatter(context, i, head, target):
     return f"columns[{i}].formatter = columns[{i}].defaultFormatter = {_fr};"
 
 
-def iterate_formatters(obj, context):
+def iterate_formatters(index_and_columns, context):
     """Get SlickGrid formatters for columns"""
-    for i, (key, target) in enumerate(obj.columns):
+    for i, (key, target) in enumerate(index_and_columns):
         if key == "id":
             if target == "accession":
                 yield get_browser_glds_formatter(context, i)
@@ -104,15 +105,16 @@ def get_view_dependent_links(obj, context):
         return ""
 
 
-def twolevel(obj, context, indent=None, frozen=0, squash_preheader=False):
+def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader=False):
     """Display dataframe with two-level columns using SlickGrid"""
     _assert_type(obj, nlevels=2)
     title_postfix = f"{context.view} {context.complete_kwargs}"
     GeneFabLogger().info("HTML: converting DataFrame into interactive table")
-    columndata = dumps(obj.columns.to_list(), separators=(",", ":"))
-    rowdata = obj.to_json(orient="values")
+    index_and_columns = get_index_and_columns(obj, col_fill=col_fill)
+    columndata = dumps(index_and_columns.to_list(), separators=(",", ":"))
+    rowdata = obj.reset_index().to_json(orient="values")
     if isinstance(obj, AnnotationDataFrame) and (context.view != "status"):
-        formatters = iterate_formatters(obj, context)
+        formatters = iterate_formatters(index_and_columns, context)
     else:
         formatters = []
     content = map_replace(_get_browser_html(), {
@@ -137,7 +139,12 @@ def twolevel(obj, context, indent=None, frozen=0, squash_preheader=False):
 def threelevel(obj, context, indent=None):
     """Squash two top levels of dataframe columns and display as two-level"""
     _assert_type(obj, nlevels=3)
-    obj.columns = MultiIndex.from_tuples((
-        (f"{a}<br>{b}", c) for (a, b, c) in obj.columns
-    ))
-    return twolevel(obj, context=context, squash_preheader=True)
+    if len(obj.columns):
+        obj.columns = MultiIndex.from_tuples((
+            (f"{a}<br>{b}", c) for (a, b, c) in obj.columns
+        ))
+    else:
+        obj.columns = MultiIndex.from_tuples([("*", "*")])[:0]
+    return twolevel(
+        obj, context=context, col_fill="*<br>*", squash_preheader=True,
+    )

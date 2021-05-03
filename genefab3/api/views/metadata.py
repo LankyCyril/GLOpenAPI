@@ -40,6 +40,15 @@ def iisaf_sort_dataframe(dataframe):
     return dataframe[sum((sorted(column_order[p]) for p in prefix_order), [])]
 
 
+def INPLACE_set_id_as_index(dataframe):
+    """Move all columns with first level value of "id" into MultiIndex"""
+    if "id" in dataframe.columns.get_level_values(0):
+        dataframe.index = MultiIndex.from_frame(
+            dataframe["id"], names=dataframe[["id"]].columns,
+        )
+        dataframe.drop(columns="id", inplace=True)
+
+
 def get(mongo_collections, *, locale, context, id_fields, aggregate=False):
     """Select assays/samples based on annotation filters"""
     dataframe, full_projection = get_raw_metadata_dataframe( # single-level
@@ -61,4 +70,5 @@ def get(mongo_collections, *, locale, context, id_fields, aggregate=False):
             else: # metadata cols present and can be collapsed into booleans
                 gby = dataframe.groupby(info_cols, as_index=False, sort=False)
                 dataframe = gby.agg(lambda a: ~isnull(a).all())
+        INPLACE_set_id_as_index(dataframe)
         return AnnotationDataFrame(dataframe)

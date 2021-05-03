@@ -16,7 +16,7 @@ from genefab3.common.exceptions import GeneFabFileException
 class CachedBinaryFile(SQLiteBlob):
     """Represents an SQLiteObject that stores up-to-date file contents as a binary blob"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, table="BLOBS:blobs", compressor=None, decompressor=None):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, table="BLOBS:blobs", compressor=None, decompressor=None, maxdbsize=None):
         """Interpret file descriptors; inherit functionality from SQLiteBlob; define equality (hashableness) of self"""
         self.name, self.url, self.timestamp = name, None, timestamp
         self.identifier = identifier
@@ -24,7 +24,7 @@ class CachedBinaryFile(SQLiteBlob):
         SQLiteBlob.__init__(
             self, identifier=identifier, timestamp=timestamp,
             data_getter=lambda: self.__download_as_blob(urls),
-            sqlite_db=sqlite_db, table=table,
+            sqlite_db=sqlite_db, maxdbsize=maxdbsize, table=table,
             compressor=compressor, decompressor=decompressor,
         )
  
@@ -53,7 +53,7 @@ class CachedBinaryFile(SQLiteBlob):
 class CachedTableFile(SQLiteTable):
     """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxpartwidth=1000, **pandas_kws):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxpartwidth=1000, maxdbsize=None, **pandas_kws):
         """Interpret file descriptors; inherit functionality from SQLiteTable; define equality (hashableness) of self"""
         self.name, self.url, self.timestamp = name, None, timestamp
         self.identifier = identifier
@@ -64,8 +64,8 @@ class CachedTableFile(SQLiteTable):
             data_getter=lambda: self.__download_as_pandas_dataframe(
                 urls, pandas_kws, INPLACE_process,
             ),
-            sqlite_db=sqlite_db, maxpartwidth=maxpartwidth,
-            table=self.table, aux_table=aux_table,
+            sqlite_db=sqlite_db, maxdbsize=maxdbsize,
+            table=self.table, aux_table=aux_table, maxpartwidth=maxpartwidth,
         )
  
     def __copyfileobj(self, urls, tempfile):

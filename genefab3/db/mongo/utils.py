@@ -8,6 +8,15 @@ from genefab3.common.exceptions import GeneFabDatabaseException
 from pymongo import ASCENDING
 
 
+def iterate_mongo_connections(mongo_client):
+    query = {"$currentOp": {"allUsers": True, "idleConnections": True}}
+    projection = {"$project": {"appName": True}}
+    for e in mongo_client.admin.aggregate([query, projection]):
+        connected_app_name = e.get("appName", "")
+        if connected_app_name.startswith("GeneFab3"):
+            yield connected_app_name
+
+
 def isempty(v):
     """Check if terminal leaf value is a null value or an empty string"""
     return isnull(v) or (v == "")
