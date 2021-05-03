@@ -36,14 +36,20 @@ class OndemandSQLiteDataFrame():
     def constrain_columns(self, context):
         """Constrain self.columns to specified columns, if any"""
         if context.data_columns:
-            joined_columns_dispatch = {"/".join(c): c for c in self.columns}
+            slashed_colnames = {"/".join(c): c for c in self.columns}
             last_level_dispatch = {c[-1]: c for c in self.columns}
+            value_counts = self.columns.get_level_values(-1).value_counts()
             constrained_columns = []
             for c in context.data_columns:
-                if ("/" in c) and (c in joined_columns_dispatch):
-                    constrained_columns.append(joined_columns_dispatch[c])
+                if ("/" in c) and (c in slashed_colnames):
+                    constrained_columns.append(slashed_colnames[c])
                 elif c in last_level_dispatch:
-                    constrained_columns.append(last_level_dispatch[c])
+                    if value_counts[c] > 1:
+                        msg = "Ambiguous column requested"
+                        s = "Use full syntax (columns.ACCESSION/ASSAY/COLUMN)"
+                        raise GeneFabFileException(msg, column=c, suggestion=s)
+                    else:
+                        constrained_columns.append(last_level_dispatch[c])
                 else:
                     msg = "Requested column not in table"
                     raise GeneFabFileException(msg, column=c)
@@ -192,15 +198,21 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
     @contextmanager
     def select(self, connection):
         """Interpret arguments and temporarily expose requested data as SQL view or table"""
+        # TODO: this can be sped up when only specific columns are requested
         part_to_column = self._inverse_column_dispatcher
         if len(part_to_column) == 0:
             yield None
         else:
             args = part_to_column, None, None, 0
             join_query = self.__make_natural_join_query(*args)
+            slashed_colnames = {c[-1]: "/".join(c) for c in self.columns}
             try:
                 with mkselect(connection, join_query) as selectname:
-                    yield selectname, self._raw_columns
+                    cols = [
+                        f"`{selectname}`.`{c}` as `{slashed_colnames[c]}`"
+                        for c in self._raw_columns
+                    ]
+                    yield selectname, cols
             except (OperationalError, GeneFabDatabaseException):
                 msg = "Data could not be retrieved"
                 raise GeneFabDatabaseException(msg, table=self.name)
@@ -244,9 +256,7 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
             left_select, left_columns = object_selects[0]
             for right_select, right_columns in object_selects[1:]:
                 merged_columns = left_columns + right_columns
-                targets = ",".join((
-                    f"`{self.index.name}`", *(f"`{c}`" for c in merged_columns),
-                ))
+                targets = ",".join((f"`{self.index.name}`", *merged_columns))
                 condition = f"""`{left_select}`.`{self.index.name}` ==
                     `{right_select}`.`{self.index.name}`"""
                 query = f"""SELECT `{left_select}`.{targets} FROM
@@ -268,7 +278,7 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
                 try:
                     targets = ",".join((
                         f"`{self.index.name}`",
-                        *(f"`{c}`" for c in self._raw_columns),
+                        *(f"`{'/'.join(c)}`" for c in self.columns),
                     ))
                     q = f"SELECT {targets} FROM `{merged_select}` {q_filter}"
                     data = read_sql(q, connection, index_col=self.index.name)
