@@ -1,14 +1,16 @@
-from functools import wraps
+from functools import wraps, reduce, partial
 from contextlib import closing
 from sqlite3 import connect, OperationalError
 from numpy import nan
-from pandas import DataFrame
+from pandas import DataFrame, merge
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.types import DataDataFrame
+from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.common.exceptions import GeneFabConfigurationException
 
 
 def apply_hack(hack):
+    """Wraps `method` with function `hack`"""
     def outer(method):
         @wraps(method)
         def inner(*args, **kwargs):
@@ -17,11 +19,10 @@ def apply_hack(hack):
     return outer
 
 
-found = lambda v: v is not None
-
-
 def get_OSDF_Single_schema(self):
+    """Replaces OndemandSQLiteDataFrame_Single.get() with retrieval of just values informative for 'schema=1'"""
     from genefab3.db.sql.pandas import SQLiteIndexName
+    found = lambda v: v is not None
     index_name, data = None, {}
     with closing(connect(self.sqlite_db)) as connection:
         try:
@@ -58,21 +59,31 @@ def get_OSDF_Single_schema(self):
             return DataDataFrame(dataframe)
 
 
-def get_OSDF_OuterJoined_schema(self):
-    raise ValueError
+def get_OSDF_OuterJoined_schema(self, *, context):
+    """Replaces OndemandSQLiteDataFrame_OuterJoined.get() with retrieval of just values informative for 'schema=1'"""
+    merge_kws = dict(left_index=True, right_index=True, how="outer", sort=False)
+    return DataDataFrame(reduce(
+        partial(merge, **merge_kws),
+        (obj.get(context=context) for obj in self.objs),
+    ))
 
 
 def speedup_data_schema(get, self, *, where=None, limit=None, offset=0, context=None):
+    """If context.schema == '1', replaces OndemandSQLiteDataFrame.get() with quick retrieval of just values informative schema"""
     if context.schema != "1":
         kwargs = dict(where=where, limit=limit, offset=offset, context=context)
         return get(self, **kwargs)
+    elif where or limit or offset:
+        msg = "Table manipulation is not supported when requesting schema"
+        sug = "Remove comparisons and/or row slicing from query"
+        raise GeneFabFormatException(msg, suggestion=sug)
     else:
         from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
         from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_OuterJoined
         if isinstance(self, OndemandSQLiteDataFrame_Single):
             return get_OSDF_Single_schema(self)
         elif isinstance(self, OndemandSQLiteDataFrame_OuterJoined):
-            return get_OSDF_OuterJoined_schema(self)
+            return get_OSDF_OuterJoined_schema(self, context=context)
         else:
             msg = "Schema speedup applied to unsupported object type"
             raise GeneFabConfigurationException(msg, type=type(self))
