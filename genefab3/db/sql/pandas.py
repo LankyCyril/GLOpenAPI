@@ -70,7 +70,8 @@ def _make_view(connection, query):
         connection.cursor().execute(f"CREATE VIEW `{viewname}` as {query}")
     except OperationalError:
         msg = "Failed to create temporary view"
-        raise GeneFabDatabaseException(msg, viewname=viewname, query=query)
+        _kw = dict(viewname=viewname, debug_info=query)
+        raise GeneFabDatabaseException(msg, **_kw)
     else:
         query_repr = repr(query.lstrip()[:100] + "...")
         msg = f"Created temporary SQLite view {viewname} from {query_repr}"
@@ -251,9 +252,9 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
                 except OperationalError:
                     msg = "No data found"
                     raise GeneFabDatabaseException(msg, table=self.name)
-                except PandasDatabaseError:
+                except PandasDatabaseError as e:
                     msg = "Bad SQL query when joining tables"
-                    _kw = dict(table=self.name, debug_info=q)
+                    _kw = dict(table=self.name, debug_info=[repr(e), q])
                     raise GeneFabConfigurationException(msg, **_kw)
                 else:
                     msg = f"retrieved from SQLite as pandas DataFrame"
