@@ -7,6 +7,7 @@ from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDataManagerException
 from pandas import MultiIndex
 from genefab3.db.sql.pandas import OndemandSQLiteDataFrame
+from genefab3.common.utils import ExceptionPropagatingThread
 from genefab3.db.sql.files import CachedTableFile, CachedBinaryFile
 from natsort import natsorted
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -157,22 +158,6 @@ def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, ada
     return data
 
 
-def INPLACE_constrain_columns(sqlite_dataframe, data_columns):
-    """Constrain OndemandSQLiteDataFrame to specified columns"""
-    joined_columns_dispatch = {"/".join(c): c for c in sqlite_dataframe.columns}
-    last_level_dispatch = {c[-1]: c for c in sqlite_dataframe.columns}
-    constrained_columns = []
-    for c in data_columns:
-        if ("/" in c) and (c in joined_columns_dispatch):
-            constrained_columns.append(joined_columns_dispatch[c])
-        elif c in last_level_dispatch:
-            constrained_columns.append(last_level_dispatch[c])
-        else:
-            msg = "Requested column not in table"
-            raise GeneFabFileException(msg, column=c)
-    sqlite_dataframe.columns = MultiIndex.from_tuples(constrained_columns)
-
-
 def combine_objects(objects, context, limit=None):
     """Combine objects and post-process"""
     if len(objects) == 0:
@@ -184,14 +169,20 @@ def combine_objects(objects, context, limit=None):
     else:
         raise NotImplementedError("Merging non-table data objects")
     if isinstance(combined, OndemandSQLiteDataFrame):
-        if context.data_columns:
-            INPLACE_constrain_columns(combined, context.data_columns)
-        # TODO: speedups for schema=1
-        data = combined.get(where=context.data_comparisons)
-        if data.index.name is None:
-            data.index.name = "index" # best we can do
-        data.reset_index(inplace=True, col_level=-1, col_fill="*")
-        return data
+        combined.constrain_columns(context=context)
+        container = []
+        getter_thread = ExceptionPropagatingThread(
+            target=lambda: container.append(combined.get(context=context)),
+        )
+        # if user breaks connection, or httpd exceeds timeout,
+        # getter_thread will finish regardless AND plumb upwards through stack
+        # to get response cached in response_cache:
+        getter_thread.start()
+        # if connection persists until completion of combined.get(),
+        # getter_thread will join here and present result to user before
+        # caching in response_cache, and then will cache:
+        getter_thread.join()
+        return container.pop()
     elif context.data_columns or context.data_comparisons:
         raise GeneFabFileException(
             "Column operations on non-table data objects are not supported",
@@ -214,22 +205,22 @@ def combined_data(descriptors, context, mongo_collections, sqlite_dbs, adapter):
         msg = "Data marked as non-cacheable, cannot be returned in this format"
         sug = "Use 'format=raw'"
         raise GeneFabFileException(msg, suggestion=sug, format=context.format)
-    types = getset("file", "type")
-    if types == {"table"}:
-        sqlite_db, CachedFile = sqlite_dbs.tables, CachedTableFile
-        _kws = dict(index_col=0, INPLACE_process=True)
-    elif len(types) == 1:
-        sqlite_db, CachedFile, _kws = sqlite_dbs.blobs, CachedBinaryFile, {}
+    _types = getset("file", "type")
+    if _types == {"table"}:
+        sqlite_db, CachedFile = sqlite_dbs.tables["db"], CachedTableFile
+        maxdbsize = sqlite_dbs.tables["maxsize"]
+        _kws = dict(maxdbsize=maxdbsize, index_col=0, INPLACE_process=True)
+    elif len(_types) == 1:
+        sqlite_db, CachedFile = sqlite_dbs.blobs["db"], CachedBinaryFile
+        _kws = {}
     else:
-        raise NotImplementedError(f"Joining data of types {types}")
+        raise NotImplementedError(f"Joining data of types {_types}")
+    _sort_key = lambda d: (d.get("accession"), d.get("assay name"))
     data = combine_objects(context=context, objects=[
         get_formatted_data(
             descriptor, mongo_collections, sqlite_db, CachedFile, adapter, _kws,
         )
-        for descriptor in natsorted(
-            descriptors,
-            key=lambda d: (d.get("accession"), d.get("assay name")),
-        )
+        for descriptor in natsorted(descriptors, key=_sort_key)
     ])
     if data is None:
         raise GeneFabDatabaseException("No data found in database")

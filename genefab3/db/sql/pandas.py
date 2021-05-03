@@ -1,4 +1,4 @@
-from genefab3.common.utils import validate_no_backtick, random_string
+from genefab3.common.utils import validate_no_backtick, random_unique_string
 from pandas import Index, MultiIndex, read_sql
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -6,6 +6,7 @@ from contextlib import contextmanager, closing, ExitStack
 from sqlite3 import OperationalError, connect
 from genefab3.common.logger import GeneFabLogger
 from collections import OrderedDict
+from genefab3.common.hacks import apply_hack, speed_up_data_schema
 from genefab3.api.renderers import Placeholders
 from genefab3.common.types import DataDataFrame
 from pandas.io.sql import DatabaseError as PandasDatabaseError
@@ -31,6 +32,22 @@ class OndemandSQLiteDataFrame():
             msg = f"Setting foreign column(s) to OndemandSQLiteDataFrame"
             foreign = sorted(set(last_level) - set(self._raw_columns))
             raise GeneFabFileException(msg, columns=foreign)
+ 
+    def constrain_columns(self, context):
+        """Constrain self.columns to specified columns, if any"""
+        if context.data_columns:
+            joined_columns_dispatch = {"/".join(c): c for c in self.columns}
+            last_level_dispatch = {c[-1]: c for c in self.columns}
+            constrained_columns = []
+            for c in context.data_columns:
+                if ("/" in c) and (c in joined_columns_dispatch):
+                    constrained_columns.append(joined_columns_dispatch[c])
+                elif c in last_level_dispatch:
+                    constrained_columns.append(last_level_dispatch[c])
+                else:
+                    msg = "Requested column not in table"
+                    raise GeneFabFileException(msg, column=c)
+            self.columns = MultiIndex.from_tuples(constrained_columns)
  
     @staticmethod
     def concat(objs, axis=1):
@@ -62,27 +79,30 @@ def _make_query_filter(table, where, limit, offset):
 
 
 @contextmanager
-def _make_view(connection, query):
-    """Context manager temporarily creating an SQLite view from `query`"""
-    viewname = random_string(seed=query)
+def mkselect(connection, query, kind="TABLE"):
+    """Context manager temporarily creating an SQLite view or table from `query`"""
+    selectname = random_unique_string(seed=query)
     try:
-        connection.cursor().execute(f"CREATE VIEW `{viewname}` as {query}")
+        connection.cursor().execute(f"CREATE {kind} `{selectname}` as {query}")
     except OperationalError:
-        msg = "Failed to create temporary view"
-        raise GeneFabDatabaseException(msg, viewname=viewname, query=query)
+        msg = f"Failed to create temporary {kind}"
+        _kw = dict(name=selectname, debug_info=query)
+        raise GeneFabDatabaseException(msg, **_kw)
     else:
         query_repr = repr(query.lstrip()[:100] + "...")
-        msg = f"Created temporary SQLite view {viewname} from {query_repr}"
+        msg = f"Created temporary SQLite {kind} {selectname} from {query_repr}"
         GeneFabLogger().info(msg)
-        yield viewname
-    try:
-        connection.cursor().execute(f"DROP VIEW `{viewname}`")
-    except OperationalError:
-        msg = f"Failed to drop temporary view {viewname}"
-        GeneFabLogger().error(msg)
-    else:
-        msg = f"Dropped temporary SQLite view {viewname}"
-        GeneFabLogger().info(msg)
+        try:
+            yield selectname
+        finally:
+            try:
+                connection.cursor().execute(f"DROP {kind} `{selectname}`")
+            except OperationalError:
+                msg = f"Failed to drop temporary {kind} {selectname}"
+                GeneFabLogger().error(msg)
+            else:
+                msg = f"Dropped temporary SQLite {kind} {selectname}"
+                GeneFabLogger().info(msg)
 
 
 class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
@@ -140,12 +160,14 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
         GeneFabLogger().info(f"{self.name}; {msg}")
         return f"SELECT {targets} FROM {joined} {query_filter}"
  
-    def get(self, *, where=None, limit=None, offset=0):
+    @apply_hack(speed_up_data_schema)
+    def get(self, *, context, limit=None, offset=0):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
         part_to_column = self._inverse_column_dispatcher
         if len(part_to_column) == 0:
             return Placeholders.EmptyDataDataFrame()
         else:
+            where = context.data_comparisons
             args = part_to_column, where, limit, offset
             query = self.__make_natural_join_query(*args)
             with closing(connect(self.sqlite_db)) as connection:
@@ -168,8 +190,8 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
                     return DataDataFrame(data)
  
     @contextmanager
-    def view(self, connection):
-        """Interpret arguments and temporarily expose requested data as SQL view"""
+    def select(self, connection):
+        """Interpret arguments and temporarily expose requested data as SQL view or table"""
         part_to_column = self._inverse_column_dispatcher
         if len(part_to_column) == 0:
             yield None
@@ -177,14 +199,14 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
             args = part_to_column, None, None, 0
             join_query = self.__make_natural_join_query(*args)
             try:
-                with _make_view(connection, join_query) as viewname:
-                    yield viewname, self._raw_columns, None
+                with mkselect(connection, join_query) as selectname:
+                    yield selectname, self._raw_columns
             except (OperationalError, GeneFabDatabaseException):
                 raise GeneFabDatabaseException("No data found", table=self.name)
 
 
 class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
-    """DataDataFrame to be retrieved from SQLite, full outer joined from multiple views"""
+    """DataDataFrame to be retrieved from SQLite, full outer joined from multiple views or tables"""
  
     def __init__(self, sqlite_db, objs):
         _t = "OndemandSQLiteDataFrame"
@@ -212,49 +234,50 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
             self.name = f"FullOuterJoin({names})"
  
     @contextmanager
-    def view(self, connection):
-        """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
+    def select(self, connection):
+        """Interpret arguments and temporarily expose requested data as SQL view or table"""
         with ExitStack() as stack:
-            object_views = [
-                stack.enter_context(o.view(connection)) for o in self.objs
+            object_selects = [
+                stack.enter_context(o.select(connection)) for o in self.objs
             ]
-            left_view, left_columns, _ = object_views[0]
-            for right_view, right_columns, _ in object_views[1:]:
+            left_select, left_columns = object_selects[0]
+            for right_select, right_columns in object_selects[1:]:
                 merged_columns = left_columns + right_columns
                 targets = ",".join((
                     f"`{self.index.name}`", *(f"`{c}`" for c in merged_columns),
                 ))
-                condition = f"""`{left_view}`.`{self.index.name}` ==
-                    `{right_view}`.`{self.index.name}`"""
-                query = f"""SELECT `{left_view}`.{targets} FROM
-                        `{left_view}` LEFT JOIN `{right_view}` ON {condition}
-                    UNION SELECT `{right_view}`.{targets} FROM
-                        `{right_view}` LEFT JOIN `{left_view}` ON {condition}
-                        WHERE `{left_view}`.`{self.index.name}` IS NULL"""
-                merged_view = stack.enter_context(_make_view(connection, query))
-                left_view, left_columns = merged_view, merged_columns
-            yield merged_view, merged_columns, stack
+                condition = f"""`{left_select}`.`{self.index.name}` ==
+                    `{right_select}`.`{self.index.name}`"""
+                query = f"""SELECT `{left_select}`.{targets} FROM
+                       `{left_select}` LEFT JOIN `{right_select}` ON {condition}
+                    UNION SELECT `{right_select}`.{targets} FROM
+                       `{right_select}` LEFT JOIN `{left_select}` ON {condition}
+                       WHERE `{left_select}`.`{self.index.name}` IS NULL"""
+                merged_select = stack.enter_context(mkselect(connection, query))
+                left_select, left_columns = merged_select, merged_columns
+            yield merged_select, merged_columns
  
-    def get(self, *, where=None, limit=None, offset=0):
+    @apply_hack(speed_up_data_schema)
+    def get(self, *, context, limit=None, offset=0):
         """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
-        query_filter = _make_query_filter(self.name, where, limit, offset)
+        where = context.data_comparisons
+        q_filter = _make_query_filter(self.name, where, limit, offset)
         with closing(connect(self.sqlite_db)) as connection:
-            with self.view(connection) as (merged_view, merged_columns, stack):
+            with self.select(connection) as (merged_select, merged_columns):
                 try:
-                    q = f"SELECT * FROM `{merged_view}` {query_filter}"
+                    targets = ",".join((
+                        f"`{self.index.name}`",
+                        *(f"`{c}`" for c in self._raw_columns),
+                    ))
+                    q = f"SELECT {targets} FROM `{merged_select}` {q_filter}"
                     data = read_sql(q, connection, index_col=self.index.name)
                 except OperationalError:
-                    stack.close()
                     msg = "No data found"
                     raise GeneFabDatabaseException(msg, table=self.name)
-                except PandasDatabaseError:
-                    stack.close()
+                except PandasDatabaseError as e:
                     msg = "Bad SQL query when joining tables"
-                    _kw = dict(table=self.name, debug_info=q)
+                    _kw = dict(table=self.name, debug_info=[repr(e), q])
                     raise GeneFabConfigurationException(msg, **_kw)
-                except:
-                    stack.close()
-                    raise
                 else:
                     msg = f"retrieved from SQLite as pandas DataFrame"
                     GeneFabLogger().info(f"{self.name}; {msg}")

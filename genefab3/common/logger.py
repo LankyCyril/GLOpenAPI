@@ -9,11 +9,18 @@ def log_to_mongo_collection(collection, et=None, ev=None, stack=None, is_excepti
         remote_addr, full_path = request.remote_addr, request.full_path
     except RuntimeError:
         remote_addr, full_path = None, None
-    collection.insert_one({
-        "is_exception": is_exception, "type": et, "value": ev, "stack": stack,
+    document = {
+        "is_exception": is_exception, "type": et, "value": ev,
         "remote_addr": remote_addr, "full_path": full_path,
-        "timestamp": int(datetime.now().timestamp()), **kwargs,
-    })
+        "timestamp": int(datetime.now().timestamp()),
+    }
+    try:
+        collection.insert_one({**document, "stack": stack, **kwargs})
+    except Exception as e:
+        collection.insert_one({
+            **document, "full_logging_failure_reason": repr(e),
+            "elements_not_logged": ["stack", "kwargs"],
+        })
 
 
 @lru_cache(maxsize=None)

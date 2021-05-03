@@ -14,7 +14,7 @@ class DefaultRoutes(Routes):
         if self.adapter.get_favicon_urls():
             ico_file = CachedBinaryFile(
                 name="favicon.ico", identifier="RESOURCE/favicon.ico",
-                sqlite_db=self.sqlite_dbs.blobs, timestamp=0,
+                sqlite_db=self.sqlite_dbs.blobs["db"], timestamp=0,
                 urls=self.adapter.get_favicon_urls(),
             )
             return ico_file.data
@@ -27,7 +27,10 @@ class DefaultRoutes(Routes):
  
     @Routes.register_endpoint()
     def status(self, context=None) -> DataFrame:
-        return views.status.get(self.mongo_collections, context=context)
+        return views.status.get(
+            self.mongo_collections, context=context,
+            genefab3_client=self.genefab3_client, sqlite_dbs=self.sqlite_dbs,
+        )
  
     @Routes.register_endpoint()
     def assays(self, context) -> AnnotationDataFrame:

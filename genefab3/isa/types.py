@@ -9,9 +9,10 @@ from genefab3.common.utils import iterate_terminal_leaf_elements
 
 class Dataset():
  
-    def __init__(self, accession, files, sqlite_blobs, best_sample_name_matches=None, status_kwargs=None):
+    def __init__(self, accession, files, sqlite_dbs, best_sample_name_matches=None, status_kwargs=None):
         self.accession, self.files = accession, files
-        self.sqlite_blobs = sqlite_blobs
+        self.sqlite_db = sqlite_dbs.blobs["db"]
+        self.maxdbsize = sqlite_dbs.blobs["maxsize"]
         self.best_sample_name_matches = (
             best_sample_name_matches or
             (lambda n, N: Adapter.best_sample_name_matches(None, n, N))
@@ -29,7 +30,7 @@ class Dataset():
             urls = isa_desc.get("urls", ())
             isa_file = CachedBinaryFile(
                 name=isa_name, identifier=f"{accession}/ISA/{isa_name}",
-                sqlite_db=self.sqlite_blobs,
+                sqlite_db=self.sqlite_db, maxdbsize=self.maxdbsize,
                 urls=urls, timestamp=isa_desc.get("timestamp", -1),
             )
             self.isa = IsaFromZip(

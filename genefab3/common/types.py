@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
-from pandas import DataFrame
+from pandas import DataFrame, MultiIndex, Index
 from numpy import dtype
 
 
@@ -37,7 +37,8 @@ class Adapter():
 class Routes():
     """Base class for registered endpoints"""
  
-    def __init__(self, mongo_collections, *, locale, sqlite_dbs, adapter):
+    def __init__(self, genefab3_client, *, mongo_collections, locale, sqlite_dbs, adapter):
+        self.genefab3_client = genefab3_client
         self.mongo_collections, self.locale = mongo_collections, locale
         self.sqlite_dbs, self.adapter = sqlite_dbs, adapter
  
@@ -82,7 +83,17 @@ class GeneFabDataFrame(DataFrame):
             else:
                 _t = "bool" if column.dtype is dtype("bool") else "str"
                 return f"{_t}[..|NaN]" if column.isnull().any() else f"{_t}[..]"
-        return type(self)(self.apply(_column_schema).to_frame().T)
+        schema = self.apply(_column_schema).to_frame().T
+        if isinstance(self.index, MultiIndex):
+            index_frame = self.index.to_frame(index=False)
+            schema.index = MultiIndex.from_frame(
+                index_frame.apply(_column_schema).to_frame().T
+            )
+        else:
+            schema.index = Index(
+                [_column_schema(self.index)], name=self.index.name,
+            )
+        return type(self)(schema)
 
 
 class AnnotationDataFrame(GeneFabDataFrame):

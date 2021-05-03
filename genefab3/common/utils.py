@@ -15,6 +15,7 @@ from functools import partial, reduce
 from operator import getitem
 from collections import defaultdict, OrderedDict
 from marshal import dumps as marsh
+from threading import Thread
 
 
 timestamp36 = lambda: base_repr(int(datetime.now().timestamp() * (10**6)), 36)
@@ -31,7 +32,7 @@ def is_debug(markers={"development", "staging", "stage", "debug", "debugging"}):
     return environ.get("FLASK_ENV", None) in markers
 
 
-def random_string(seed=""):
+def random_unique_string(seed=""):
     return b64encode(uuid3(uuid4(), seed).bytes, b'_-').decode().rstrip("=")
 
 
@@ -40,9 +41,12 @@ def pick_reachable_url(urls, name=None):
     """Iterate `urls` and get the first reachable URL"""
     def _pick():
         for url in urls:
-            with request_head(url, allow_redirects=True) as response:
-                if response.ok:
-                    return url
+            try:
+                with request_head(url, allow_redirects=True) as response:
+                    if response.ok:
+                        return url
+            except (URLError, OSError):
+                continue
         else:
             for url in urls:
                 try:
@@ -142,3 +146,18 @@ def validate_no_special_character(identifier, desc, c):
         raise GeneFabConfigurationException(msg, **{desc: identifier})
 validate_no_backtick = partial(validate_no_special_character, c="`")
 validate_no_doublequote = partial(validate_no_special_character, c='"')
+
+
+class ExceptionPropagatingThread(Thread):
+    """Thread that raises errors in main thread on join()"""
+    def run(self):
+        self.exception = None
+        try:
+            super(ExceptionPropagatingThread, self).run()
+        except Exception as e:
+            self.exception = e
+            raise
+    def join(self):
+        super(ExceptionPropagatingThread, self).join()
+        if self.exception:
+            raise self.exception
