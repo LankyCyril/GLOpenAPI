@@ -16,7 +16,6 @@ from collections.abc import Callable
 from collections import OrderedDict
 from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
 from threading import Thread
-from genefab3.common.utils import ExceptionPropagatingThread
 from datetime import datetime
 
 
@@ -327,18 +326,10 @@ class SQLiteObject():
                 next(iter(self.__trigger_spec[table_or_aux])), "trigger_field",
             )
             trigger_function = self.__trigger_spec[table_or_aux][trigger_field]
-        updater_thread = ExceptionPropagatingThread(
-            target=partial(
-                self.__conditional_update, table_or_aux=table_or_aux,
-                trigger_field=trigger_field, trigger_function=trigger_function,
-            ),
+        self.__conditional_update(
+            table_or_aux=table_or_aux,
+            trigger_field=trigger_field, trigger_function=trigger_function,
         )
-        # if user breaks connection, or httpd exceeds timeout,
-        # updater_thread will finish and cache regardless:
-        updater_thread.start()
-        # if connection persists until completion of self.__conditional_update,
-        # updater_thread will join here and retrieve data:
-        updater_thread.join()
         return self.__retrieve()
 
 

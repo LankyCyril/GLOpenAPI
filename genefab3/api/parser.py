@@ -61,8 +61,8 @@ class Context():
         self.identity = quote(dumps(sort_keys=True, separators=(",", ":"), obj={
             "?": self.view, "query": self.query, "sort_by": self.sort_by,
             "unwind": sorted(self.unwind), "projection": self.projection,
-            "data_columns": sorted(self.data_columns),
-            "data_comparisons": sorted(self.data_comparisons),
+            "data_columns": self.data_columns,
+            "data_comparisons": self.data_comparisons,
             "format": self.format, "schema": self.schema, "debug": self.debug,
         }))
  
@@ -92,7 +92,10 @@ class Context():
                 self.query["$and"].append(query)
             if columns or comparisons:
                 if self.view == "data":
-                    self.data_columns.extend(columns)
+                    _already_present = set(self.data_columns)
+                    for column in columns:
+                        if column not in _already_present:
+                            self.data_columns.extend(columns)
                     self.data_comparisons.extend(comparisons)
                 else:
                     msg = "Column queries are only valid for /data/"
