@@ -157,22 +157,6 @@ def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, ada
     return data
 
 
-def INPLACE_constrain_columns(sqlite_dataframe, data_columns):
-    """Constrain OndemandSQLiteDataFrame to specified columns"""
-    joined_columns_dispatch = {"/".join(c): c for c in sqlite_dataframe.columns}
-    last_level_dispatch = {c[-1]: c for c in sqlite_dataframe.columns}
-    constrained_columns = []
-    for c in data_columns:
-        if ("/" in c) and (c in joined_columns_dispatch):
-            constrained_columns.append(joined_columns_dispatch[c])
-        elif c in last_level_dispatch:
-            constrained_columns.append(last_level_dispatch[c])
-        else:
-            msg = "Requested column not in table"
-            raise GeneFabFileException(msg, column=c)
-    sqlite_dataframe.columns = MultiIndex.from_tuples(constrained_columns)
-
-
 def combine_objects(objects, context, limit=None):
     """Combine objects and post-process"""
     if len(objects) == 0:
@@ -184,11 +168,8 @@ def combine_objects(objects, context, limit=None):
     else:
         raise NotImplementedError("Merging non-table data objects")
     if isinstance(combined, OndemandSQLiteDataFrame):
-        if context.data_columns:
-            INPLACE_constrain_columns(combined, context.data_columns)
-        # TODO: speedups for schema=1
-        data = combined.get(where=context.data_comparisons, context=context)
-        return data
+        combined.constrain_columns(context=context)
+        return combined.get(context=context)
     elif context.data_columns or context.data_comparisons:
         raise GeneFabFileException(
             "Column operations on non-table data objects are not supported",

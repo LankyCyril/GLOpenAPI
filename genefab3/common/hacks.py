@@ -6,6 +6,7 @@ from pandas import DataFrame, merge
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.types import DataDataFrame
 from genefab3.common.exceptions import GeneFabFormatException
+from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabConfigurationException
 
 
@@ -44,8 +45,10 @@ def get_OSDF_Single_schema(self):
                         index_name = str(c)
                     if c in whitelist:
                         data[c] = [_min, _max, _nan]
-        except OperationalError:
-            raise GeneFabDatabaseException("No data found", table=self.name)
+        except OperationalError as e:
+            msg = "Data could not be retrieved"
+            _kw = dict(table=self.name, debug_info=repr(e))
+            raise GeneFabDatabaseException(msg, **_kw)
         else:
             dataframe = DataFrame(data)
             if (set(dataframe.columns) != whitelist):
@@ -68,18 +71,20 @@ def get_OSDF_OuterJoined_schema(self, *, context):
     ))
 
 
-def speedup_data_schema(get, self, *, where=None, limit=None, offset=0, context=None):
+def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
     """If context.schema == '1', replaces OndemandSQLiteDataFrame.get() with quick retrieval of just values informative schema"""
     if context.schema != "1":
-        kwargs = dict(where=where, limit=limit, offset=offset, context=context)
+        kwargs = dict(context=context, limit=limit, offset=offset)
         return get(self, **kwargs)
-    elif where or limit or offset:
+    elif context.data_comparisons or context.data_columns or limit or offset:
         msg = "Table manipulation is not supported when requesting schema"
-        sug = "Remove comparisons and/or row slicing from query"
+        sug = "Remove comparisons and/or column, row slicing from query"
         raise GeneFabFormatException(msg, suggestion=sug)
     else:
         from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
         from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_OuterJoined
+        msg = f"apply_hack(speed_up_data_schema) for {self.name}"
+        GeneFabLogger().info(msg)
         if isinstance(self, OndemandSQLiteDataFrame_Single):
             return get_OSDF_Single_schema(self)
         elif isinstance(self, OndemandSQLiteDataFrame_OuterJoined):
