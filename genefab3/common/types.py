@@ -3,6 +3,7 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
 from pandas import DataFrame, MultiIndex, Index
 from numpy import dtype
+from genefab3.common.logger import GeneFabLogger
 
 
 class Adapter():
@@ -100,7 +101,10 @@ class AnnotationDataFrame(GeneFabDataFrame):
     @property
     def accessions(self):
         col = ("id", "accession")
-        return set(self[col].drop_duplicates()) if col in self else set()
+        if col in self.index.names:
+            return set(self.index.get_level_values(col).drop_duplicates())
+        else:
+            return None
     @property
     def metadata_columns(self):
         return [c for c in self.columns if c[0] not in {"id", "file"}]
@@ -116,7 +120,20 @@ class DataDataFrame(GeneFabDataFrame):
         self.datatypes, self.gct_validity_set = set(), set()
     @property
     def accessions(self):
-        return set(self.columns[1:].get_level_values(0))
+        if self.columns.nlevels == 2:
+            # may have been squashed for '&format=browser':
+            accessions = set()
+            for c in self.columns[1:].get_level_values(0):
+                if c.count("<br>") < 2:
+                    accessions.add(c.split("<br>")[0])
+                else:
+                    msg = "DataDataFrame.accessions: unexpected column name"
+                    GeneFabLogger().warning(f"{msg}: {c!r}")
+                    return None
+            else:
+                return accessions
+        else: # normal representation
+            return set(self.columns[1:].get_level_values(0))
     @property
     def gct_valid(self):
         return (

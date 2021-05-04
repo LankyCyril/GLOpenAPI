@@ -7,6 +7,7 @@ from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDataManagerException
 from pandas import MultiIndex
 from genefab3.db.sql.pandas import OndemandSQLiteDataFrame
+from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.db.sql.files import CachedTableFile, CachedBinaryFile
 from natsort import natsorted
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -168,8 +169,13 @@ def combine_objects(objects, context, limit=None):
     else:
         raise NotImplementedError("Merging non-table data objects")
     if isinstance(combined, OndemandSQLiteDataFrame):
-        combined.constrain_columns(context=context)
-        return combined.get(context=context)
+        if context.data_columns and (context.format == "gct"):
+            msg = "GCT format is disabled for arbitrarily subset tables"
+            _kw = dict(columns="|".join(context.data_columns))
+            raise GeneFabFormatException(msg, **_kw)
+        else:
+            combined.constrain_columns(context=context)
+            return combined.get(context=context)
     elif context.data_columns or context.data_comparisons:
         raise GeneFabFileException(
             "Column operations on non-table data objects are not supported",

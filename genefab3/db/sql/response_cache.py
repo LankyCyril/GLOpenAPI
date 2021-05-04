@@ -51,7 +51,12 @@ class ResponseCache():
  
     def put(self, context, obj, response):
         """Store response object blob in response_cache table, if possible"""
+        _cid = context.identity
         if self.sqlite_db is None:
+            return
+        if not obj.accessions:
+            msg = "None or unrecognized accession names in object"
+            _logw(f"ResponseCache(), did not store:\n  {msg}, {_cid}")
             return
         api_path = quote(context.full_path)
         blob = Binary(compress(response.get_data()))
@@ -77,7 +82,6 @@ class ResponseCache():
                     cursor.execute(make_insert_accession_entry_command(*args))
             except OperationalError:
                 connection.rollback()
-                _cid = context.identity
                 _loge(f"ResponseCache(), could not store:\n  {_cid}")
             else:
                 connection.commit()
