@@ -116,7 +116,9 @@ class DataDataFrame(GeneFabDataFrame):
         self.datatypes, self.gct_validity_set = set(), set()
     @property
     def accessions(self):
-        return set(self.columns[1:].get_level_values(0))
+        return { # may have been squashed for '&format=browser'
+            c.split("<br>")[0] for c in self.columns[1:].get_level_values(0)
+        }
     @property
     def gct_valid(self):
         return (
