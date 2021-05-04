@@ -51,10 +51,6 @@ def gct(obj, context=None, indent=None, level_formatter="/".join):
     elif not obj.gct_valid:
         msg = "GCT format is not valid for given datatype"
         raise GeneFabFormatException(msg, datatype=obj.datatypes.pop())
-    elif context.data_columns:
-        msg = "GCT format is disabled for arbitrarily subset tables"
-        _kw = dict(columns="|".join(context.data_columns))
-        raise GeneFabFormatException(msg, **_kw)
     else:
         text = obj.to_csv(sep="\t", header=False, na_rep="")
         # NaNs left empty: https://www.genepattern.org/file-formats-guide#GCT
