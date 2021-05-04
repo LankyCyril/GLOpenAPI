@@ -133,5 +133,5 @@ class CacheableRenderer():
                     _thread.join() # will fill container if does not time out
             if not self.genefab3_client.cacher_thread.isAlive():
                 self.genefab3_client.mongo_client.close()
-            return container.pop()
+            return (container or [None])[0]
         return wrapper

@@ -49,7 +49,7 @@ def INPLACE_set_id_as_index(dataframe):
         dataframe.drop(columns="id", inplace=True)
 
 
-def get(mongo_collections, *, locale, context, id_fields, aggregate=False):
+def get(*, mongo_collections, locale, context, id_fields, aggregate=False):
     """Select assays/samples based on annotation filters"""
     dataframe, full_projection = get_raw_metadata_dataframe( # single-level
         mongo_collections, locale=locale, context=context, id_fields=id_fields,

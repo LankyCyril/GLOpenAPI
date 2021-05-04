@@ -1,33 +1,26 @@
-from contextlib import closing
-from sqlite3 import connect, Binary, OperationalError
-from os import access, W_OK, path
 from genefab3.common.utils import iterate_terminal_leaves, as_is
 from itertools import count
+from sqlite3 import OperationalError, Binary
 from genefab3.db.sql.pandas import SQLiteIndexName
 from functools import lru_cache, partial
 from pandas import isnull, DataFrame
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
 from copy import deepcopy
+from genefab3.db.sql.utils import sql_connection
 from genefab3.common.logger import GeneFabLogger
-from pandas.io.sql import DatabaseError
+from pandas.io.sql import DatabaseError as PandasDatabaseError
 from genefab3.common.exceptions import GeneFabDatabaseException
 from collections.abc import Callable
 from collections import OrderedDict
 from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
 from threading import Thread
 from datetime import datetime
+from os import path
 
 
-def is_sqlite_file_ready(filename):
-    """Make sure `filename` is reachable and writable, set auto_vacuum to 1 (FULL)"""
-    try:
-        with closing(connect(filename)) as connection:
-            connection.cursor().execute("PRAGMA auto_vacuum = 1")
-    except (OSError, FileNotFoundError, OperationalError):
-        return False
-    else: # if not writable, but already on auto_vacuum = 1, won't have thrown
-        return access(filename, W_OK)
+# TODO: This entire submodule is flexible and robust, but completely unreadable;
+#       this is a fever dream and needs to be heavily refactored.
 
 
 def is_singular_spec(spec):
@@ -132,8 +125,8 @@ class SQLiteObject():
  
     def __ensure_table(self, table, schema):
         """Create table with schema, provided as a dictionary"""
-        with closing(connect(self.sqlite_db)) as connection:
-            connection.cursor().execute(
+        with sql_connection(self.sqlite_db, "tables") as (_, execute):
+            execute(
                 "CREATE TABLE IF NOT EXISTS `{}` ({})".format(
                     validate_no_backtick(table, "table"), ", ".join(
                         "`" + validate_no_backtick(f, "field") + "` " + k
@@ -156,19 +149,17 @@ class SQLiteObject():
             AND `{self.__identifier_field}` == "{self.__identifier_value}" """
         insert_action = f"""INSERT INTO `{table}` (`{"`, `".join(fields)}`)
             VALUES ({", ".join("?" for _ in fields)})"""
-        with closing(connect(self.sqlite_db)) as connection:
+        with sql_connection(self.sqlite_db, "tables") as (_, execute):
             logger_args = self.__identifier_field, self.__identifier_value
             try:
-                connection.cursor().execute(delete_action)
-                connection.cursor().execute(insert_action, values)
+                execute(delete_action)
+                execute(insert_action, values)
                 msg = "Updated fields for SQLiteObject\n  (%s == %s)"
                 GeneFabLogger().info(msg, *logger_args)
-            except OperationalError:
+            except OperationalError as e:
                 msg = "Could not update fields for SQLiteObject\n  (%s == %s)"
-                GeneFabLogger().warning(msg, *logger_args)
-                connection.rollback()
-            else:
-                connection.commit()
+                GeneFabLogger().warning(f"{msg} due to {e!r}", *logger_args)
+                raise
  
     def __update_table(self, table, spec):
         """Update table(s) in SQLite"""
@@ -182,7 +173,7 @@ class SQLiteObject():
         elif dataframe.columns.nlevels != 1:
             msg = "MultiIndex columns in cached DataFrame"
             raise NotImplementedError(msg)
-        with closing(connect(self.sqlite_db)) as connection:
+        with sql_connection(self.sqlite_db, "tables") as (connection, execute):
             bounds = range(0, dataframe.shape[1], self.maxpartwidth)
             part_iterator = iterparts(table, connection, must_exist=False)
             for bound, (partname, *_) in zip(bounds, part_iterator):
@@ -196,11 +187,10 @@ class SQLiteObject():
                         partname, connection, index=True, if_exists="replace",
                         chunksize=1000, method=partial(mkinsert, name=partname),
                     )
-                except (OperationalError, DatabaseError) as e:
+                except (OperationalError, PandasDatabaseError) as e:
                     drop_all_parts(table, connection)
-                    connection.rollback()
                     msg = "Failed to insert SQLite table"
-                    _kw = dict(signature=self.__signature, error=str(e))
+                    _kw = dict(signature=self.__signature, debug_info=repr(e))
                     raise GeneFabDatabaseException(msg, **_kw)
             else:
                 GeneFabLogger().info(
@@ -223,10 +213,10 @@ class SQLiteObject():
                     msg = "SQLiteObject: unsupported type of update spec"
                     raise GeneFabConfigurationException(msg, type=type(spec))
  
-    def __drop_self_from(self, connection, table):
+    def __drop_self_from(self, execute, table):
         """Helper method (during an open connection) to drop rows matching `self.signature` from `table`"""
         try:
-            connection.cursor().execute(f"""DELETE FROM `{table}` WHERE
+            execute(f"""DELETE FROM `{table}` WHERE
                 `{self.__identifier_field}` == "{self.__identifier_value}" """)
         except OperationalError:
             msg = "Could not drop multiple entries for same %s == %s"
@@ -235,24 +225,24 @@ class SQLiteObject():
  
     def __retrieve_field(self, table, field, postprocess_function):
         """Retrieve target table field from database"""
-        with closing(connect(self.sqlite_db)) as connection:
+        with sql_connection(self.sqlite_db, "tables") as (connection, execute):
             query = f"""SELECT `{field}` from `{table}` WHERE
                 `{self.__identifier_field}` == "{self.__identifier_value}" """
-            ret = connection.cursor().execute(query).fetchall()
+            ret = execute(query).fetchall()
             if len(ret) == 0:
                 msg = "No data found"
                 raise GeneFabDatabaseException(msg, signature=self.__signature)
             elif (len(ret) == 1) and (len(ret[0]) == 1):
                 return postprocess_function(ret[0][0])
             else:
-                self.__drop_self_from(connection, table)
+                self.__drop_self_from(execute, table)
                 msg = "Entries conflict (will attempt to fix on next request)"
                 raise GeneFabDatabaseException(msg, signature=self.__signature)
  
     def __retrieve_table(self, table, postprocess_function=as_is):
         """Create an OndemandSQLiteDataFrame object dispatching columns to table parts"""
         column_dispatcher = OrderedDict()
-        with closing(connect(self.sqlite_db)) as connection:
+        with sql_connection(self.sqlite_db, "tables") as (connection, _):
             for partname, index_name, columns in iterparts(table, connection):
                 if index_name not in column_dispatcher:
                     column_dispatcher[index_name] = partname
@@ -289,10 +279,10 @@ class SQLiteObject():
  
     def __conditional_update(self, table_or_aux, trigger_field, trigger_function):
         """Check trigger fields and values and perform update if triggered"""
-        with closing(connect(self.sqlite_db)) as connection:
+        with sql_connection(self.sqlite_db, "tables") as (connection, execute):
             query = f"""SELECT `{trigger_field}` FROM `{table_or_aux}` WHERE
                 `{self.__identifier_field}` == "{self.__identifier_value}" """
-            ret = connection.cursor().execute(query).fetchall()
+            ret = execute(query).fetchall()
             if len(ret) == 0:
                 trigger_value = None
             elif (len(ret) == 1) and (len(ret[0]) == 1):
@@ -303,7 +293,7 @@ class SQLiteObject():
                 m = "Conflicting trigger values for SQLiteObject\n  (%s == %s)"
                 logger_args = self.__identifier_field, self.__identifier_value
                 GeneFabLogger().warning(m, *logger_args)
-                self.__drop_self_from(connection, table_or_aux)
+                self.__drop_self_from(execute, table_or_aux)
                 trigger_value = None
         if trigger_function(trigger_value):
             self.changed = True
@@ -421,19 +411,19 @@ class SQLiteTable(SQLiteObject):
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > target_size):
                 GeneFabLogger().info(f"{desc} is being shrunk")
-                with closing(connect(self.sqlite_db)) as connection:
+                _kw = dict(filename=self.sqlite_db, desc="tables")
+                with sql_connection(**_kw) as (connection, execute):
                     query_oldest = f"""SELECT `identifier`,`retrieved_at`
                         FROM `{self.aux_table}` WHERE `retrieved_at` ==
                         (SELECT MIN(`retrieved_at`) FROM `{self.aux_table}`)
                         LIMIT 1"""
                     try:
-                        cursor = connection.cursor()
-                        entries = cursor.execute(query_oldest).fetchall()
+                        entries = execute(query_oldest).fetchall()
                         if len(entries) and (len(entries[0]) == 2):
                             identifier = entries[0][0]
                         else:
                             break
-                        cursor.execute(f"""DELETE FROM `{self.aux_table}`
+                        execute(f"""DELETE FROM `{self.aux_table}`
                             WHERE `identifier` == "{identifier}" """)
                         drop_all_parts(identifier, connection)
                     except OperationalError:

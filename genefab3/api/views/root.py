@@ -64,7 +64,7 @@ def _get_root_html():
     return (Path(__file__).parent / "root.html").read_text()
 
 
-def get(mongo_collections, context):
+def get(*, mongo_collections, context):
     """Serve an interactive documentation page"""
     equals_json = get_metadata_equals_json(mongo_collections)
     existence_json = get_metadata_existence_json(equals_json)

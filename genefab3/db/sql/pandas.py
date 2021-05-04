@@ -1,6 +1,6 @@
-from contextlib import contextmanager, closing, ExitStack
+from contextlib import contextmanager, ExitStack
 from genefab3.common.utils import random_unique_string, validate_no_backtick
-from sqlite3 import OperationalError, connect
+from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.logger import GeneFabLogger
 from pandas import Index, MultiIndex, read_sql
@@ -9,17 +9,18 @@ from functools import lru_cache, partial
 from numpy import isreal
 from re import search, sub
 from genefab3.common.hacks import apply_hack, speed_up_data_schema
+from genefab3.db.sql.utils import sql_connection
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 from genefab3.common.types import DataDataFrame
 from collections import OrderedDict
 
 
 @contextmanager
-def mkselect(connection, query, kind="TABLE"):
+def mkselect(execute, query, kind="TABLE"):
     """Context manager temporarily creating an SQLite view or table from `query`"""
     selectname = random_unique_string(seed=query)
     try:
-        connection.cursor().execute(f"CREATE {kind} `{selectname}` as {query}")
+        execute(f"CREATE {kind} `{selectname}` as {query}")
     except OperationalError:
         msg = f"Failed to create temporary {kind}"
         _kw = dict(name=selectname, debug_info=query)
@@ -32,7 +33,7 @@ def mkselect(connection, query, kind="TABLE"):
             yield selectname
         finally:
             try:
-                connection.cursor().execute(f"DROP {kind} `{selectname}`")
+                execute(f"DROP {kind} `{selectname}`")
             except OperationalError:
                 msg = f"Failed to drop temporary {kind} {selectname}"
                 GeneFabLogger().error(msg)
@@ -144,8 +145,8 @@ class OndemandSQLiteDataFrame():
         final_targets = ",".join((
             f"`{self.index.name}`", *(f"`{'/'.join(c)}`" for c in self.columns),
         ))
-        with closing(connect(self.sqlite_db)) as connection:
-            with self.select(connection, kind="VIEW") as (select, _):
+        with sql_connection(self.sqlite_db, "tables") as (connection, execute):
+            with self.select(execute, kind="VIEW") as (select, _):
                 try:
                     q = f"SELECT {final_targets} FROM `{select}` {query_filter}"
                     data = read_sql(q, connection, index_col=self.index.name)
@@ -224,7 +225,7 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
         return icd
  
     @contextmanager
-    def select(self, connection, kind="TABLE"):
+    def select(self, execute, kind="TABLE"):
         """Temporarily expose requested data as SQL view or table for OndemandSQLiteDataFrame_OuterJoined.select()"""
         _n, _icd = len(self._raw_columns), self._inverse_column_dispatcher
         _tt = "\n  ".join(("", *_icd))
@@ -237,7 +238,7 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
             SELECT `{self.index.name}`,{','.join(columns_as_slashed_columns)}
             FROM {join_statement}"""
         try:
-            with mkselect(connection, query, kind=kind) as selectname:
+            with mkselect(execute, query, kind=kind) as selectname:
                 yield selectname, [
                     f"`{self._columns_raw2slashed[c]}`"
                     for c in self._raw_columns
@@ -294,11 +295,11 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
             return matches.pop()
  
     @contextmanager
-    def select(self, connection, kind="TABLE"):
+    def select(self, execute, kind="TABLE"):
         """Temporarily expose requested data as SQL view or table"""
         with ExitStack() as stack:
             enter_context = stack.enter_context
-            selects = [enter_context(o.select(connection)) for o in self.objs]
+            selects = [enter_context(o.select(execute)) for o in self.objs]
             agg_select, agg_columns = selects[0]
             for i, (next_select, next_columns) in enumerate(selects[1:], 1):
                 agg_columns = agg_columns + next_columns
@@ -318,5 +319,5 @@ class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
                     _kind = "VIEW"
                 else:
                     _kind = "TABLE"
-                agg_select = enter_context(mkselect(connection, query, _kind))
+                agg_select = enter_context(mkselect(execute, query, _kind))
             yield agg_select, None

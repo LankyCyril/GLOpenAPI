@@ -38,10 +38,8 @@ class Adapter():
 class Routes():
     """Base class for registered endpoints"""
  
-    def __init__(self, genefab3_client, *, mongo_collections, locale, sqlite_dbs, adapter):
+    def __init__(self, genefab3_client):
         self.genefab3_client = genefab3_client
-        self.mongo_collections, self.locale = mongo_collections, locale
-        self.sqlite_dbs, self.adapter = sqlite_dbs, adapter
  
     def register_endpoint(endpoint=None):
         """Decorator that adds `endpoint` and `fmt` attributes to class method"""

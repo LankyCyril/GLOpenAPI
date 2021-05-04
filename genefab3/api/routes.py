@@ -11,11 +11,12 @@ class DefaultRoutes(Routes):
  
     @Routes.register_endpoint("/favicon.<imgtype>")
     def favicon(self, imgtype, context=None) -> bytes:
-        if self.adapter.get_favicon_urls():
+        if self.genefab3_client.adapter.get_favicon_urls():
             ico_file = CachedBinaryFile(
                 name="favicon.ico", identifier="RESOURCE/favicon.ico",
-                sqlite_db=self.sqlite_dbs.blobs["db"], timestamp=0,
-                urls=self.adapter.get_favicon_urls(),
+                sqlite_db=self.genefab3_client.sqlite_dbs.blobs["db"],
+                urls=self.genefab3_client.adapter.get_favicon_urls(),
+                timestamp=0,
             )
             return ico_file.data
         else:
@@ -23,33 +24,39 @@ class DefaultRoutes(Routes):
  
     @Routes.register_endpoint("/")
     def root(self, context) -> str:
-        return views.root.get(self.mongo_collections, context=context)
+        return views.root.get(
+            mongo_collections=self.genefab3_client.mongo_collections,
+            context=context,
+        )
  
     @Routes.register_endpoint()
     def status(self, context=None) -> DataFrame:
         return views.status.get(
-            self.mongo_collections, context=context,
-            genefab3_client=self.genefab3_client, sqlite_dbs=self.sqlite_dbs,
+            genefab3_client=self.genefab3_client,
+            sqlite_dbs=self.genefab3_client.sqlite_dbs, context=context,
         )
  
     @Routes.register_endpoint()
     def assays(self, context) -> AnnotationDataFrame:
         return views.metadata.get(
-            self.mongo_collections, locale=self.locale, context=context,
-            id_fields=["accession", "assay name"], aggregate=True,
+            mongo_collections=self.genefab3_client.mongo_collections,
+            id_fields=["accession", "assay name"], aggregate=1,
+            locale=self.genefab3_client.locale, context=context,
         )
  
     @Routes.register_endpoint()
     def samples(self, context) -> AnnotationDataFrame:
         return views.metadata.get(
-            self.mongo_collections, locale=self.locale, context=context,
-            id_fields=["accession", "assay name", "sample name"],
-            aggregate=False,
+            mongo_collections=self.genefab3_client.mongo_collections,
+            id_fields=["accession", "assay name", "sample name"], aggregate=0,
+            locale=self.genefab3_client.locale, context=context,
         )
  
     @Routes.register_endpoint()
     def data(self, context) -> Union[DataDataFrame, Response]:
         return views.data.get(
-            self.mongo_collections, locale=self.locale, context=context,
-            sqlite_dbs=self.sqlite_dbs, adapter=self.adapter,
+            mongo_collections=self.genefab3_client.mongo_collections,
+            sqlite_dbs=self.genefab3_client.sqlite_dbs,
+            adapter=self.genefab3_client.adapter,
+            locale=self.genefab3_client.locale, context=context,
         )

@@ -36,13 +36,14 @@ def mongo_db_report(mongo_client):
     }
 
 
-def get(mongo_collections, *, context, genefab3_client, sqlite_dbs):
+def get(*, genefab3_client, sqlite_dbs, context):
     for _ in iterate_terminal_leaves(context.query):
         msg = "Metadata queries are not valid for view"
         raise GeneFabParserException(msg, view="status")
     else:
-        projection = {"_id": False, **{c: True for c in STATUS_COLUMNS}}
-        status_json = mongo_collections.status.find({}, projection)
+        status_json = genefab3_client.mongo_collections.status.find(
+            {}, {"_id": False, **{c: True for c in STATUS_COLUMNS}},
+        )
     status_df = blackjack_normalize(list(status_json), max_level=0).sort_values(
         by=["report timestamp", "report type"], ascending=[False, True],
     )
@@ -51,7 +52,7 @@ def get(mongo_collections, *, context, genefab3_client, sqlite_dbs):
     astype_args = status_df[["args", "kwargs"]].astype(str)
     astype_args[astype_args.isin({"[]", "{}", "()"})] = nan
     status_df[["args", "kwargs"]] = astype_args
-    status_df = status_df.append(
+    status_df = status_df.append( # TODO order
         other=(
             [sqlite_db_report(n, d) for n, d in sqlite_dbs.__dict__.items()] +
             [mongo_db_report(genefab3_client.mongo_client)]

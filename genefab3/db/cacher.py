@@ -14,17 +14,19 @@ from genefab3.db.mongo.status import drop_status, update_status
 
 class CacherThread(Thread):
     """Lives in background and keeps local metadata cache, metadata index, and response cache up to date"""
+    CLIENT_ATTRIBUTES_TO_COPY = (
+      "adapter", "mongo_collections", "locale", "sqlite_dbs", "units_formatter",
+    )
  
-    def __init__(self, *, genefab3_client, adapter, mongo_collections, mongo_appname, locale, sqlite_dbs, metadata_update_interval, metadata_retry_delay, units_formatter):
+    def __init__(self, *, genefab3_client, metadata_update_interval, metadata_retry_delay):
         """Prepare background thread that iteratively watches for changes to datasets"""
         self.genefab3_client = genefab3_client
-        self._id = mongo_appname.replace("GeneFab3", "CacherThread")
-        self.adapter = adapter
-        self.mongo_collections, self.locale = mongo_collections, locale
-        self.sqlite_dbs = sqlite_dbs
+        _id = genefab3_client.mongo_appname.replace("GeneFab3", "CacherThread")
+        self._id = _id
+        for attr in self.CLIENT_ATTRIBUTES_TO_COPY:
+            setattr(self, attr, getattr(genefab3_client, attr))
         self.metadata_update_interval = metadata_update_interval
         self.metadata_retry_delay = metadata_retry_delay
-        self.units_formatter = units_formatter
         self.response_cache = ResponseCache(self.sqlite_dbs)
         self.status_kwargs = dict(collection=self.mongo_collections.status)
         super().__init__()

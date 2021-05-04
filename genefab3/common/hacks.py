@@ -1,6 +1,6 @@
 from functools import wraps, reduce, partial
-from contextlib import closing
-from sqlite3 import connect, OperationalError
+from genefab3.db.sql.utils import sql_connection
+from sqlite3 import OperationalError
 from numpy import nan
 from pandas import DataFrame, merge
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -23,12 +23,11 @@ def apply_hack(hack):
 def get_OSDF_Single_schema(self):
     """Replaces OndemandSQLiteDataFrame_Single.get() with retrieval of just values informative for 'schema=1'"""
     from genefab3.db.sql.pandas import SQLiteIndexName
-    found = lambda v: v is not None
-    index_name, data = None, {}
-    with closing(connect(self.sqlite_db)) as connection:
+    index_name, data, found = None, {}, lambda v: v is not None
+    with sql_connection(self.sqlite_db, "tables") as (_, execute):
+        fetch = lambda query: execute(query).fetchone()
+        whitelist = {self.index.name, *self.columns.get_level_values(-1)}
         try:
-            fetch = lambda query: connection.cursor().execute(query).fetchone()
-            whitelist = {self.index.name, *self.columns.get_level_values(-1)}
             for part, columns in self._inverse_column_dispatcher.items():
                 mktargets = lambda f: ",".join(f"{f}(`{c}`)" for c in columns)
                 mkquery = lambda t: f"SELECT {t} FROM `{part}` LIMIT 1"
@@ -46,9 +45,8 @@ def get_OSDF_Single_schema(self):
                     if c in whitelist:
                         data[c] = [_min, _max, _nan]
         except OperationalError as e:
-            msg = "Data could not be retrieved"
             _kw = dict(table=self.name, debug_info=repr(e))
-            raise GeneFabDatabaseException(msg, **_kw)
+            raise GeneFabDatabaseException("Data could not be retrieved", **_kw)
         else:
             dataframe = DataFrame(data)
             if (set(dataframe.columns) != whitelist):
