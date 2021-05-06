@@ -15,6 +15,7 @@ from functools import partial, reduce
 from operator import getitem
 from collections import defaultdict, OrderedDict
 from marshal import dumps as marsh
+from itertools import chain, count
 from threading import Thread
 
 
@@ -120,6 +121,11 @@ def blackjack(e, max_level, head=(), marsh=marsh, len=len, isinstance=isinstance
         else:
             cache[ck] = ((join(head), e),)
     yield from cache[ck]
+
+
+def KeyToPosition(*lists):
+    """Create an OrderedDict mapping `keys` to integers in range"""
+    return OrderedDict(zip(chain(*lists), count()))
 
 
 def blackjack_normalize(cursor, max_level=2, dict=dict, blackjack=blackjack):

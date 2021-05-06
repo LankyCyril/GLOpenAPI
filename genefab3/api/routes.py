@@ -62,10 +62,10 @@ class DefaultRoutes(Routes):
             locale=self.genefab3_client.locale, context=context,
         )
  
-    @Routes.register_endpoint()
-    def debug(self, context=None) -> StreamedTable:
-        return views.debug.get(
+    @Routes.register_endpoint("/prototyping/samples/")
+    def prototyping_samples(self, context=None) -> StreamedTable:
+        return views.prototyping_samples.get(
             mongo_collections=self.genefab3_client.mongo_collections,
-            id_fields=["accession", "assay name", "sample name"], aggregate=0,
-            locale=self.genefab3_client.locale, context=context,
+            id_fields=["accession", "assay name", "sample name"],
+            condense=False, locale=self.genefab3_client.locale, context=context,
         )

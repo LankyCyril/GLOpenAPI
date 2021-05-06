@@ -1,44 +1,39 @@
 from genefab3.common.types import StreamedTable, NaN
 from genefab3.db.mongo.utils import aggregate_entries_by_context
-from itertools import tee, count, chain
-from genefab3.common.utils import blackjack
-from collections import OrderedDict
+from itertools import tee
+from genefab3.common.utils import blackjack, KeyToPosition
 from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException
 
 
-class AnnotationRowIterator(StreamedTable):
-    prefix_order = "id", "investigation", "study", "assay", "file", ""
+class StreamedAnnotationTable(StreamedTable):
+    _prefix_order = "id", "investigation", "study", "assay", "file", ""
+    _cursor_workers = "keys", "index", "values", "rows"
+    _accession_key = "id.accession"
  
     def __init__(self, *, mongo_collections, locale, context, id_fields):
-        """Make and retain forked MongoDB aggregation cursors, infer index names and columns in order `self.prefix_order`"""
+        """Make and retain forked MongoDB aggregation cursors, infer index names and columns in order `self._prefix_order`"""
         cursor, _ = aggregate_entries_by_context(
             mongo_collections.metadata, locale=locale, context=context,
             id_fields=id_fields,
         )
-        self._cursors = dict(zip(
-            ("keys", "index", "values", "rows"),
-            tee(cursor, 4),
-        ))
-        self.accessions, key_pool, _nrows = set(), set(), 0
+        self._cursors = dict(zip(self._cursor_workers, tee(cursor, 4)))
+        self.accessions, _key_pool, _nrows = set(), set(), 0
         for _nrows, entry in enumerate(self._cursors["keys"], 1):
             for key, value in blackjack(entry, max_level=2):
-                key_pool.add(key)
-                if key == "id.accession":
+                _key_pool.add(key)
+                if key == self._accession_key:
                     self.accessions.add(value)
-        key_order = {p: set() for p in self.prefix_order}
-        for key in key_pool:
-            for prefix in self.prefix_order:
+        _key_order = {p: set() for p in self._prefix_order}
+        for key in _key_pool:
+            for prefix in self._prefix_order:
                 if key.startswith(prefix):
-                    key_order[prefix].add(key)
+                    _key_order[prefix].add(key)
                     break
-        self._index_key_dispatcher = OrderedDict(zip(
-            sorted(key_order["id"]), count(),
-        ))
-        self._column_key_dispatcher = OrderedDict(zip(
-            sum((sorted(key_order[p]) for p in self.prefix_order[1:]), []),
-            count(),
-        ))
+        self._index_key_dispatcher = KeyToPosition(sorted(_key_order["id"]))
+        self._column_key_dispatcher = KeyToPosition(
+            *(sorted(_key_order[p]) for p in self._prefix_order[1:]),
+        )
         self._index_nlevels = len(self._index_key_dispatcher)
         self.shape = (_nrows, len(self._column_key_dispatcher))
  
@@ -82,17 +77,15 @@ class AnnotationRowIterator(StreamedTable):
  
     @property
     def rows(self):
-        dispatcher = OrderedDict(zip(
-            chain(self._index_key_dispatcher, self._column_key_dispatcher),
-            count(),
-        ))
+        dispatchers = self._index_key_dispatcher, self._column_key_dispatcher
+        dispatcher = KeyToPosition(*dispatchers)
         yield from self._iter_body_levels(self._cursors["rows"], dispatcher)
 
 
-def get(*, mongo_collections, locale, context, id_fields, aggregate=False):
+def get(*, mongo_collections, locale, context, id_fields, condense=False):
     """Select assays/samples based on annotation filters"""
     try:
-        annotation = AnnotationRowIterator(
+        annotation = StreamedAnnotationTable(
             mongo_collections=mongo_collections, locale=locale,
             context=context, id_fields=id_fields,
         )
