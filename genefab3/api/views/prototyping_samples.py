@@ -1,7 +1,6 @@
 from genefab3.common.types import StreamedAnnotationTable, NaN
 from genefab3.db.mongo.utils import aggregate_entries_by_context
-from itertools import tee
-from genefab3.common.utils import blackjack, KeyToPosition
+from genefab3.common.utils import ForkableIterator, blackjack, KeyToPosition
 from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.api.renderers import Placeholders
@@ -9,7 +8,6 @@ from genefab3.api.renderers import Placeholders
 
 class _StreamedAnnotationTable(StreamedAnnotationTable):
     _prefix_order = "id", "investigation", "study", "assay", "file", ""
-    _cursor_workers = "keys", "index", "values", "rows"
     _accession_key = "id.accession"
  
     def __init__(self, *, mongo_collections, locale, context, id_fields):
@@ -18,9 +16,9 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
             mongo_collections.metadata, locale=locale, context=context,
             id_fields=id_fields,
         )
-        self._cursors = dict(zip(self._cursor_workers, tee(cursor, 4)))
+        self._cursors = ForkableIterator(cursor)
         self.accessions, _key_pool, _nrows = set(), set(), 0
-        for _nrows, entry in enumerate(self._cursors["keys"], 1):
+        for _nrows, entry in enumerate(self._cursors(), 1):
             for key, value in blackjack(entry, max_level=2):
                 _key_pool.add(key)
                 if key == self._accession_key:
@@ -86,12 +84,12 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
     @property
     def index(self):
         dispatcher = self._index_key_dispatcher
-        yield from self._iter_body_levels(self._cursors["index"], dispatcher)
+        yield from self._iter_body_levels(self._cursors(), dispatcher)
  
     @property
     def values(self):
         dispatcher = self._column_key_dispatcher
-        yield from self._iter_body_levels(self._cursors["values"], dispatcher)
+        yield from self._iter_body_levels(self._cursors(), dispatcher)
 
 
 def get(*, mongo_collections, locale, context, id_fields, condense=False):

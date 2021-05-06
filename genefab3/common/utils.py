@@ -2,6 +2,7 @@ from numpy import generic as NumpyGenericType, base_repr
 from datetime import datetime
 from copy import deepcopy
 from os import environ
+from itertools import tee, chain, count
 from base64 import b64encode
 from uuid import uuid3, uuid4
 from contextlib import contextmanager
@@ -15,7 +16,6 @@ from functools import partial, reduce
 from operator import getitem
 from collections import defaultdict, OrderedDict
 from marshal import dumps as marsh
-from itertools import chain, count
 from threading import Thread
 
 
@@ -31,6 +31,15 @@ deepcopy_keys = lambda d, *kk: deepcopy({k: d[k] for k in kk})
 def is_debug(markers={"development", "staging", "stage", "debug", "debugging"}):
     """Determine if app is running in debug mode"""
     return environ.get("FLASK_ENV", None) in markers
+
+
+class ForkableIterator():
+    """Iterator factory, returns a teed copy of original iterator when called"""
+    def __init__(self, it):
+        self.it = it
+    def __call__(self):
+        self.it, _it = tee(self.it)
+        return _it
 
 
 def random_unique_string(seed=""):
