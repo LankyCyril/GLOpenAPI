@@ -14,8 +14,9 @@ from genefab3.db.sql.response_cache import ResponseCache
 from genefab3.common.utils import ExceptionPropagatingThread
 
 
-from genefab3.common.types import StreamedTable
-from genefab3.api.renderers import StreamedTableRenderers
+from genefab3.common.types import StreamedAnnotationTable
+from genefab3.api.renderers import PlaintextStreamedTableRenderers
+from genefab3.api.renderers import BrowserStreamedTableRenderers
 
 
 TYPE_RENDERERS = OrderedDict((
@@ -49,10 +50,11 @@ TYPE_RENDERERS = OrderedDict((
         "json": PlaintextDataFrameRenderers.json,
         "browser": BrowserDataFrameRenderers.twolevel,
     }),
-    (StreamedTable, {
-        "csv": StreamedTableRenderers.csv,
-        "tsv": StreamedTableRenderers.tsv,
-        "json": StreamedTableRenderers.json,
+    (StreamedAnnotationTable, {
+        "csv": PlaintextStreamedTableRenderers.csv,
+        "tsv": PlaintextStreamedTableRenderers.tsv,
+        "json": PlaintextStreamedTableRenderers.json,
+        "browser": BrowserStreamedTableRenderers.twolevel,
     }),
 ))
 
@@ -75,7 +77,7 @@ class CacheableRenderer():
             return_types = set(return_type.__args__)
         else:
             return_types = {return_type}
-        if return_types & {AnnotationDataFrame, DataDataFrame, StreamedTable}:
+        if return_types & {AnnotationDataFrame, DataDataFrame, StreamedAnnotationTable}:
             default_format, cacheable = "csv", True
         elif DataFrame in return_types:
             default_format, cacheable = "csv", False

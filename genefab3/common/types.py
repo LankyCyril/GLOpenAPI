@@ -6,6 +6,9 @@ from numpy import dtype
 from genefab3.common.logger import GeneFabLogger
 
 
+NaN = type("UnquotedNaN", (float,), dict(__str__=lambda _: "NaN"))()
+
+
 class Adapter():
     """Base class for database adapters"""
  
@@ -141,4 +144,4 @@ class DataDataFrame(GeneFabDataFrame):
 
 
 class StreamedTable(): pass
-NaN = type("UnquotedNaN", (float,), dict(__str__=lambda _: "NaN"))()
+class StreamedAnnotationTable(StreamedTable): pass

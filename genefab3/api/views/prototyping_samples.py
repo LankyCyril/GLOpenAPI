@@ -1,12 +1,13 @@
-from genefab3.common.types import StreamedTable, NaN
+from genefab3.common.types import StreamedAnnotationTable, NaN
 from genefab3.db.mongo.utils import aggregate_entries_by_context
 from itertools import tee
 from genefab3.common.utils import blackjack, KeyToPosition
 from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException
+from genefab3.api.renderers import Placeholders
 
 
-class StreamedAnnotationTable(StreamedTable):
+class _StreamedAnnotationTable(StreamedAnnotationTable):
     _prefix_order = "id", "investigation", "study", "assay", "file", ""
     _cursor_workers = "keys", "index", "values", "rows"
     _accession_key = "id.accession"
@@ -39,7 +40,7 @@ class StreamedAnnotationTable(StreamedTable):
  
     @property
     def empty(self):
-        return len(self._column_key_dispatcher) == 0
+        return self.shape[1] + self._index_nlevels == 0
  
     def _iter_header_levels(self, dispatcher):
         fields_and_bounds = [
@@ -56,6 +57,10 @@ class StreamedAnnotationTable(StreamedTable):
     @property
     def column_levels(self):
         yield from self._iter_header_levels(self._column_key_dispatcher)
+ 
+    @property
+    def header(self):
+        return [*zip(*list(self.index_levels)), *zip(*list(self.column_levels))]
  
     def _iter_body_levels(self, cursor, dispatcher):
         for entry in cursor:
@@ -85,7 +90,7 @@ class StreamedAnnotationTable(StreamedTable):
 def get(*, mongo_collections, locale, context, id_fields, condense=False):
     """Select assays/samples based on annotation filters"""
     try:
-        annotation = StreamedAnnotationTable(
+        annotation = _StreamedAnnotationTable(
             mongo_collections=mongo_collections, locale=locale,
             context=context, id_fields=id_fields,
         )
@@ -98,7 +103,7 @@ def get(*, mongo_collections, locale, context, id_fields, condense=False):
         else:
             msg = "Could not retrieve sorted metadata"
         raise GeneFabDatabaseException(msg, locale=locale, reason=str(e))
-    if annotation.empty:
-        return None # TODO (["id"] * len(id_fields)), (); id_fields, ()
+    if False:#annotation.empty:
+        return Placeholders.EmptyStreamedAnnotationTable(id_fields=id_fields)
     else:
         return annotation

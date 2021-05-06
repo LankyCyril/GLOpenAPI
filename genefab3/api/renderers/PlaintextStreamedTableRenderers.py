@@ -3,7 +3,7 @@ from csv import writer as CSVWriter
 from flask import Response
 
 
-def _iter_formatted_chunks(chunks, prefix, delimiter, quoting, lineterminator=None):
+def _iter_formatted_chunks(chunks, prefix="", delimiter=",", quoting=2, lineterminator=None):
     """Iterate chunks in `delimiter`-separated format"""
     fmtparams = dict(delimiter=delimiter, quoting=quoting)
     if lineterminator:
@@ -19,13 +19,13 @@ def _iter_formatted_chunks(chunks, prefix, delimiter, quoting, lineterminator=No
 
 def _xsv(obj, delimiter):
     """Display StreamedTable in plaintext `delimiter`-separated format"""
-    def _iter_all_formatted_chunks():
+    def _iter_chained_formatted_chunks():
         def _header():
             for left, right in zip(obj.index_levels, obj.column_levels):
                 yield left + right
         yield from _iter_formatted_chunks(_header(), "#", delimiter, 0)
         yield from _iter_formatted_chunks(obj.rows, "", delimiter, 2)
-    return Response(_iter_all_formatted_chunks(), mimetype="text/plain")
+    return Response(_iter_chained_formatted_chunks(), mimetype="text/plain")
 
 
 def _iter_json_chunks(obj):
