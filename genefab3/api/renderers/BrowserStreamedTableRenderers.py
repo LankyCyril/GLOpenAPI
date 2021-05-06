@@ -1,6 +1,5 @@
 from genefab3.common.types import StreamedTable, StreamedAnnotationTable
 from genefab3.common.exceptions import GeneFabConfigurationException
-from functools import lru_cache
 from pathlib import Path
 from genefab3.common.logger import GeneFabLogger
 from genefab3.api.renderers.PlaintextStreamedTableRenderers import _iter_bracketed
@@ -15,12 +14,6 @@ def _assert_type(obj, nlevels):
         msg = "Data cannot be represented as an interactive table"
         _kw = dict(type=type(obj).__name__, nlevels=passed_nlevels)
         raise GeneFabConfigurationException(msg, **_kw)
-
-
-@lru_cache(maxsize=None)
-def _get_browser_html():
-    """Return list of lines of HTML template"""
-    return (Path(__file__).parent/"dataframe.html").read_text().splitlines(True)
 
 
 def build_url(context, target_view=None, drop=set()):
@@ -105,20 +98,22 @@ def get_view_dependent_links(obj, context):
 
 
 def _iter_html_chunks(replacements):
+    """Return list of lines of HTML template and subsitute variables with generated data"""
     pattern = compile(r'|'.join(map(escape, replacements.keys())))
-    for line in _get_browser_html():
-        match = pattern.search(line)
-        if match:
-            replacement = replacements[match.group()]
-            if isinstance(replacement, str):
-                yield pattern.sub(replacement, line)
+    with open(Path(__file__).parent/"dataframe.html") as template:
+        for line in template:
+            match = pattern.search(line)
+            if match:
+                replacement = replacements[match.group()]
+                if isinstance(replacement, str):
+                    yield pattern.sub(replacement, line)
+                else:
+                    before, after = pattern.split(line, 1)
+                    yield before
+                    yield from replacement
+                    yield after
             else:
-                before, after = pattern.split(line, 1)
-                yield before
-                yield from replacement
-                yield after
-        else:
-            yield line
+                yield line
 
 
 def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader=False):
