@@ -35,14 +35,17 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
         self._column_key_dispatcher = KeyToPosition(
             *(sorted(_key_order[p]) for p in self._prefix_order[1:]),
         )
-        self._index_nlevels = len(self._index_key_dispatcher)
+        self.n_index_levels = len(self._index_key_dispatcher)
         self.shape = (_nrows, len(self._column_key_dispatcher))
  
-    def reset_index(self, inplace=True):
-        _dd = self._index_key_dispatcher, self._column_key_dispatcher
-        self._column_key_dispatcher = KeyToPosition(*_dd)
-        self.shape = (self.shape[0], self.shape[1] + self._index_nlevels)
-        self._index_key_dispatcher, self._index_nlevels = {}, 0
+    def move_index_boundary(self, *, to):
+        """Like pandas methods reset_index() and set_index(), but by numeric position"""
+        keys = iter([*self._index_key_dispatcher, *self._column_key_dispatcher])
+        index_keys = (next(keys) for _ in range(to))
+        self._index_key_dispatcher = KeyToPosition(index_keys)
+        self._column_key_dispatcher = KeyToPosition(keys)
+        self.shape = (self.shape[0], len(self._column_key_dispatcher))
+        self.n_index_levels = len(self._index_key_dispatcher)
  
     def _iter_header_levels(self, dispatcher):
         fields_and_bounds = [
@@ -54,11 +57,23 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
  
     @property
     def index_levels(self):
+        """Iterate index level line by line"""
         yield from self._iter_header_levels(self._index_key_dispatcher)
  
     @property
+    def index_names(self):
+        """Iterate index names column by column, like in pandas"""
+        yield from zip(*list(self.index_levels))
+ 
+    @property
     def column_levels(self):
+        """Iterate column levels line by line"""
         yield from self._iter_header_levels(self._column_key_dispatcher)
+ 
+    @property
+    def columns(self):
+        """Iterate column names column by column, like in pandas"""
+        yield from zip(*list(self.column_levels))
  
     def _iter_body_levels(self, cursor, dispatcher):
         for entry in cursor:
@@ -72,10 +87,6 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
     def index(self):
         dispatcher = self._index_key_dispatcher
         yield from self._iter_body_levels(self._cursors["index"], dispatcher)
- 
-    @property
-    def columns(self):
-        yield from zip(*list(self.column_levels))
  
     @property
     def values(self):

@@ -17,37 +17,33 @@ def _iter_formatted_chunks(chunks, prefix="", delimiter=",", quoting=2, lineterm
             handle.truncate()
 
 
+def _iter_bracketed(prefix="", d=None, n=None, postfix=""):
+    """Iterate chunks in bracketed `delimiter`-separated format"""
+    leveliter = iter(d)
+    chunks = (next(leveliter) for _ in range(n-1))
+    yield f"{prefix}["
+    yield from _iter_formatted_chunks(chunks, "[", ",", 2, "],")
+    yield from _iter_formatted_chunks([next(leveliter)], "[", ",", 2, "]")
+    yield f"]{postfix}"
+
+
 def _xsv(obj, delimiter):
     """Display StreamedTable in plaintext `delimiter`-separated format"""
+    obj.move_index_boundary(to=0)
     def _iter_chained_formatted_chunks():
-        def _header():
-            for left, right in zip(obj.index_levels, obj.column_levels):
-                yield left + right
-        yield from _iter_formatted_chunks(_header(), "#", delimiter, 0)
-        yield from _iter_formatted_chunks(obj.rows, "", delimiter, 2)
+        yield from _iter_formatted_chunks(obj.column_levels, "#", delimiter, 0)
+        yield from _iter_formatted_chunks(obj.values, "", delimiter, 2)
     return Response(_iter_chained_formatted_chunks(), mimetype="text/plain")
 
 
 def _iter_json_chunks(obj):
     """Iterate StreamedTable as JSON chunks"""
-    def _iter_header(levels, width):
-        width = width or len(levels) + 1
-        for i, level in enumerate(zip(*levels)):
-            yield from _iter_formatted_chunks([level], "[", ",", 2, "]")
-            yield "," if i < width - 1 else ""
-    def _iter_index_or_values(levels):
-        chunks = (next(levels) for _ in range(obj.shape[0]-1))
-        yield from _iter_formatted_chunks(chunks, "[", ",", 2, "],")
-        yield from _iter_formatted_chunks([next(levels)], "[", ",", 2, "]")
-    yield '{"meta":{"index_names":['
-    yield from _iter_header(list(obj.index_levels), None)
-    yield ']},"columns":['
-    yield from _iter_header(list(obj.column_levels), obj.shape[1])
-    yield '],"index":['
-    yield from _iter_index_or_values(obj.index)
-    yield '],"data":['
-    yield from _iter_index_or_values(obj.values)
-    yield "]}"
+    _iw, _h, _w = obj.n_index_levels, *obj.shape
+    yield '{"meta":{'
+    yield from _iter_bracketed('"index_names":', obj.index_names, _iw, "},")
+    yield from _iter_bracketed('"columns":', obj.columns, _w, ",")
+    yield from _iter_bracketed('"index":', obj.index, _h, ",")
+    yield from _iter_bracketed('"data":', obj.values, _h, "}")
 
 
 def csv(obj, context=None, indent=None):

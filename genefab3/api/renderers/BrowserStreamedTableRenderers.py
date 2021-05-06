@@ -3,10 +3,9 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import lru_cache
 from pathlib import Path
 from genefab3.common.logger import GeneFabLogger
-from genefab3.api.renderers.PlaintextStreamedTableRenderers import _iter_formatted_chunks
+from genefab3.api.renderers.PlaintextStreamedTableRenderers import _iter_bracketed
 from re import compile, escape
 from flask import Response
-from itertools import cycle
 
 
 def _assert_type(obj, nlevels):
@@ -115,17 +114,16 @@ def _iter_html_chunks(replacements):
                 yield pattern.sub(replacement, line)
             else:
                 before, after = pattern.split(line, 1)
-                yield from [before, "["]
-                for chunks in zip(cycle("["), replacement, cycle(["],"])):
-                    yield from chunks
-                yield from ["]", after]
+                yield before
+                yield from replacement
+                yield after
         else:
             yield line
 
 
 def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader=False):
     """Display StreamedTable with two-level columns using SlickGrid"""
-    obj.reset_index(inplace=True)
+    obj.move_index_boundary(to=0)
     _assert_type(obj, nlevels=2)
     title_postfix = f"{context.view} {context.complete_kwargs}"
     msg = "HTML: converting StreamedTable into interactive table"
@@ -144,8 +142,8 @@ def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader
         "$ASSAYSVIEW": build_url(context, "assays"),
         "$SAMPLESVIEW": build_url(context, "samples"),
         "$DATAVIEW": build_url(context, "data"),
-        "$COLUMNDATA": _iter_formatted_chunks(obj.columns),
-        "$ROWDATA": _iter_formatted_chunks(obj.values),
+        "$COLUMNDATA": _iter_bracketed(d=obj.columns, n=obj.shape[1]),
+        "$ROWDATA": _iter_bracketed(d=obj.values, n=obj.shape[0]),
         "$CONTEXTURL": build_url(context),
         "$FORMATTERS": "\n".join(formatters),
         "$FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
