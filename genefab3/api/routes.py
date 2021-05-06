@@ -4,6 +4,7 @@ from genefab3.api import views
 from pandas import DataFrame
 from typing import Union
 from flask import Response
+from genefab3.common.types import StreamedTable
 
 
 class DefaultRoutes(Routes):
@@ -58,5 +59,13 @@ class DefaultRoutes(Routes):
             mongo_collections=self.genefab3_client.mongo_collections,
             sqlite_dbs=self.genefab3_client.sqlite_dbs,
             adapter=self.genefab3_client.adapter,
+            locale=self.genefab3_client.locale, context=context,
+        )
+ 
+    @Routes.register_endpoint()
+    def debug(self, context=None) -> StreamedTable:
+        return views.debug.get(
+            mongo_collections=self.genefab3_client.mongo_collections,
+            id_fields=["accession", "assay name", "sample name"], aggregate=0,
             locale=self.genefab3_client.locale, context=context,
         )

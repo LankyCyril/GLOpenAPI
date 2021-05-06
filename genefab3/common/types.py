@@ -138,3 +138,7 @@ class DataDataFrame(GeneFabDataFrame):
             (len(self.datatypes) == 1) and
             self.gct_validity_set and all(self.gct_validity_set)
         )
+
+
+class StreamedTable(): pass
+NaN = type("UnquotedNaN", (float,), dict(__str__=lambda _: "NaN"))()

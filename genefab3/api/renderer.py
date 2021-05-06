@@ -14,6 +14,10 @@ from genefab3.db.sql.response_cache import ResponseCache
 from genefab3.common.utils import ExceptionPropagatingThread
 
 
+from genefab3.common.types import StreamedTable
+from genefab3.api.renderers import StreamedTableRenderers
+
+
 TYPE_RENDERERS = OrderedDict((
     (Response, {
         "raw": lambda obj, *a, **k: obj,
@@ -45,6 +49,11 @@ TYPE_RENDERERS = OrderedDict((
         "json": PlaintextDataFrameRenderers.json,
         "browser": BrowserDataFrameRenderers.twolevel,
     }),
+    (StreamedTable, {
+        "csv": StreamedTableRenderers.csv,
+        "tsv": StreamedTableRenderers.tsv,
+        "json": StreamedTableRenderers.json,
+    }),
 ))
 
 
@@ -66,7 +75,7 @@ class CacheableRenderer():
             return_types = set(return_type.__args__)
         else:
             return_types = {return_type}
-        if return_types & {AnnotationDataFrame, DataDataFrame}:
+        if return_types & {AnnotationDataFrame, DataDataFrame, StreamedTable}:
             default_format, cacheable = "csv", True
         elif DataFrame in return_types:
             default_format, cacheable = "csv", False
@@ -78,22 +87,22 @@ class CacheableRenderer():
  
     def dispatch_renderer(self, obj, context, default_format, indent=None):
         """Render `obj` according to its type and passed kwargs"""
-        if obj is None:
-            raise GeneFabConfigurationException("Route returned no object")
+        for types, fmt_to_renderer in TYPE_RENDERERS.items():
+            if isinstance(obj, types):
+                if context.format is None:
+                    renderer = fmt_to_renderer[default_format]
+                elif context.format in fmt_to_renderer:
+                    renderer = fmt_to_renderer[context.format]
+                else:
+                    raise GeneFabFormatException(
+                        "Requested format not valid for requested data",
+                        type=type(obj).__name__, format=context.format,
+                        default_format=default_format,
+                    )
+                return renderer(obj, context, indent=indent)
         else:
-            for types, fmt_to_renderer in TYPE_RENDERERS.items():
-                if isinstance(obj, types):
-                    if context.format is None:
-                        renderer = fmt_to_renderer[default_format]
-                    elif context.format in fmt_to_renderer:
-                        renderer = fmt_to_renderer[context.format]
-                    else:
-                        raise GeneFabFormatException(
-                            "Requested format not valid for requested data",
-                            type=type(obj).__name__, format=context.format,
-                            default_format=default_format,
-                        )
-                    return renderer(obj, context, indent=indent)
+            msg = "Route returned unsupported object"
+            raise GeneFabConfigurationException(msg, type=type(obj).__name__)
  
     def __call__(self, method):
         """Render object returned from `method`, put in LRU cache by `context.identity`"""
@@ -127,7 +136,8 @@ class CacheableRenderer():
                         container.append(self.dispatch_renderer(obj, **k))
                         if container[0].status_code == 200:
                             if response_cache is not None:
-                                response_cache.put(context, obj, container[0])
+                                pass # TODO need to put result post-hoc?
+                                #response_cache.put(context, obj, container[0])
                     _thread = ExceptionPropagatingThread(target=_call_and_cache)
                     _thread.start() # will complete even after timeout errors
                     _thread.join() # will fill container if does not time out
