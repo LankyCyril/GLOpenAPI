@@ -30,23 +30,24 @@ def _xsv(obj, delimiter):
 
 def _iter_json_chunks(obj):
     """Iterate StreamedTable as JSON chunks"""
-    def _iter_header(levels, width, end):
+    def _iter_header(levels, width):
         width = width or len(levels) + 1
         for i, level in enumerate(zip(*levels)):
             yield from _iter_formatted_chunks([level], "[", ",", 2, "]")
-            yield "," if i < width - 1 else end
-    def _iter_index_or_values(levels, end):
+            yield "," if i < width - 1 else ""
+    def _iter_index_or_values(levels):
         chunks = (next(levels) for _ in range(obj.shape[0]-1))
         yield from _iter_formatted_chunks(chunks, "[", ",", 2, "],")
-        yield from _iter_formatted_chunks([next(levels)], "[", ",", 2, "]"+end)
+        yield from _iter_formatted_chunks([next(levels)], "[", ",", 2, "]")
     yield '{"meta":{"index_names":['
-    yield from _iter_header(list(obj.index_levels), None, end="]},")
-    yield '"columns":['
-    yield from _iter_header(list(obj.column_levels), obj.shape[1], end="],")
-    yield '"index":['
-    yield from _iter_index_or_values(obj.index, end="],")
-    yield '"data":['
-    yield from _iter_index_or_values(obj.values, end="]}")
+    yield from _iter_header(list(obj.index_levels), None)
+    yield ']},"columns":['
+    yield from _iter_header(list(obj.column_levels), obj.shape[1])
+    yield '],"index":['
+    yield from _iter_index_or_values(obj.index)
+    yield '],"data":['
+    yield from _iter_index_or_values(obj.values)
+    yield "]}"
 
 
 def csv(obj, context=None, indent=None):

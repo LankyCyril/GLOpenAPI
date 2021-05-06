@@ -38,9 +38,11 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
         self._index_nlevels = len(self._index_key_dispatcher)
         self.shape = (_nrows, len(self._column_key_dispatcher))
  
-    @property
-    def empty(self):
-        return self.shape[1] + self._index_nlevels == 0
+    def reset_index(self, inplace=True):
+        _dd = self._index_key_dispatcher, self._column_key_dispatcher
+        self._column_key_dispatcher = KeyToPosition(*_dd)
+        self.shape = (self.shape[0], self.shape[1] + self._index_nlevels)
+        self._index_key_dispatcher, self._index_nlevels = {}, 0
  
     def _iter_header_levels(self, dispatcher):
         fields_and_bounds = [
@@ -58,10 +60,6 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
     def column_levels(self):
         yield from self._iter_header_levels(self._column_key_dispatcher)
  
-    @property
-    def header(self):
-        return [*zip(*list(self.index_levels)), *zip(*list(self.column_levels))]
- 
     def _iter_body_levels(self, cursor, dispatcher):
         for entry in cursor:
             level = [NaN] * len(dispatcher)
@@ -76,15 +74,13 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
         yield from self._iter_body_levels(self._cursors["index"], dispatcher)
  
     @property
+    def columns(self):
+        yield from zip(*list(self.column_levels))
+ 
+    @property
     def values(self):
         dispatcher = self._column_key_dispatcher
         yield from self._iter_body_levels(self._cursors["values"], dispatcher)
- 
-    @property
-    def rows(self):
-        dispatchers = self._index_key_dispatcher, self._column_key_dispatcher
-        dispatcher = KeyToPosition(*dispatchers)
-        yield from self._iter_body_levels(self._cursors["rows"], dispatcher)
 
 
 def get(*, mongo_collections, locale, context, id_fields, condense=False):
@@ -103,7 +99,7 @@ def get(*, mongo_collections, locale, context, id_fields, condense=False):
         else:
             msg = "Could not retrieve sorted metadata"
         raise GeneFabDatabaseException(msg, locale=locale, reason=str(e))
-    if False:#annotation.empty:
-        return Placeholders.EmptyStreamedAnnotationTable(id_fields=id_fields)
-    else:
+    if annotation.shape[0]:
         return annotation
+    else:
+        return Placeholders.EmptyStreamedAnnotationTable(id_fields=id_fields)

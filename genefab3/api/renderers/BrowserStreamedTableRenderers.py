@@ -11,7 +11,7 @@ from itertools import cycle
 
 def _assert_type(obj, nlevels):
     """Check validity of `obj` for converting as a multi-column-level StreamedTable"""
-    passed_nlevels = {len(column) for column in getattr(obj, "header", [[]])}
+    passed_nlevels = {len(column) for column in getattr(obj, "columns", [[]])}
     if (not isinstance(obj, StreamedTable)) or (passed_nlevels != {nlevels}):
         msg = "Data cannot be represented as an interactive table"
         _kw = dict(type=type(obj).__name__, nlevels=passed_nlevels)
@@ -125,12 +125,13 @@ def _iter_html_chunks(replacements):
 
 def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader=False):
     """Display StreamedTable with two-level columns using SlickGrid"""
+    obj.reset_index(inplace=True)
     _assert_type(obj, nlevels=2)
     title_postfix = f"{context.view} {context.complete_kwargs}"
     msg = "HTML: converting StreamedTable into interactive table"
     GeneFabLogger().info(msg)
     if isinstance(obj, StreamedAnnotationTable) and (context.view != "status"):
-        formatters = iterate_formatters(obj.header, context)
+        formatters = iterate_formatters(obj.columns, context)
     else:
         formatters = []
     replacements = {
@@ -143,8 +144,8 @@ def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader
         "$ASSAYSVIEW": build_url(context, "assays"),
         "$SAMPLESVIEW": build_url(context, "samples"),
         "$DATAVIEW": build_url(context, "data"),
-        "$COLUMNDATA": _iter_formatted_chunks(obj.header),
-        "$ROWDATA": _iter_formatted_chunks(obj.rows),
+        "$COLUMNDATA": _iter_formatted_chunks(obj.columns),
+        "$ROWDATA": _iter_formatted_chunks(obj.values),
         "$CONTEXTURL": build_url(context),
         "$FORMATTERS": "\n".join(formatters),
         "$FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
