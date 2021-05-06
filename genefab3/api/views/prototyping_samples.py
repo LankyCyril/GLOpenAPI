@@ -1,3 +1,5 @@
+from marshal import dumps as marsh
+from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.types import StreamedAnnotationTable, NaN
 from genefab3.db.mongo.utils import aggregate_entries_by_context
 from genefab3.common.utils import ForkableIterator, blackjack, KeyToPosition
@@ -6,16 +8,48 @@ from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.api.renderers import Placeholders
 
 
+def squash(cursor):
+    """Condense sequential entries from same assay into entries where existing fields resolve to True"""
+    hashes, current_id, squashed_entry = set(), None, {}
+    def _booleanize(entry):
+        if isinstance(entry, dict):
+            for k, v in entry.items():
+                if k != "id":
+                    if isinstance(v, dict):
+                        _booleanize(v)
+                    else:
+                        entry[k] = "True"
+        return entry
+    for entry in cursor:
+        if entry["id"] != current_id:
+            if current_id is not None:
+                yield _booleanize(squashed_entry)
+                squashed_entry = {}
+            current_id, _hash = entry["id"], marsh(entry["id"], 4)
+            if _hash in hashes:
+                msg = "Retrieved metadata was not sorted"
+                raise GeneFabConfigurationException(msg)
+            else:
+                hashes.add(_hash)
+        squashed_entry.update(entry)
+    if current_id is not None:
+        yield _booleanize(squashed_entry)
+
+
 class _StreamedAnnotationTable(StreamedAnnotationTable):
     _prefix_order = "id", "investigation", "study", "assay", "file", ""
     _accession_key = "id.accession"
  
-    def __init__(self, *, mongo_collections, locale, context, id_fields):
+    def __init__(self, *, mongo_collections, locale, context, id_fields, condense):
         """Make and retain forked MongoDB aggregation cursors, infer index names and columns in order `self._prefix_order`"""
         cursor, _ = aggregate_entries_by_context(
             mongo_collections.metadata, locale=locale, context=context,
             id_fields=id_fields,
         )
+        if condense:
+            cursor, self._na_rep = squash(cursor), "False"
+        else:
+            self._na_rep = NaN
         self._cursors = ForkableIterator(cursor)
         self.accessions, _key_pool, _nrows = set(), set(), 0
         for _nrows, entry in enumerate(self._cursors(), 1):
@@ -75,7 +109,7 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
  
     def _iter_body_levels(self, cursor, dispatcher):
         for entry in cursor:
-            level = [NaN] * len(dispatcher)
+            level = [self._na_rep] * len(dispatcher)
             for key, value in blackjack(entry, max_level=2):
                 if key in dispatcher:
                     level[dispatcher[key]] = value
@@ -97,7 +131,7 @@ def get(*, mongo_collections, locale, context, id_fields, condense=False):
     try:
         annotation = _StreamedAnnotationTable(
             mongo_collections=mongo_collections, locale=locale,
-            context=context, id_fields=id_fields,
+            context=context, id_fields=id_fields, condense=condense,
         )
     except MongoOperationError as e:
         errmsg = getattr(e, "details", {}).get("errmsg", "").lower()

@@ -69,3 +69,11 @@ class DefaultRoutes(Routes):
             id_fields=["accession", "assay name", "sample name"],
             condense=False, locale=self.genefab3_client.locale, context=context,
         )
+ 
+    @Routes.register_endpoint("/prototyping/assays/")
+    def prototyping_assays(self, context=None) -> StreamedAnnotationTable:
+        return views.prototyping_samples.get(
+            mongo_collections=self.genefab3_client.mongo_collections,
+            id_fields=["accession", "assay name"], condense=True,
+            locale=self.genefab3_client.locale, context=context,
+        )
