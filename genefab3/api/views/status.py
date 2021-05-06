@@ -1,12 +1,20 @@
+from pandas import MultiIndex, DataFrame, concat
 from os import path
 from numpy import nan
 from datetime import datetime
 from genefab3.db.mongo.utils import iterate_mongo_connections
 from genefab3.common.utils import iterate_terminal_leaves, blackjack_normalize
 from genefab3.common.exceptions import GeneFabParserException
-from pandas import DataFrame, concat, MultiIndex
 from itertools import chain, cycle
-from genefab3.api.views.metadata import INPLACE_set_id_as_index
+
+
+def INPLACE_set_id_as_index(dataframe):
+    """Move all columns with first level value of "id" into MultiIndex"""
+    if "id" in dataframe.columns.get_level_values(0):
+        dataframe.index = MultiIndex.from_frame(
+            dataframe["id"], names=dataframe[["id"]].columns,
+        )
+        dataframe.drop(columns="id", inplace=True)
 
 
 GiB = 1024**3
