@@ -127,11 +127,13 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
  
     @property
     def index(self):
+        """Iterate index line by line, like in pandas"""
         dispatcher = self._index_key_dispatcher
         yield from self._iter_body_levels(self._cursors(), dispatcher)
  
     @property
     def values(self):
+        """Iterate values line by line, like in pandas"""
         dispatcher = self._column_key_dispatcher
         yield from self._iter_body_levels(self._cursors(), dispatcher)
 
