@@ -40,7 +40,7 @@ class DefaultRoutes(Routes):
     def assays(self, context) -> StreamedAnnotationTable:
         return views.metadata.get(
             mongo_collections=self.genefab3_client.mongo_collections,
-            id_fields=["accession", "assay name"], condense=1,
+            id_fields=["accession", "assay name"], condensed=1,
             locale=self.genefab3_client.locale, context=context,
         )
  
@@ -48,7 +48,7 @@ class DefaultRoutes(Routes):
     def samples(self, context) -> StreamedAnnotationTable:
         return views.metadata.get(
             mongo_collections=self.genefab3_client.mongo_collections,
-            id_fields=["accession", "assay name", "sample name"], condense=0,
+            id_fields=["accession", "assay name", "sample name"], condensed=0,
             locale=self.genefab3_client.locale, context=context,
         )
  
