@@ -2,7 +2,7 @@ from marshal import dumps as marsh
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.types import StreamedAnnotationTable, NaN
 from genefab3.db.mongo.utils import aggregate_entries_by_context
-from genefab3.common.utils import ForkableIterator, blackjack, KeyToPosition
+from genefab3.common.utils import RewindableIterator, blackjack, KeyToPosition
 from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.api.renderers import Placeholders
@@ -50,9 +50,9 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
             cursor, self._na_rep = squash(cursor), "False"
         else:
             self._na_rep = NaN
-        self._cursors = ForkableIterator(cursor)
+        self._cursor = RewindableIterator(cursor)
         self.accessions, _key_pool, _nrows = set(), set(), 0
-        for _nrows, entry in enumerate(self._cursors(), 1):
+        for _nrows, entry in enumerate(self._cursor.rewound(), 1):
             for key, value in blackjack(entry, max_level=2):
                 _key_pool.add(key)
                 if key == self._accession_key:
@@ -129,13 +129,13 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
     def index(self):
         """Iterate index line by line, like in pandas"""
         dispatcher = self._index_key_dispatcher
-        yield from self._iter_body_levels(self._cursors(), dispatcher)
+        yield from self._iter_body_levels(self._cursor.rewound(), dispatcher)
  
     @property
     def values(self):
         """Iterate values line by line, like in pandas"""
         dispatcher = self._column_key_dispatcher
-        yield from self._iter_body_levels(self._cursors(), dispatcher)
+        yield from self._iter_body_levels(self._cursor.rewound(), dispatcher)
 
 
 def get(*, mongo_collections, locale, context, id_fields, condense=False):

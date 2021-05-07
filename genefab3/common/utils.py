@@ -33,11 +33,11 @@ def is_debug(markers={"development", "staging", "stage", "debug", "debugging"}):
     return environ.get("FLASK_ENV", None) in markers
 
 
-class ForkableIterator():
-    """Iterator factory, returns a teed copy of original iterator when called"""
+class RewindableIterator():
+    """Iterator factory, returns a teed copy of original iterator on `self.rewound()`"""
     def __init__(self, it):
         self.it = it
-    def __call__(self):
+    def rewound(self):
         self.it, _it = tee(self.it)
         return _it
 
