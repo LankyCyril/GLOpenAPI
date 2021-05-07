@@ -121,15 +121,15 @@ def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), p
     """Run .find() or .aggregate() based on query, projection"""
     full_projection = {**context.projection, **{"id."+f: 1 for f in id_fields}}
     sort_by_too = ["id."+f for f in id_fields if "id."+f not in context.sort_by]
-    pipeline=[
+    pipeline = [
         {"$sort": {f: ASCENDING for f in (*context.sort_by, *sort_by_too)}},
       *({"$unwind": f"${f}"} for f in context.unwind),
         {"$match": context.query},
         {"$project": {**full_projection, "_id": False}},
         *postprocess,
     ]
-    collation={"locale": locale, "numericOrdering": True}
-    return collection.aggregate(pipeline, collation=collation), full_projection
+    collation = {"locale": locale, "numericOrdering": True}
+    return collection.aggregate(pipeline, collation=collation)
 
 
 def aggregate_file_descriptors_by_context(collection, *, locale, context, tech_type_locator="investigation.study assays.study assay technology type"):

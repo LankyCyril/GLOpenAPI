@@ -225,7 +225,7 @@ def combined_data(descriptors, context, mongo_collections, sqlite_dbs, adapter):
 
 def get(*, mongo_collections, locale, context, sqlite_dbs, adapter):
     """Return data corresponding to search parameters; merged if multiple underlying files are same type and joinable"""
-    cursor, _ = aggregate_file_descriptors_by_context(
+    cursor = aggregate_file_descriptors_by_context(
         mongo_collections.metadata, locale=locale, context=context,
     )
     descriptors = list(cursor)

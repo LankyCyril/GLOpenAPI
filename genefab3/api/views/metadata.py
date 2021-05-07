@@ -42,7 +42,7 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
  
     def __init__(self, *, mongo_collections, locale, context, id_fields, condense):
         """Make and retain forked MongoDB aggregation cursors, infer index names and columns in order `self._prefix_order`"""
-        cursor, _ = aggregate_entries_by_context(
+        cursor = aggregate_entries_by_context(
             mongo_collections.metadata, locale=locale, context=context,
             id_fields=id_fields,
         )
