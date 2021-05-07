@@ -1,14 +1,15 @@
-from pandas import MultiIndex, Index
-from genefab3.common.types import StreamedAnnotationTable, DataDataFrame
+from genefab3.common.types import StreamedAnnotationTable, DataDataFrame, NaN
+from pandas import Index, MultiIndex
 
 
 class EmptyStreamedAnnotationTable(StreamedAnnotationTable):
-    def __init__(self, *, id_fields):
-        self.shape = (0, 0)
-        self.index_levels = [["id"] * len(id_fields), id_fields]
-        self.column_levels = [[], []]
-        self.index = self.values = self.rows = [[]]
-        self.header = [["id", f] for f in id_fields]
+    """Return an empty StreamedAnnotationTable-like"""
+    def __init__(self):
+        self.shape, self.n_index_levels = (0, 0), 1
+        self.index_levels, self.column_levels = ["*"], ["*", "*"]
+        self.index_names, self.columns = [["*"]], [["*", "*"]]
+        self.index, self.values = [[NaN]], [[NaN]]
+        self.move_index_boundary = lambda *a, **k: None
 
 
 def EmptyDataDataFrame(*, index_name="index"):

@@ -178,8 +178,9 @@ for (var i = columns.length; i --> 0;) {
     var longest = c.name;
     for (var j = data.length; j --> 0;) {
         var value = data[j][field];
-        if ((value !== null) && (value.toString().length > longest.length))
-            longest = value;
+        if ((value !== null) && (value === value) && (value !== undefined))
+            if (value.toString().length > longest.length)
+                longest = value;
     }
     var widthchecker = $("<span>"+longest+"&nbsp;&times;</span>").hide();
     $("body").append(widthchecker);

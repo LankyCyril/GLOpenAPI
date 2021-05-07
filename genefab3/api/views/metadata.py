@@ -155,4 +155,4 @@ def get(*, mongo_collections, locale, context, id_fields, condense=False):
     if annotation.shape[0]:
         return annotation
     else:
-        return Placeholders.EmptyStreamedAnnotationTable(id_fields=id_fields)
+        return Placeholders.EmptyStreamedAnnotationTable()
