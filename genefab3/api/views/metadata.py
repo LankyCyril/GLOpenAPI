@@ -3,6 +3,7 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.types import StreamedAnnotationTable, NaN
 from genefab3.db.mongo.utils import aggregate_entries_by_context
 from genefab3.common.utils import RewindableIterator, blackjack, KeyToPosition
+from functools import lru_cache
 from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.api.renderers import Placeholders
@@ -18,7 +19,7 @@ def squash(cursor):
                     if isinstance(v, dict):
                         _booleanize(v)
                     else:
-                        entry[k] = "True"
+                        entry[k] = True
         return entry
     for entry in cursor:
         if entry["id"] != current_id:
@@ -47,9 +48,9 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
             id_fields=id_fields,
         )
         if condense:
-            cursor, self._na_rep = squash(cursor), "False"
+            cursor, self._condensed = squash(cursor), True
         else:
-            self._na_rep = NaN
+            self._condensed = False
         self._cursor = RewindableIterator(cursor)
         self.accessions, _key_pool, _nrows = set(), set(), 0
         for _nrows, entry in enumerate(self._cursor.rewound(), 1):
@@ -117,9 +118,13 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
         """Test if valid for CLS, i.e. has exactly one metadata column"""
         return len(self.metadata_columns) == 1
  
+    @lru_cache(maxsize=128)
+    def _make_empty_level(self, n):
+        return [False if self._condensed else NaN] * n
+ 
     def _iter_body_levels(self, cursor, dispatcher):
         for entry in cursor:
-            level = [self._na_rep] * len(dispatcher)
+            level = self._make_empty_level(len(dispatcher))
             for key, value in blackjack(entry, max_level=2):
                 if key in dispatcher:
                     level[dispatcher[key]] = value
