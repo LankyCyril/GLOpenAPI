@@ -234,9 +234,9 @@ grid.onSort.subscribe(function(e, args) {
             var v1 = r1[f], v2 = r2[f];
             var sign = sortcols[i].sortAsc ? 1 : -1;
             var ans = sign * (
-                ((v1 === "NaN") || (v1 === null) || (v !== v))
-                ? (((v2 === "NaN") || (v2 === null) || (v !== v)) ? 0 : -1)
-                : (((v2 === "NaN") || (v2 === null) || (v !== v))
+                ((v1 === "NaN") || (v1 === null) || (v1 !== v1))
+                ? (((v2 === "NaN") || (v2 === null) || (v2 !== v2)) ? 0 : -1)
+                : (((v2 === "NaN") || (v2 === null) || (v2 !== v2))
                     ? 1 : v1.toString().localeCompare(
                         v2, undefined, {numeric: true}
                     )
