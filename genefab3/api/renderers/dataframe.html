@@ -112,9 +112,6 @@ var basic_formatter = function(r,c,v,d,x) {
                     ? "<i style='color:#BBB'>NaN</i>" : v ))
 };
 
-// these do not happen often, but when they do, csv.writer capitalizes them:
-var True = true, False = false;
-
 var columns = [], _rc = $COLUMNDATA;
 for (var i = _rc.length; i --> 0;)
     columns[i] = {

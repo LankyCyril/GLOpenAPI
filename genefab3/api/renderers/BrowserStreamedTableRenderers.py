@@ -2,7 +2,7 @@ from genefab3.common.types import StreamedTable, StreamedAnnotationTable
 from genefab3.common.exceptions import GeneFabConfigurationException
 from pathlib import Path
 from genefab3.common.logger import GeneFabLogger
-from genefab3.api.renderers.PlaintextStreamedTableRenderers import _iter_bracketed
+from genefab3.api.renderers.PlaintextStreamedTableRenderers import _iter_json_chunks
 from re import compile, escape
 from flask import Response
 
@@ -136,8 +136,8 @@ def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader
         "$ASSAYSVIEW": build_url(context, "assays"),
         "$SAMPLESVIEW": build_url(context, "samples"),
         "$DATAVIEW": build_url(context, "data"),
-        "$COLUMNDATA": _iter_bracketed(d=obj.columns, n=obj.shape[1]),
-        "$ROWDATA": _iter_bracketed(d=obj.values, n=obj.shape[0]),
+        "$COLUMNDATA": _iter_json_chunks(d=obj.columns, n=obj.shape[1]),
+        "$ROWDATA": _iter_json_chunks(d=obj.values, n=obj.shape[0]),
         "$CONTEXTURL": build_url(context),
         "$FORMATTERS": "\n".join(formatters),
         "$FROZENCOLUMN": "undefined" if frozen is None else str(frozen),

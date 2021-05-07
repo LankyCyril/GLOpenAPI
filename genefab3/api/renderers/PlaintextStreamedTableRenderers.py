@@ -1,33 +1,10 @@
-from io import StringIO
-from csv import writer as CSVWriter
-from re import sub
-from genefab3.common.exceptions import GeneFabFormatException
-from genefab3.common.utils import as_is
-from flask import Response
-
-
-def _iter_formatted_chunks(chunks, prefix="", delimiter=",", quoting=2, lineterminator=None):
-    """Iterate chunks in `delimiter`-separated format"""
-    fmtparams = dict(delimiter=delimiter, quoting=quoting)
-    if lineterminator:
-        fmtparams["lineterminator"] = lineterminator
-    with StringIO() as handle:
-        writer = CSVWriter(handle, **fmtparams)
-        for chunk in chunks:
-            writer.writerow(chunk)
-            handle.seek(0)
-            yield prefix + handle.getvalue()
-            handle.truncate()
-
-
-def _iter_bracketed(prefix="", d=None, n=None, postfix=""):
-    """Iterate chunks in bracketed `delimiter`-separated format"""
-    leveliter = iter(d)
-    chunks = (next(leveliter) for _ in range(n-1))
-    yield f"{prefix}["
-    yield from _iter_formatted_chunks(chunks, "[", ",", 2, "],")
-    yield from _iter_formatted_chunks([next(leveliter)], "[", ",", 2, "]")
-    yield f"]{postfix}"
+from re import sub # 32
+from genefab3.common.exceptions import GeneFabFormatException # 37
+from genefab3.common.utils import as_is # 52
+from flask import Response # 54
+from json import dumps # 61
+from io import StringIO # 87
+from csv import writer as CSVWriter # 88
 
 
 def _list_continuous_cls(obj, target, target_name):
@@ -77,24 +54,52 @@ def cls(obj, context=None, continuous=None, space_formatter=lambda s: sub(r'\s',
     return Response(iter(lines), mimetype="text/plain")
 
 
+def _iter_json_chunks(prefix="", d=None, n=None, postfix=""):
+    """Iterate chunks in bracketed `delimiter`-separated format"""
+    def _foreach(chunks, end):
+        for chunk in chunks:
+            yield dumps(chunk, separators=(",", ":")) + end
+    leveliter = iter(d)
+    chunks = (next(leveliter) for _ in range(n-1))
+    yield f"{prefix}["
+    yield from _foreach(chunks, end=",")
+    yield from _foreach([next(leveliter)], end="")
+    yield f"]{postfix}"
+
+
+def json(obj, context=None, indent=None):
+    """Display StreamedTable as JSON"""
+    _iw, _h, _w = obj.n_index_levels, *obj.shape
+    def _iter():
+        yield '{"meta":{"index_names":'
+        yield from _iter_json_chunks('', obj.index_names, _iw, "},")
+        yield from _iter_json_chunks('"columns":', obj.columns, _w, ",")
+        yield from _iter_json_chunks('"index":', obj.index, _h, ",")
+        yield from _iter_json_chunks('"data":', obj.values, _h, "}")
+    return Response(_iter(), mimetype="application/json")
+
+
+def _iter_xsv_chunks(chunks, prefix="", delimiter=",", quoting=2, lineterminator=None):
+    """Iterate chunks in `delimiter`-separated format"""
+    fmtparams = dict(delimiter=delimiter, quoting=quoting)
+    if lineterminator:
+        fmtparams["lineterminator"] = lineterminator
+    with StringIO() as handle:
+        writer = CSVWriter(handle, **fmtparams)
+        for chunk in chunks:
+            writer.writerow(chunk)
+            handle.seek(0)
+            yield prefix + handle.getvalue()
+            handle.truncate()
+
+
 def _xsv(obj, delimiter):
     """Display StreamedTable in plaintext `delimiter`-separated format"""
     obj.move_index_boundary(to=0)
-    def _iter_chained_formatted_chunks():
-        yield from _iter_formatted_chunks(obj.column_levels, "#", delimiter, 0)
-        yield from _iter_formatted_chunks(obj.values, "", delimiter, 2)
-    return Response(_iter_chained_formatted_chunks(), mimetype="text/plain")
-
-
-def _iter_json_chunks(obj):
-    """Iterate StreamedTable as JSON chunks"""
-    _iw, _h, _w = obj.n_index_levels, *obj.shape
-    yield '{"meta":{'
-    yield from _iter_bracketed('"index_names":', obj.index_names, _iw, "},")
-    yield from _iter_bracketed('"columns":', obj.columns, _w, ",")
-    yield from _iter_bracketed('"index":', obj.index, _h, ",")
-    yield from _iter_bracketed('"data":', obj.values, _h, "}")
-
+    def _iter():
+        yield from _iter_xsv_chunks(obj.column_levels, "#", delimiter, 0)
+        yield from _iter_xsv_chunks(obj.values, "", delimiter, 2)
+    return Response(_iter(), mimetype="text/plain")
 
 def csv(obj, context=None, indent=None):
     """Display StreamedTable as CSV"""
@@ -103,7 +108,3 @@ def csv(obj, context=None, indent=None):
 def tsv(obj, context=None, indent=None):
     """Display StreamedTable as TSV"""
     return _xsv(obj, delimiter="\t")
-
-def json(obj, context=None, indent=None):
-    """Display StreamedTable as JSON"""
-    return Response(_iter_json_chunks(obj), mimetype="application/json")

@@ -1,3 +1,4 @@
+from math import nan
 from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
@@ -6,7 +7,10 @@ from numpy import dtype
 from genefab3.common.logger import GeneFabLogger
 
 
-NaN = type("UnquotedNaN", (float,), dict(__str__=lambda _: "NaN"))()
+NaN = type("UnquotedNaN", (float,), dict(
+    __new__=lambda s: float.__new__(s, nan), __eq__=lambda s,o: False,
+    __str__=lambda _: "NaN", __repr__=lambda _: "NaN",
+))()
 
 
 class Adapter():
