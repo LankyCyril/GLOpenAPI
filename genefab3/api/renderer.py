@@ -2,7 +2,9 @@ from collections import OrderedDict
 from flask import Response
 from genefab3.api.renderers import SimpleRenderers, PlaintextDataFrameRenderers
 from genefab3.api.renderers import BrowserDataFrameRenderers
-from genefab3.common.types import AnnotationDataFrame, DataDataFrame
+from genefab3.api.renderers import PlaintextStreamedTableRenderers
+from genefab3.api.renderers import BrowserStreamedTableRenderers
+from genefab3.common.types import StreamedAnnotationTable, DataDataFrame
 from pandas import DataFrame
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabFormatException
@@ -12,11 +14,6 @@ from genefab3.api.parser import Context
 from copy import deepcopy
 from genefab3.db.sql.response_cache import ResponseCache
 from genefab3.common.utils import ExceptionPropagatingThread
-
-
-from genefab3.common.types import StreamedAnnotationTable
-from genefab3.api.renderers import PlaintextStreamedTableRenderers
-from genefab3.api.renderers import BrowserStreamedTableRenderers
 
 
 TYPE_RENDERERS = OrderedDict((
@@ -30,12 +27,12 @@ TYPE_RENDERERS = OrderedDict((
     ((list, dict), {
         "json": SimpleRenderers.json,
     }),
-    (AnnotationDataFrame, {
-        "cls": PlaintextDataFrameRenderers.cls,
-        "csv": PlaintextDataFrameRenderers.csv,
-        "tsv": PlaintextDataFrameRenderers.tsv,
-        "json": PlaintextDataFrameRenderers.json,
-        "browser": BrowserDataFrameRenderers.twolevel,
+    (StreamedAnnotationTable, {
+        "cls": PlaintextStreamedTableRenderers.cls,
+        "csv": PlaintextStreamedTableRenderers.csv,
+        "tsv": PlaintextStreamedTableRenderers.tsv,
+        "json": PlaintextStreamedTableRenderers.json,
+        "browser": BrowserStreamedTableRenderers.twolevel,
     }),
     (DataDataFrame, {
         "gct": PlaintextDataFrameRenderers.gct,
@@ -49,12 +46,6 @@ TYPE_RENDERERS = OrderedDict((
         "tsv": PlaintextDataFrameRenderers.tsv,
         "json": PlaintextDataFrameRenderers.json,
         "browser": BrowserDataFrameRenderers.twolevel,
-    }),
-    (StreamedAnnotationTable, {
-        "csv": PlaintextStreamedTableRenderers.csv,
-        "tsv": PlaintextStreamedTableRenderers.tsv,
-        "json": PlaintextStreamedTableRenderers.json,
-        "browser": BrowserStreamedTableRenderers.twolevel,
     }),
 ))
 
@@ -77,7 +68,7 @@ class CacheableRenderer():
             return_types = set(return_type.__args__)
         else:
             return_types = {return_type}
-        if return_types & {AnnotationDataFrame, DataDataFrame, StreamedAnnotationTable}:
+        if return_types & {DataDataFrame, StreamedAnnotationTable}:
             default_format, cacheable = "csv", True
         elif DataFrame in return_types:
             default_format, cacheable = "csv", False

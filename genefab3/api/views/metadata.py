@@ -107,6 +107,16 @@ class _StreamedAnnotationTable(StreamedAnnotationTable):
         """Iterate column names column by column, like in pandas"""
         yield from zip(*list(self.column_levels))
  
+    @property
+    def metadata_columns(self):
+        """List columns under any ISA category"""
+        return [c for c in self.columns if c[0] not in {"id", "file"}]
+ 
+    @property
+    def cls_valid(self):
+        """Test if valid for CLS, i.e. has exactly one metadata column"""
+        return len(self.metadata_columns) == 1
+ 
     def _iter_body_levels(self, cursor, dispatcher):
         for entry in cursor:
             level = [self._na_rep] * len(dispatcher)
