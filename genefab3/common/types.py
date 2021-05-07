@@ -98,20 +98,9 @@ class GeneFabDataFrame(DataFrame):
         return type(self)(schema)
 
 
-class AnnotationDataFrame(GeneFabDataFrame):
-    @property
-    def accessions(self):
-        col = ("id", "accession")
-        if col in self.index.names:
-            return set(self.index.get_level_values(col).drop_duplicates())
-        else:
-            return None
-    @property
-    def metadata_columns(self):
-        return [c for c in self.columns if c[0] not in {"id", "file"}]
-    @property
-    def cls_valid(self):
-        return len(self.metadata_columns) == 1
+class StreamedTable(): pass
+class StreamedAnnotationTable(StreamedTable): pass
+class StreamedDataTable(StreamedTable): pass
 
 
 class DataDataFrame(GeneFabDataFrame):
@@ -141,7 +130,3 @@ class DataDataFrame(GeneFabDataFrame):
             (len(self.datatypes) == 1) and
             self.gct_validity_set and all(self.gct_validity_set)
         )
-
-
-class StreamedTable(): pass
-class StreamedAnnotationTable(StreamedTable): pass

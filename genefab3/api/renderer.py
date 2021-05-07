@@ -1,10 +1,10 @@
 from collections import OrderedDict
 from flask import Response
+from genefab3.common.types import StreamedAnnotationTable, DataDataFrame
 from genefab3.api.renderers import SimpleRenderers, PlaintextDataFrameRenderers
 from genefab3.api.renderers import BrowserDataFrameRenderers
 from genefab3.api.renderers import PlaintextStreamedTableRenderers
 from genefab3.api.renderers import BrowserStreamedTableRenderers
-from genefab3.common.types import StreamedAnnotationTable, DataDataFrame
 from pandas import DataFrame
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.exceptions import GeneFabFormatException
@@ -19,13 +19,6 @@ from genefab3.common.utils import ExceptionPropagatingThread
 TYPE_RENDERERS = OrderedDict((
     (Response, {
         "raw": lambda obj, *a, **k: obj,
-    }),
-    ((str, bytes), {
-        "raw": SimpleRenderers.raw,
-        "html": SimpleRenderers.html,
-    }),
-    ((list, dict), {
-        "json": SimpleRenderers.json,
     }),
     (StreamedAnnotationTable, {
         "cls": PlaintextStreamedTableRenderers.cls,
@@ -46,6 +39,13 @@ TYPE_RENDERERS = OrderedDict((
         "tsv": PlaintextDataFrameRenderers.tsv,
         "json": PlaintextDataFrameRenderers.json,
         "browser": BrowserDataFrameRenderers.twolevel,
+    }),
+    ((str, bytes), {
+        "raw": SimpleRenderers.raw,
+        "html": SimpleRenderers.html,
+    }),
+    ((list, dict), {
+        "json": SimpleRenderers.json,
     }),
 ))
 
@@ -76,7 +76,7 @@ class CacheableRenderer():
             default_format, cacheable = "html", False
         else:
             default_format, cacheable = "raw", False
-        return return_types, default_format, cacheable
+        return default_format, cacheable
  
     def dispatch_renderer(self, obj, context, default_format, indent=None):
         """Render `obj` according to its type and passed kwargs"""
@@ -108,8 +108,8 @@ class CacheableRenderer():
                 _kw = dict(context=context, indent=4, default_format="json")
                 container = [self.dispatch_renderer(obj, **_kw)]
             else:
-                return_types, default_format, cached = self._infer_types(method)
-                if cached:
+                default_format, cacheable = self._infer_types(method)
+                if cacheable:
                     response_cache = ResponseCache(self.sqlite_dbs)
                     response = response_cache.get(context)
                     container = [response] if response else []

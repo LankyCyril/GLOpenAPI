@@ -1,43 +1,10 @@
 from re import sub, MULTILINE
 from genefab3.common.exceptions import GeneFabFormatException
-from genefab3.common.utils import as_is
 from flask import Response
 from functools import partial
 from genefab3.common.types import DataDataFrame
 from genefab3.common.exceptions import GeneFabConfigurationException
 from json import dumps
-
-
-def cls(obj, context=None, continuous=None, space_formatter=lambda s: sub(r'\s', "_", s), indent=None):
-    """Display presumed annotation/factor dataframe in plaintext CLS format"""
-    if getattr(obj, "cls_valid", None) is not True:
-        msg = "Exactly one target assay/study metadata field must be present"
-        _kw = dict(target_columns=getattr(obj, "metadata_columns", []))
-        raise GeneFabFormatException(msg, **_kw, format="cls")
-    else:
-        target, sample_count = obj.metadata_columns[0], obj.shape[0]
-    if (continuous is None) or (continuous is True):
-        try:
-            _data = [
-                ["#numeric"], ["#" + (".".join(target))],
-                obj[target].astype(float),
-            ]
-        except ValueError:
-            if continuous is True:
-                msg = "Cannot represent target annotation as continuous"
-                raise GeneFabFormatException(msg, target=target, format="cls")
-            else:
-                continuous = False
-    if continuous is False:
-        space_fmt, classes = (space_formatter or as_is), obj[target].unique()
-        class2id = {c: i for i, c in enumerate(classes)}
-        _data = [
-            [sample_count, len(classes), 1],
-            ["# "+space_fmt(classes[0])] + [space_fmt(c) for c in classes[1:]],
-            [class2id[v] for v in obj[target]]
-        ]
-    content = "\n".join(["\t".join([str(f) for f in fs]) for fs in _data])
-    return Response(content, mimetype="text/plain")
 
 
 def gct(obj, context=None, indent=None, level_formatter="/".join):
