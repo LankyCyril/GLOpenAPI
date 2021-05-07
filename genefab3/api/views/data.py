@@ -1,24 +1,21 @@
-from genefab3.db.mongo.utils import aggregate_file_descriptors_by_context
-from genefab3.db.mongo.utils import match_sample_names_to_file_descriptor
-from functools import lru_cache, reduce, partial
-from genefab3.common.utils import pick_reachable_url
+from genefab3.common.utils import pick_reachable_url, ForkableIterator
 from flask import redirect, Response
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDataManagerException
-from pandas import MultiIndex
+from natsort import natsorted
+from genefab3.db.mongo.utils import match_sample_names_to_file_descriptor
+from functools import partial, lru_cache, reduce
+from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.db.sql.pandas import OndemandSQLiteDataFrame
+from pandas import MultiIndex
 from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.db.sql.files import CachedTableFile, CachedBinaryFile
-from natsort import natsorted
-from genefab3.common.exceptions import GeneFabDatabaseException
+from genefab3.db.mongo.utils import aggregate_file_descriptors_by_context
 from urllib.error import HTTPError
 
 
-def validate_joinable_files(descriptors):
+def validate_joinable_files(descriptors, getset):
     """Check for ability to join data from requested files"""
-    getset = lru_cache(maxsize=None)(lambda *keys: set(
-        reduce(lambda d, k: d.get(k, {}), keys, d) or None for d in descriptors
-    ))
     if len(getset("file", "datatype")) > 1:
         msg = "Cannot combine data of multiple datatypes"
         return msg, dict(datatypes=getset("file", "datatype"))
@@ -40,19 +37,12 @@ def validate_joinable_files(descriptors):
         return None, {}
 
 
-def file_redirect(descriptors):
+def file_redirect(descriptor):
     """Redirect to file at original URL, without caching or interpreting"""
-    if len(descriptors) == 1:
-        name = descriptors[0]["file"]["filename"]
-        urls = descriptors[0]["file"].get("urls", ())
-        with pick_reachable_url(urls, name=name) as url:
-            return redirect(url, code=303, Response=Response)
-    else:
-        raise GeneFabFileException(
-            ("Multiple files match query; " +
-            "with format 'raw', only one file can be requested"),
-            format="raw", files={d["file"]["filename"] for d in descriptors},
-        )
+    name = descriptor["file"]["filename"]
+    urls = descriptor["file"].get("urls", ())
+    with pick_reachable_url(urls, name=name) as url:
+        return redirect(url, code=303, Response=Response)
 
 
 def harmonize_columns(dataframe, descriptor, sample_names, best_sample_name_matches):
@@ -185,15 +175,16 @@ def combine_objects(objects, context, limit=None):
         return combined
 
 
-def combined_data(descriptors, context, mongo_collections, sqlite_dbs, adapter):
+def combined_data(descriptors, n_descriptors, context, mongo_collections, sqlite_dbs, adapter):
     """Patch through to cached data for each file and combine them"""
-    if len(descriptors) > 1:
-        msg, _kw = validate_joinable_files(descriptors)
+    getset = lru_cache(maxsize=None)(lambda *keys: set(
+        reduce(lambda d, k: d.get(k, {}), keys, d) or None
+        for d in descriptors()
+    ))
+    if n_descriptors > 1:
+        msg, _kw = validate_joinable_files(descriptors(), getset)
         if msg:
             raise GeneFabFileException(msg, **_kw)
-    getset = lru_cache(maxsize=None)(lambda *keys: set(
-        reduce(lambda d, k: d.get(k, {}), keys, d) or None for d in descriptors
-    ))
     if getset("file", "cacheable") != {True}:
         msg = "Data marked as non-cacheable, cannot be returned in this format"
         sug = "Use 'format=raw'"
@@ -213,7 +204,7 @@ def combined_data(descriptors, context, mongo_collections, sqlite_dbs, adapter):
         get_formatted_data(
             descriptor, mongo_collections, sqlite_db, CachedFile, adapter, _kws,
         )
-        for descriptor in natsorted(descriptors, key=_sort_key)
+        for descriptor in natsorted(descriptors(), key=_sort_key)
     ])
     if data is None:
         raise GeneFabDatabaseException("No data found in database")
@@ -225,23 +216,32 @@ def combined_data(descriptors, context, mongo_collections, sqlite_dbs, adapter):
 
 def get(*, mongo_collections, locale, context, sqlite_dbs, adapter):
     """Return data corresponding to search parameters; merged if multiple underlying files are same type and joinable"""
-    cursor = aggregate_file_descriptors_by_context(
+    descriptors = ForkableIterator(aggregate_file_descriptors_by_context(
         mongo_collections.metadata, locale=locale, context=context,
-    )
-    descriptors = list(cursor)
-    for d in descriptors:
+    ))
+    n_descriptors = 0
+    for n_descriptors, d in enumerate(descriptors(), 1):
         if ("file" in d) and (not isinstance(d["file"], dict)):
             msg = "Query did not result in an unambiguous target file"
             raise GeneFabDatabaseException(msg, debug_info=d)
         elif ("file" not in d) or ("filename" not in d["file"]):
             msg = "File information missing for entry"
             raise GeneFabDatabaseException(msg, entry=d)
-    if not len(descriptors):
+    if n_descriptors == 0:
         msg = "No file found matching specified constraints"
         raise HTTPError(context.full_path, 404, msg, hdrs=None, fp=None)
     elif context.format == "raw":
-        return file_redirect(descriptors)
+        if n_descriptors == 1:
+            return file_redirect(next(descriptors()))
+        else:
+            raise GeneFabFileException(
+                ("Multiple files match query; " +
+                "with format 'raw', only one file can be requested"),
+                format="raw",
+                files={d["file"]["filename"] for d in descriptors()},
+            )
     else:
         return combined_data(
-            descriptors, context, mongo_collections, sqlite_dbs, adapter,
+            descriptors, n_descriptors,
+            context, mongo_collections, sqlite_dbs, adapter,
         )
