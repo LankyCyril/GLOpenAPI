@@ -8,15 +8,13 @@ from itertools import chain
 
 
 GiB = 1024**3
-ID_COLUMNS = ("accession", "assay name", "sample name",)
-REPORT_COLUMNS = (
-    "report type", "status", "warning", "error", "args", "kwargs",
-    "report timestamp",
-)
+ID_COLUMNS = "accession", "assay name", "sample name"
+INFO_COLUMNS = "report timestamp", "report type", "status"
+ATTR_COLUMNS = "warning", "error", "args", "kwargs"
 
 
 def sqlite_db_report(db_name, descriptor):
-    return {"report": {
+    return {"information": {
         "report type": f"size of {db_name}, GiB",
         "status": (
             format(path.getsize(descriptor["db"]) / GiB, ".3f")
@@ -27,7 +25,7 @@ def sqlite_db_report(db_name, descriptor):
 
 
 def mongo_db_report(mongo_client):
-    return {"report": {
+    return {"information": {
         "report type": f"number of active MongoDB connections",
         "status": sum(1 for _ in iterate_mongo_connections(mongo_client)),
         "report timestamp": int(datetime.now().timestamp()),
@@ -44,7 +42,8 @@ def get(*, genefab3_client, sqlite_dbs, context):
             genefab3_client.mongo_collections.status.aggregate([
                 {"$group": {"_id": {
                     "id": {c: f"${c}" for c in ID_COLUMNS},
-                    "report": {c: f"${c}" for c in REPORT_COLUMNS},
+                    "information": {c: f"${c}" for c in INFO_COLUMNS},
+                    "report attributes": {c: f"${c}" for c in ATTR_COLUMNS},
                 }}},
                 {"$replaceRoot": {"newRoot": "$_id"}},
             ]),
