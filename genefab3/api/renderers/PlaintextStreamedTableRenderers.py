@@ -1,10 +1,11 @@
-from re import sub # 32
-from genefab3.common.exceptions import GeneFabFormatException # 37
-from genefab3.common.utils import as_is # 52
-from flask import Response # 54
-from json import dumps # 61
-from io import StringIO # 87
-from csv import writer as CSVWriter # 88
+from re import sub
+from genefab3.common.exceptions import GeneFabFormatException
+from genefab3.common.utils import as_is
+from flask import Response
+from json import dumps
+from genefab3.common.utils import json_permissive_default
+from io import StringIO
+from csv import writer as CSVWriter
 
 
 def _list_continuous_cls(obj, target, target_name):
@@ -54,11 +55,11 @@ def cls(obj, context=None, continuous=None, space_formatter=lambda s: sub(r'\s',
     return Response(iter(lines), mimetype="text/plain")
 
 
-def _iter_json_chunks(prefix="", d=None, n=None, postfix=""):
+def _iter_json_chunks(prefix="", d=None, n=None, postfix="", default=json_permissive_default):
     """Iterate chunks in bracketed `delimiter`-separated format"""
     def _foreach(chunks, end):
         for chunk in chunks:
-            yield dumps(chunk, separators=(",", ":")) + end
+            yield dumps(chunk, separators=(",", ":"), default=default) + end
     leveliter = iter(d)
     chunks = (next(leveliter) for _ in range(n-1))
     yield f"{prefix}["

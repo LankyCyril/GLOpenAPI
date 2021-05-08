@@ -40,12 +40,6 @@ TYPE_RENDERERS = OrderedDict((
         "json": PlaintextStreamedTableRenderers.json,
         "browser": BrowserStreamedTableRenderers.twolevel,
     }),
-    (DataFrame, {
-        "csv": PlaintextDataFrameRenderers.csv,
-        "tsv": PlaintextDataFrameRenderers.tsv,
-        "json": PlaintextDataFrameRenderers.json,
-        "browser": BrowserDataFrameRenderers.twolevel,
-    }),
     ((str, bytes), {
         "raw": SimpleRenderers.raw,
         "html": SimpleRenderers.html,

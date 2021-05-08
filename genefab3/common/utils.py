@@ -10,7 +10,6 @@ from requests import head as request_head
 from urllib.request import urlopen
 from urllib.error import URLError
 from re import compile, escape
-from pandas import DataFrame
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import partial, reduce
 from operator import getitem
@@ -135,11 +134,6 @@ def blackjack(e, max_level, head=(), marsh=marsh, len=len, isinstance=isinstance
 def KeyToPosition(*lists):
     """Create an OrderedDict mapping `keys` to integers in range"""
     return OrderedDict(zip(chain(*lists), count()))
-
-
-def blackjack_normalize(cursor, max_level=2, dict=dict, blackjack=blackjack):
-    """Quickly flatten iterable of dictionaries of known schema in pure Python"""
-    return DataFrame(dict(blackjack(e, max_level)) for e in cursor)
 
 
 def json_permissive_default(o):
