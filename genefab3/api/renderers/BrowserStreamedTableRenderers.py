@@ -1,4 +1,4 @@
-from genefab3.common.types import StreamedAnnotationTable, StreamedDataTable
+from genefab3.common.types import StreamedTable, StreamedAnnotationTable
 from genefab3.common.exceptions import GeneFabConfigurationException
 from pathlib import Path
 from genefab3.common.logger import GeneFabLogger
@@ -10,8 +10,7 @@ from flask import Response
 def _assert_type(obj, nlevels):
     """Check validity of `obj` for converting as a multi-column-level StreamedTable"""
     passed_nlevels = {len(column) for column in getattr(obj, "columns", [[]])}
-    valid_types = StreamedAnnotationTable, StreamedDataTable
-    if (not isinstance(obj, valid_types)) or (passed_nlevels != {nlevels}):
+    if (not isinstance(obj, StreamedTable)) or (passed_nlevels != {nlevels}):
         msg = "Data cannot be represented as an interactive table"
         _kw = dict(type=type(obj).__name__, nlevels=passed_nlevels)
         raise GeneFabConfigurationException(msg, **_kw)

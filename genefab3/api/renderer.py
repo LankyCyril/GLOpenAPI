@@ -1,6 +1,6 @@
 from collections import OrderedDict
 from flask import Response
-from genefab3.common.types import StreamedAnnotationTable, DataDataFrame
+from genefab3.common.types import StreamedAnnotationTable, StreamedSchema, DataDataFrame
 from genefab3.api.renderers import SimpleRenderers, PlaintextDataFrameRenderers
 from genefab3.api.renderers import BrowserDataFrameRenderers
 from genefab3.api.renderers import PlaintextStreamedTableRenderers
@@ -33,6 +33,12 @@ TYPE_RENDERERS = OrderedDict((
         "tsv": PlaintextDataFrameRenderers.tsv,
         "json": PlaintextDataFrameRenderers.json,
         "browser": BrowserDataFrameRenderers.threelevel,
+    }),
+    (StreamedSchema, {
+        "csv": PlaintextStreamedTableRenderers.csv,
+        "tsv": PlaintextStreamedTableRenderers.tsv,
+        "json": PlaintextStreamedTableRenderers.json,
+        "browser": BrowserStreamedTableRenderers.twolevel,
     }),
     (DataFrame, {
         "csv": PlaintextDataFrameRenderers.csv,

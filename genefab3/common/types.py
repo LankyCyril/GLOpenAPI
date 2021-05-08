@@ -3,15 +3,16 @@ from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
 from genefab3.common.utils import RewindableIterator, blackjack, KeyToPosition
-from pandas import DataFrame, MultiIndex, Index
-from numpy import dtype
-from genefab3.common.logger import GeneFabLogger
 
 
-NaN = type("UnquotedNaN", (float,), dict(
-    __new__=lambda s: float.__new__(s, nan), __eq__=lambda s,o: False,
-    __str__=lambda _: "NaN", __repr__=lambda _: "NaN",
-))()
+class SuperchargedNaN(float):
+    def __new__(self): return float.__new__(self, nan)
+    def __str__(self): return "NaN"
+    def __repr__(self): return "NaN"
+    def __eq__(self, other): return False
+    def __lt__(self, other): return not isinstance(other, float)
+    def __gt__(self, other): return False
+NaN = SuperchargedNaN()
 
 
 class Adapter():
@@ -71,7 +72,61 @@ class Routes():
                 yield method.endpoint, method
 
 
-class StreamedAnnotationTable():
+class StreamedTable():
+    """Generalized streamed table (either from MongoDB or from SQLite"""
+    @property
+    def schema(self):
+        return StreamedSchema(self)
+
+
+class StreamedSchema(StreamedTable):
+    """Streamed value descriptors per column of StreamedTable"""
+ 
+    def __init__(self, table): self.table = table
+    def __getattr__(self, attr): return getattr(self.table, attr)
+ 
+    @property
+    def shape(self): return (1, self.table.shape[1])
+    @property
+    def index(self): yield from self._schemify("index")
+    @property
+    def values(self): yield from self._schemify("values")
+ 
+    def _schemify(self, attr, isinstance=isinstance, type=type, float=float, str=str, SuperchargedNaN=SuperchargedNaN, len=len, TypeError=TypeError, enumerate=enumerate, zip=zip, min=min, max=max):
+        _mt = lambda a, b, bool=bool, type=type, isinstance=isinstance: (bool if
+            isinstance(a, bool) and isinstance(b, bool) else type(a + b))
+        for i, level in enumerate(getattr(self.table, attr)):
+            if i == 0:
+                minima, maxima = level[:], level[:]
+                types, hasnan = [str] * len(level), [a != a for a in level]
+            else:
+                for j, (_min, _max, b) in enumerate(zip(minima, maxima, level)):
+                    if not isinstance(_min, str):
+                        try:
+                            minima[j], types[j] = min(_min, b), _mt(_min, b)
+                        except TypeError:
+                            minima[j], types[j] = "str", str
+                    if not isinstance(_max, str):
+                        try:
+                            maxima[j] = max(_max, b)
+                            types[j] = str if types[j] is str else _mt(_max, b)
+                        except TypeError:
+                            maxima[j], types[j] = "str", str
+                hasnan = [a or (b != b) for a, b in zip(hasnan, level)]
+        _schema = []
+        for _t, _min, _max, _h in zip(types, minima, maxima, hasnan):
+            _pipenan = f"|{NaN}" if _h else ""
+            if _t is SuperchargedNaN:
+                _t = float
+            if _t is str:
+                _schema.append(f"str[..{_pipenan}]")
+            else:
+                _schema.append(f"{_t.__name__}[({_min})..({_max}){_pipenan}]")
+        yield _schema
+
+
+class StreamedAnnotationTable(StreamedTable):
+    """Table streamed from MongoDB cursor or cursor-like iterator"""
     _index_category = "id"
     _accession_key = "id.accession"
  
@@ -171,8 +226,16 @@ class StreamedAnnotationTable():
         yield from self._iter_body_levels(self._cursor.rewound(), dispatcher)
 
 
-class StreamedDataTable():
+class StreamedDataTable(StreamedTable):
     pass
+
+
+# Legacy classes, to be removed after full refactoring:
+
+
+from pandas import DataFrame, MultiIndex, Index
+from numpy import dtype
+from genefab3.common.logger import GeneFabLogger
 
 
 class GeneFabDataFrame(DataFrame):
