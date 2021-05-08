@@ -1,4 +1,3 @@
-from pandas import isnull
 from re import sub, search
 from functools import partial
 from bson.errors import InvalidDocument as InvalidDocumentError
@@ -17,19 +16,13 @@ def iterate_mongo_connections(mongo_client):
             yield connected_app_name
 
 
-def isempty(v): # TODO could probably just check (v != v) or (v == ""), but need to test
-    """Check if terminal leaf value is a null value or an empty string"""
-    return isnull(v) or (v == "")
+isempty = lambda v: (v != v) or (v == "")
+is_regex = lambda v: search(r'^\/.*\/$', v)
 
 
 def is_safe_token(v, allow_regex=False):
     """Check if value is safe for PyMongo queries"""
     return "$" not in (sub(r'\$\/$', "", v) if allow_regex else v)
-
-
-def is_regex(v):
-    """Check if value is a regex"""
-    return search(r'^\/.*\/$', v)
 
 
 def is_unit_formattable(e, unit_key):
