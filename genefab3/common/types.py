@@ -134,6 +134,7 @@ class StreamedAnnotationTable(StreamedTable):
     """Table streamed from MongoDB cursor or cursor-like iterator"""
     _index_category = "id"
     _accession_key = "id.accession"
+    _isa_categories = {"investigation", "study", "assay"}
  
     def __init__(self, *, cursor, category_order=("investigation", "study", "assay", "file"), na_rep=NaN, normalization_level=2):
         """Make and retain forked aggregation cursors, infer index names and columns adhering to provided category order"""
@@ -174,7 +175,7 @@ class StreamedAnnotationTable(StreamedTable):
  
     def _iter_header_levels(self, dispatcher):
         fields_and_bounds = [
-            (ff, 2 - (ff[0] in {"id", "file", "report"})) # TODO: check against ISA fields
+            (ff, (ff[0] in self._isa_categories) + 1)
             for ff in (c.split(".") for c in dispatcher)
         ]
         yield [".".join(ff[:b]) or "*" for ff, b in fields_and_bounds]
@@ -191,9 +192,9 @@ class StreamedAnnotationTable(StreamedTable):
         yield from self._iter_header_levels(self._column_key_dispatcher)
  
     @property
-    def metadata_columns(self):
-        """List columns under any ISA category""" # TODO: check against ISA fields
-        return [c for c in self.columns if c[0] not in {"id", "file", "report"}]
+    def metadata_columns(self, _getcat=lambda c: c[0].split(".")[0]):
+        """List columns under any ISA category"""
+        return [c for c in self.columns if _getcat(c) in self._isa_categories]
  
     @property
     def cls_valid(self):
