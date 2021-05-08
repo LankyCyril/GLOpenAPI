@@ -17,7 +17,7 @@ def iterate_mongo_connections(mongo_client):
             yield connected_app_name
 
 
-def isempty(v):
+def isempty(v): # TODO could probably just check (v != v) or (v == ""), but need to test
     """Check if terminal leaf value is a null value or an empty string"""
     return isnull(v) or (v == "")
 
