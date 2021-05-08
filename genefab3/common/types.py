@@ -6,6 +6,7 @@ from genefab3.common.utils import RewindableIterator, blackjack, KeyToPosition
 
 
 class SuperchargedNaN(float):
+    """math.nan represented as NaN and comparable against any types"""
     def __new__(self): return float.__new__(self, nan)
     def __str__(self): return "NaN"
     def __repr__(self): return "NaN"
@@ -73,14 +74,17 @@ class Routes():
 
 
 class StreamedTable():
-    """Generalized streamed table (either from MongoDB or from SQLite"""
+    """Generalized streamed table (either from MongoDB or from SQLite)"""
     @property
-    def schema(self):
-        return StreamedSchema(self)
+    def schema(self): return StreamedSchema(self)
+    @property
+    def index_names(self): yield from zip(*list(self.index_levels))
+    @property
+    def columns(self): yield from zip(*list(self.column_levels))
 
 
 class StreamedSchema(StreamedTable):
-    """Streamed value descriptors per column of StreamedTable"""
+    """Streamed value descriptors (type, min, max, hasnan) per column of StreamedTable"""
  
     def __init__(self, table): self.table = table
     def __getattr__(self, attr): return getattr(self.table, attr)
@@ -88,14 +92,15 @@ class StreamedSchema(StreamedTable):
     @property
     def shape(self): return (1, self.table.shape[1])
     @property
-    def index(self): yield from self._schemify("index")
+    def index(self): yield from self._schemify(self.table.index)
     @property
-    def values(self): yield from self._schemify("values")
+    def values(self): yield from self._schemify(self.table.values)
  
-    def _schemify(self, attr, isinstance=isinstance, type=type, float=float, str=str, SuperchargedNaN=SuperchargedNaN, len=len, TypeError=TypeError, enumerate=enumerate, zip=zip, min=min, max=max):
+    def _schemify(self, target, isinstance=isinstance, type=type, float=float, str=str, SuperchargedNaN=SuperchargedNaN, len=len, TypeError=TypeError, enumerate=enumerate, zip=zip, min=min, max=max):
+        """Aggregate and return (yield once) value descriptors (type, min, max, hasnan) for each column"""
         _mt = lambda a, b, bool=bool, type=type, isinstance=isinstance: (bool if
             isinstance(a, bool) and isinstance(b, bool) else type(a + b))
-        for i, level in enumerate(getattr(self.table, attr)):
+        for i, level in enumerate(target):
             if i == 0:
                 minima, maxima = level[:], level[:]
                 types, hasnan = [str] * len(level), [a != a for a in level]
@@ -131,7 +136,7 @@ class StreamedAnnotationTable(StreamedTable):
     _accession_key = "id.accession"
  
     def __init__(self, *, cursor, category_order=("investigation", "study", "assay", "file"), na_rep=NaN):
-        """Make and retain forked MongoDB aggregation cursors, infer index names and columns adhering to provided category order"""
+        """Make and retain forked aggregation cursors, infer index names and columns adhering to provided category order"""
         self._cursor, self._na_rep = RewindableIterator(cursor), na_rep
         self.accessions, _key_pool, _nrows = set(), set(), 0
         for _nrows, entry in enumerate(self._cursor.rewound(), 1):
@@ -169,7 +174,7 @@ class StreamedAnnotationTable(StreamedTable):
  
     def _iter_header_levels(self, dispatcher):
         fields_and_bounds = [
-            (ff, 2 - (ff[0] in {"id", "file"}))
+            (ff, 2 - (ff[0] in {"id", "file"})) # TODO: check against ISA fields
             for ff in (c.split(".") for c in dispatcher)
         ]
         yield [".".join(ff[:b]) or "*" for ff, b in fields_and_bounds]
@@ -181,23 +186,13 @@ class StreamedAnnotationTable(StreamedTable):
         yield from self._iter_header_levels(self._index_key_dispatcher)
  
     @property
-    def index_names(self):
-        """Iterate index names column by column, like in pandas"""
-        yield from zip(*list(self.index_levels))
- 
-    @property
     def column_levels(self):
         """Iterate column levels line by line"""
         yield from self._iter_header_levels(self._column_key_dispatcher)
  
     @property
-    def columns(self):
-        """Iterate column names column by column, like in pandas"""
-        yield from zip(*list(self.column_levels))
- 
-    @property
     def metadata_columns(self):
-        """List columns under any ISA category"""
+        """List columns under any ISA category""" # TODO: check against ISA fields
         return [c for c in self.columns if c[0] not in {"id", "file"}]
  
     @property
