@@ -135,12 +135,12 @@ class StreamedAnnotationTable(StreamedTable):
     _index_category = "id"
     _accession_key = "id.accession"
  
-    def __init__(self, *, cursor, category_order=("investigation", "study", "assay", "file"), na_rep=NaN):
+    def __init__(self, *, cursor, category_order=("investigation", "study", "assay", "file"), na_rep=NaN, normalization_level=2):
         """Make and retain forked aggregation cursors, infer index names and columns adhering to provided category order"""
         self._cursor, self._na_rep = RewindableIterator(cursor), na_rep
         self.accessions, _key_pool, _nrows = set(), set(), 0
         for _nrows, entry in enumerate(self._cursor.rewound(), 1):
-            for key, value in blackjack(entry, max_level=2):
+            for key, value in blackjack(entry, max_level=normalization_level):
                 _key_pool.add(key)
                 if key == self._accession_key:
                     self.accessions.add(value)
@@ -174,7 +174,7 @@ class StreamedAnnotationTable(StreamedTable):
  
     def _iter_header_levels(self, dispatcher):
         fields_and_bounds = [
-            (ff, 2 - (ff[0] in {"id", "file"})) # TODO: check against ISA fields
+            (ff, 2 - (ff[0] in {"id", "file", "report"})) # TODO: check against ISA fields
             for ff in (c.split(".") for c in dispatcher)
         ]
         yield [".".join(ff[:b]) or "*" for ff, b in fields_and_bounds]
@@ -193,7 +193,7 @@ class StreamedAnnotationTable(StreamedTable):
     @property
     def metadata_columns(self):
         """List columns under any ISA category""" # TODO: check against ISA fields
-        return [c for c in self.columns if c[0] not in {"id", "file"}]
+        return [c for c in self.columns if c[0] not in {"id", "file", "report"}]
  
     @property
     def cls_valid(self):

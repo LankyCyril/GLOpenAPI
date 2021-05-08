@@ -142,6 +142,8 @@ def json_permissive_default(o):
         return o.item()
     elif isinstance(o, set):
         return f"<set>{list(o)}"
+    elif isinstance(o, bytes):
+        return str(o)
     else:
         return str(type(o))
 

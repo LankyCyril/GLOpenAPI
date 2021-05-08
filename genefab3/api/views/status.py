@@ -8,30 +8,30 @@ from itertools import chain
 
 
 GiB = 1024**3
-
-STATUS_COLUMNS = [
-    "accession", "assay name", "sample name", "report type", "status",
-    "warning", "error", "args", "kwargs", "report timestamp",
-]
+ID_COLUMNS = ("accession", "assay name", "sample name",)
+REPORT_COLUMNS = (
+    "report type", "status", "warning", "error", "args", "kwargs",
+    "report timestamp",
+)
 
 
 def sqlite_db_report(db_name, descriptor):
-    return {
+    return {"report": {
         "report type": f"size of {db_name}, GiB",
         "status": (
             format(path.getsize(descriptor["db"]) / GiB, ".3f")
             if (descriptor["db"] and path.isfile(descriptor["db"])) else "0"
         ),
         "report timestamp": int(datetime.now().timestamp()),
-    }
+    }}
 
 
 def mongo_db_report(mongo_client):
-    return {
+    return {"report": {
         "report type": f"number of active MongoDB connections",
         "status": sum(1 for _ in iterate_mongo_connections(mongo_client)),
         "report timestamp": int(datetime.now().timestamp()),
-    }
+    }}
 
 
 def get(*, genefab3_client, sqlite_dbs, context):
@@ -41,8 +41,12 @@ def get(*, genefab3_client, sqlite_dbs, context):
     return StreamedAnnotationTable(
         cursor=chain(
             [sqlite_db_report(n, d) for n, d in sqlite_dbs.__dict__.items()],
-            genefab3_client.mongo_collections.status.find(
-                {}, {"_id": False, **{c: True for c in STATUS_COLUMNS}},
-            )
+            genefab3_client.mongo_collections.status.aggregate([
+                {"$group": {"_id": {
+                    "id": {c: f"${c}" for c in ID_COLUMNS},
+                    "report": {c: f"${c}" for c in REPORT_COLUMNS},
+                }}},
+                {"$replaceRoot": {"newRoot": "$_id"}},
+            ]),
         ),
     )
