@@ -2,7 +2,7 @@ from numpy import generic as NumpyGenericType, base_repr
 from datetime import datetime
 from copy import deepcopy
 from os import environ
-from itertools import tee, chain, count
+from itertools import chain, count
 from base64 import b64encode
 from uuid import uuid3, uuid4
 from contextlib import contextmanager
@@ -30,15 +30,6 @@ deepcopy_keys = lambda d, *kk: deepcopy({k: d[k] for k in kk})
 def is_debug(markers={"development", "staging", "stage", "debug", "debugging"}):
     """Determine if app is running in debug mode"""
     return environ.get("FLASK_ENV", None) in markers
-
-
-class RewindableIterator():
-    """Iterator factory, returns a teed copy of original iterator on `self.rewound()`"""
-    def __init__(self, it):
-        self.it = it
-    def rewound(self):
-        self.it, _it = tee(self.it)
-        return _it
 
 
 def random_unique_string(seed=""):

@@ -1,4 +1,4 @@
-from genefab3.common.utils import pick_reachable_url, RewindableIterator
+from genefab3.common.utils import pick_reachable_url
 from flask import redirect, Response
 from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDataManagerException
@@ -10,6 +10,7 @@ from genefab3.db.sql.pandas import OndemandSQLiteDataFrame
 from pandas import MultiIndex
 from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.db.sql.files import CachedTableFile, CachedBinaryFile
+from genefab3.common.types import PhoenixIterator
 from genefab3.db.mongo.utils import aggregate_file_descriptors_by_context
 from urllib.error import HTTPError
 
@@ -178,8 +179,7 @@ def combine_objects(objects, context, limit=None):
 def combined_data(descriptors, n_descriptors, context, mongo_collections, sqlite_dbs, adapter):
     """Patch through to cached data for each file and combine them"""
     getset = lru_cache(maxsize=None)(lambda *keys: set(
-        reduce(lambda d, k: d.get(k, {}), keys, d) or None
-        for d in descriptors.rewound()
+        reduce(lambda d, k: d.get(k, {}), keys, d) or None for d in descriptors
     ))
     if n_descriptors > 1:
         msg, _kw = validate_joinable_files(getset)
@@ -204,7 +204,7 @@ def combined_data(descriptors, n_descriptors, context, mongo_collections, sqlite
         get_formatted_data(
             descriptor, mongo_collections, sqlite_db, CachedFile, adapter, _kws,
         )
-        for descriptor in natsorted(descriptors.rewound(), key=_sort_key)
+        for descriptor in natsorted(descriptors, key=_sort_key)
     ])
     if data is None:
         raise GeneFabDatabaseException("No data found in database")
@@ -216,11 +216,11 @@ def combined_data(descriptors, n_descriptors, context, mongo_collections, sqlite
 
 def get(*, mongo_collections, locale, context, sqlite_dbs, adapter):
     """Return data corresponding to search parameters; merged if multiple underlying files are same type and joinable"""
-    descriptors = RewindableIterator(aggregate_file_descriptors_by_context(
+    descriptors = PhoenixIterator(aggregate_file_descriptors_by_context(
         mongo_collections.metadata, locale=locale, context=context,
     ))
     n_descriptors = 0
-    for n_descriptors, d in enumerate(descriptors.rewound(), 1):
+    for n_descriptors, d in enumerate(descriptors, 1):
         if ("file" in d) and (not isinstance(d["file"], dict)):
             msg = "Query did not result in an unambiguous target file"
             raise GeneFabDatabaseException(msg, debug_info=d)
@@ -232,13 +232,13 @@ def get(*, mongo_collections, locale, context, sqlite_dbs, adapter):
         raise HTTPError(context.full_path, 404, msg, hdrs=None, fp=None)
     elif context.format == "raw":
         if n_descriptors == 1:
-            return file_redirect(next(descriptors.rewound()))
+            return file_redirect(next(descriptors))
         else:
             raise GeneFabFileException(
                 ("Multiple files match query; " +
                 "with format 'raw', only one file can be requested"),
                 format="raw",
-                files={d["file"]["filename"] for d in descriptors.rewound()},
+                files={d["file"]["filename"] for d in descriptors},
             )
     else:
         return combined_data(

@@ -1,8 +1,9 @@
 from math import nan
+from itertools import tee
 from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
-from genefab3.common.utils import RewindableIterator, blackjack, KeyToPosition
+from genefab3.common.utils import blackjack, KeyToPosition
 
 
 class SuperchargedNaN(float):
@@ -14,6 +15,15 @@ class SuperchargedNaN(float):
     def __lt__(self, other): return not isinstance(other, float)
     def __gt__(self, other): return False
 NaN = SuperchargedNaN()
+
+
+class PhoenixIterator():
+    """Iterator factory, returns a teed copy of original iterator when asked to iterate"""
+    def __init__(self, it):
+        self.it = it
+    def __iter__(self):
+        self.it, _it = tee(self.it)
+        return _it
 
 
 class Adapter():
@@ -138,9 +148,9 @@ class StreamedAnnotationTable(StreamedTable):
  
     def __init__(self, *, cursor, category_order=("investigation", "study", "assay", "file"), na_rep=NaN, normalization_level=2):
         """Make and retain forked aggregation cursors, infer index names and columns adhering to provided category order"""
-        self._cursor, self._na_rep = RewindableIterator(cursor), na_rep
+        self._cursor, self._na_rep = PhoenixIterator(cursor), na_rep
         self.accessions, _key_pool, _nrows = set(), set(), 0
-        for _nrows, entry in enumerate(self._cursor.rewound(), 1):
+        for _nrows, entry in enumerate(self._cursor, 1):
             for key, value in blackjack(entry, max_level=normalization_level):
                 _key_pool.add(key)
                 if key == self._accession_key:
@@ -213,13 +223,13 @@ class StreamedAnnotationTable(StreamedTable):
     def index(self):
         """Iterate index line by line, like in pandas"""
         dispatcher = self._index_key_dispatcher
-        yield from self._iter_body_levels(self._cursor.rewound(), dispatcher)
+        yield from self._iter_body_levels(self._cursor, dispatcher)
  
     @property
     def values(self):
         """Iterate values line by line, like in pandas"""
         dispatcher = self._column_key_dispatcher
-        yield from self._iter_body_levels(self._cursor.rewound(), dispatcher)
+        yield from self._iter_body_levels(self._cursor, dispatcher)
 
 
 class StreamedDataTable(StreamedTable):
