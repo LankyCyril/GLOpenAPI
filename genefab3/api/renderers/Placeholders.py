@@ -1,5 +1,4 @@
-from genefab3.common.types import StreamedAnnotationTable, DataDataFrame, NaN
-from pandas import Index, MultiIndex
+from genefab3.common.types import StreamedAnnotationTable, NaN
 
 
 class EmptyStreamedAnnotationTable(StreamedAnnotationTable):
@@ -10,13 +9,3 @@ class EmptyStreamedAnnotationTable(StreamedAnnotationTable):
         self.index_names, self.columns = [["*"]], [["*", "*"]]
         self.index, self.values = [[NaN]], [[NaN]]
         self.move_index_boundary = lambda *a, **k: None
-
-
-def EmptyDataDataFrame(*, index_name="index"):
-    """Return an empty dataframe that matches data format"""
-    dataframe = DataDataFrame(
-        index=Index([], name=index_name),
-        columns=MultiIndex.from_tuples([("*", "*", "*")]),
-    )
-    dataframe.drop(columns="*", inplace=True)
-    return dataframe
