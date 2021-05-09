@@ -5,7 +5,6 @@ from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.logger import GeneFabLogger
 from pandas import Index, MultiIndex, read_sql
 from genefab3.common.exceptions import GeneFabFileException
-from functools import lru_cache, partial
 from numpy import isreal
 from re import search, sub
 from genefab3.common.hacks import apply_hack, speed_up_data_schema
@@ -66,10 +65,6 @@ class OndemandSQLiteDataFrame():
     @property
     def _columns_raw2slashed(self):
         return {c[-1]: "/".join(c) for c in self.columns}
- 
-    @lru_cache(maxsize=16384)
-    def _column_as_slashed(self, table, column):
-        return f"`{table}`.`{column}` as `{self._columns_raw2slashed[column]}`"
  
     @property
     def _columns_slashed2full(self):
@@ -232,8 +227,11 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
         msg = f"retrieving {_n} columns from {len(_icd)} table(s):{_tt}"
         GeneFabLogger().info(f"{self.name}; {msg}")
         join_statement = " NATURAL JOIN ".join(f"`{p}`" for p in _icd)
-        _as = partial(self._column_as_slashed, table=self.name)
-        columns_as_slashed_columns = [_as(column=c) for c in self._raw_columns]
+        columns_as_slashed_columns = [
+            f"""`{self._column_dispatcher[column]}`.`{column}`
+                as `{self._columns_raw2slashed[column]}`"""
+            for column in self._raw_columns
+        ]
         query = f"""
             SELECT `{self.index.name}`,{','.join(columns_as_slashed_columns)}
             FROM {join_statement}"""
