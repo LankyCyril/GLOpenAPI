@@ -15,27 +15,30 @@ from genefab3.db.mongo.utils import aggregate_file_descriptors_by_context
 from urllib.error import HTTPError
 
 
-def validate_joinable_files(getset):
+def fail_if_files_not_joinable(getset):
     """Check for ability to join data from requested files"""
     if len(getset("file", "datatype")) > 1:
         msg = "Cannot combine data of multiple datatypes"
-        return msg, dict(datatypes=getset("file", "datatype"))
+        _kw = dict(datatypes=getset("file", "datatype"))
     elif len(getset("technology type")) > 1:
         msg = "Cannot combine data for multiple technology types"
-        return msg, dict(technology_types=getset("technology type"))
+        _kw = dict(technology_types=getset("technology type"))
     elif getset("file", "joinable") != {True}:
-        return "Cannot combine multiple files of this datatype", dict(
+        msg = "Cannot combine multiple files of this datatype"
+        _kw = dict(
             datatype=getset("file", "datatype").pop(),
             filenames=getset("file", "filename"),
         )
     elif getset("file", "type") != {"table"}:
         msg = "Cannot combine non-table files"
-        return msg, dict(types=getset("file", "type"))
+        _kw = dict(types=getset("file", "type"))
     elif len(getset("file", "index_name")) > 1:
         msg = "Cannot combine tables with conflicting index names"
-        return msg, dict(index_names=getset("file", "index_name"))
+        _kw = dict(index_names=getset("file", "index_name"))
     else:
-        return None, {}
+        msg, _kw = None, {}
+    if msg:
+        raise GeneFabFileException(msg, **_kw)
 
 
 def file_redirect(descriptor):
@@ -113,7 +116,7 @@ def INPLACE_process_dataframe(dataframe, *, mongo_collections, descriptor, best_
         dataframe.columns = harmonized_column_order
 
 
-def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, adapter, _kws):
+def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, adapter, identifier_prefix, _kws):
     """Instantiate and initialize CachedFile object; post-process its data; select only the columns in passed annotation"""
     try:
         accession = descriptor["accession"]
@@ -123,7 +126,8 @@ def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, ada
         msg = "File descriptor missing 'accession', 'assay name', or 'filename'"
         raise GeneFabDatabaseException(msg, descriptor=descriptor)
     else:
-        identifier = f"{accession}/File/{assay_name}/{filename}"
+        prefix = identifier_prefix
+        identifier = f"{prefix}:{accession}/File/{assay_name}/{filename}"
     if "INPLACE_process" in _kws:
         _kws = {**_kws, "INPLACE_process": partial(
             INPLACE_process_dataframe, descriptor=descriptor,
@@ -182,9 +186,7 @@ def combined_data(descriptors, n_descriptors, context, mongo_collections, sqlite
         reduce(lambda d, k: d.get(k, {}), keys, d) or None for d in descriptors
     ))
     if n_descriptors > 1:
-        msg, _kw = validate_joinable_files(getset)
-        if msg:
-            raise GeneFabFileException(msg, **_kw)
+        fail_if_files_not_joinable(getset)
     if getset("file", "cacheable") != {True}:
         msg = "Data marked as non-cacheable, cannot be returned in this format"
         sug = "Use 'format=raw'"
@@ -192,17 +194,19 @@ def combined_data(descriptors, n_descriptors, context, mongo_collections, sqlite
     _types = getset("file", "type")
     if _types == {"table"}:
         sqlite_db, CachedFile = sqlite_dbs.tables["db"], CachedTableFile
+        identifier_prefix = "TABLE"
         maxdbsize = sqlite_dbs.tables["maxsize"]
         _kws = dict(maxdbsize=maxdbsize, index_col=0, INPLACE_process=True)
     elif len(_types) == 1:
         sqlite_db, CachedFile = sqlite_dbs.blobs["db"], CachedBinaryFile
-        _kws = {}
+        identifier_prefix, _kws = "BLOB", {}
     else:
         raise NotImplementedError(f"Joining data of types {_types}")
     _sort_key = lambda d: (d.get("accession"), d.get("assay name"))
     data = combine_objects(context=context, objects=[
         get_formatted_data(
-            descriptor, mongo_collections, sqlite_db, CachedFile, adapter, _kws,
+            descriptor, mongo_collections, sqlite_db, CachedFile, adapter,
+            identifier_prefix, _kws,
         )
         for descriptor in natsorted(descriptors, key=_sort_key)
     ])

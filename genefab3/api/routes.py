@@ -12,7 +12,7 @@ class DefaultRoutes(Routes):
     def favicon(self, imgtype, context=None) -> bytes:
         if self.genefab3_client.adapter.get_favicon_urls():
             ico_file = CachedBinaryFile(
-                name="favicon.ico", identifier="RESOURCE/favicon.ico",
+                name="favicon.ico", identifier="BLOB:/favicon.ico",
                 sqlite_db=self.genefab3_client.sqlite_dbs.blobs["db"],
                 urls=self.genefab3_client.adapter.get_favicon_urls(),
                 timestamp=0,
