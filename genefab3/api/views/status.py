@@ -10,7 +10,8 @@ from itertools import chain
 GiB = 1024**3
 ID_COLUMNS = "accession", "assay name", "sample name"
 INFO_COLUMNS = "report timestamp", "report type", "status"
-ATTR_COLUMNS = "warning", "error", "args", "kwargs"
+MESSAGE_COLUMNS = "error", "warning"
+ATTR_COLUMNS = "args", "kwargs"
 
 
 def sqlite_db_report(db_name, descriptor):
@@ -43,9 +44,11 @@ def get(*, genefab3_client, sqlite_dbs, context):
                 {"$group": {"_id": {
                     "id": {c: f"${c}" for c in ID_COLUMNS},
                     "information": {c: f"${c}" for c in INFO_COLUMNS},
+                    "messages": {c: f"${c}" for c in MESSAGE_COLUMNS},
                     "report attributes": {c: f"${c}" for c in ATTR_COLUMNS},
                 }}},
                 {"$replaceRoot": {"newRoot": "$_id"}},
             ]),
         ),
+        na_rep=None,
     )
