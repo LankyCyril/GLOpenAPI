@@ -18,19 +18,16 @@ class CachedBinaryFile(SQLiteBlob):
  
     def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, table="BLOBS:blobs", compressor=None, decompressor=None, maxdbsize=None):
         """Interpret file descriptors; inherit functionality from SQLiteBlob; define equality (hashableness) of self"""
-        self.name, self.url, self.timestamp = name, None, timestamp
-        self.identifier = identifier
-        self.table = table
+        self.name, self.url = name, None
         SQLiteBlob.__init__(
-            self, identifier=identifier, timestamp=timestamp,
+            self, sqlite_db=sqlite_db, maxdbsize=maxdbsize,
+            table=table, identifier=identifier, timestamp=timestamp,
             data_getter=lambda: self.__download_as_blob(urls),
-            sqlite_db=sqlite_db, maxdbsize=maxdbsize, table=table,
             compressor=compressor, decompressor=decompressor,
         )
  
     def __download_as_blob(self, urls):
         """Download data from URL as-is"""
-        self.url, data = None, None
         for url in urls:
             msg = f"{self.name}; trying URL:\n  {url}"
             GeneFabLogger().info(msg)
@@ -53,19 +50,15 @@ class CachedBinaryFile(SQLiteBlob):
 class CachedTableFile(SQLiteTable):
     """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxpartcols=998, maxdbsize=None, **pandas_kws):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxdbsize=None, **pandas_kws):
         """Interpret file descriptors; inherit functionality from SQLiteTable; define equality (hashableness) of self"""
-        self.name, self.url, self.timestamp = name, None, timestamp
-        self.identifier = identifier
-        self.aux_table = aux_table
-        self.table = f"TABLE:{identifier}"
+        self.name, self.identifier, self.url = name, identifier, None
         SQLiteTable.__init__(
-            self, identifier=f"TABLE:{identifier}", timestamp=timestamp,
+            self, sqlite_db=sqlite_db, maxdbsize=maxdbsize,
+            table=identifier, aux_table=aux_table, timestamp=timestamp,
             data_getter=lambda: self.__download_as_pandas_dataframe(
                 urls, pandas_kws, INPLACE_process,
             ),
-            sqlite_db=sqlite_db, maxdbsize=maxdbsize,
-            table=self.table, aux_table=aux_table, maxpartcols=maxpartcols,
         )
  
     def __copyfileobj(self, urls, tempfile):

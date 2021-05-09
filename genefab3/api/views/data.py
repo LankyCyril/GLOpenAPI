@@ -131,8 +131,8 @@ def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, ada
             mongo_collections=mongo_collections,
         )}
     file = CachedFile(
-        identifier=identifier,
-        name=filename, urls=descriptor["file"].get("urls", ()),
+        name=filename, identifier=identifier,
+        urls=descriptor["file"].get("urls", ()),
         timestamp=descriptor["file"].get("timestamp", -1),
         sqlite_db=sqlite_db, **_kws,
     )

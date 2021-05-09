@@ -5,8 +5,8 @@ from genefab3.db.sql.utils import sql_connection
 from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
 from genefab3.common.logger import GeneFabLogger
 from threading import Thread
-from genefab3.common.utils import as_is
 from genefab3.common.exceptions import GeneFabConfigurationException
+from genefab3.common.utils import as_is
 from datetime import datetime
 from genefab3.common.exceptions import GeneFabDatabaseException
 from math import inf
@@ -61,11 +61,27 @@ class SQLiteObject():
         for partname, *_ in cls.iterparts(table, connection, must_exist=True):
             connection.execute(f"DROP TABLE IF EXISTS `{partname}`")
  
-    def trigger(self):
+    def is_stale(self, *, timestamp_table=None, id_field=None, db_type=None):
         """Evaluates to True if underlying data in need of update, otherwise False"""
-        msg = "did not define self.trigger(), will never update"
-        GeneFabLogger().warning(f"{type(self).__name__} {msg}")
-        return False
+        if (timestamp_table is None) or (id_field is None):
+            msg = "did not pass arguments to self.is_stale(), will never update"
+            GeneFabLogger().warning(f"{type(self).__name__} {msg}")
+        else:
+            desc = db_type or f"for {type(self).__name__}"
+            self_id_value = getattr(self, id_field)
+            query = f"""SELECT `timestamp` FROM `{timestamp_table}`
+                WHERE `{id_field}` == "{self_id_value}" """
+        with sql_connection(self.sqlite_db, desc) as (connection, execute):
+            ret = execute(query).fetchall()
+            if len(ret) == 0:
+                return True
+            elif (len(ret) == 1) and (len(ret[0]) == 1):
+                return (ret[0][0] < self.timestamp)
+            else:
+                msg = "Conflicting timestamp values for SQLiteObject"
+                GeneFabLogger().warning(f"{msg}\n  ({self_id_value})")
+                self.drop(connection=connection)
+                return True
  
     def update(self):
         """Update underlying data in SQLite"""
@@ -85,7 +101,7 @@ class SQLiteObject():
     @property
     def data(self):
         """Main interface: returns data associated with this SQLiteObject; will have auto-updated itself in the process if necessary"""
-        if self.trigger():
+        if self.is_stale():
             self.update()
             self.changed = True
         else:
@@ -97,7 +113,7 @@ class SQLiteObject():
 class SQLiteBlob(SQLiteObject):
     """Represents an SQLiteObject initialized with a spec suitable for a binary blob"""
  
-    def __init__(self, *, sqlite_db, identifier, table, timestamp, data_getter, compressor=as_is, decompressor=as_is, maxdbsize=None):
+    def __init__(self, *, sqlite_db, identifier, table, timestamp, data_getter, compressor=None, decompressor=None, maxdbsize=None):
         if not table.startswith("BLOBS:"):
             msg = "Table name for SQLiteBlob must start with 'BLOBS:'"
             raise GeneFabConfigurationException(msg, table=table)
@@ -115,33 +131,26 @@ class SQLiteBlob(SQLiteObject):
             self.identifier = validate_no_doublequote(identifier, "identifier")
             self.table, self.timestamp = table, timestamp
             self.data_getter = data_getter
-            self.compressor, self.decompressor = compressor, decompressor
+            self.compressor = compressor or as_is
+            self.decompressor = decompressor or as_is
  
-    def drop(self, execute):
-        execute(f"""DELETE FROM `{self.table}`
-            WHERE `identifier` == "{self.identifier}" """)
+    def drop(self, *, connection, other=None):
+        identifier = other or self.identifier
+        connection.execute(f"""DELETE FROM `{self.table}`
+            WHERE `identifier` == "{identifier}" """)
  
-    def trigger(self):
+    def is_stale(self):
         """Evaluates to True if underlying data in need of update, otherwise False"""
-        query = f"""SELECT `timestamp` FROM `{self.table}`
-            WHERE `identifier` == "{self.identifier}" """
-        with sql_connection(self.sqlite_db, "blobs") as (_, execute):
-            ret = execute(query).fetchall()
-            if len(ret) == 0:
-                return True
-            elif (len(ret) == 1) and (len(ret[0]) == 1):
-                return (ret[0][0] < self.timestamp)
-            else:
-                msg = "Conflicting trigger values for SQLiteObject"
-                GeneFabLogger().warning(f"{msg}\n  ({self.identifier})")
-                self.drop()
-                return True
+        return SQLiteObject.is_stale(
+            self, timestamp_table=self.table, id_field="identifier",
+            db_type="blobs",
+        )
  
     def update(self):
         """Run `self.data_getter` and insert result into `self.table` as BLOB"""
         blob = Binary(bytes(self.compressor(self.data_getter())))
-        with sql_connection(self.sqlite_db, "blobs") as (_, execute):
-            self.drop(execute)
+        with sql_connection(self.sqlite_db, "blobs") as (connection, execute):
+            self.drop(connection=connection)
             execute(f"""INSERT INTO `{self.table}`
                 (`identifier`,`blob`,`timestamp`,`retrieved_at`)
                 VALUES(?,?,?,?)""", [
@@ -151,7 +160,7 @@ class SQLiteBlob(SQLiteObject):
  
     def retrieve(self):
         """Take `blob` from `self.table` and decompress with `self.decompressor`"""
-        with sql_connection(self.sqlite_db, "blobs") as (_, execute):
+        with sql_connection(self.sqlite_db, "blobs") as (connection, execute):
             query = f"""SELECT `blob` from `{self.table}`
                 WHERE `identifier` == "{self.identifier}" """
             ret = execute(query).fetchall()
@@ -161,7 +170,7 @@ class SQLiteBlob(SQLiteObject):
             elif (len(ret) == 1) and (len(ret[0]) == 1):
                 return self.decompressor(ret[0][0])
             else:
-                self.drop(execute)
+                self.drop(connection=connection)
                 msg = "Entries conflict (will attempt to fix on next request)"
                 raise GeneFabDatabaseException(msg, identifier=self.identifier)
 
@@ -192,26 +201,18 @@ class SQLiteTable(SQLiteObject):
             self.maxpartcols, self.maxdbsize = maxpartcols, maxdbsize or inf
             self.data_getter = data_getter
  
-    def drop(self, connection, execute):
-        execute(f"""DELETE FROM `{self.aux_table}`
-            WHERE `table` == "{self.table}" """)
-        SQLiteObject.drop_all_parts(self.table, connection)
+    def drop(self, *, connection, other=None):
+        table = other or self.table
+        connection.execute(f"""DELETE FROM `{self.aux_table}`
+            WHERE `table` == "{table}" """)
+        SQLiteObject.drop_all_parts(table, connection)
  
-    def trigger(self):
+    def is_stale(self):
         """Evaluates to True if underlying data in need of update, otherwise False"""
-        query = f"""SELECT `timestamp` FROM `{self.aux_table}`
-            WHERE `table` == "{self.table}" """
-        with sql_connection(self.sqlite_db, "tables") as (connection, execute):
-            ret = execute(query).fetchall()
-            if len(ret) == 0:
-                return True
-            elif (len(ret) == 1) and (len(ret[0]) == 1):
-                return (ret[0][0] < self.timestamp)
-            else:
-                msg = "Conflicting trigger values for SQLiteObject"
-                GeneFabLogger().warning(f"{msg}\n  ({self.table})")
-                self.drop(connection, execute)
-                return True
+        return SQLiteObject.is_stale(
+            self, timestamp_table=self.aux_table, id_field="table",
+            db_type="tables",
+        )
  
     def _validated_dataframe(self, dataframe):
         if not isinstance(dataframe, DataFrame):
@@ -230,7 +231,7 @@ class SQLiteTable(SQLiteObject):
         """Update `self.table` with result of `self.data_getter()`, update `self.aux_table` with timestamps"""
         dataframe = self._validated_dataframe(self.data_getter())
         with sql_connection(self.sqlite_db, "tables") as (connection, execute):
-            self.drop(connection, execute)
+            self.drop(connection=connection)
             bounds = range(0, dataframe.shape[1], self.maxpartcols)
             parts = SQLiteObject.iterparts(self.table, connection, must_exist=0)
             try:
@@ -245,7 +246,7 @@ class SQLiteTable(SQLiteObject):
                     self.table, self.timestamp, int(datetime.now().timestamp()),
                 ])
             except (OperationalError, PandasDatabaseError) as e:
-                self.drop(connection, execute)
+                self.drop(connection=connection)
                 msg = "Failed to insert SQLite table (or table part)"
                 _kw = dict(part=partname, debug_info=repr(e))
                 raise GeneFabDatabaseException(msg, **_kw)
@@ -287,9 +288,7 @@ class SQLiteTable(SQLiteObject):
                         table = (execute(query_oldest).fetchone() or [None])[0]
                         if table is None:
                             break
-                        execute(f"""DELETE FROM `{self.aux_table}`
-                            WHERE `table` == "{table}" """)
-                        SQLiteObject.drop_all_parts(table, connection)
+                        self.drop(connection=connection, other=table)
                     except OperationalError:
                         connection.rollback()
                         break
