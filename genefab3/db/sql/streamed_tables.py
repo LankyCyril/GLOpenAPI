@@ -44,7 +44,7 @@ def mkselect(execute, query, kind="TABLE"):
 class SQLiteIndexName(str): pass
 
 
-class OndemandSQLiteDataFrame():
+class StreamedDataTableWizard():
  
     @property
     def columns(self):
@@ -58,7 +58,7 @@ class OndemandSQLiteDataFrame():
         if set(last_level) <= set(self._raw_columns):
             self._raw_columns, self._columns = list(last_level), all_levels
         else:
-            msg = f"Setting foreign column(s) to OndemandSQLiteDataFrame"
+            msg = f"Setting foreign column(s) to StreamedDataTableWizard"
             foreign = sorted(set(last_level) - set(self._raw_columns))
             raise GeneFabFileException(msg, columns=foreign)
  
@@ -124,10 +124,10 @@ class OndemandSQLiteDataFrame():
                 yield sub(r'(`)([^`]*)(`)', f"`{sanitized_name}`", dc, count=1)
  
     def _make_query_filter(self, context, limit, offset):
-        """Validate arguments to OndemandSQLiteDataFrame_Single.get()"""
+        """Validate arguments to StreamedDataTableWizard_Single.get()"""
         where = list(self._sanitize_where(context))
         if (offset != 0) and (limit is None):
-            msg = "OndemandSQLiteDataFrame: `offset` without `limit`"
+            msg = "StreamedDataTableWizard: `offset` without `limit`"
             raise GeneFabDatabaseException(msg, table=self.name)
         where_filter = "" if not where else f"WHERE {' AND '.join(where)}"
         limit_filter = "" if limit is None else f"LIMIT {limit} OFFSET {offset}"
@@ -163,9 +163,9 @@ class OndemandSQLiteDataFrame():
  
     @staticmethod
     def concat(objs, axis=1):
-        """Concatenate OndemandSQLiteDataFrame objects without evaluation"""
-        _t, _t_s = "OndemandSQLiteDataFrame", "OndemandSQLiteDataFrame_Single"
-        _Single = OndemandSQLiteDataFrame_Single
+        """Concatenate StreamedDataTableWizard objects without evaluation"""
+        _t, _t_s = "StreamedDataTableWizard", "StreamedDataTableWizard_Single"
+        _Single = StreamedDataTableWizard_Single
         if len(objs) == 1:
             return objs[0]
         elif not all(isinstance(o, _Single) for o in objs):
@@ -177,10 +177,10 @@ class OndemandSQLiteDataFrame():
             raise ValueError(msg)
         else:
             sqlite_db = objs[0].sqlite_db
-            return OndemandSQLiteDataFrame_OuterJoined(sqlite_db, objs)
+            return StreamedDataTableWizard_OuterJoined(sqlite_db, objs)
 
 
-class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
+class StreamedDataTableWizard_Single(StreamedDataTableWizard):
     """DataDataFrame to be retrieved from SQLite, possibly from multiple parts of same tabular file"""
  
     def __init__(self, sqlite_db, column_dispatcher):
@@ -199,10 +199,10 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
             if self.name is None:
                 self.name = p
         if len(_index_names) == 0:
-            msg = "OndemandSQLiteDataFrame(): no index"
+            msg = "StreamedDataTableWizard(): no index"
             raise GeneFabDatabaseException(msg, table=self.name)
         elif len(_index_names) > 1:
-            msg = "OndemandSQLiteDataFrame(): parts indexes do not match"
+            msg = "StreamedDataTableWizard(): parts indexes do not match"
             _kw = dict(table=self.name, index_names=_index_names)
             raise GeneFabDatabaseException(msg, **_kw)
         self.index = Index([], name=_index_names.pop())
@@ -221,7 +221,7 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
  
     @contextmanager
     def select(self, execute, kind="TABLE"):
-        """Temporarily expose requested data as SQL view or table for OndemandSQLiteDataFrame_OuterJoined.select()"""
+        """Temporarily expose requested data as SQL view or table for StreamedDataTableWizard_OuterJoined.select()"""
         _n, _icd = len(self._raw_columns), self._inverse_column_dispatcher
         _tt = "\n  ".join(("", *_icd))
         msg = f"retrieving {_n} columns from {len(_icd)} table(s):{_tt}"
@@ -246,11 +246,11 @@ class OndemandSQLiteDataFrame_Single(OndemandSQLiteDataFrame):
             raise GeneFabDatabaseException(msg, table=self.name)
 
 
-class OndemandSQLiteDataFrame_OuterJoined(OndemandSQLiteDataFrame):
+class StreamedDataTableWizard_OuterJoined(StreamedDataTableWizard):
     """DataDataFrame to be retrieved from SQLite, full outer joined from multiple views or tables"""
  
     def __init__(self, sqlite_db, objs):
-        _t = "OndemandSQLiteDataFrame"
+        _t = "StreamedDataTableWizard"
         self.sqlite_db, self.objs = sqlite_db, objs
         if len(objs) < 2:
             raise ValueError(f"{type(self).__name__}: no objects to join")

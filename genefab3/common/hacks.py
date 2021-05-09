@@ -21,8 +21,8 @@ def apply_hack(hack):
 
 
 def get_OSDF_Single_schema(self):
-    """Replaces OndemandSQLiteDataFrame_Single.get() with retrieval of just values informative for 'schema=1'"""
-    from genefab3.db.sql.pandas import SQLiteIndexName
+    """Replaces StreamedDataTableWizard_Single.get() with retrieval of just values informative for 'schema=1'"""
+    from genefab3.db.sql.streamed_tables import SQLiteIndexName
     index_name, data, found = None, {}, lambda v: v is not None
     with sql_connection(self.sqlite_db, "tables") as (_, execute):
         fetch = lambda query: execute(query).fetchone()
@@ -61,7 +61,7 @@ def get_OSDF_Single_schema(self):
 
 
 def get_OSDF_OuterJoined_schema(self, *, context):
-    """Replaces OndemandSQLiteDataFrame_OuterJoined.get() with retrieval of just values informative for 'schema=1'"""
+    """Replaces StreamedDataTableWizard_OuterJoined.get() with retrieval of just values informative for 'schema=1'"""
     merge_kws = dict(left_index=True, right_index=True, how="outer", sort=False)
     return DataDataFrame(reduce(
         partial(merge, **merge_kws),
@@ -70,7 +70,7 @@ def get_OSDF_OuterJoined_schema(self, *, context):
 
 
 def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
-    """If context.schema == '1', replaces OndemandSQLiteDataFrame.get() with quick retrieval of just values informative schema"""
+    """If context.schema == '1', replaces StreamedDataTableWizard.get() with quick retrieval of just values informative schema"""
     if context.schema != "1":
         kwargs = dict(context=context, limit=limit, offset=offset)
         return get(self, **kwargs)
@@ -79,13 +79,13 @@ def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
         sug = "Remove comparisons and/or column, row slicing from query"
         raise GeneFabFormatException(msg, suggestion=sug)
     else:
-        from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
-        from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_OuterJoined
+        from genefab3.db.sql.streamed_tables import StreamedDataTableWizard_Single
+        from genefab3.db.sql.streamed_tables import StreamedDataTableWizard_OuterJoined
         msg = f"apply_hack(speed_up_data_schema) for {self.name}"
         GeneFabLogger().info(msg)
-        if isinstance(self, OndemandSQLiteDataFrame_Single):
+        if isinstance(self, StreamedDataTableWizard_Single):
             return get_OSDF_Single_schema(self)
-        elif isinstance(self, OndemandSQLiteDataFrame_OuterJoined):
+        elif isinstance(self, StreamedDataTableWizard_OuterJoined):
             return get_OSDF_OuterJoined_schema(self, context=context)
         else:
             msg = "Schema speedup applied to unsupported object type"

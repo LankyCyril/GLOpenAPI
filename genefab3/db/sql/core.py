@@ -1,6 +1,6 @@
 from itertools import count
 from sqlite3 import OperationalError, Binary
-from genefab3.db.sql.pandas import SQLiteIndexName
+from genefab3.db.sql.streamed_tables import SQLiteIndexName
 from genefab3.db.sql.utils import sql_connection
 from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
 from genefab3.common.logger import GeneFabLogger
@@ -12,7 +12,7 @@ from genefab3.common.exceptions import GeneFabDatabaseException
 from math import inf
 from pandas import DataFrame
 from collections import OrderedDict
-from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
+from genefab3.db.sql.streamed_tables import StreamedDataTableWizard_Single
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 from os import path
 
@@ -255,7 +255,7 @@ class SQLiteTable(SQLiteObject):
                 GeneFabLogger().info(f"{msg}:\n  {self.table}")
  
     def retrieve(self):
-        """Create an OndemandSQLiteDataFrame object dispatching columns to table parts"""
+        """Create an StreamedDataTableWizard object dispatching columns to table parts"""
         column_dispatcher = OrderedDict()
         with sql_connection(self.sqlite_db, "tables") as (connection, _):
             parts = SQLiteObject.iterparts(self.table, connection)
@@ -267,7 +267,7 @@ class SQLiteTable(SQLiteObject):
         if not column_dispatcher:
             raise GeneFabDatabaseException("No data found", table=self.table)
         else:
-            return OndemandSQLiteDataFrame_Single(
+            return StreamedDataTableWizard_Single(
                 self.sqlite_db, column_dispatcher,
             )
  

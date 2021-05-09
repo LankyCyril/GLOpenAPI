@@ -6,7 +6,7 @@ from natsort import natsorted
 from genefab3.db.mongo.utils import match_sample_names_to_file_descriptor
 from functools import partial, lru_cache, reduce
 from genefab3.common.exceptions import GeneFabDatabaseException
-from genefab3.db.sql.pandas import OndemandSQLiteDataFrame
+from genefab3.db.sql.streamed_tables import StreamedDataTableWizard
 from pandas import MultiIndex
 from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.db.sql.files import CachedTableFile, CachedBinaryFile
@@ -141,7 +141,7 @@ def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, ada
         sqlite_db=sqlite_db, **_kws,
     )
     data = file.data
-    if isinstance(data, OndemandSQLiteDataFrame):
+    if isinstance(data, StreamedDataTableWizard):
         _, harmonized_column_order = harmonize_columns(
             data, descriptor, natsorted(descriptor["sample name"]),
             adapter.best_sample_name_matches,
@@ -159,11 +159,11 @@ def combine_objects(objects, context, limit=None):
         return None
     elif len(objects) == 1:
         combined = objects[0]
-    elif all(isinstance(obj, OndemandSQLiteDataFrame) for obj in objects):
-        combined = OndemandSQLiteDataFrame.concat(objects, axis=1)
+    elif all(isinstance(obj, StreamedDataTableWizard) for obj in objects):
+        combined = StreamedDataTableWizard.concat(objects, axis=1)
     else:
         raise NotImplementedError("Merging non-table data objects")
-    if isinstance(combined, OndemandSQLiteDataFrame):
+    if isinstance(combined, StreamedDataTableWizard):
         if context.data_columns and (context.format == "gct"):
             msg = "GCT format is disabled for arbitrarily subset tables"
             _kw = dict(columns="|".join(context.data_columns))
