@@ -4,6 +4,7 @@ from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
 from genefab3.common.utils import blackjack, KeyToPosition
+from genefab3.db.sql.utils import sql_connection
 
 
 class SuperchargedNaN(float):
@@ -146,12 +147,12 @@ class StreamedAnnotationTable(StreamedTable):
     _accession_key = "id.accession"
     _isa_categories = {"investigation", "study", "assay"}
  
-    def __init__(self, *, cursor, category_order=("investigation", "study", "assay", "file"), na_rep=NaN, normalization_level=2):
-        """Make and retain forked aggregation cursors, infer index names and columns adhering to provided category order"""
+    def __init__(self, *, cursor, category_order=("investigation", "study", "assay", "file"), na_rep=NaN):
+        """Infer index names and columns adhering to provided category order, retain forked aggregation cursors"""
         self._cursor, self._na_rep = PhoenixIterator(cursor), na_rep
         self.accessions, _key_pool, _nrows = set(), set(), 0
         for _nrows, entry in enumerate(self._cursor, 1):
-            for key, value in blackjack(entry, max_level=normalization_level):
+            for key, value in blackjack(entry, max_level=2):
                 _key_pool.add(key)
                 if key == self._accession_key:
                     self.accessions.add(value)
@@ -233,7 +234,84 @@ class StreamedAnnotationTable(StreamedTable):
 
 
 class StreamedDataTable(StreamedTable):
-    pass
+    """Table streamed from SQLite query"""
+ 
+    def __init__(self, *, sqlite_db, query, na_rep=NaN):
+        """Infer index names and columns, retain connection and query information"""
+        from genefab3.db.sql.streamed_tables import SQLiteIndexName
+        _split3 = lambda c: (c[0].split("/", 2) + ["*", "*"])[:3]
+        self.sqlite_db = sqlite_db
+        self.query = query
+        self.na_rep = na_rep
+        with sql_connection(self.sqlite_db, "tables") as (connection, execute):
+            cursor = connection.cursor()
+            cursor.execute(self.query)
+            self._index_name = SQLiteIndexName(cursor.description[0][0])
+            self._columns = [_split3(c) for c in cursor.description[1:]]
+            _count_query = f"SELECT count(*) FROM ({self.query})"
+            self.shape = (
+                (execute(_count_query).fetchone() or [0])[0],
+                len(self._columns),
+            )
+        self.accessions = {c[0] for c in self._columns}
+        self.n_index_levels = 1
+        self.datatypes = set()
+        self.gct_validity_set = set()
+ 
+    @property
+    def gct_valid(self):
+        """Test if valid for GCT, i.e. has exactly one datatype, and the datatype is supported"""
+        return (
+            (len(self.datatypes) == 1) and
+            self.gct_validity_set and all(self.gct_validity_set)
+        )
+ 
+    def move_index_boundary(self, *, to):
+        """Like pandas methods reset_index() and set_index(), but by numeric position"""
+        if to == 0:
+            self.n_index_levels = 0
+            self.shape = (self.shape[0], len(self._columns) + 1)
+        elif to == 1:
+            self.n_index_levels = 1
+            self.shape = (self.shape[0], len(self._columns))
+        else:
+            msg = "StreamedDataTable.move_index_boundary only moves to 0 or 1"
+            raise GeneFabConfigurationException(msg, to=to)
+ 
+    @property
+    def index_levels(self):
+        """Iterate index level line by line"""
+        if self.n_index_levels:
+            yield ["*", "*", self._index_name]
+ 
+    @property
+    def column_levels(self):
+        """Iterate column levels line by line"""
+        if self.n_index_levels:
+            yield from zip(*self._columns)
+        else:
+            yield from zip(["*", "*", self._index_name], *self._columns)
+ 
+    @property
+    def index(self):
+        """Iterate index line by line, like in pandas"""
+        if self.n_index_levels:
+            with sql_connection(self.sqlite_db, "tables") as (_, execute):
+                index_query = f"SELECT `{self._index_name}` FROM ({self.query})"
+                yield from execute(index_query)
+        else:
+            yield from ([] for _ in range(self.shape[0]))
+ 
+    @property
+    def values(self):
+        """Iterate values line by line, like in pandas"""
+        if self.n_index_levels:
+            with sql_connection(self.sqlite_db, "tables") as (_, execute):
+                for _, *values in execute(self.query):
+                    yield values
+        else:
+            with sql_connection(self.sqlite_db, "tables") as (_, execute):
+                yield from execute(self.query)
 
 
 # Legacy classes, to be removed after full refactoring:

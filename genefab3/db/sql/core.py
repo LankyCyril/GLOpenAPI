@@ -48,9 +48,8 @@ class SQLiteObject():
                 except OperationalError:
                     break
                 else:
-                    desc = cursor.description
-                    index_name = SQLiteIndexName(desc[0][0])
-                    columns = [c[0] for c in desc[1:]]
+                    index_name = SQLiteIndexName(cursor.description[0][0])
+                    columns = [c[0] for c in cursor.description[1:]]
                     yield partname, index_name, columns
             else:
                 yield partname, None, None
