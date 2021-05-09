@@ -2,7 +2,7 @@ from genefab3.common.utils import iterate_terminal_leaves, as_is
 from itertools import count
 from sqlite3 import OperationalError, Binary
 from genefab3.db.sql.pandas import SQLiteIndexName
-from functools import lru_cache, partial
+from functools import lru_cache
 from pandas import isnull, DataFrame
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
@@ -70,13 +70,6 @@ def format_sql_value(value):
             return repr(value)
     else:
         return repr(value)
-
-
-def mkinsert(pd_table, conn, keys, data_iter, name):
-    """Non-parameterized SQLite INSERT for simple table schemas from trusted sources"""
-    for row in data_iter:
-        values = ",".join(format_sql_value(v) for v in row)
-        conn.execute(f"INSERT INTO `{name}` VALUES({values})")
 
 
 def drop_all_parts(table, connection):
@@ -174,7 +167,7 @@ class SQLiteObject():
             msg = "MultiIndex columns in cached DataFrame"
             raise NotImplementedError(msg)
         with sql_connection(self.sqlite_db, "tables") as (connection, execute):
-            bounds = range(0, dataframe.shape[1], self.maxpartwidth)
+            bounds = range(0, dataframe.shape[1], self.maxpartcols)
             part_iterator = iterparts(table, connection, must_exist=False)
             for bound, (partname, *_) in zip(bounds, part_iterator):
                 GeneFabLogger().info(
@@ -183,9 +176,9 @@ class SQLiteObject():
                     partname,
                 )
                 try:
-                    dataframe.iloc[:,bound:bound+self.maxpartwidth].to_sql(
-                        partname, connection, index=True, if_exists="replace",
-                        chunksize=1000, method=partial(mkinsert, name=partname),
+                    dataframe.iloc[:,bound:bound+self.maxpartcols].to_sql(
+                        partname, connection, index=True,
+                        if_exists="replace", chunksize=1024,
                     )
                 except (OperationalError, PandasDatabaseError) as e:
                     drop_all_parts(table, connection)
@@ -363,7 +356,7 @@ class SQLiteBlob(SQLiteObject):
 class SQLiteTable(SQLiteObject):
     """Represents an SQLiteObject initialized with a spec suitable for a generic table"""
  
-    def __init__(self, data_getter, sqlite_db, table, aux_table, identifier, timestamp, maxpartwidth=1000, maxdbsize=None):
+    def __init__(self, data_getter, sqlite_db, table, aux_table, identifier, timestamp, maxpartcols=998, maxdbsize=None):
         if not table.startswith("TABLE:"):
             msg = "Table name for SQLiteTable must start with 'TABLE:'"
             _kw = dict(table=table, identifier=identifier)
@@ -373,7 +366,7 @@ class SQLiteTable(SQLiteObject):
             _kw = dict(aux_table=aux_table, identifier=identifier)
             raise GeneFabConfigurationException(msg, **_kw)
         self.identifier, self.aux_table = identifier, aux_table
-        self.maxpartwidth, self.maxdbsize = maxpartwidth, maxdbsize
+        self.maxpartcols, self.maxdbsize = maxpartcols, maxdbsize
         SQLiteObject.__init__(
             self, sqlite_db, signature={"identifier": identifier},
             table_schemas={

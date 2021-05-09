@@ -53,7 +53,7 @@ class CachedBinaryFile(SQLiteBlob):
 class CachedTableFile(SQLiteTable):
     """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxpartwidth=1000, maxdbsize=None, **pandas_kws):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxpartcols=998, maxdbsize=None, **pandas_kws):
         """Interpret file descriptors; inherit functionality from SQLiteTable; define equality (hashableness) of self"""
         self.name, self.url, self.timestamp = name, None, timestamp
         self.identifier = identifier
@@ -65,7 +65,7 @@ class CachedTableFile(SQLiteTable):
                 urls, pandas_kws, INPLACE_process,
             ),
             sqlite_db=sqlite_db, maxdbsize=maxdbsize,
-            table=self.table, aux_table=aux_table, maxpartwidth=maxpartwidth,
+            table=self.table, aux_table=aux_table, maxpartcols=maxpartcols,
         )
  
     def __copyfileobj(self, urls, tempfile):
