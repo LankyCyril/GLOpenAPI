@@ -16,7 +16,7 @@ def iterate_mongo_connections(mongo_client):
             yield connected_app_name
 
 
-isempty = lambda v: (v != v) or (v == "")
+isempty = lambda v: (v != v) or (v == "") or (v is None)
 is_regex = lambda v: search(r'^\/.*\/$', v)
 
 
