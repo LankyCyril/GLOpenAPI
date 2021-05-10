@@ -262,9 +262,7 @@ class StreamedDataTable(StreamedTable):
         """Infer index names and columns, retain connection and query information"""
         from genefab3.db.sql.streamed_tables import SQLiteIndexName
         _split3 = lambda c: (c[0].split("/", 2) + ["*", "*"])[:3]
-        self.sqlite_db = sqlite_db
-        self.source = source
-        self.query = query
+        self.sqlite_db, self.source, self.query = sqlite_db, source, query
         self.na_rep = na_rep
         with sql_connection(self.sqlite_db, "tables") as (connection, execute):
             try:
@@ -273,18 +271,19 @@ class StreamedDataTable(StreamedTable):
                 self._index_name = SQLiteIndexName(cursor.description[0][0])
                 self._columns = [_split3(c) for c in cursor.description[1:]]
                 _count_query = f"SELECT count(*) FROM ({self.query})"
-                self.shape = (
-                    (execute(_count_query).fetchone() or [0])[0],
-                    len(self._columns),
-                )
+                _nrows = (execute(_count_query).fetchone() or [0])[0]
+                self.shape = (_nrows, len(self._columns))
             except OperationalError as e:
+                self.__del__()
                 self._reraise(e)
         if index_col is not None:
             if self._index_name != index_col:
+                self.__del__()
                 msg = "leftmost SQL column does not match passed index_col"
                 raise NotImplementedError(f"StreamedDataTable: {msg}")
         if override_columns is not None:
             if len(self._columns) != len(override_columns):
+                self.__del__()
                 raise GeneFabConfigurationException(
                     "StreamedDataTable: unexpected length of override_columns",
                     own_length=len(self._columns),
@@ -387,6 +386,20 @@ class StreamedDataTable(StreamedTable):
                             yield [self.na_rep if v is None else v for v in vv]
         except OperationalError as e:
             self._reraise(e)
+ 
+    def __del__(self):
+        """Remove self.source from SQLite"""
+        with sql_connection(self.sqlite_db, "tables") as (_, execute):
+            msg = "Deleting temporary StreamedDataTable source"
+            GeneFabLogger().info(f"{msg} {self.source} ...")
+            try:
+                execute(f"DROP TABLE `{self.source}`")
+            except OperationalError:
+                try:
+                    execute(f"DROP VIEW `{self.source}`")
+                except OperationalError:
+                    msg = "Failed to delete temporary StreamedDataTable source"
+                    GeneFabLogger().error(f"{msg} {self.source}")
 
 
 # Legacy class plug, to be removed after full refactoring:
