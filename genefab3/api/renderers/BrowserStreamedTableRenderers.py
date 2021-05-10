@@ -114,10 +114,9 @@ def _iter_html_chunks(replacements):
                 yield line
 
 
-def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader=False):
+def twolevel(obj, context, squash_preheader=False, frozen=0, indent=None):
     """Display StreamedTable with two-level columns using SlickGrid"""
     obj.move_index_boundary(to=0)
-    _assert_type(obj, nlevels=2)
     title_postfix = f"{context.view} {context.complete_kwargs}"
     msg = "HTML: converting StreamedTable into interactive table"
     GeneFabLogger().info(msg)
@@ -125,6 +124,12 @@ def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader
         formatters = iterate_formatters(obj.columns, context)
     else:
         formatters = []
+    if squash_preheader:
+        _assert_type(obj, nlevels=3)
+        columns = ((f"{c[0]}<br>{c[1]}", c[2]) for c in obj.columns)
+    else:
+        _assert_type(obj, nlevels=2)
+        columns = obj.columns
     replacements = {
         "$APPNAME": f"{context.app_name}: {title_postfix}",
         "$SQUASH_PREHEADER": SQUASHED_PREHEADER_CSS if squash_preheader else "",
@@ -135,7 +140,7 @@ def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader
         "$ASSAYSVIEW": build_url(context, "assays"),
         "$SAMPLESVIEW": build_url(context, "samples"),
         "$DATAVIEW": build_url(context, "data"),
-        "$COLUMNDATA": _iter_json_chunks(d=obj.columns, n=obj.shape[1]),
+        "$COLUMNDATA": _iter_json_chunks(d=columns, n=obj.shape[1]),
         "$ROWDATA": _iter_json_chunks(d=obj.values, n=obj.shape[0]),
         "$CONTEXTURL": build_url(context),
         "$FORMATTERS": "\n".join(formatters),
@@ -147,4 +152,4 @@ def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader
 
 def threelevel(obj, context, indent=None):
     """Squash two top levels of StreamedTable columns and display as two-level"""
-    # TODO
+    return twolevel(obj, context, squash_preheader=True, indent=indent)

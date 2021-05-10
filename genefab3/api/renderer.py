@@ -105,8 +105,8 @@ class CacheableRenderer():
                 try:
                     obj = obj.schema
                 except AttributeError:
-                    m = "'schema=1' is not valid for requested data"
-                    raise GeneFabFormatException(m, type=type(obj).__name__)
+                    msg = "'schema=1' is not valid for requested data"
+                    raise GeneFabFormatException(msg, type=type(obj).__name__)
             content, mimetype = self.dispatch_renderer(
                 obj, context=context, default_format=default_format,
             )
