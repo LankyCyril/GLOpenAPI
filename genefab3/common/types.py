@@ -102,8 +102,11 @@ class ResponseContainer():
             return self.content
         elif isinstance(self.content, Callable):
             return Response(self.content(), mimetype=self.mimetype)
-        else:
+        elif self.content is not None:
             return Response(self.content, mimetype=self.mimetype)
+        else:
+            msg = "Route returned no response"
+            raise GeneFabConfigurationException(msg)
 
 
 class StreamedTable():

@@ -5,6 +5,8 @@ from json import dumps
 from genefab3.common.utils import json_permissive_default
 from io import StringIO
 from csv import writer as CSVWriter
+from genefab3.common.types import StreamedDataTable
+from genefab3.common.exceptions import GeneFabConfigurationException
 
 
 def _list_continuous_cls(obj, target, target_name):
@@ -55,30 +57,6 @@ def cls(obj, context=None, continuous=None, space_formatter=lambda s: sub(r'\s',
     return content, "text/plain"
 
 
-def gct(obj, context=None, indent=None, level_formatter="/".join):
-    """Display presumed data dataframe in plaintext GCT format"""
-    # TODO
-    #if (not isinstance(obj, DataDataFrame)) or (len(obj.datatypes) == 0):
-    #    msg = "No datatype information associated with retrieved data"
-    #    raise GeneFabConfigurationException(msg)
-    #elif len(obj.datatypes) > 1:
-    #    msg = "GCT format does not support mixed datatypes"
-    #    raise GeneFabFormatException(msg, datatypes=obj.datatypes)
-    #elif not obj.gct_valid:
-    #    msg = "GCT format is not valid for given datatype"
-    #    raise GeneFabFormatException(msg, datatype=obj.datatypes.pop())
-    #else:
-    #    text = obj.to_csv(sep="\t", header=False, na_rep="")
-    #    # NaNs left empty: https://www.genepattern.org/file-formats-guide#GCT
-    #    content = (
-    #        "#1.2\n{}\t{}\n".format(*obj.shape),
-    #        "Name\tDescription\t" +
-    #        "\t".join(level_formatter(levels) for levels in obj.columns) +
-    #        "\n" + sub(r'^(.+?\t)', r'\1\1', text, flags=MULTILINE)
-    #    )
-    #    return Response(content, mimetype="text/plain")
-
-
 def _iter_json_chunks(prefix="", d=None, n=None, postfix="", default=json_permissive_default):
     """Iterate chunks in bracketed `delimiter`-separated format"""
     def _foreach(chunks, end):
@@ -116,6 +94,31 @@ def _iter_xsv_chunks(chunks, prefix="", delimiter=",", quoting=2, lineterminator
             handle.seek(0)
             yield prefix + handle.getvalue()
             handle.truncate()
+
+
+def gct(obj, context=None, indent=None, level_formatter="/".join):
+    """Display StreamedDataTable in plaintext GCT format, if supported"""
+    if (not isinstance(obj, StreamedDataTable)) or (len(obj.datatypes) == 0):
+        msg = "No datatype information associated with retrieved data"
+        raise GeneFabConfigurationException(msg)
+    elif len(obj.datatypes) > 1:
+        msg = "GCT format does not support mixed datatypes"
+        raise GeneFabFormatException(msg, datatypes=obj.datatypes)
+    elif not obj.gct_valid:
+        msg = "GCT format is not valid for given datatype"
+        raise GeneFabFormatException(msg, datatype=obj.datatypes.pop())
+    else:
+        def content():
+            obj.na_rep = "" # https://www.genepattern.org/file-formats-guide#GCT
+            yield "#1.2\n{}\t{}\n".format(*obj.shape)
+            yield "Name\tDescription"
+            for level in obj.columns:
+                yield "\t" + level_formatter(level)
+            yield "\n"
+            _iter_value_lines = _iter_xsv_chunks(obj.values, "", "\t", 0)
+            for (index, *_), value_line in zip(obj.index, _iter_value_lines):
+                yield f"{index}\t{index}\t{value_line}"
+    return content, "text/plain"
 
 
 def _xsv(obj, delimiter):
