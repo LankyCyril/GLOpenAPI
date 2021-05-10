@@ -7,6 +7,7 @@ from zlib import compress, decompress, error as ZlibError
 from threading import Thread
 from os import path
 from flask import Response
+from genefab3.common.types import ResponseContainer
 
 
 RESPONSE_CACHE_SCHEMAS = (
@@ -180,7 +181,7 @@ class ResponseCache():
         _kw = dict(desc="response_cache", none_ok=True)
         with sql_connection(self.sqlite_db, **_kw) as (_, execute):
             if execute is None:
-                return
+                return ResponseContainer(data=None)
             try:
                 row = execute(query).fetchone()
             except OperationalError:
@@ -193,10 +194,10 @@ class ResponseCache():
             except ZlibError:
                 msg = "ResponseCache() could not decompress, staging deletion"
                 _logw(f"{msg}:\n  {context.identity}")
-                return None
+                return ResponseContainer(data=None)
             else:
                 _logi(f"ResponseCache(), retrieved:\n  {context.identity}")
-                return response
+                return ResponseContainer(data=response)
         else:
             _logi(f"ResponseCache(), nothing yet for:\n  {context.identity}")
-            return None
+            return ResponseContainer(data=None)

@@ -4,7 +4,6 @@ from pathlib import Path
 from genefab3.common.logger import GeneFabLogger
 from genefab3.api.renderers.PlaintextStreamedTableRenderers import _iter_json_chunks
 from re import compile, escape
-from flask import Response
 
 
 def _assert_type(obj, nlevels):
@@ -143,7 +142,7 @@ def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader
         "$FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
     }
     _iter_chained_formatted_chunks = lambda: _iter_html_chunks(replacements)
-    return Response(_iter_chained_formatted_chunks(), mimetype="text/html")
+    return _iter_chained_formatted_chunks(), "text/html"
 
 
 def threelevel(obj, context, indent=None):

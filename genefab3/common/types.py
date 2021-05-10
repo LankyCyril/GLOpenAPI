@@ -3,6 +3,7 @@ from itertools import tee
 from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
+from flask import Response
 from genefab3.common.utils import blackjack, KeyToPosition
 from genefab3.db.sql.utils import sql_connection
 from sqlite3 import OperationalError
@@ -85,6 +86,23 @@ class Routes():
             method = getattr(self, name)
             if isinstance(getattr(method, "endpoint", None), str):
                 yield method.endpoint, method
+
+
+class ResponseContainer():
+    """Dataclass that holds data (streamer or Response), mimetype, whether result is redirect or not"""
+    def update(self, data=None, mimetype=None, is_redirect=False):
+        self.data, self.mimetype, self.is_redirect = data, mimetype, is_redirect
+    def __init__(self, data=None, mimetype=None, is_redirect=False):
+        self.update(data, mimetype, is_redirect)
+    @property
+    def empty(self):
+        return self.data is None
+    @property
+    def response(self):
+        if isinstance(self.data, Response):
+            return self.data
+        else:
+            return Response(self.data, mimetype=self.mimetype)
 
 
 class StreamedTable():
@@ -243,7 +261,8 @@ class StreamedDataTable(StreamedTable):
         """Infer index names and columns, retain connection and query information"""
         from genefab3.db.sql.streamed_tables import SQLiteIndexName
         _split3 = lambda c: (c[0].split("/", 2) + ["*", "*"])[:3]
-        self.sqlite_db, self.source = sqlite_db, source
+        self.sqlite_db = sqlite_db
+        self.source = source
         self.query = query
         self.na_rep = na_rep
         with sql_connection(self.sqlite_db, "tables") as (connection, execute):

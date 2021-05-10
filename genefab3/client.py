@@ -39,6 +39,13 @@ class GeneFabClient():
         """Modify Flask application, enable compression"""
         app.config = {**getattr(app, "config", {}), **(compress_params or {})}
         Compress(app)
+        #@app.teardown_appcontext
+        #def _test(exc):
+        #    from genefab3.db.sql.utils import sql_connection
+        #    with sql_connection("./.genefab3.sqlite3/tables.db", "test") as (connection, execute):
+        #        for name, kind in execute("SELECT name,type from `sqlite_master`").fetchall():
+        #            if name.startswith("TEMP:"):
+        #                execute(f"DROP {kind.upper()} `{name}`")
         return app
  
     def _get_mongo_db_connection(self, *, db_name, client_params=None, collection_names=None, locale="en_US", units_formatter=None, test_timeout=10):

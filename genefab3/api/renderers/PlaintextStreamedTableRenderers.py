@@ -1,7 +1,6 @@
 from re import sub
 from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.common.utils import as_is
-from flask import Response
 from json import dumps
 from genefab3.common.utils import json_permissive_default
 from io import StringIO
@@ -52,7 +51,7 @@ def cls(obj, context=None, continuous=None, space_formatter=lambda s: sub(r'\s',
     if continuous is False:
         space_formatter = space_formatter or as_is
         lines = _iter_discrete_cls(obj, target, space_formatter)
-    return Response(iter(lines), mimetype="text/plain")
+    return iter(lines), "text/plain"
 
 
 def gct(obj, context=None, indent=None, level_formatter="/".join):
@@ -101,7 +100,7 @@ def json(obj, context=None, indent=None):
         yield from _iter_json_chunks('"columns":', obj.columns, _w, ",")
         yield from _iter_json_chunks('"index":', obj.index, _h, ",")
         yield from _iter_json_chunks('"data":', obj.values, _h, "}")
-    return Response(_iter(), mimetype="application/json")
+    return _iter(), "application/json"
 
 
 def _iter_xsv_chunks(chunks, prefix="", delimiter=",", quoting=2, lineterminator=None):
@@ -124,7 +123,7 @@ def _xsv(obj, delimiter):
     def _iter():
         yield from _iter_xsv_chunks(obj.column_levels, "#", delimiter, 0)
         yield from _iter_xsv_chunks(obj.values, "", delimiter, 2)
-    return Response(_iter(), mimetype="text/plain")
+    return _iter(), "text/plain"
 
 def csv(obj, context=None, indent=None):
     """Display StreamedTable as CSV"""

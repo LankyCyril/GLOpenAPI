@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from flask import Response
 from genefab3.common.types import StreamedAnnotationTable, StreamedDataTable
-from genefab3.common.types import StreamedSchema
+from genefab3.common.types import StreamedSchema, ResponseContainer
 from genefab3.api.renderers import SimpleRenderers
 from genefab3.api.renderers import PlaintextStreamedTableRenderers
 from genefab3.api.renderers import BrowserStreamedTableRenderers
@@ -92,10 +92,34 @@ class CacheableRenderer():
                         type=type(obj).__name__, format=context.format,
                         default_format=default_format,
                     )
-                return renderer(obj, context, indent=indent)
+                data, mimetype = renderer(obj, context, indent=indent)
+                is_redirect = (getattr(data, "status_code", 200) // 100 == 3)
+                return data, mimetype, is_redirect
         else:
             msg = "Route returned unsupported object"
             raise GeneFabConfigurationException(msg, type=type(obj).__name__)
+ 
+    def _fill_response_container_and_cache(self, response_container, response_cache, context, default_format, method, args, kwargs):
+        """If no response cache found, call method, dispatch renderer, and update response_container with data, mimetype, is_redirect"""
+        def _call_and_cache():
+            obj = method(*args, context=context, **kwargs)
+            if context.schema == "1":
+                try:
+                    obj = obj.schema
+                except AttributeError:
+                    m = "'schema=1' is not valid for requested data"
+                    raise GeneFabFormatException(m, type=type(obj).__name__)
+            data, mimetype, is_redirect = self.dispatch_renderer(
+                obj, context=context, default_format=default_format,
+            )
+            response_container.update(data, mimetype, is_redirect)
+            if not response_container.is_redirect:
+                if response_cache is not None:
+                    pass # TODO need to put result post-hoc?
+                    #response_cache.put(context, obj, container[0])
+        _thread = ExceptionPropagatingThread(target=_call_and_cache)
+        _thread.start() # will complete even after timeout errors
+        _thread.join() # will fill container if does not time out
  
     def __call__(self, method):
         """Render object returned from `method`, put in LRU cache by `context.identity`"""
@@ -105,36 +129,25 @@ class CacheableRenderer():
             if context.debug == "1":
                 obj = deepcopy(context.__dict__)
                 context.format = "json"
-                _kw = dict(context=context, indent=4, default_format="json")
-                container = [self.dispatch_renderer(obj, **_kw)]
+                data, mimetype, _ = self.dispatch_renderer(
+                    obj, context=context, indent=4, default_format="json",
+                )
+                response_container = ResponseContainer(data, mimetype)
             else:
                 default_format, cacheable = self._infer_types(method)
                 if cacheable:
                     response_cache = ResponseCache(self.sqlite_dbs)
-                    response = response_cache.get(context)
-                    container = [response] if response else []
+                    response_container = response_cache.get(context)
                 else:
-                    response_cache, container = None, []
-                if not container:
-                    def _call_and_cache():
-                        obj = method(*args, context=context, **kwargs)
-                        if context.schema == "1":
-                            try:
-                                obj = obj.schema
-                            except AttributeError:
-                                m = "'schema=1' is not valid for requested data"
-                                _kw = dict(type=type(obj).__name__)
-                                raise GeneFabFormatException(m, **_kw)
-                        k = dict(context=context, default_format=default_format)
-                        container.append(self.dispatch_renderer(obj, **k))
-                        if container[0].status_code == 200:
-                            if response_cache is not None:
-                                pass # TODO need to put result post-hoc?
-                                #response_cache.put(context, obj, container[0])
-                    _thread = ExceptionPropagatingThread(target=_call_and_cache)
-                    _thread.start() # will complete even after timeout errors
-                    _thread.join() # will fill container if does not time out
+                    response_cache = None
+                    response_container = ResponseContainer()
+                if response_container.empty:
+                    self._fill_response_container_and_cache(
+                        response_container, response_cache,
+                        context, default_format,
+                        method, args, kwargs,
+                    )
             if not self.genefab3_client.cacher_thread.isAlive():
                 self.genefab3_client.mongo_client.close()
-            return (container or [None])[0]
+            return response_container.response
         return wrapper
