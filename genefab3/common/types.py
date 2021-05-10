@@ -89,20 +89,21 @@ class Routes():
 
 
 class ResponseContainer():
-    """Dataclass that holds data (streamer or Response), mimetype, whether result is redirect or not"""
-    def update(self, data=None, mimetype=None, is_redirect=False):
-        self.data, self.mimetype, self.is_redirect = data, mimetype, is_redirect
-    def __init__(self, data=None, mimetype=None, is_redirect=False):
-        self.update(data, mimetype, is_redirect)
+    """Holds content (bytes, strings, streamer function, or Response) and mimetype"""
+    def update(self, content, mimetype):
+        self.content, self.mimetype = content, mimetype
+    def __init__(self, content=None, mimetype=None):
+        self.update(content, mimetype)
     @property
     def empty(self):
-        return self.data is None
-    @property
-    def response(self):
-        if isinstance(self.data, Response):
-            return self.data
+        return self.content is None
+    def make_response(self):
+        if isinstance(self.content, Response):
+            return self.content
+        elif isinstance(self.content, Callable):
+            return Response(self.content(), mimetype=self.mimetype)
         else:
-            return Response(self.data, mimetype=self.mimetype)
+            return Response(self.content, mimetype=self.mimetype)
 
 
 class StreamedTable():

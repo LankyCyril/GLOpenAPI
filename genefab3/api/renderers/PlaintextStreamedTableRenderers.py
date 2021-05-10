@@ -51,7 +51,8 @@ def cls(obj, context=None, continuous=None, space_formatter=lambda s: sub(r'\s',
     if continuous is False:
         space_formatter = space_formatter or as_is
         lines = _iter_discrete_cls(obj, target, space_formatter)
-    return iter(lines), "text/plain"
+    content = lambda: iter(lines)
+    return content, "text/plain"
 
 
 def gct(obj, context=None, indent=None, level_formatter="/".join):
@@ -94,13 +95,13 @@ def _iter_json_chunks(prefix="", d=None, n=None, postfix="", default=json_permis
 def json(obj, context=None, indent=None):
     """Display StreamedTable as JSON"""
     _iw, _h, _w = obj.n_index_levels, *obj.shape
-    def _iter():
+    def content():
         yield '{"meta":{"index_names":'
         yield from _iter_json_chunks('', obj.index_names, _iw, "},")
         yield from _iter_json_chunks('"columns":', obj.columns, _w, ",")
         yield from _iter_json_chunks('"index":', obj.index, _h, ",")
         yield from _iter_json_chunks('"data":', obj.values, _h, "}")
-    return _iter(), "application/json"
+    return content, "application/json"
 
 
 def _iter_xsv_chunks(chunks, prefix="", delimiter=",", quoting=2, lineterminator=None):
@@ -120,10 +121,10 @@ def _iter_xsv_chunks(chunks, prefix="", delimiter=",", quoting=2, lineterminator
 def _xsv(obj, delimiter):
     """Display StreamedTable in plaintext `delimiter`-separated format"""
     obj.move_index_boundary(to=0)
-    def _iter():
+    def content():
         yield from _iter_xsv_chunks(obj.column_levels, "#", delimiter, 0)
         yield from _iter_xsv_chunks(obj.values, "", delimiter, 2)
-    return _iter(), "text/plain"
+    return content, "text/plain"
 
 def csv(obj, context=None, indent=None):
     """Display StreamedTable as CSV"""

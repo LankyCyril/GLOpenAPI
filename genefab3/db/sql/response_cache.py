@@ -181,7 +181,7 @@ class ResponseCache():
         _kw = dict(desc="response_cache", none_ok=True)
         with sql_connection(self.sqlite_db, **_kw) as (_, execute):
             if execute is None:
-                return ResponseContainer(data=None)
+                return ResponseContainer(content=None)
             try:
                 row = execute(query).fetchone()
             except OperationalError:
@@ -194,10 +194,10 @@ class ResponseCache():
             except ZlibError:
                 msg = "ResponseCache() could not decompress, staging deletion"
                 _logw(f"{msg}:\n  {context.identity}")
-                return ResponseContainer(data=None)
+                return ResponseContainer(content=None)
             else:
                 _logi(f"ResponseCache(), retrieved:\n  {context.identity}")
-                return ResponseContainer(data=response)
+                return ResponseContainer(content=response)
         else:
             _logi(f"ResponseCache(), nothing yet for:\n  {context.identity}")
-            return ResponseContainer(data=None)
+            return ResponseContainer(content=None)

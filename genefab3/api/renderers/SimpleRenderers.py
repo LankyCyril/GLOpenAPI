@@ -4,8 +4,9 @@ from genefab3.common.utils import json_permissive_default
 
 def raw(obj, context=None, indent=None):
     """Display objects of various types in 'raw' format"""
+    content = obj
     mimetype = "text/plain" if isinstance(obj, str) else "application"
-    return obj, mimetype
+    return content, mimetype
 
 
 def html(obj, context=None, indent=None):

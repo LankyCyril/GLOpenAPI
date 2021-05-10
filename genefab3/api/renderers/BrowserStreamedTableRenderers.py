@@ -141,8 +141,8 @@ def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader
         "$FORMATTERS": "\n".join(formatters),
         "$FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
     }
-    _iter_chained_formatted_chunks = lambda: _iter_html_chunks(replacements)
-    return _iter_chained_formatted_chunks(), "text/html"
+    content = lambda: _iter_html_chunks(replacements)
+    return content, "text/html"
 
 
 def threelevel(obj, context, indent=None):
