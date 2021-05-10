@@ -236,7 +236,7 @@ class StreamedAnnotationTable(StreamedTable):
 class StreamedDataTable(StreamedTable):
     """Table streamed from SQLite query"""
  
-    def __init__(self, *, sqlite_db, query, na_rep=NaN):
+    def __init__(self, *, sqlite_db, query, na_rep=None):
         """Infer index names and columns, retain connection and query information"""
         from genefab3.db.sql.streamed_tables import SQLiteIndexName
         _split3 = lambda c: (c[0].split("/", 2) + ["*", "*"])[:3]
@@ -275,7 +275,7 @@ class StreamedDataTable(StreamedTable):
             self.n_index_levels = 1
             self.shape = (self.shape[0], len(self._columns))
         else:
-            msg = "StreamedDataTable.move_index_boundary only moves to 0 or 1"
+            msg = "StreamedDataTable.move_index_boundary() only moves to 0 or 1"
             raise GeneFabConfigurationException(msg, to=to)
  
     @property
@@ -296,22 +296,41 @@ class StreamedDataTable(StreamedTable):
     def index(self):
         """Iterate index line by line, like in pandas"""
         if self.n_index_levels:
+            index_query = f"SELECT `{self._index_name}` FROM ({self.query})"
             with sql_connection(self.sqlite_db, "tables") as (_, execute):
-                index_query = f"SELECT `{self._index_name}` FROM ({self.query})"
-                yield from execute(index_query)
+                if self.na_rep is None:
+                    yield from execute(index_query)
+                else:
+                    msg = "StreamedDataTable with custom na_rep may be slow"
+                    GeneFabLogger().warning(msg)
+                    _na_tup = (self.na_rep,)
+                    for value, *_ in execute(index_query):
+                        yield _na_tup if value is None else (value,)
         else:
             yield from ([] for _ in range(self.shape[0]))
  
     @property
     def values(self):
         """Iterate values line by line, like in pandas"""
-        if self.n_index_levels:
-            with sql_connection(self.sqlite_db, "tables") as (_, execute):
-                for _, *values in execute(self.query):
-                    yield values
+        if self.na_rep is None:
+            if self.n_index_levels:
+                with sql_connection(self.sqlite_db, "tables") as (_, execute):
+                    for _, *values in execute(self.query):
+                        yield values
+            else:
+                with sql_connection(self.sqlite_db, "tables") as (_, execute):
+                    yield from execute(self.query)
         else:
-            with sql_connection(self.sqlite_db, "tables") as (_, execute):
-                yield from execute(self.query)
+            msg = "StreamedDataTable with custom na_rep may be slow"
+            GeneFabLogger().warning(msg)
+            if self.n_index_levels:
+                with sql_connection(self.sqlite_db, "tables") as (_, execute):
+                    for _, *values in execute(self.query):
+                        yield [self.na_rep if v is None else v for v in values]
+            else:
+                with sql_connection(self.sqlite_db, "tables") as (_, execute):
+                    for values in execute(self.query):
+                        yield [self.na_rep if v is None else v for v in values]
 
 
 # Legacy classes, to be removed after full refactoring:
