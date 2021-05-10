@@ -42,11 +42,11 @@ class ResponseCache():
     def __init__(self, sqlite_dbs):
         self.sqlite_db = sqlite_dbs.response_cache["db"]
         self.maxdbsize = sqlite_dbs.response_cache["maxsize"]
-        _kw = dict(desc="response_cache", timeout=5, none_ok=True)
-        with sql_connection(self.sqlite_db, **_kw) as (connection, execute):
-            if connection is None:
-                _logw("ResponseCache():\n  LRU SQL cache DISABLED by client")
-            else:
+        if self.sqlite_db is None:
+            _logw("ResponseCache():\n  LRU SQL cache DISABLED by client")
+        else:
+            _kw = dict(desc="response_cache", timeout=5)
+            with sql_connection(self.sqlite_db, **_kw) as (connection, execute):
                 for table, schema in RESPONSE_CACHE_SCHEMAS:
                     query = f"CREATE TABLE IF NOT EXISTS `{table}` {schema}"
                     execute(query)
@@ -54,7 +54,9 @@ class ResponseCache():
     def put(self, context, obj, response):
         """Store response object blob in response_cache table, if possible; this will happen in a parallel thread"""
         api_path, _cid = quote(context.full_path), context.identity
-        if not obj.accessions:
+        if self.sqlite_db is None:
+            return
+        elif not obj.accessions:
             msg = "None or unrecognized accession names in object"
             _logw(f"ResponseCache(), did not store:\n  {msg}, {_cid}")
             return
@@ -63,13 +65,10 @@ class ResponseCache():
         make_insert_accession_entry_command = """INSERT INTO `accessions_used`
             (accession, context_identity) VALUES ({}, "{}")""".format
         def _put():
-            _kw = dict(desc="response_cache", none_ok=True)
-            with sql_connection(self.sqlite_db, **_kw) as (_, execute):
-                if execute is None:
-                    return
-                else:
-                    blob = Binary(compress(response.get_data()))
-                    stored_at = int(datetime.now().timestamp())
+            desc = "response_cache"
+            with sql_connection(self.sqlite_db, desc) as (_, execute):
+                blob = Binary(compress(response.get_data()))
+                stored_at = int(datetime.now().timestamp())
                 try:
                     execute(f"""DELETE FROM `response_cache`
                         WHERE `context_identity` == "{context.identity}" """)
@@ -136,10 +135,9 @@ class ResponseCache():
  
     def drop_all(self):
         """Drop all cached responses"""
-        _kw = dict(desc="response_cache", none_ok=True)
-        with sql_connection(self.sqlite_db, **_kw) as (_, execute):
-            if execute is None:
-                return
+        if self.sqlite_db is None:
+            return
+        with sql_connection(self.sqlite_db, "response_cache") as (_, execute):
             try:
                 execute("DELETE FROM `accessions_used`")
                 execute("DELETE FROM `response_cache`")
@@ -151,10 +149,9 @@ class ResponseCache():
  
     def drop(self, accession):
         """Drop responses for given accession"""
-        _kw = dict(desc="response_cache", none_ok=True)
-        with sql_connection(self.sqlite_db, **_kw) as (_, execute):
-            if execute is None:
-                return
+        if self.sqlite_db is None:
+            return
+        with sql_connection(self.sqlite_db, "response_cache") as (_, execute):
             try:
                 acc_repr = sane_sql_repr(accession)
                 query = f"""SELECT `context_identity` FROM `accessions_used`
@@ -176,12 +173,11 @@ class ResponseCache():
  
     def get(self, context):
         """Retrieve cached response object blob from response_cache table if possible; otherwise return None"""
+        if self.sqlite_db is None:
+            return ResponseContainer(content=None)
         query = f"""SELECT `response`, `mimetype` FROM `response_cache`
             WHERE `context_identity` == "{context.identity}" LIMIT 1"""
-        _kw = dict(desc="response_cache", none_ok=True)
-        with sql_connection(self.sqlite_db, **_kw) as (_, execute):
-            if execute is None:
-                return ResponseContainer(content=None)
+        with sql_connection(self.sqlite_db, "response_cache") as (_, execute):
             try:
                 row = execute(query).fetchone()
             except OperationalError:
