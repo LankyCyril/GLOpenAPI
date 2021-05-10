@@ -3,21 +3,19 @@ from genefab3.common.utils import random_unique_string, validate_no_backtick
 from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.logger import GeneFabLogger
-from pandas import Index, MultiIndex, read_sql
+from genefab3.common.types import StreamedDataTable
 from genefab3.common.exceptions import GeneFabFileException
+from collections import Counter, OrderedDict
 from numpy import isreal
 from re import search, sub
 from genefab3.common.hacks import apply_hack, speed_up_data_schema
 from genefab3.db.sql.utils import sql_connection
-from pandas.io.sql import DatabaseError as PandasDatabaseError
-from genefab3.common.types import DataDataFrame
-from collections import OrderedDict
 
 
 @contextmanager
-def mkselect(execute, query, kind="TABLE"):
+def mkselect(execute, query, kind="TABLE", keep=False):
     """Context manager temporarily creating an SQLite view or table from `query`"""
-    selectname = random_unique_string(seed=query)
+    selectname = "TEMP:" + random_unique_string(seed=query)
     try:
         execute(f"CREATE {kind} `{selectname}` as {query}")
     except OperationalError:
@@ -31,14 +29,18 @@ def mkselect(execute, query, kind="TABLE"):
         try:
             yield selectname
         finally:
-            try:
-                execute(f"DROP {kind} `{selectname}`")
-            except OperationalError:
-                msg = f"Failed to drop temporary {kind} {selectname}"
-                GeneFabLogger().error(msg)
-            else:
-                msg = f"Dropped temporary SQLite {kind} {selectname}"
+            if keep:
+                msg = f"KEEPING temporary SQLite {kind} {selectname}"
                 GeneFabLogger().info(msg)
+            else:
+                try:
+                    execute(f"DROP {kind} `{selectname}`")
+                except OperationalError:
+                    msg = f"Failed to drop temporary {kind} {selectname}"
+                    GeneFabLogger().error(msg)
+                else:
+                    msg = f"Dropped temporary SQLite {kind} {selectname}"
+                    GeneFabLogger().info(msg)
 
 
 class SQLiteIndexName(str): pass
@@ -50,16 +52,14 @@ class StreamedDataTableWizard():
     def columns(self):
         return self._columns
     @columns.setter
-    def columns(self, value):
-        if isinstance(value, Index):
-            all_levels, last_level = value, value.get_level_values(-1)
-        else:
-            all_levels, last_level = Index(value), value
-        if set(last_level) <= set(self._raw_columns):
-            self._raw_columns, self._columns = list(last_level), all_levels
+    def columns(self, passed_columns):
+        passed_last_level = [c[-1] for c in passed_columns]
+        own_last_level = [c[-1] for c in self._columns]
+        if set(passed_last_level) <= set(own_last_level):
+            self._columns = passed_columns
         else:
             msg = f"Setting foreign column(s) to StreamedDataTableWizard"
-            foreign = sorted(set(last_level) - set(self._raw_columns))
+            foreign = sorted(set(passed_last_level) - set(own_last_level))
             raise GeneFabFileException(msg, columns=foreign)
  
     @property
@@ -74,17 +74,14 @@ class StreamedDataTableWizard():
     def _columns_raw2full(self):
         return {c[-1]: c for c in self.columns}
  
-    @property
-    def _columns_raw_name_counts(self):
-        return self.columns.get_level_values(-1).value_counts()
- 
     def _column_passed2full(self, passed_name, ignore_missing=False):
         """Match passed column name to full column name found in self.columns"""
+        _raw_name_counts = Counter(c[-1] for c in self.columns)
         full_name = self._columns_slashed2full.get(
             passed_name, (
                 self._columns_raw2full.get(passed_name)
-                if self._columns_raw_name_counts.get(passed_name) == 1
-                else self._columns_raw_name_counts.get(passed_name, 0)
+                if _raw_name_counts.get(passed_name) == 1
+                else _raw_name_counts.get(passed_name, 0)
             ),
         )
         if isreal(full_name):
@@ -105,14 +102,18 @@ class StreamedDataTableWizard():
     def constrain_columns(self, context):
         """Constrain self.columns to specified columns, if any"""
         if context.data_columns:
-            self.columns = MultiIndex.from_tuples([
+            self.columns = [
                 self._column_passed2full(c) for c in context.data_columns
-            ])
+            ]
  
     def _sanitize_where(self, context):
         """Infer column names for SQLite WHERE as columns are presented in table or view"""
         passed2full = getattr(
-            self, "_unique_column_passed2full", self._column_passed2full,
+            self,
+            # defined in StreamedDataTableWizard_OuterJoined:
+            "_unique_column_passed2full",
+            # defined in StreamedDataTableWizard/StreamedDataTableWizard_Single:
+            self._column_passed2full,
         )
         for dc in getattr(context, "data_comparisons", []):
             match = search(r'(`)([^`]*)(`)', dc)
@@ -124,7 +125,7 @@ class StreamedDataTableWizard():
                 yield sub(r'(`)([^`]*)(`)', f"`{sanitized_name}`", dc, count=1)
  
     def _make_query_filter(self, context, limit, offset):
-        """Validate arguments to StreamedDataTableWizard_Single.get()"""
+        """Validate arguments for StreamedDataTableWizard.get() and append WHERE, LIMIT, OFFSET clauses"""
         where = list(self._sanitize_where(context))
         if (offset != 0) and (limit is None):
             msg = "StreamedDataTableWizard: `offset` without `limit`"
@@ -135,31 +136,25 @@ class StreamedDataTableWizard():
  
     @apply_hack(speed_up_data_schema)
     def get(self, *, context, limit=None, offset=0):
-        """Interpret arguments and retrieve data as DataDataFrame by running SQL queries"""
+        """Interpret arguments and retrieve data as StreamedDataTable by running SQL queries"""
         query_filter = self._make_query_filter(context, limit, offset)
         final_targets = ",".join((
-            f"`{self.index.name}`", *(f"`{'/'.join(c)}`" for c in self.columns),
+            f"`{self._index_name}`",
+            *(f"`{'/'.join(c)}`" for c in self.columns),
         ))
-        with sql_connection(self.sqlite_db, "tables") as (connection, execute):
-            with self.select(execute, kind="VIEW") as (select, _):
-                try:
-                    q = f"SELECT {final_targets} FROM `{select}` {query_filter}"
-                    data = read_sql(q, connection, index_col=self.index.name)
-                except (OperationalError, PandasDatabaseError) as e:
-                    if "too many columns" in str(e).lower():
-                        msg = "Too many columns requested"
-                        sug = "Limit request to fewer than 2000 columns"
-                        _kw = dict(table=self.name, suggestion=sug)
-                        raise GeneFabDatabaseException(msg, **_kw)
-                    else:
-                        msg = "Data could not be retrieved"
-                        _kw = dict(table=self.name, debug_info=[repr(e), q])
-                        raise GeneFabDatabaseException(msg, **_kw)
-                else:
-                    msg = f"retrieved from SQLite as pandas DataFrame"
-                    GeneFabLogger().info(f"{self.name}; {msg}")
-                    data.columns = self.columns
-                    return DataDataFrame(data)
+        with sql_connection(self.sqlite_db, "tables") as (_, execute):
+            with self.select(execute, kind="TABLE", keep=True) as (select, _):
+                msg = f"passing SQLite table {select} to StreamedDataTable"
+                GeneFabLogger().info(f"{self.name}; {msg}")
+        data = StreamedDataTable(
+            sqlite_db=self.sqlite_db,
+            query=f"SELECT {final_targets} FROM `{select}` {query_filter}",
+            index_col=self._index_name, override_columns=self.columns,
+            source=select,
+        )
+        msg = f"retrieving from SQLite as StreamedDataTable"
+        GeneFabLogger().info(f"{self.name}; {msg}")
+        return data
  
     @staticmethod
     def concat(objs, axis=1):
@@ -181,65 +176,64 @@ class StreamedDataTableWizard():
 
 
 class StreamedDataTableWizard_Single(StreamedDataTableWizard):
-    """DataDataFrame to be retrieved from SQLite, possibly from multiple parts of same tabular file"""
+    """StreamedDataTable to be retrieved from SQLite, possibly from multiple parts of same tabular file"""
  
     def __init__(self, sqlite_db, column_dispatcher):
         """Interpret `column_dispatcher`"""
         self.sqlite_db = sqlite_db
         self._column_dispatcher = column_dispatcher
         self.name = None
-        self._raw_columns, _index_names = [], set()
+        self._columns, _index_names = [], set()
         for n, p in column_dispatcher.items():
             validate_no_backtick(n, "column")
             validate_no_backtick(p, "table_part")
             if isinstance(n, SQLiteIndexName):
                 _index_names.add(n)
             else:
-                self._raw_columns.append(n)
+                self._columns.append([n])
             if self.name is None:
                 self.name = p
         if len(_index_names) == 0:
             msg = "StreamedDataTableWizard(): no index"
             raise GeneFabDatabaseException(msg, table=self.name)
         elif len(_index_names) > 1:
-            msg = "StreamedDataTableWizard(): parts indexes do not match"
+            msg = "StreamedDataTableWizard(): indexes of parts do not match"
             _kw = dict(table=self.name, index_names=_index_names)
             raise GeneFabDatabaseException(msg, **_kw)
-        self.index = Index([], name=_index_names.pop())
-        self._columns = Index(self._raw_columns, name=None)
+        self._index_name = _index_names.pop()
  
     @property
     def _inverse_column_dispatcher(self):
         """Make dictionary {table_part -> [col, col, col, ...]}"""
         icd = OrderedDict({
             # get index column from part containing first requested column:
-            self._column_dispatcher[self._raw_columns[0]]: [self.index.name],
+            self._column_dispatcher[self.columns[0][-1]]: [self._index_name],
         })
-        for column in self._raw_columns:
-            icd.setdefault(self._column_dispatcher[column], []).append(column)
+        for *_, rawcol in self.columns:
+            icd.setdefault(self._column_dispatcher[rawcol], []).append(rawcol)
         return icd
  
     @contextmanager
-    def select(self, execute, kind="TABLE"):
+    def select(self, execute, kind="TABLE", keep=False):
         """Temporarily expose requested data as SQL view or table for StreamedDataTableWizard_OuterJoined.select()"""
-        _n, _icd = len(self._raw_columns), self._inverse_column_dispatcher
+        _n, _icd = len(self.columns), self._inverse_column_dispatcher
         _tt = "\n  ".join(("", *_icd))
         msg = f"retrieving {_n} columns from {len(_icd)} table(s):{_tt}"
         GeneFabLogger().info(f"{self.name}; {msg}")
         join_statement = " NATURAL JOIN ".join(f"`{p}`" for p in _icd)
         columns_as_slashed_columns = [
-            f"""`{self._column_dispatcher[column]}`.`{column}`
-                as `{self._columns_raw2slashed[column]}`"""
-            for column in self._raw_columns
+            f"""`{self._column_dispatcher[rawcol]}`.`{rawcol}`
+                as `{self._columns_raw2slashed[rawcol]}`"""
+            for *_, rawcol in self.columns
         ]
         query = f"""
-            SELECT `{self.index.name}`,{','.join(columns_as_slashed_columns)}
+            SELECT `{self._index_name}`,{','.join(columns_as_slashed_columns)}
             FROM {join_statement}"""
         try:
-            with mkselect(execute, query, kind=kind) as selectname:
+            with mkselect(execute, query, kind=kind, keep=keep) as selectname:
                 yield selectname, [
-                    f"`{self._columns_raw2slashed[c]}`"
-                    for c in self._raw_columns
+                    f"`{self._columns_raw2slashed[rawcol]}`"
+                    for *_, rawcol in self.columns
                 ]
         except (OperationalError, GeneFabDatabaseException):
             msg = "Data could not be retrieved"
@@ -247,30 +241,19 @@ class StreamedDataTableWizard_Single(StreamedDataTableWizard):
 
 
 class StreamedDataTableWizard_OuterJoined(StreamedDataTableWizard):
-    """DataDataFrame to be retrieved from SQLite, full outer joined from multiple views or tables"""
+    """StreamedDataTable to be retrieved from SQLite, full outer joined from multiple views or tables"""
  
     def __init__(self, sqlite_db, objs):
         _t = "StreamedDataTableWizard"
         self.sqlite_db, self.objs = sqlite_db, objs
         if len(objs) < 2:
             raise ValueError(f"{type(self).__name__}: no objects to join")
-        elif len(set(obj.index.name for obj in objs)) != 1:
+        elif len(set(obj._index_name for obj in objs)) != 1:
             msg = f"Concatenating {_t} objects with differing index names"
             raise ValueError(msg)
         else:
-            self.index = Index([], name=objs[0].index.name)
-        if len(set(obj.columns.nlevels for obj in objs)) != 1:
-            msg = f"Concatenating {_t} objects with differing column `nlevels`"
-            raise ValueError(msg)
-        else:
-            if objs[0].columns.nlevels == 1:
-                _mkindex = Index
-            else:
-                _mkindex = MultiIndex.from_tuples
-            self._columns = _mkindex(
-                sum((obj.columns.to_list() for obj in objs), []),
-            )
-            self._raw_columns = self._columns.get_level_values(-1)
+            self._index_name = objs[0]._index_name
+            self._columns = sum((obj.columns for obj in objs), [])
             names = ", ".join(str(obj.name) for obj in objs)
             self.name = f"FullOuterJoin({names})"
  
@@ -293,7 +276,7 @@ class StreamedDataTableWizard_OuterJoined(StreamedDataTableWizard):
             return matches.pop()
  
     @contextmanager
-    def select(self, execute, kind="TABLE"):
+    def select(self, execute, kind="TABLE", keep=False):
         """Temporarily expose requested data as SQL view or table"""
         with ExitStack() as stack:
             enter_context = stack.enter_context
@@ -302,20 +285,20 @@ class StreamedDataTableWizard_OuterJoined(StreamedDataTableWizard):
             for i, (next_select, next_columns) in enumerate(selects[1:], 1):
                 agg_columns = agg_columns + next_columns
                 agg_targets = ",".join(agg_columns)
-                condition = f"""`{agg_select}`.`{self.index.name}` ==
-                    `{next_select}`.`{self.index.name}`"""
+                condition = f"""`{agg_select}`.`{self._index_name}` ==
+                    `{next_select}`.`{self._index_name}`"""
                 query = f"""
-                    SELECT `{agg_select}`.`{self.index.name}`,{agg_targets}
+                    SELECT `{agg_select}`.`{self._index_name}`,{agg_targets}
                         FROM `{agg_select}` LEFT JOIN `{next_select}`
                             ON {condition}
                     UNION
-                    SELECT `{next_select}`.`{self.index.name}`,{agg_targets}
+                    SELECT `{next_select}`.`{self._index_name}`,{agg_targets}
                         FROM `{next_select}` LEFT JOIN `{agg_select}`
                             ON {condition}
-                            WHERE `{agg_select}`.`{self.index.name}` IS NULL"""
-                if (i == len(selects) - 1) and (kind == "VIEW"):
-                    _kind = "VIEW"
+                            WHERE `{agg_select}`.`{self._index_name}` IS NULL"""
+                if i == len(selects) - 1:
+                    _kw = dict(kind=kind, keep=keep)
                 else:
-                    _kind = "TABLE"
-                agg_select = enter_context(mkselect(execute, query, _kind))
+                    _kw = dict(kind="TABLE", keep=False)
+                agg_select = enter_context(mkselect(execute, query, **_kw))
             yield agg_select, None

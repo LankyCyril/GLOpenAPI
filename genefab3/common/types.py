@@ -5,6 +5,8 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
 from genefab3.common.utils import blackjack, KeyToPosition
 from genefab3.db.sql.utils import sql_connection
+from sqlite3 import OperationalError
+from genefab3.common.exceptions import GeneFabDatabaseException
 
 
 class SuperchargedNaN(float):
@@ -236,27 +238,53 @@ class StreamedAnnotationTable(StreamedTable):
 class StreamedDataTable(StreamedTable):
     """Table streamed from SQLite query"""
  
-    def __init__(self, *, sqlite_db, query, na_rep=None):
+    def __init__(self, *, sqlite_db, query, source, na_rep=None, index_col=None, override_columns=None):
         """Infer index names and columns, retain connection and query information"""
         from genefab3.db.sql.streamed_tables import SQLiteIndexName
         _split3 = lambda c: (c[0].split("/", 2) + ["*", "*"])[:3]
-        self.sqlite_db = sqlite_db
+        self.sqlite_db, self.source = sqlite_db, source
         self.query = query
         self.na_rep = na_rep
         with sql_connection(self.sqlite_db, "tables") as (connection, execute):
-            cursor = connection.cursor()
-            cursor.execute(self.query)
-            self._index_name = SQLiteIndexName(cursor.description[0][0])
-            self._columns = [_split3(c) for c in cursor.description[1:]]
-            _count_query = f"SELECT count(*) FROM ({self.query})"
-            self.shape = (
-                (execute(_count_query).fetchone() or [0])[0],
-                len(self._columns),
-            )
+            try:
+                cursor = connection.cursor()
+                cursor.execute(self.query)
+                self._index_name = SQLiteIndexName(cursor.description[0][0])
+                self._columns = [_split3(c) for c in cursor.description[1:]]
+                _count_query = f"SELECT count(*) FROM ({self.query})"
+                self.shape = (
+                    (execute(_count_query).fetchone() or [0])[0],
+                    len(self._columns),
+                )
+            except OperationalError as e:
+                self._reraise(e)
+        if index_col is not None:
+            if self._index_name != index_col:
+                msg = "leftmost SQL column does not match passed index_col"
+                raise NotImplementedError(f"StreamedDataTable: {msg}")
+        if override_columns is not None:
+            if len(self._columns) != len(override_columns):
+                raise GeneFabConfigurationException(
+                    "StreamedDataTable: unexpected length of override_columns",
+                    own_length=len(self._columns),
+                    passed_length=len(override_columns),
+                )
+            else:
+                self._columns = override_columns
         self.accessions = {c[0] for c in self._columns}
         self.n_index_levels = 1
-        self.datatypes = set()
-        self.gct_validity_set = set()
+        self.datatypes, self.gct_validity_set = set(), set()
+ 
+    def _reraise(self, e):
+        """Raise own exception on OperationalError"""
+        if "too many columns" in str(e).lower():
+            msg = "Too many columns requested"
+            sug = "Limit request to fewer than 2000 columns"
+            raise GeneFabDatabaseException(msg, suggestion=sug)
+        else:
+            msg = "Data could not be retrieved"
+            debug_info = [repr(e), self.query]
+            raise GeneFabDatabaseException(msg, debug_info=debug_info)
  
     @property
     def gct_valid(self):
@@ -298,39 +326,46 @@ class StreamedDataTable(StreamedTable):
         if self.n_index_levels:
             index_query = f"SELECT `{self._index_name}` FROM ({self.query})"
             with sql_connection(self.sqlite_db, "tables") as (_, execute):
-                if self.na_rep is None:
-                    yield from execute(index_query)
-                else:
-                    msg = "StreamedDataTable with custom na_rep may be slow"
-                    GeneFabLogger().warning(msg)
-                    _na_tup = (self.na_rep,)
-                    for value, *_ in execute(index_query):
-                        yield _na_tup if value is None else (value,)
+                try:
+                    if self.na_rep is None:
+                        yield from execute(index_query)
+                    else:
+                        msg = "StreamedDataTable with custom na_rep may be slow"
+                        GeneFabLogger().warning(msg)
+                        _na_tup = (self.na_rep,)
+                        for value, *_ in execute(index_query):
+                            yield _na_tup if value is None else (value,)
+                except OperationalError as e:
+                    self._reraise(e)
         else:
             yield from ([] for _ in range(self.shape[0]))
  
     @property
     def values(self):
         """Iterate values line by line, like in pandas"""
-        if self.na_rep is None:
-            if self.n_index_levels:
-                with sql_connection(self.sqlite_db, "tables") as (_, execute):
-                    for _, *values in execute(self.query):
-                        yield values
+        _kw = dict(filename=self.sqlite_db, desc="tables")
+        try:
+            if self.na_rep is None:
+                if self.n_index_levels:
+                    with sql_connection(**_kw) as (_, execute):
+                        for _, *vv in execute(self.query):
+                            yield vv
+                else:
+                    with sql_connection(**_kw) as (_, execute):
+                        yield from execute(self.query)
             else:
-                with sql_connection(self.sqlite_db, "tables") as (_, execute):
-                    yield from execute(self.query)
-        else:
-            msg = "StreamedDataTable with custom na_rep may be slow"
-            GeneFabLogger().warning(msg)
-            if self.n_index_levels:
-                with sql_connection(self.sqlite_db, "tables") as (_, execute):
-                    for _, *values in execute(self.query):
-                        yield [self.na_rep if v is None else v for v in values]
-            else:
-                with sql_connection(self.sqlite_db, "tables") as (_, execute):
-                    for values in execute(self.query):
-                        yield [self.na_rep if v is None else v for v in values]
+                msg = "StreamedDataTable with custom na_rep may be slow"
+                GeneFabLogger().warning(msg)
+                if self.n_index_levels:
+                    with sql_connection(**_kw) as (_, execute):
+                        for _, *vv in execute(self.query):
+                            yield [self.na_rep if v is None else v for v in vv]
+                else:
+                    with sql_connection(**_kw) as (_, execute):
+                        for vv in execute(self.query):
+                            yield [self.na_rep if v is None else v for v in vv]
+        except OperationalError as e:
+            self._reraise(e)
 
 
 # Legacy classes, to be removed after full refactoring:

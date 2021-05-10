@@ -7,7 +7,6 @@ from genefab3.db.mongo.utils import match_sample_names_to_file_descriptor
 from functools import partial, lru_cache, reduce
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.db.sql.streamed_tables import StreamedDataTableWizard
-from pandas import MultiIndex
 from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.db.sql.files import CachedTableFile, CachedBinaryFile
 from genefab3.common.types import PhoenixIterator
@@ -49,11 +48,11 @@ def file_redirect(descriptor):
         return redirect(url, code=303, Response=Response)
 
 
-def harmonize_columns(dataframe, descriptor, sample_names, best_sample_name_matches):
+def harmonize_columns(columns, descriptor, sample_names, best_sample_name_matches):
     """Match sample names to columns, infer correct order of original columns based on order of sample_names"""
     harmonized_column_order, harmonized_positions = [], []
     include_nomatch = (descriptor["file"].get("column_subset") != "sample name")
-    for i, c in enumerate(dataframe.columns):
+    for i, c in enumerate(columns):
         hcs, ps = best_sample_name_matches(
             c, sample_names, return_positions=True,
         )
@@ -71,7 +70,7 @@ def harmonize_columns(dataframe, descriptor, sample_names, best_sample_name_matc
             _kws = dict(filename=filename, column=c, sample_names=hcs)
             raise GeneFabDataManagerException(msg, **_kws)
     harmonized_unordered = harmonized_column_order[:]
-    original_unordered = list(dataframe.columns)
+    original_unordered = list(columns)
     column_order = original_unordered[:]
     current_positions = [i for p, i in harmonized_positions]
     target_positions = [i for p, i in sorted(harmonized_positions)]
@@ -97,7 +96,7 @@ def INPLACE_process_dataframe(dataframe, *, mongo_collections, descriptor, best_
             raise NotImplementedError(msg)
         else:
             index_order, harmonized_index_order = harmonize_columns(
-                dataframe.T, descriptor, all_sample_names,
+                dataframe.index, descriptor, all_sample_names,
                 best_sample_name_matches,
             )
             if not (dataframe.index == index_order).all():
@@ -108,7 +107,8 @@ def INPLACE_process_dataframe(dataframe, *, mongo_collections, descriptor, best_
             dataframe.index = harmonized_index_order
     else:
         column_order, harmonized_column_order = harmonize_columns(
-            dataframe, descriptor, all_sample_names, best_sample_name_matches,
+            dataframe.columns, descriptor, all_sample_names,
+            best_sample_name_matches,
         )
         if not (dataframe.columns == column_order).all():
             for column in column_order: # reorder columns in-place
@@ -143,13 +143,14 @@ def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, ada
     data = file.data
     if isinstance(data, StreamedDataTableWizard):
         _, harmonized_column_order = harmonize_columns(
-            data, descriptor, natsorted(descriptor["sample name"]),
+            [c[-1] for c in data.columns],
+            descriptor, natsorted(descriptor["sample name"]),
             adapter.best_sample_name_matches,
         )
-        data.columns = MultiIndex.from_tuples((
+        data.columns = [
             (accession, assay_name, column)
             for column in harmonized_column_order
-        ))
+        ]
     return data
 
 
