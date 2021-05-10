@@ -55,6 +55,30 @@ def cls(obj, context=None, continuous=None, space_formatter=lambda s: sub(r'\s',
     return Response(iter(lines), mimetype="text/plain")
 
 
+def gct(obj, context=None, indent=None, level_formatter="/".join):
+    """Display presumed data dataframe in plaintext GCT format"""
+    # TODO
+    #if (not isinstance(obj, DataDataFrame)) or (len(obj.datatypes) == 0):
+    #    msg = "No datatype information associated with retrieved data"
+    #    raise GeneFabConfigurationException(msg)
+    #elif len(obj.datatypes) > 1:
+    #    msg = "GCT format does not support mixed datatypes"
+    #    raise GeneFabFormatException(msg, datatypes=obj.datatypes)
+    #elif not obj.gct_valid:
+    #    msg = "GCT format is not valid for given datatype"
+    #    raise GeneFabFormatException(msg, datatype=obj.datatypes.pop())
+    #else:
+    #    text = obj.to_csv(sep="\t", header=False, na_rep="")
+    #    # NaNs left empty: https://www.genepattern.org/file-formats-guide#GCT
+    #    content = (
+    #        "#1.2\n{}\t{}\n".format(*obj.shape),
+    #        "Name\tDescription\t" +
+    #        "\t".join(level_formatter(levels) for levels in obj.columns) +
+    #        "\n" + sub(r'^(.+?\t)', r'\1\1', text, flags=MULTILINE)
+    #    )
+    #    return Response(content, mimetype="text/plain")
+
+
 def _iter_json_chunks(prefix="", d=None, n=None, postfix="", default=json_permissive_default):
     """Iterate chunks in bracketed `delimiter`-separated format"""
     def _foreach(chunks, end):

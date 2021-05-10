@@ -144,3 +144,8 @@ def twolevel(obj, context, indent=None, frozen=0, col_fill="*", squash_preheader
     }
     _iter_chained_formatted_chunks = lambda: _iter_html_chunks(replacements)
     return Response(_iter_chained_formatted_chunks(), mimetype="text/html")
+
+
+def threelevel(obj, context, indent=None):
+    """Squash two top levels of StreamedTable columns and display as two-level"""
+    # TODO

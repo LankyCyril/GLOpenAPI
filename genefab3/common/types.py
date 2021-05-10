@@ -7,6 +7,7 @@ from genefab3.common.utils import blackjack, KeyToPosition
 from genefab3.db.sql.utils import sql_connection
 from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabDatabaseException
+from genefab3.common.logger import GeneFabLogger
 
 
 class SuperchargedNaN(float):
@@ -368,70 +369,5 @@ class StreamedDataTable(StreamedTable):
             self._reraise(e)
 
 
-# Legacy classes, to be removed after full refactoring:
-
-
-from pandas import DataFrame, MultiIndex, Index
-from numpy import dtype
-from genefab3.common.logger import GeneFabLogger
-
-
-class GeneFabDataFrame(DataFrame):
-    @property
-    def schema(self):
-        """Represent each column as {type}[({min})..({max})|{has_nans}]"""
-        def _column_schema(column):
-            if column.dtype in (dtype("int64"), dtype("float64")):
-                _t, _min, _max = str(column.dtype)[:-2], None, None
-                if _t == "float":
-                    _dropna = column.dropna()
-                    _int = _dropna.astype(int)
-                    if (_dropna == _int).all():
-                        _t, _min, _max = "int", _int.min(), _int.max()
-                if (_min is None) or (_max is None):
-                    _min, _max = column.min(), column.max()
-                _nan = "|NaN" if column.isnull().any() else ""
-                return f"{_t}[({_min})..({_max}){_nan}]"
-            else:
-                _t = "bool" if column.dtype is dtype("bool") else "str"
-                return f"{_t}[..|NaN]" if column.isnull().any() else f"{_t}[..]"
-        schema = self.apply(_column_schema).to_frame().T
-        if isinstance(self.index, MultiIndex):
-            index_frame = self.index.to_frame(index=False)
-            schema.index = MultiIndex.from_frame(
-                index_frame.apply(_column_schema).to_frame().T
-            )
-        else:
-            schema.index = Index(
-                [_column_schema(self.index)], name=self.index.name,
-            )
-        return type(self)(schema)
-
-
-class DataDataFrame(GeneFabDataFrame):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._metadata.extend(["datatypes", "gct_validity_set"])
-        self.datatypes, self.gct_validity_set = set(), set()
-    @property
-    def accessions(self):
-        if self.columns.nlevels == 2:
-            # may have been squashed for '&format=browser':
-            accessions = set()
-            for c in self.columns[1:].get_level_values(0):
-                if c.count("<br>") < 2:
-                    accessions.add(c.split("<br>")[0])
-                else:
-                    msg = "DataDataFrame.accessions: unexpected column name"
-                    GeneFabLogger().warning(f"{msg}: {c!r}")
-                    return None
-            else:
-                return accessions
-        else: # normal representation
-            return set(self.columns[1:].get_level_values(0))
-    @property
-    def gct_valid(self):
-        return (
-            (len(self.datatypes) == 1) and
-            self.gct_validity_set and all(self.gct_validity_set)
-        )
+# Legacy class plug, to be removed after full refactoring:
+class DataDataFrame(): pass

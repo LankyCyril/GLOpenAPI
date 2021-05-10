@@ -1,4 +1,5 @@
-from genefab3.common.types import Routes, StreamedAnnotationTable, DataDataFrame
+from genefab3.common.types import Routes
+from genefab3.common.types import StreamedAnnotationTable, StreamedDataTable
 from genefab3.db.sql.files import CachedBinaryFile
 from genefab3.api import views
 from typing import Union
@@ -52,7 +53,7 @@ class DefaultRoutes(Routes):
         )
  
     @Routes.register_endpoint()
-    def data(self, context) -> Union[DataDataFrame, Response]:
+    def data(self, context) -> Union[StreamedDataTable, Response]:
         return views.data.get(
             mongo_collections=self.genefab3_client.mongo_collections,
             sqlite_dbs=self.genefab3_client.sqlite_dbs,

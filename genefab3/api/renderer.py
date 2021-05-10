@@ -1,8 +1,8 @@
 from collections import OrderedDict
 from flask import Response
-from genefab3.common.types import StreamedAnnotationTable, StreamedSchema, DataDataFrame
-from genefab3.api.renderers import SimpleRenderers, PlaintextDataFrameRenderers
-from genefab3.api.renderers import BrowserDataFrameRenderers
+from genefab3.common.types import StreamedAnnotationTable, StreamedDataTable
+from genefab3.common.types import StreamedSchema
+from genefab3.api.renderers import SimpleRenderers
 from genefab3.api.renderers import PlaintextStreamedTableRenderers
 from genefab3.api.renderers import BrowserStreamedTableRenderers
 from pandas import DataFrame
@@ -27,12 +27,12 @@ TYPE_RENDERERS = OrderedDict((
         "json": PlaintextStreamedTableRenderers.json,
         "browser": BrowserStreamedTableRenderers.twolevel,
     }),
-    (DataDataFrame, {
-        "gct": PlaintextDataFrameRenderers.gct,
-        "csv": PlaintextDataFrameRenderers.csv,
-        "tsv": PlaintextDataFrameRenderers.tsv,
-        "json": PlaintextDataFrameRenderers.json,
-        "browser": BrowserDataFrameRenderers.threelevel,
+    (StreamedDataTable, {
+        "gct": PlaintextStreamedTableRenderers.gct,
+        "csv": PlaintextStreamedTableRenderers.csv,
+        "tsv": PlaintextStreamedTableRenderers.tsv,
+        "json": PlaintextStreamedTableRenderers.json,
+        "browser": BrowserStreamedTableRenderers.threelevel,
     }),
     (StreamedSchema, {
         "csv": PlaintextStreamedTableRenderers.csv,
@@ -68,7 +68,7 @@ class CacheableRenderer():
             return_types = set(return_type.__args__)
         else:
             return_types = {return_type}
-        if return_types & {DataDataFrame, StreamedAnnotationTable}:
+        if return_types & {StreamedAnnotationTable, StreamedDataTable}:
             default_format, cacheable = "csv", True
         elif DataFrame in return_types:
             default_format, cacheable = "csv", False
