@@ -138,7 +138,7 @@ class StreamedSchema(StreamedTable):
             isinstance(a, bool) and isinstance(b, bool) else type(a + b))
         for i, level in enumerate(target):
             if i == 0:
-                minima, maxima = level[:], level[:]
+                minima, maxima = list(level), list(level)
                 types, hasnan = [str] * len(level), [a != a for a in level]
             else:
                 for j, (_min, _max, b) in enumerate(zip(minima, maxima, level)):

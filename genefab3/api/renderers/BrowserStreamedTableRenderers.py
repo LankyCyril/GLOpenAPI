@@ -1,18 +1,9 @@
-from genefab3.common.types import StreamedTable, StreamedAnnotationTable
+from genefab3.common.types import StreamedAnnotationTable
 from genefab3.common.exceptions import GeneFabConfigurationException
 from pathlib import Path
 from genefab3.common.logger import GeneFabLogger
 from genefab3.api.renderers.PlaintextStreamedTableRenderers import _iter_json_chunks
 from re import compile, escape
-
-
-def _assert_type(obj, nlevels):
-    """Check validity of `obj` for converting as a multi-column-level StreamedTable"""
-    passed_nlevels = {len(column) for column in getattr(obj, "columns", [[]])}
-    if (not isinstance(obj, StreamedTable)) or (passed_nlevels != {nlevels}):
-        msg = "Data cannot be represented as an interactive table"
-        _kw = dict(type=type(obj).__name__, nlevels=passed_nlevels)
-        raise GeneFabConfigurationException(msg, **_kw)
 
 
 def build_url(context, target_view=None, drop=set()):
@@ -125,10 +116,8 @@ def twolevel(obj, context, squash_preheader=False, frozen=0, indent=None):
     else:
         formatters = []
     if squash_preheader:
-        _assert_type(obj, nlevels=3)
         columns = ((f"{c[0]}<br>{c[1]}", c[2]) for c in obj.columns)
     else:
-        _assert_type(obj, nlevels=2)
         columns = obj.columns
     replacements = {
         "$APPNAME": f"{context.app_name}: {title_postfix}",
@@ -150,6 +139,14 @@ def twolevel(obj, context, squash_preheader=False, frozen=0, indent=None):
     return content, "text/html"
 
 
-def threelevel(obj, context, indent=None):
-    """Squash two top levels of StreamedTable columns and display as two-level"""
-    return twolevel(obj, context, squash_preheader=True, indent=indent)
+def html(obj, context, indent=None):
+    """Force two-level columns in StreamedTable and render using SlickGrid"""
+    passed_nlevels = {len(column) for column in getattr(obj, "columns", [[]])}
+    if passed_nlevels == {2}:
+        return twolevel(obj, context, squash_preheader=False, indent=indent)
+    elif passed_nlevels == {3}:
+        return twolevel(obj, context, squash_preheader=True, indent=indent)
+    else:
+        msg = "Data cannot be represented as an interactive table"
+        _kw = dict(type=type(obj).__name__, nlevels=passed_nlevels)
+        raise GeneFabConfigurationException(msg, **_kw)

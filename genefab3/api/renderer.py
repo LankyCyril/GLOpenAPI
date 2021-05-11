@@ -25,20 +25,20 @@ TYPE_RENDERERS = OrderedDict((
         "csv": PlaintextStreamedTableRenderers.csv,
         "tsv": PlaintextStreamedTableRenderers.tsv,
         "json": PlaintextStreamedTableRenderers.json,
-        "browser": BrowserStreamedTableRenderers.twolevel,
+        "browser": BrowserStreamedTableRenderers.html,
     }),
     (StreamedDataTable, {
         "gct": PlaintextStreamedTableRenderers.gct,
         "csv": PlaintextStreamedTableRenderers.csv,
         "tsv": PlaintextStreamedTableRenderers.tsv,
         "json": PlaintextStreamedTableRenderers.json,
-        "browser": BrowserStreamedTableRenderers.threelevel,
+        "browser": BrowserStreamedTableRenderers.html,
     }),
     (StreamedSchema, {
         "csv": PlaintextStreamedTableRenderers.csv,
         "tsv": PlaintextStreamedTableRenderers.tsv,
         "json": PlaintextStreamedTableRenderers.json,
-        "browser": BrowserStreamedTableRenderers.twolevel,
+        "browser": BrowserStreamedTableRenderers.html,
     }),
     ((str, bytes), {
         "raw": SimpleRenderers.raw,
