@@ -31,16 +31,19 @@ def _iter_discrete_cls(obj, target, space_formatter):
     yield "\t".join(class2id[row[target]] for row in obj.values) + "\n"
 
 
-def _iter_json_chunks(prefix="", d=None, n=None, postfix="", default=json_permissive_default):
+def _iter_json_chunks(prefix="", data=None, length=None, postfix="", default=json_permissive_default):
     """Iterate chunks in bracketed `delimiter`-separated format"""
     def _foreach(chunks, end):
         for chunk in chunks:
             yield dumps(chunk, separators=(",", ":"), default=default) + end
-    leveliter = iter(d)
-    chunks = (next(leveliter) for _ in range(n-1))
+    leveliter = iter(data)
+    chunks = (next(leveliter) for _ in range(length-1))
     yield f"{prefix}["
-    yield from _foreach(chunks, end=",")
-    yield from _foreach([next(leveliter)], end="")
+    try:
+        yield from _foreach(chunks, end=",")
+        yield from _foreach([next(leveliter)], end="")
+    except StopIteration:
+        pass
     yield f"]{postfix}"
 
 
