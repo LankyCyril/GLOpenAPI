@@ -24,9 +24,8 @@ class _TempSchemaSource():
     """Temporary source for hacked table; similar to TempSelect()"""
     def __init__(self, sqlite_db):
         self.sqlite_db = sqlite_db
-        self.name = "SCHEMA_HACK"#:" + random_unique_string()
+        self.name = "SCHEMA_HACK:" + random_unique_string()
     def __del__(self):
-        return
         with sql_connection(self.sqlite_db, "tables") as (_, execute):
             try:
                 execute(f"DROP TABLE `{self.name}`")

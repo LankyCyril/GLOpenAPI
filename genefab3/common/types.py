@@ -132,6 +132,8 @@ class StreamedSchema(StreamedTable):
         _mt = lambda a, b, bool=bool, type=type, isinstance=isinstance: (bool if
             isinstance(a, bool) and isinstance(b, bool) else type(a + b))
         _zip_enum = lambda *a, enumerate=enumerate, zip=zip: enumerate(zip(*a))
+        if self.table.shape[0] == 0:
+            yield [NaN] * self.table.shape[1]
         for i, level in enumerate(target):
             if i == 0:
                 minima, maxima = list(level), list(level)
