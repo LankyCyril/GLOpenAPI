@@ -24,8 +24,9 @@ class _TempSchemaSource():
     """Temporary source for hacked table; similar to TempSelect()"""
     def __init__(self, sqlite_db):
         self.sqlite_db = sqlite_db
-        self.name = "SCHEMA_HACK:" + random_unique_string()
+        self.name = "SCHEMA_HACK"#:" + random_unique_string()
     def __del__(self):
+        return
         with sql_connection(self.sqlite_db, "tables") as (_, execute):
             try:
                 execute(f"DROP TABLE `{self.name}`")
@@ -41,8 +42,9 @@ def _make_sub(self, table):
     """Make substitute source and query for quick retrieval of values informative for schema"""
     sql_targets = [self._index_name, *("/".join(c) for c in self.columns)]
     functargets = lambda f: ",".join(f"{f}(`{st}`)" for st in sql_targets)
-    mkquery = lambda t: f"SELECT {t} FROM `{table.source_select.name}` LIMIT 1"
-    n_rows_query = f"SELECT COUNT(*) FROM `{table.source_select.name}` LIMIT 1"
+    source_name, query_filter = table.source_select.name, table.query_filter
+    mkquery = lambda t: f"SELECT {t} FROM `{source_name}` {query_filter}"
+    n_rows_query = f"SELECT COUNT(*) FROM `{source_name}` {query_filter}"
     with sql_connection(table.sqlite_db, "tables") as (connection, execute):
         fetch = lambda query: execute(query).fetchone()
         minima = fetch(mkquery(functargets("MIN")))
@@ -51,15 +53,15 @@ def _make_sub(self, table):
         n_rows = fetch(n_rows_query)[0]
         hasnan = [(n_rows - c) > 0 for c in counts]
         sub_source = _TempSchemaSource(sqlite_db=table.sqlite_db)
-        sub_data = {}
+        sub_data = DataFrame(columns=sql_targets)
         for t, m, M, h in zip(sql_targets, minima, maxima, hasnan):
             _min = m if (m is not None) else (M if (M is not None) else NaN)
             _max = M if (M is not None) else _min
             _nan = NaN if h else _max
             sub_data[t] = [_min, _max, _nan]
         try:
-            _kw = dict(if_exists="replace")
-            DataFrame(sub_data).to_sql(sub_source.name, connection, **_kw)
+            sub_data.set_index(self._index_name, inplace=True)
+            sub_data.to_sql(sub_source.name, connection, if_exists="replace")
         except (OperationalError, PandasDatabaseError) as e:
             msg = "Schema speedup failed: could not create substitute table"
             raise GeneFabDatabaseException(msg, debug_info=repr(e))
