@@ -32,6 +32,7 @@ class PhoenixIterator():
 
 class StringIterator():
     """Wraps functions that yield text"""
+    default_format = "html"
     def __init__(self, func): self.func = func
     def __call__(self): return self.func()
 
@@ -112,6 +113,8 @@ class ResponseContainer():
 
 class StreamedTable():
     """Generalized streamed table (either from MongoDB or from SQLite)"""
+    default_format = "csv"
+    cacheable = True
     @property
     def schema(self): return StreamedSchema(self)
     @property
