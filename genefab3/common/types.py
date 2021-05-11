@@ -353,8 +353,6 @@ class StreamedDataTable(StreamedTable):
                     if self.na_rep is None:
                         yield from execute(index_query)
                     else:
-                        msg = "StreamedDataTable with custom na_rep may be slow"
-                        GeneFabLogger().warning(msg)
                         _na_tup = (self.na_rep,)
                         for value, *_ in execute(index_query):
                             yield _na_tup if value is None else (value,)
@@ -377,8 +375,9 @@ class StreamedDataTable(StreamedTable):
                     with sql_connection(**_kw) as (_, execute):
                         yield from execute(self.query)
             else:
-                msg = "StreamedDataTable with custom na_rep may be slow"
-                GeneFabLogger().warning(msg)
+                if self.shape[0] > 50:
+                    msg = "StreamedDataTable with custom na_rep may be slow"
+                    GeneFabLogger().warning(msg)
                 if self.n_index_levels:
                     with sql_connection(**_kw) as (_, execute):
                         for _, *vv in execute(self.query):
@@ -403,7 +402,3 @@ class StreamedDataTable(StreamedTable):
                 except OperationalError:
                     msg = "Failed to delete temporary StreamedDataTable source"
                     GeneFabLogger().error(f"{msg} {self.source}")
-
-
-# Legacy class plug, to be removed after full refactoring:
-class DataDataFrame(): pass
