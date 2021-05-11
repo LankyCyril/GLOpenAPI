@@ -1,4 +1,3 @@
-from math import nan
 from itertools import tee
 from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
@@ -11,15 +10,15 @@ from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.logger import GeneFabLogger
 
 
-class SuperchargedNaN(float):
-    """math.nan represented as NaN and comparable against any types"""
-    def __new__(self): return float.__new__(self, nan)
+class ExtNaN(float):
+    """Extended nan: math.nan represented as NaN and comparable against any types"""
+    def __new__(self): return float.__new__(self, "nan")
     def __str__(self): return "NaN"
     def __repr__(self): return "NaN"
     def __eq__(self, other): return False
     def __lt__(self, other): return not isinstance(other, float)
     def __gt__(self, other): return False
-NaN = SuperchargedNaN()
+NaN = ExtNaN()
 
 
 class PhoenixIterator():
@@ -128,16 +127,17 @@ class StreamedSchema(StreamedTable):
     @property
     def values(self): yield from self._schemify(self.table.values)
  
-    def _schemify(self, target, isinstance=isinstance, type=type, float=float, str=str, SuperchargedNaN=SuperchargedNaN, len=len, TypeError=TypeError, enumerate=enumerate, zip=zip, min=min, max=max):
+    def _schemify(self, target, isinstance=isinstance, str=str, min=min, max=max, TypeError=TypeError, zip=zip, ExtNaN=ExtNaN, float=float):
         """Aggregate and return (yield once) value descriptors (type, min, max, hasnan) for each column"""
         _mt = lambda a, b, bool=bool, type=type, isinstance=isinstance: (bool if
             isinstance(a, bool) and isinstance(b, bool) else type(a + b))
+        _zip_enum = lambda *a, enumerate=enumerate, zip=zip: enumerate(zip(*a))
         for i, level in enumerate(target):
             if i == 0:
                 minima, maxima = list(level), list(level)
                 types, hasnan = [str] * len(level), [a != a for a in level]
             else:
-                for j, (_min, _max, b) in enumerate(zip(minima, maxima, level)):
+                for j, (_min, _max, b) in _zip_enum(minima, maxima, level):
                     if not isinstance(_min, str):
                         try:
                             minima[j], types[j] = min(_min, b), _mt(_min, b)
@@ -153,7 +153,7 @@ class StreamedSchema(StreamedTable):
         _schema = []
         for _t, _min, _max, _h in zip(types, minima, maxima, hasnan):
             _pipenan = f"|{NaN}" if _h else ""
-            if _t is SuperchargedNaN:
+            if _t is ExtNaN:
                 _t = float
             if _t is str:
                 _schema.append(f"str[..{_pipenan}]")
@@ -388,13 +388,11 @@ class StreamedDataTable(StreamedTable):
     def __del__(self):
         """Remove self.source from SQLite"""
         with sql_connection(self.sqlite_db, "tables") as (_, execute):
-            msg = "Deleting temporary StreamedDataTable source"
-            GeneFabLogger().info(f"{msg} {self.source} ...")
             try:
                 execute(f"DROP TABLE `{self.source}`")
             except OperationalError:
-                try:
-                    execute(f"DROP VIEW `{self.source}`")
-                except OperationalError:
-                    msg = "Failed to delete temporary StreamedDataTable source"
-                    GeneFabLogger().error(f"{msg} {self.source}")
+                msg = "Failed to delete temporary StreamedDataTable source"
+                GeneFabLogger().error(f"{msg} {self.source}")
+            else:
+                msg = "Deleted temporary StreamedDataTable source"
+                GeneFabLogger().info(f"{msg} {self.source}")

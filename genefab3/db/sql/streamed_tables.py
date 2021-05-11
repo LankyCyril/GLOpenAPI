@@ -13,33 +13,33 @@ from genefab3.db.sql.utils import sql_connection
 
 
 @contextmanager
-def mkselect(execute, query, kind="TABLE", keep=False):
+def mkselect(execute, query, persist=False):
     """Context manager temporarily creating an SQLite view or table from `query`"""
     selectname = "TEMP:" + random_unique_string(seed=query)
     try:
-        execute(f"CREATE {kind} `{selectname}` as {query}")
+        execute(f"CREATE TABLE `{selectname}` as {query}")
     except OperationalError:
-        msg = f"Failed to create temporary {kind}"
+        msg = f"Failed to create temporary table"
         _kw = dict(name=selectname, debug_info=query)
         raise GeneFabDatabaseException(msg, **_kw)
     else:
         query_repr = repr(query.lstrip()[:100] + "...")
-        msg = f"Created temporary SQLite {kind} {selectname} from {query_repr}"
+        msg = f"Created temporary SQLite table {selectname} from {query_repr}"
         GeneFabLogger().info(msg)
         try:
             yield selectname
         finally:
-            if keep:
-                msg = f"KEEPING temporary SQLite {kind} {selectname}"
+            if persist:
+                msg = f"KEEPING temporary SQLite table {selectname}"
                 GeneFabLogger().info(msg)
             else:
                 try:
-                    execute(f"DROP {kind} `{selectname}`")
+                    execute(f"DROP TABLE `{selectname}`")
                 except OperationalError:
-                    msg = f"Failed to drop temporary {kind} {selectname}"
+                    msg = f"Failed to drop temporary table {selectname}"
                     GeneFabLogger().error(msg)
                 else:
-                    msg = f"Dropped temporary SQLite {kind} {selectname}"
+                    msg = f"Dropped temporary SQLite table {selectname}"
                     GeneFabLogger().info(msg)
 
 
@@ -143,7 +143,7 @@ class StreamedDataTableWizard():
             *(f"`{'/'.join(c)}`" for c in self.columns),
         ))
         with sql_connection(self.sqlite_db, "tables") as (_, execute):
-            with self.select(execute, kind="TABLE", keep=True) as (select, _):
+            with self.select(execute, persist=True) as (select, _):
                 msg = f"passing SQLite table {select} to StreamedDataTable"
                 GeneFabLogger().info(f"{self.name}; {msg}")
         data = StreamedDataTable(
@@ -214,8 +214,8 @@ class StreamedDataTableWizard_Single(StreamedDataTableWizard):
         return icd
  
     @contextmanager
-    def select(self, execute, kind="TABLE", keep=False):
-        """Temporarily expose requested data as SQL view or table for StreamedDataTableWizard_OuterJoined.select()"""
+    def select(self, execute, persist=False):
+        """Temporarily expose requested data as SQL table for StreamedDataTableWizard_OuterJoined.select()"""
         _n, _icd = len(self.columns), self._inverse_column_dispatcher
         _tt = "\n  ".join(("", *_icd))
         msg = f"retrieving {_n} columns from {len(_icd)} table(s):{_tt}"
@@ -230,7 +230,7 @@ class StreamedDataTableWizard_Single(StreamedDataTableWizard):
             SELECT `{self._index_name}`,{','.join(columns_as_slashed_columns)}
             FROM {join_statement}"""
         try:
-            with mkselect(execute, query, kind=kind, keep=keep) as selectname:
+            with mkselect(execute, query, persist=persist) as selectname:
                 yield selectname, [
                     f"`{self._columns_raw2slashed[rawcol]}`"
                     for *_, rawcol in self.columns
@@ -276,8 +276,8 @@ class StreamedDataTableWizard_OuterJoined(StreamedDataTableWizard):
             return matches.pop()
  
     @contextmanager
-    def select(self, execute, kind="TABLE", keep=False):
-        """Temporarily expose requested data as SQL view or table"""
+    def select(self, execute, persist=False):
+        """Temporarily expose requested data as SQL table"""
         with ExitStack() as stack:
             enter_context = stack.enter_context
             selects = [enter_context(o.select(execute)) for o in self.objs]
@@ -297,8 +297,9 @@ class StreamedDataTableWizard_OuterJoined(StreamedDataTableWizard):
                             ON {condition}
                             WHERE `{agg_select}`.`{self._index_name}` IS NULL"""
                 if i == len(selects) - 1:
-                    _kw = dict(kind=kind, keep=keep)
+                    _persist = persist
                 else:
-                    _kw = dict(kind="TABLE", keep=False)
-                agg_select = enter_context(mkselect(execute, query, **_kw))
+                    _persist = False
+                agg_select = enter_context(mkselect(execute, query, _persist))
+                # TODO: drop already-merged selects;
             yield agg_select, None

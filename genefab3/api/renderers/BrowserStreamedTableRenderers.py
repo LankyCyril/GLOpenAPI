@@ -1,9 +1,9 @@
-from genefab3.common.types import StreamedAnnotationTable
-from genefab3.common.exceptions import GeneFabConfigurationException
+from re import compile, escape
 from pathlib import Path
 from genefab3.common.logger import GeneFabLogger
+from genefab3.common.types import StreamedAnnotationTable
 from genefab3.api.renderers.PlaintextStreamedTableRenderers import _iter_json_chunks
-from re import compile, escape
+from genefab3.common.exceptions import GeneFabConfigurationException
 
 
 def build_url(context, target_view=None, drop=set()):
@@ -68,12 +68,6 @@ def iterate_formatters(index_and_columns, context):
             yield get_browser_meta_formatter(context, i, head, target)
 
 
-SQUASHED_PREHEADER_CSS = """
-.slick-preheader-panel .slick-header-column {font-size: 9pt; line-height: .8}
-.slick-preheader-panel .slick-column-name {position: relative; top: -1pt}
-"""
-
-
 def get_view_dependent_links(obj, context):
     """Add CLS/GCT links to samples and data views, respectively"""
     if getattr(obj, "cls_valid", None) is True:
@@ -103,6 +97,12 @@ def _iter_html_chunks(replacements):
                     yield after
             else:
                 yield line
+
+
+SQUASHED_PREHEADER_CSS = """
+    .slick-preheader-panel .slick-header-column {font-size:9pt;line-height:.8}
+    .slick-preheader-panel .slick-column-name {position: relative;top:-1pt}
+"""
 
 
 def twolevel(obj, context, squash_preheader=False, frozen=0, indent=None):

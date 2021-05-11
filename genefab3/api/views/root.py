@@ -2,8 +2,8 @@ from collections import defaultdict
 from natsort import natsorted
 from functools import lru_cache
 from pathlib import Path
-from genefab3.common.utils import map_replace, is_debug
 from json import dumps
+from genefab3.common.utils import map_replace, is_debug
 
 
 def get_metadata_equals_json(mongo_collections):
@@ -65,7 +65,7 @@ def _get_root_html():
 
 
 def get(*, mongo_collections, context):
-    """Serve an interactive documentation page"""
+    """Serve an interactive documentation page""" # TODO: stream
     equals_json = get_metadata_equals_json(mongo_collections)
     existence_json = get_metadata_existence_json(equals_json)
     wildcards = get_metadata_wildcards(existence_json)

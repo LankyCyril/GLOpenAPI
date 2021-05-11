@@ -1,16 +1,14 @@
 from functools import wraps
-from genefab3.common.utils import random_unique_string
 from genefab3.db.sql.utils import sql_connection
-from sqlite3 import OperationalError
-from pandas.io.sql import DatabaseError as PandasDatabaseError
-from numpy import nan
+from genefab3.common.types import NaN, StreamedDataTable
+from genefab3.common.utils import random_unique_string
 from pandas import DataFrame
+from sqlite3 import OperationalError
+from re import sub, search, IGNORECASE
+from pandas.io.sql import DatabaseError as PandasDatabaseError
 from genefab3.common.exceptions import GeneFabDatabaseException
-from genefab3.common.types import StreamedDataTable, NaN
-from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabConfigurationException
-from re import search, sub, IGNORECASE
 
 
 def apply_hack(hack):
@@ -36,9 +34,9 @@ def _make_sub(table, targets):
         hasnan = [(n_rows - c) > 0 for c in counts]
         sub_data, found = {}, lambda v: v is not None
         for t, m, M, h in zip(targets, minima, maxima, hasnan):
-            _min = m if found(m) else M if found(M) else nan
+            _min = m if found(m) else M if found(M) else NaN
             _max = M if found(M) else _min
-            _nan = nan if h else _max
+            _nan = NaN if h else _max
             sub_data[t.strip("`")] = [_min, _max, _nan]
         sub_source = "SCHEMA_HACK:" + random_unique_string()
         try:
@@ -67,10 +65,6 @@ def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
     from genefab3.db.sql.streamed_tables import StreamedDataTableWizard
     if context.schema != "1":
         return get(self, context=context, limit=limit, offset=offset)
-    elif context.data_comparisons or context.data_columns or limit or offset:
-        msg = "Table manipulation is not supported when requesting schema"
-        sug = "Remove comparisons and/or column, row slicing from query"
-        raise GeneFabFormatException(msg, suggestion=sug)
     elif isinstance(self, StreamedDataTableWizard):
         msg = f"apply_hack(speed_up_data_schema) for {self.name}"
         GeneFabLogger().info(msg)
@@ -82,7 +76,6 @@ def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
         else:
             msg = "Schema speedup failed: could not infer target columns"
             raise GeneFabConfigurationException(msg, debug_info=table.query)
-        table.__del__()
         return StreamedDataTable(
             sqlite_db=self.sqlite_db, query=sub_query,
             source=sub_source, na_rep=NaN,

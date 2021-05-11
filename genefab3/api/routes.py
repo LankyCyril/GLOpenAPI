@@ -1,6 +1,6 @@
 from genefab3.common.types import Routes
-from genefab3.common.types import StreamedAnnotationTable, StreamedDataTable
 from genefab3.api import views
+from genefab3.common.types import StreamedAnnotationTable, StreamedDataTable
 from typing import Union
 from flask import Response
 

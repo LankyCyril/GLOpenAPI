@@ -64,7 +64,7 @@ def pick_reachable_url(urls, name=None):
 
 
 def map_replace(string, mappings, compile=compile, join=r'|'.join, escape=escape, map=map):
-    """Perform multiple replacements in one go"""
+    """Perform multiple replacements in one go""" # TODO: will be removed after root.py is converted to streaming
     pattern = compile(join(map(escape, mappings.keys())))
     return pattern.sub(lambda m: mappings[m.group()], string)
 

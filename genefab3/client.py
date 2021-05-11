@@ -1,15 +1,15 @@
+from genefab3.common.exceptions import GeneFabConfigurationException
+from flask_compress import Compress
+from genefab3.common.utils import timestamp36, is_debug
 from pymongo import MongoClient
 from socket import create_connection, error as SocketError
-from genefab3.common.exceptions import GeneFabConfigurationException
 from types import SimpleNamespace
-from genefab3.common.utils import timestamp36, is_debug
-from flask_compress import Compress
-from genefab3.api.renderer import CacheableRenderer
 from genefab3.common.logger import GeneFabLogger, MongoDBLogger
-from functools import partial
-from genefab3.common.exceptions import exception_catcher
 from genefab3.db.mongo.utils import iterate_mongo_connections
 from genefab3.db.cacher import CacherThread
+from genefab3.api.renderer import CacheableRenderer
+from functools import partial
+from genefab3.common.exceptions import exception_catcher
 
 
 class GeneFabClient():

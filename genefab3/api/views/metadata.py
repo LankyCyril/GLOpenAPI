@@ -1,9 +1,9 @@
 from marshal import dumps as marsh
 from genefab3.common.exceptions import GeneFabConfigurationException
-from genefab3.common.types import StreamedAnnotationTable, NaN
 from genefab3.db.mongo.utils import aggregate_entries_by_context
 from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException
+from genefab3.common.types import StreamedAnnotationTable, NaN
 from genefab3.api.renderers import Placeholders
 
 

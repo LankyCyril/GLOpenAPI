@@ -1,11 +1,11 @@
+from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.utils import pick_reachable_url
 from flask import redirect, Response
-from genefab3.common.exceptions import GeneFabFileException
 from genefab3.common.exceptions import GeneFabDataManagerException
 from natsort import natsorted
 from genefab3.db.mongo.utils import match_sample_names_to_file_descriptor
-from functools import partial, lru_cache, reduce
 from genefab3.common.exceptions import GeneFabDatabaseException
+from functools import partial, lru_cache, reduce
 from genefab3.db.sql.streamed_tables import StreamedDataTableWizard
 from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.db.sql.files import CachedTableFile, CachedBinaryFile

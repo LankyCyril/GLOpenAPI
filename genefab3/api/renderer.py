@@ -2,18 +2,17 @@ from collections import OrderedDict
 from flask import Response
 from genefab3.common.types import StreamedAnnotationTable, StreamedDataTable
 from genefab3.common.types import StreamedSchema, ResponseContainer
-from genefab3.api.renderers import SimpleRenderers
 from genefab3.api.renderers import PlaintextStreamedTableRenderers
 from genefab3.api.renderers import BrowserStreamedTableRenderers
-from pandas import DataFrame
-from genefab3.common.exceptions import GeneFabConfigurationException
-from genefab3.common.exceptions import GeneFabFormatException
+from genefab3.api.renderers import SimpleRenderers
 from typing import Union
+from genefab3.common.exceptions import GeneFabFormatException
+from genefab3.common.exceptions import GeneFabConfigurationException
+from genefab3.common.utils import ExceptionPropagatingThread
 from functools import wraps
 from genefab3.api.parser import Context
 from copy import deepcopy
 from genefab3.db.sql.response_cache import ResponseCache
-from genefab3.common.utils import ExceptionPropagatingThread
 
 
 TYPE_RENDERERS = OrderedDict((
@@ -56,8 +55,6 @@ class CacheableRenderer():
     def __init__(self, genefab3_client):
         """Initialize object renderer and LRU cacher"""
         self.genefab3_client = genefab3_client
-        self.sqlite_dbs = genefab3_client.sqlite_dbs
-        self.flask_app = genefab3_client.flask_app
  
     def _infer_types(self, method):
         """Infer return types, default format, and cacheability based on type hints of method"""
@@ -70,8 +67,6 @@ class CacheableRenderer():
             return_types = {return_type}
         if return_types & {StreamedAnnotationTable, StreamedDataTable}:
             default_format, cacheable = "csv", True
-        elif DataFrame in return_types:
-            default_format, cacheable = "csv", False
         elif str in return_types:
             default_format, cacheable = "html", False
         else:
@@ -122,7 +117,7 @@ class CacheableRenderer():
         """Render object returned from `method`, put in LRU cache by `context.identity`"""
         @wraps(method)
         def wrapper(*args, **kwargs):
-            context = Context(self.flask_app)
+            context = Context(self.genefab3_client.flask_app)
             if context.debug == "1":
                 obj = deepcopy(context.__dict__)
                 context.format = "json"
@@ -133,7 +128,9 @@ class CacheableRenderer():
             else:
                 default_format, cacheable = self._infer_types(method)
                 if cacheable:
-                    response_cache = ResponseCache(self.sqlite_dbs)
+                    response_cache = ResponseCache(
+                        self.genefab3_client.sqlite_dbs,
+                    )
                     response_container = response_cache.get(context)
                 else:
                     response_cache = None
