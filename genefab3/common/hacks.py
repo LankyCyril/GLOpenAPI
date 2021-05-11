@@ -6,7 +6,7 @@ from pandas.io.sql import DatabaseError as PandasDatabaseError
 from numpy import nan
 from pandas import DataFrame
 from genefab3.common.exceptions import GeneFabDatabaseException
-from genefab3.common.types import StreamedDataTable
+from genefab3.common.types import StreamedDataTable, NaN
 from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabConfigurationException
@@ -85,7 +85,7 @@ def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
         table.__del__()
         return StreamedDataTable(
             sqlite_db=self.sqlite_db, query=sub_query,
-            source=sub_source, na_rep=table.na_rep,
+            source=sub_source, na_rep=NaN,
         )
     else:
         msg = "Schema speedup applied to unsupported object type"
