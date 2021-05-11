@@ -1,6 +1,5 @@
 from genefab3.common.types import Routes
 from genefab3.common.types import StreamedAnnotationTable, StreamedDataTable
-from genefab3.db.sql.files import CachedBinaryFile
 from genefab3.api import views
 from typing import Union
 from flask import Response
@@ -11,16 +10,7 @@ class DefaultRoutes(Routes):
  
     @Routes.register_endpoint("/favicon.<imgtype>")
     def favicon(self, imgtype, context=None) -> bytes:
-        if self.genefab3_client.adapter.get_favicon_urls():
-            ico_file = CachedBinaryFile(
-                name="favicon.ico", identifier="BLOB:/favicon.ico",
-                sqlite_db=self.genefab3_client.sqlite_dbs.blobs["db"],
-                urls=self.genefab3_client.adapter.get_favicon_urls(),
-                timestamp=0,
-            )
-            return ico_file.data
-        else:
-            return b''
+        return b''
  
     @Routes.register_endpoint("/")
     def root(self, context) -> str:

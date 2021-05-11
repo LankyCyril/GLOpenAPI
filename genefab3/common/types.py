@@ -42,10 +42,6 @@ class Adapter():
                 _kw = dict(adapter=type(self).__name__, method=method_name)
                 raise GeneFabConfigurationException(msg, **_kw)
  
-    def get_favicon_urls(self):
-        """List favicon URLs, of which the first reachable one will be used (fallback behavior)"""
-        return []
- 
     def best_sample_name_matches(self, name, names, return_positions=False):
         """Test sample name identity (fallback behavior)"""
         if return_positions:

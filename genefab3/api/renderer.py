@@ -112,7 +112,7 @@ class CacheableRenderer():
             )
             response_container.update(content, mimetype)
             if not isinstance(response_container.content, Response):
-                if response_cache is not None:
+                if response_cache is not None: # TODO
                     pass #response_cache.put(context, response_container)
         _thread = ExceptionPropagatingThread(target=_call_and_cache)
         _thread.start() # will complete even after timeout errors
