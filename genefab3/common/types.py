@@ -28,6 +28,9 @@ class PhoenixIterator():
     def __iter__(self):
         self.it, _it = tee(self.it)
         return _it
+    def __next__(self):
+        for e in self:
+            return e
 
 
 class StringIterator():
