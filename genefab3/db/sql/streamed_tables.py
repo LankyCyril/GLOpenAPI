@@ -15,6 +15,9 @@ from genefab3.db.sql.utils import sql_connection
 @contextmanager
 def mkselect(execute, query, persist=False):
     """Context manager temporarily creating an SQLite view or table from `query`"""
+    # TODO: Could make it a class that removes table on self.__del__();
+    # this will allow to once again create the terminal select as a VIEW,
+    # and automagically destroy temporary tables/views when no longer accessed
     selectname = "TEMP:" + random_unique_string(seed=query)
     try:
         execute(f"CREATE TABLE `{selectname}` as {query}")
@@ -278,6 +281,7 @@ class StreamedDataTableWizard_OuterJoined(StreamedDataTableWizard):
     @contextmanager
     def select(self, execute, persist=False):
         """Temporarily expose requested data as SQL table"""
+        # TODO: this may create unnecessarily large temporary tables; fix it?
         with ExitStack() as stack:
             enter_context = stack.enter_context
             selects = [enter_context(o.select(execute)) for o in self.objs]
