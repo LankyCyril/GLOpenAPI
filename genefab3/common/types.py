@@ -257,12 +257,12 @@ class StreamedAnnotationTable(StreamedTable):
 class StreamedDataTable(StreamedTable):
     """Table streamed from SQLite query"""
  
-    def __init__(self, *, sqlite_db, query, source, na_rep=None, index_col=None, override_columns=None):
+    def __init__(self, *, sqlite_db, query, na_rep=None, index_col=None, override_columns=None, _depends_on=None):
         """Infer index names and columns, retain connection and query information"""
         from genefab3.db.sql.streamed_tables import SQLiteIndexName
         _split3 = lambda c: (c[0].split("/", 2) + ["*", "*"])[:3]
-        self.sqlite_db, self.source, self.query = sqlite_db, source, query
-        self.na_rep = na_rep
+        self.sqlite_db, self.query, self.na_rep = sqlite_db, query, na_rep
+        self._depends_on = _depends_on # keeps source from being deleted early
         with sql_connection(self.sqlite_db, "tables") as (connection, execute):
             try:
                 cursor = connection.cursor()
@@ -384,15 +384,3 @@ class StreamedDataTable(StreamedTable):
                             yield [self.na_rep if v is None else v for v in vv]
         except OperationalError as e:
             self._reraise(e)
- 
-    def __del__(self):
-        """Remove self.source from SQLite"""
-        with sql_connection(self.sqlite_db, "tables") as (_, execute):
-            try:
-                execute(f"DROP TABLE `{self.source}`")
-            except OperationalError:
-                msg = "Failed to delete temporary StreamedDataTable source"
-                GeneFabLogger().error(f"{msg} {self.source}")
-            else:
-                msg = "Deleted temporary StreamedDataTable source"
-                GeneFabLogger().info(f"{msg} {self.source}")

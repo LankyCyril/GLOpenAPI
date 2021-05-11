@@ -1,4 +1,3 @@
-from contextlib import contextmanager, ExitStack
 from genefab3.common.utils import random_unique_string, validate_no_backtick
 from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -12,44 +11,43 @@ from genefab3.common.hacks import apply_hack, speed_up_data_schema
 from genefab3.db.sql.utils import sql_connection
 
 
-@contextmanager
-def mkselect(execute, query, persist=False):
-    """Context manager temporarily creating an SQLite view or table from `query`"""
-    # TODO: Could make it a class that removes table on self.__del__();
-    # this will allow to once again create the terminal select as a VIEW,
-    # and automagically destroy temporary tables/views when no longer accessed
-    selectname = "TEMP:" + random_unique_string(seed=query)
-    try:
-        execute(f"CREATE TABLE `{selectname}` as {query}")
-    except OperationalError:
-        msg = f"Failed to create temporary table"
-        _kw = dict(name=selectname, debug_info=query)
-        raise GeneFabDatabaseException(msg, **_kw)
-    else:
-        query_repr = repr(query.lstrip()[:100] + "...")
-        msg = f"Created temporary SQLite table {selectname} from {query_repr}"
-        GeneFabLogger().info(msg)
-        try:
-            yield selectname
-        finally:
-            if persist:
-                msg = f"KEEPING temporary SQLite table {selectname}"
-                GeneFabLogger().info(msg)
+class TempSelect():
+    """Temporary table or view generated from `query`"""
+ 
+    def __init__(self, *, sqlite_db, query, targets, kind="TABLE", _depends_on=None):
+        self.sqlite_db = sqlite_db
+        self._depends_on = _depends_on # keeps sources from being deleted early
+        self.query, self.targets, self.kind = query, targets, kind
+        self.name = "TEMP:" + random_unique_string(seed=query)
+        with sql_connection(self.sqlite_db, "tables") as (_, execute):
+            try:
+                execute(f"CREATE {self.kind} `{self.name}` as {query}")
+            except OperationalError:
+                msg = f"Failed to create temporary {self.kind}"
+                _kw = dict(name=self.name, debug_info=query)
+                raise GeneFabDatabaseException(msg, **_kw)
             else:
-                try:
-                    execute(f"DROP TABLE `{selectname}`")
-                except OperationalError:
-                    msg = f"Failed to drop temporary table {selectname}"
-                    GeneFabLogger().error(msg)
-                else:
-                    msg = f"Dropped temporary SQLite table {selectname}"
-                    GeneFabLogger().info(msg)
+                query_repr = repr(query.lstrip()[:200] + "...")
+                msg = f"Created temporary SQLite {self.kind}"
+                GeneFabLogger().info(f"{msg} {self.name} from {query_repr}")
+ 
+    def __del__(self):
+        with sql_connection(self.sqlite_db, "tables") as (_, execute):
+            try:
+                execute(f"DROP {self.kind} `{self.name}`")
+            except OperationalError:
+                msg = f"Failed to drop temporary {self.kind} {self.name}"
+                GeneFabLogger().error(msg)
+            else:
+                msg = f"Dropped temporary SQLite {self.kind} {self.name}"
+                GeneFabLogger().info(msg)
 
 
 class SQLiteIndexName(str): pass
 
 
 class StreamedDataTableWizard():
+    """StreamedDataTable to be retrieved from SQLite, possibly from multiple parts of same or multiple tabular files"""
  
     @property
     def columns(self):
@@ -145,15 +143,14 @@ class StreamedDataTableWizard():
             f"`{self._index_name}`",
             *(f"`{'/'.join(c)}`" for c in self.columns),
         ))
-        with sql_connection(self.sqlite_db, "tables") as (_, execute):
-            with self.select(execute, persist=True) as (select, _):
-                msg = f"passing SQLite table {select} to StreamedDataTable"
-                GeneFabLogger().info(f"{self.name}; {msg}")
+        select = self.make_select(kind="VIEW")
+        msg = f"passing SQLite table {select.name} to StreamedDataTable"
+        GeneFabLogger().info(f"{self.name}; {msg}")
         data = StreamedDataTable(
             sqlite_db=self.sqlite_db,
-            query=f"SELECT {final_targets} FROM `{select}` {query_filter}",
+            query=f"SELECT {final_targets} FROM `{select.name}` {query_filter}",
             index_col=self._index_name, override_columns=self.columns,
-            source=select,
+            _depends_on=select,
         )
         msg = f"retrieving from SQLite as StreamedDataTable"
         GeneFabLogger().info(f"{self.name}; {msg}")
@@ -216,9 +213,8 @@ class StreamedDataTableWizard_Single(StreamedDataTableWizard):
             icd.setdefault(self._column_dispatcher[rawcol], []).append(rawcol)
         return icd
  
-    @contextmanager
-    def select(self, execute, persist=False):
-        """Temporarily expose requested data as SQL table for StreamedDataTableWizard_OuterJoined.select()"""
+    def make_select(self, kind):
+        """Temporarily expose requested data as SQL table or view"""
         _n, _icd = len(self.columns), self._inverse_column_dispatcher
         _tt = "\n  ".join(("", *_icd))
         msg = f"retrieving {_n} columns from {len(_icd)} table(s):{_tt}"
@@ -232,15 +228,12 @@ class StreamedDataTableWizard_Single(StreamedDataTableWizard):
         query = f"""
             SELECT `{self._index_name}`,{','.join(columns_as_slashed_columns)}
             FROM {join_statement}"""
-        try:
-            with mkselect(execute, query, persist=persist) as selectname:
-                yield selectname, [
-                    f"`{self._columns_raw2slashed[rawcol]}`"
-                    for *_, rawcol in self.columns
-                ]
-        except (OperationalError, GeneFabDatabaseException):
-            msg = "Data could not be retrieved"
-            raise GeneFabDatabaseException(msg, table=self.name)
+        return TempSelect(
+            sqlite_db=self.sqlite_db, kind=kind, query=query, targets=[
+                f"`{self._columns_raw2slashed[rawcol]}`"
+                for *_, rawcol in self.columns
+            ],
+        )
 
 
 class StreamedDataTableWizard_OuterJoined(StreamedDataTableWizard):
@@ -278,32 +271,27 @@ class StreamedDataTableWizard_OuterJoined(StreamedDataTableWizard):
         else:
             return matches.pop()
  
-    @contextmanager
-    def select(self, execute, persist=False):
-        """Temporarily expose requested data as SQL table"""
-        # TODO: this may create unnecessarily large temporary tables; fix it?
-        with ExitStack() as stack:
-            enter_context = stack.enter_context
-            selects = [enter_context(o.select(execute)) for o in self.objs]
-            agg_select, agg_columns = selects[0]
-            for i, (next_select, next_columns) in enumerate(selects[1:], 1):
-                agg_columns = agg_columns + next_columns
-                agg_targets = ",".join(agg_columns)
-                condition = f"""`{agg_select}`.`{self._index_name}` ==
-                    `{next_select}`.`{self._index_name}`"""
-                query = f"""
-                    SELECT `{agg_select}`.`{self._index_name}`,{agg_targets}
-                        FROM `{agg_select}` LEFT JOIN `{next_select}`
-                            ON {condition}
-                    UNION
-                    SELECT `{next_select}`.`{self._index_name}`,{agg_targets}
-                        FROM `{next_select}` LEFT JOIN `{agg_select}`
-                            ON {condition}
-                            WHERE `{agg_select}`.`{self._index_name}` IS NULL"""
-                if i == len(selects) - 1:
-                    _persist = persist
-                else:
-                    _persist = False
-                agg_select = enter_context(mkselect(execute, query, _persist))
-                # TODO: drop already-merged selects;
-            yield agg_select, None
+    def make_select(self, kind):
+        """Temporarily expose requested data as SQL table or view"""
+        agg_select = self.objs[0].make_select(kind="TABLE")
+        for i, obj in enumerate(self.objs[1:], 1):
+            next_select = obj.make_select(kind="TABLE")
+            agg_targets = agg_select.targets + next_select.targets
+            query_targets = ",".join(agg_targets)
+            condition = f"""`{agg_select.name}`.`{self._index_name}` ==
+                `{next_select.name}`.`{self._index_name}`"""
+            agg_query = f"""
+                SELECT `{agg_select.name}`.`{self._index_name}`,{query_targets}
+                    FROM `{agg_select.name}` LEFT JOIN `{next_select.name}`
+                        ON {condition}
+                UNION
+                SELECT `{next_select.name}`.`{self._index_name}`,{query_targets}
+                    FROM `{next_select.name}` LEFT JOIN `{agg_select.name}`
+                        ON {condition}
+                        WHERE `{agg_select.name}`.`{self._index_name}` ISNULL"""
+            agg_select = TempSelect(
+                sqlite_db=self.sqlite_db, query=agg_query, targets=agg_targets,
+                kind=kind if (i == len(self.objs) - 1) else "TABLE",
+                _depends_on=(agg_select, next_select),
+            )
+        return agg_select
