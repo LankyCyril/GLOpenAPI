@@ -1,13 +1,16 @@
-from functools import wraps, reduce, partial
+from functools import wraps
+from genefab3.common.utils import random_unique_string
 from genefab3.db.sql.utils import sql_connection
 from sqlite3 import OperationalError
+from pandas.io.sql import DatabaseError as PandasDatabaseError
 from numpy import nan
-from pandas import DataFrame, merge
+from pandas import DataFrame
 from genefab3.common.exceptions import GeneFabDatabaseException
-from genefab3.common.types import DataDataFrame
+from genefab3.common.types import StreamedDataTable
 from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabConfigurationException
+from re import search, sub, IGNORECASE
 
 
 def apply_hack(hack):
@@ -20,73 +23,70 @@ def apply_hack(hack):
     return outer
 
 
-def get_OSDF_Single_schema(self):
-    """Replaces StreamedDataTableWizard_Single.get() with retrieval of just values informative for 'schema=1'"""
-    from genefab3.db.sql.streamed_tables import SQLiteIndexName
-    index_name, data, found = None, {}, lambda v: v is not None
-    with sql_connection(self.sqlite_db, "tables") as (_, execute):
+def _make_sub(table, targets):
+    """Make substitute source and query for quick retrieval of values informative for schema"""
+    with sql_connection(table.sqlite_db, "tables") as (connection, execute):
+        functargets = lambda f: ",".join(f"{f}({t})" for t in targets)
+        mkquery = lambda t: f"SELECT {t} FROM `{table.source}` LIMIT 1"
         fetch = lambda query: execute(query).fetchone()
-        whitelist = {self.index.name, *self.columns.get_level_values(-1)}
+        minima = fetch(mkquery(functargets("MIN")))
+        maxima = fetch(mkquery(functargets("MAX")))
+        counts = fetch(mkquery(functargets("COUNT")))
+        n_rows = fetch(f"SELECT COUNT(*) FROM `{table.source}` LIMIT 1")[0]
+        hasnan = [(n_rows - c) > 0 for c in counts]
+        sub_data, found = {}, lambda v: v is not None
+        for t, m, M, h in zip(targets, minima, maxima, hasnan):
+            _min = m if found(m) else M if found(M) else nan
+            _max = M if found(M) else _min
+            _nan = nan if h else _max
+            sub_data[t.strip("`")] = [_min, _max, _nan]
+        sub_source = "SCHEMA_HACK:" + random_unique_string()
         try:
-            for part, columns in self._inverse_column_dispatcher.items():
-                mktargets = lambda f: ",".join(f"{f}(`{c}`)" for c in columns)
-                mkquery = lambda t: f"SELECT {t} FROM `{part}` LIMIT 1"
-                minima = fetch(mkquery(mktargets("MIN")))
-                maxima = fetch(mkquery(mktargets("MAX")))
-                counts = fetch(mkquery(mktargets("COUNT")))
-                n_rows = fetch(f"SELECT COUNT(*) FROM `{part}` LIMIT 1")[0]
-                hasnan = [(n_rows - c) > 0 for c in counts]
-                for c, m, M, h in zip(columns, minima, maxima, hasnan):
-                    _min = m if found(m) else M if found(M) else nan
-                    _max = M if found(M) else _min
-                    _nan = nan if h else _max
-                    if isinstance(c, SQLiteIndexName):
-                        index_name = str(c)
-                    if c in whitelist:
-                        data[c] = [_min, _max, _nan]
-        except OperationalError as e:
-            _kw = dict(table=self.name, debug_info=repr(e))
-            raise GeneFabDatabaseException("Data could not be retrieved", **_kw)
+            DataFrame(sub_data).to_sql(
+                sub_source, connection, if_exists="replace",
+            )
+        except (OperationalError, PandasDatabaseError) as e:
+            msg = "Schema speedup failed: could create substitute table"
+            raise GeneFabDatabaseException(msg, debug_info=repr(e))
+        sub_query = sub(
+            r'(select\s+.*\s+from\s+)[^\s]*$', fr'\1`{sub_source}`',
+            table.query.rstrip(), flags=IGNORECASE,
+        )
+        if sub_query == table.query.rstrip():
+            execute(f"DROP TABLE IF EXISTS `{sub_source}`")
+            raise GeneFabConfigurationException(
+                "Schema speedup failed: could not substitute source table",
+                debug_info=table.query.rstrip(),
+            )
         else:
-            dataframe = DataFrame(data)
-            if (set(dataframe.columns) != whitelist):
-                msg = "Failed to apply schema speedup, columns did not match"
-                raise GeneFabDatabaseException(msg, table=self.name)
-            else:
-                if index_name is not None:
-                    dataframe.set_index(index_name, inplace=True)
-                dataframe = dataframe[self.columns.get_level_values(-1)]
-                dataframe.columns = self.columns
-            return DataDataFrame(dataframe)
-
-
-def get_OSDF_OuterJoined_schema(self, *, context):
-    """Replaces StreamedDataTableWizard_OuterJoined.get() with retrieval of just values informative for 'schema=1'"""
-    merge_kws = dict(left_index=True, right_index=True, how="outer", sort=False)
-    return DataDataFrame(reduce(
-        partial(merge, **merge_kws),
-        (obj.get(context=context) for obj in self.objs),
-    ))
+            return sub_source, sub_query
 
 
 def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
-    """If context.schema == '1', replaces StreamedDataTableWizard.get() with quick retrieval of just values informative schema"""
+    """If context.schema == '1', replaces underlying query with quick retrieval of just values informative for schema"""
+    from genefab3.db.sql.streamed_tables import StreamedDataTableWizard
     if context.schema != "1":
-        kwargs = dict(context=context, limit=limit, offset=offset)
-        return get(self, **kwargs)
+        return get(self, context=context, limit=limit, offset=offset)
     elif context.data_comparisons or context.data_columns or limit or offset:
         msg = "Table manipulation is not supported when requesting schema"
         sug = "Remove comparisons and/or column, row slicing from query"
         raise GeneFabFormatException(msg, suggestion=sug)
-    else:
-        from genefab3.db.sql.streamed_tables import StreamedDataTableWizard_Single
-        from genefab3.db.sql.streamed_tables import StreamedDataTableWizard_OuterJoined
+    elif isinstance(self, StreamedDataTableWizard):
         msg = f"apply_hack(speed_up_data_schema) for {self.name}"
         GeneFabLogger().info(msg)
-        if isinstance(self, StreamedDataTableWizard_Single):
-            return get_OSDF_Single_schema(self)
-        elif isinstance(self, StreamedDataTableWizard_OuterJoined):
-            return get_OSDF_OuterJoined_schema(self, context=context)
+        table = get(self, context=context, limit=limit, offset=offset)
+        match = search(r'select\s+(.*)\s+from\s', table.query, flags=IGNORECASE)
+        if match:
+            targets = match.group(1).split(",")
+            sub_source, sub_query = _make_sub(table, targets)
         else:
-            msg = "Schema speedup applied to unsupported object type"
-            raise GeneFabConfigurationException(msg, type=type(self))
+            msg = "Schema speedup failed: could not infer target columns"
+            raise GeneFabConfigurationException(msg, debug_info=table.query)
+        table.__del__()
+        return StreamedDataTable(
+            sqlite_db=self.sqlite_db, query=sub_query,
+            source=sub_source, na_rep=table.na_rep,
+        )
+    else:
+        msg = "Schema speedup applied to unsupported object type"
+        raise GeneFabConfigurationException(msg, type=type(self))
