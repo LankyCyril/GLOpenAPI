@@ -1,7 +1,7 @@
 from collections import OrderedDict
 from flask import Response
 from genefab3.common.types import StreamedAnnotationTable, StreamedDataTable
-from genefab3.common.types import StreamedSchema, ResponseContainer
+from genefab3.common.types import StreamedSchema
 from genefab3.api.renderers import PlaintextStreamedTableRenderers
 from genefab3.api.renderers import BrowserStreamedTableRenderers
 from genefab3.api.renderers import SimpleRenderers
@@ -12,12 +12,13 @@ from genefab3.common.utils import ExceptionPropagatingThread
 from functools import wraps
 from genefab3.api.parser import Context
 from copy import deepcopy
+from genefab3.common.types import ResponseContainer
 from genefab3.db.sql.response_cache import ResponseCache
 
 
 TYPE_RENDERERS = OrderedDict((
     (Response, {
-        "raw": lambda obj, *a, **k: obj,
+        "raw": lambda obj, *a, **k: (obj, "application"),
     }),
     (StreamedAnnotationTable, {
         "cls": PlaintextStreamedTableRenderers.cls,
