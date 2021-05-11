@@ -1,4 +1,4 @@
-from genefab3.common.types import Routes
+from genefab3.common.types import Routes, StringIterator
 from genefab3.api import views
 from genefab3.common.types import StreamedAnnotationTable, StreamedDataTable
 from typing import Union
@@ -13,7 +13,7 @@ class DefaultRoutes(Routes):
         return b''
  
     @Routes.register_endpoint("/")
-    def root(self, context) -> str:
+    def root(self, context) -> StringIterator:
         return views.root.get(
             mongo_collections=self.genefab3_client.mongo_collections,
             context=context,

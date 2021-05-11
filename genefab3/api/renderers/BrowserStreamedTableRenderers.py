@@ -80,10 +80,10 @@ def get_view_dependent_links(obj, context):
         return ""
 
 
-def _iter_html_chunks(replacements):
+def _iter_html_chunks(template_file, replacements):
     """Return list of lines of HTML template and subsitute variables with generated data"""
     pattern = compile(r'|'.join(map(escape, replacements.keys())))
-    with open(Path(__file__).parent/"dataframe.html") as template:
+    with open(template_file) as template:
         for line in template:
             match = pattern.search(line)
             if match:
@@ -135,7 +135,8 @@ def twolevel(obj, context, squash_preheader=False, frozen=0, indent=None):
         "$FORMATTERS": "\n".join(formatters),
         "$FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
     }
-    content = lambda: _iter_html_chunks(replacements)
+    template_file = Path(__file__).parent / "dataframe.html"
+    content = lambda: _iter_html_chunks(template_file, replacements)
     return content, "text/html"
 
 

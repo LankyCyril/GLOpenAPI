@@ -5,6 +5,7 @@ from genefab3.common.types import StreamedSchema, ResponseContainer
 from genefab3.api.renderers import PlaintextStreamedTableRenderers
 from genefab3.api.renderers import BrowserStreamedTableRenderers
 from genefab3.api.renderers import SimpleRenderers
+from genefab3.common.types import StringIterator
 from typing import Union
 from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.common.exceptions import GeneFabConfigurationException
@@ -39,7 +40,7 @@ TYPE_RENDERERS = OrderedDict((
         "json": PlaintextStreamedTableRenderers.json,
         "browser": BrowserStreamedTableRenderers.html,
     }),
-    ((str, bytes), {
+    ((StringIterator, str, bytes), {
         "raw": SimpleRenderers.raw,
         "html": SimpleRenderers.html,
     }),

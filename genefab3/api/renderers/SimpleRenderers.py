@@ -1,4 +1,6 @@
 from json import dumps
+from collections.abc import Callable
+from genefab3.common.types import StringIterator
 from genefab3.common.utils import json_permissive_default
 
 
@@ -10,8 +12,13 @@ def raw(obj, context=None, indent=None):
 
 
 def html(obj, context=None, indent=None):
-    """Display HTML code""" # TODO stream
-    content = obj.decode() if isinstance(obj, bytes) else obj
+    """Display HTML code"""
+    if isinstance(obj, bytes):
+        content = obj.decode()
+    elif isinstance(obj, Callable):
+        content = StringIterator(obj)
+    else:
+        content = obj
     return content, "text/html"
 
 

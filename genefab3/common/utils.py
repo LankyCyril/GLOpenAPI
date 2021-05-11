@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from requests import head as request_head
 from urllib.request import urlopen
 from urllib.error import URLError
-from re import compile, escape
+from re import compile
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import partial, reduce
 from operator import getitem
@@ -61,12 +61,6 @@ def pick_reachable_url(urls, name=None):
                 else:
                     raise URLError(f"No URLs are reachable: {urls}")
     yield _pick()
-
-
-def map_replace(string, mappings, compile=compile, join=r'|'.join, escape=escape, map=map):
-    """Perform multiple replacements in one go""" # TODO: will be removed after root.py is converted to streaming
-    pattern = compile(join(map(escape, mappings.keys())))
-    return pattern.sub(lambda m: mappings[m.group()], string)
 
 
 def iterate_terminal_leaves(d, step_tracker=1, max_steps=256, isinstance=isinstance, dict=dict, enumerate=enumerate):

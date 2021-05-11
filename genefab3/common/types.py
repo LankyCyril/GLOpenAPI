@@ -30,6 +30,12 @@ class PhoenixIterator():
         return _it
 
 
+class StringIterator():
+    """Wraps functions that yield text"""
+    def __init__(self, func): self.func = func
+    def __call__(self): return self.func()
+
+
 class Adapter():
     """Base class for database adapters"""
  

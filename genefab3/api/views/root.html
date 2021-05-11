@@ -4,7 +4,7 @@
         <meta charset='utf-8'>
         <meta http-equiv='X-UA-Compatible' content='IE=edge'/>
         <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
-        <title>%APPNAME%</title>
+        <title>$APPNAME</title>
         <link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Oxygen+Mono&family=Roboto:wght@300;500&display=swap'/>
         <style>
             * {font-size: 13pt; font-family: "Roboto", sans-serif; font-weight: 300}
@@ -64,14 +64,14 @@
 <script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js'></script>
 <script>
 
-var url_root = "%URL_ROOT%";
+var url_root = "$URL_ROOT";
 
 var metadata = {
-    "wildcard": /* METADATA_WILDCARDS */,
-    "existence": /* METADATA_EXISTENCE */,
-    "equals": /* METADATA_EQUALS */,
-    "assay": /* METADATA_ASSAYS */,
-    "file-datatype": /* METADATA_DATATYPES */,
+    "wildcard": $METADATA_WILDCARDS,
+    "existence": $METADATA_EXISTENCE,
+    "equals": $METADATA_EQUALS,
+    "assay": $METADATA_ASSAYS,
+    "file-datatype": $METADATA_DATATYPES,
 };
 
 function trimmed_option(key) {
@@ -403,7 +403,7 @@ function prefill_example() {
     $("#meta-assay-list .list-item:first-child .key-level.level-1").val("");
     $("#meta-file-datatype-list .value-level").val("unnormalized counts");
     $("#url-description").text("You are here:");
-    $("#url").html("%URL_ROOT%");
+    $("#url").html("$URL_ROOT");
     $("#url-follow a").attr("href", "");
     $("#url-follow").css("background", "#DDD");
     var option = new Option("", "");
@@ -434,7 +434,7 @@ $(document).ready(function() {
         <div id='url-builder' class='interactive' style='display:none'>
             <div id='url-wrapper'>
                 <div id='url-description'>You are here:</div>
-                <div id='url'>%URL_ROOT%</div>
+                <div id='url'>$URL_ROOT</div>
                 <div id='url-follow'><a href=''>Follow generated URL</a></div>
             </div>
         </div>
@@ -491,7 +491,7 @@ $(document).ready(function() {
                     table data is returned in formats 'csv', 'tsv', 'json', 'browser' (see below);
                     raw file data is returned if the requested format is 'raw' and a single file
                     matches the rest of the query.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<a href="%URL_ROOT%/samples"><code><b>/samples/</b></code></a>
+                    <i>Example:</i>&nbsp;&nbsp;<a href="$URL_ROOT/samples"><code><b>/samples/</b></code></a>
                 </div>
             </div>
             <div>
@@ -521,8 +521,8 @@ $(document).ready(function() {
                     <p>As a shorthand, it is also possible to pass a mixed query, where accessions and assay names
                     are separated by a forward slash, and multiple accessions / assay names are joined by a vertical pipe
                     (<code>id=ACCESSION_1/ASSAY_1A|ACCESSION_2</code>)</p>
-                    <i>Example:</i>&nbsp;&nbsp;<a href="%URL_ROOT%/samples/?id.accession=GLDS-38"><code>/samples/?<b>id.accession=GLDS-38</b></code></a><br>
-                    <i>Example:</i>&nbsp;&nbsp;<a href="%URL_ROOT%/samples/?id=GLDS-38/proteomics|GLDS-276"><code>/samples/?<b>id=GLDS-38/proteomics|GLDS-276</b></code></a>
+                    <i>Example:</i>&nbsp;&nbsp;<a href="$URL_ROOT/samples/?id.accession=GLDS-38"><code>/samples/?<b>id.accession=GLDS-38</b></code></a><br>
+                    <i>Example:</i>&nbsp;&nbsp;<a href="$URL_ROOT/samples/?id=GLDS-38/proteomics|GLDS-276"><code>/samples/?<b>id=GLDS-38/proteomics|GLDS-276</b></code></a>
                 </div>
             </div>
             <div>
@@ -548,7 +548,7 @@ $(document).ready(function() {
                     to only the datasets, assays, and samples that have this category annotated.</p>
                     <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
                     the values of fields in the category will be reported in table columns.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<a href="%URL_ROOT%/samples/?study.factor value"><code>/samples/?<b>study.factor value</b></code></a>
+                    <i>Example:</i>&nbsp;&nbsp;<a href="$URL_ROOT/samples/?study.factor value"><code>/samples/?<b>study.factor value</b></code></a>
                 </div>
             </div>
             <div>
@@ -579,7 +579,7 @@ $(document).ready(function() {
                     have this field annotated.</p>
                     <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
                     the values of this field will be reported in table columns.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<a href="%URL_ROOT%/samples/?study.factor value.spaceflight"><code>/samples/?<b>study.factor value.spaceflight</b></code></a>
+                    <i>Example:</i>&nbsp;&nbsp;<a href="$URL_ROOT/samples/?study.factor value.spaceflight"><code>/samples/?<b>study.factor value.spaceflight</b></code></a>
                 </div>
             </div>
             <div>
@@ -611,8 +611,8 @@ $(document).ready(function() {
                     annotated with a specific value of an ISA field.</p>
                     <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
                     the values of this field will be reported in table columns.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<a href="%URL_ROOT%/samples/?study.characteristics.genotype=WT"><code>/samples/?<b>study.characteristics.genotype=WT</b></code></a><br>
-                    <i>Example:</i>&nbsp;&nbsp;<a href="%URL_ROOT%/samples/?study.characteristics.genotype=WT|TK6"><code>/samples/?<b>study.characteristics.genotype=WT|TK6</b></code></a>
+                    <i>Example:</i>&nbsp;&nbsp;<a href="$URL_ROOT/samples/?study.characteristics.genotype=WT"><code>/samples/?<b>study.characteristics.genotype=WT</b></code></a><br>
+                    <i>Example:</i>&nbsp;&nbsp;<a href="$URL_ROOT/samples/?study.characteristics.genotype=WT|TK6"><code>/samples/?<b>study.characteristics.genotype=WT|TK6</b></code></a>
                 </div>
             </div>
             <div>
@@ -661,10 +661,10 @@ $(document).ready(function() {
                     <p>Finally, the query can be constrained by specifying a full file name
                     of interest or a regular expression pattern enclosed in forward slashes.</p>
                     <i>Examples:</i><br>
-                    <a href="%URL_ROOT%/samples/?file.datatype"><code>/samples/?<b>file.datatype</b></code></a><br>
-                    <a href="%URL_ROOT%/samples/?file.datatype=differential expression"><code>/samples/?<b>file.datatype=differential expression</b></code></a><br>
-                    <a href="%URL_ROOT%/samples/?file.datatype=visualization table|pca"><code>/samples/?<b>file.datatype=visualization table|pca</b></code></a><br>
-                    <a href="%URL_ROOT%/samples/?file.filename=/trimmed\.fastq\.gz$/"><code>/samples/?<b>file.filename=/trimmed\.fastq\.gz$/</b></code></a>
+                    <a href="$URL_ROOT/samples/?file.datatype"><code>/samples/?<b>file.datatype</b></code></a><br>
+                    <a href="$URL_ROOT/samples/?file.datatype=differential expression"><code>/samples/?<b>file.datatype=differential expression</b></code></a><br>
+                    <a href="$URL_ROOT/samples/?file.datatype=visualization table|pca"><code>/samples/?<b>file.datatype=visualization table|pca</b></code></a><br>
+                    <a href="$URL_ROOT/samples/?file.filename=/trimmed\.fastq\.gz$/"><code>/samples/?<b>file.filename=/trimmed\.fastq\.gz$/</b></code></a>
                 </div>
             </div>
             <div>
@@ -717,13 +717,13 @@ $(document).ready(function() {
                     and instead exists as the only suitable format for requesting non-tabular data.
                     Note that currently it only resolves successfully if exactly one data file matches the query.</p>
                     <i>Examples:</i><br>
-                    <a href="%URL_ROOT%/samples/?study.factor value.spaceflight&format=browser">
+                    <a href="$URL_ROOT/samples/?study.factor value.spaceflight&format=browser">
                         <code>/samples/?study.factor value.spaceflight&<b>format=browser</b></code></a><br>
-                    <a href="%URL_ROOT%/samples/?study.factor value.spaceflight&format=json">
+                    <a href="$URL_ROOT/samples/?study.factor value.spaceflight&format=json">
                         <code>/samples/?study.factor value.spaceflight&<b>format=json</b></code></a><br>
-                    <a href="%URL_ROOT%/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&format=tsv">
+                    <a href="$URL_ROOT/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&format=tsv">
                         <code>/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&<b>format=tsv</b></code></a><br>
-                    <a href="%URL_ROOT%/data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&format=raw">
+                    <a href="$URL_ROOT/data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&format=raw">
                         <code>/data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&<b>format=raw</b></code></a>
                 </div>
             </div>

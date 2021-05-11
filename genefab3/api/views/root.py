@@ -1,9 +1,10 @@
 from collections import defaultdict
 from natsort import natsorted
-from functools import lru_cache
 from pathlib import Path
 from json import dumps
-from genefab3.common.utils import map_replace, is_debug
+from genefab3.common.utils import is_debug
+from genefab3.api.renderers.BrowserStreamedTableRenderers import _iter_html_chunks
+from genefab3.common.types import StringIterator
 
 
 def get_metadata_equals_json(mongo_collections):
@@ -11,8 +12,8 @@ def get_metadata_equals_json(mongo_collections):
     equals_json = defaultdict(dict)
     for entry in mongo_collections.metadata_aux.find():
         equals_json[entry["isa_category"]][entry["subkey"]] = {
-            key: {value: True for value in values}
-            for key, values in entry["content"].items()
+            key: {v.replace("\n", r'\n').replace("\t", r'\t'): True for v in vv}
+            for key, vv in entry["content"].items()
         }
     return dict(equals_json)
 
@@ -48,9 +49,8 @@ def get_metadata_assays(mongo_collections):
     }
 
 
-def get_metadata_datatypes(mongo_collections):
+def get_metadata_datatypes(mongo_collections): # TODO: should be cached at index stage
     """Generate JSON for documentation section 'meta-file-datatype'"""
-    # TODO: should be cached at index stage
     cursor = mongo_collections.metadata.aggregate([
         {"$unwind": "$file"},
         {"$project": {"k": "$file.datatype", "_id": False}},
@@ -58,14 +58,8 @@ def get_metadata_datatypes(mongo_collections):
     return {e["k"]: True for e in cursor if "k" in e}
 
 
-@lru_cache(maxsize=None)
-def _get_root_html():
-    """Return text of HTML template"""
-    return (Path(__file__).parent / "root.html").read_text()
-
-
 def get(*, mongo_collections, context):
-    """Serve an interactive documentation page""" # TODO: stream
+    """Serve an interactive documentation page"""
     equals_json = get_metadata_equals_json(mongo_collections)
     existence_json = get_metadata_existence_json(equals_json)
     wildcards = get_metadata_wildcards(existence_json)
@@ -73,16 +67,16 @@ def get(*, mongo_collections, context):
     metadata_datatypes = get_metadata_datatypes(mongo_collections)
     dumps_as_is = lambda j: dumps(j, separators=(",", ":"))
     dumps_sorted = lambda j: dumps(j, separators=(",", ":"), sort_keys=True)
-    return map_replace(
-        _get_root_html(), {
-            "%APPNAME%": context.app_name,
-            "%URL_ROOT%": context.url_root,
-            "/* METADATA_WILDCARDS */": dumps_sorted(wildcards),
-            "/* METADATA_EXISTENCE */": dumps_sorted(existence_json),
-            "/* METADATA_EQUALS */": dumps_sorted(equals_json),
-            "/* METADATA_ASSAYS */": dumps_as_is(metadata_assays),
-            "/* METADATA_DATATYPES */": dumps_sorted(metadata_datatypes),
-            "<!--DEBUG ": "" if is_debug() else "<!--",
-            " DEBUG-->": "" if is_debug() else "-->",
-        },
-    )
+    replacements = {
+        "$APPNAME": context.app_name,
+        "$URL_ROOT": context.url_root,
+        "$METADATA_WILDCARDS": dumps_sorted(wildcards),
+        "$METADATA_EXISTENCE": dumps_sorted(existence_json),
+        "$METADATA_EQUALS": dumps_sorted(equals_json),
+        "$METADATA_ASSAYS": dumps_as_is(metadata_assays),
+        "$METADATA_DATATYPES": dumps_sorted(metadata_datatypes),
+        "<!--DEBUG ": "" if is_debug() else "<!--",
+        " DEBUG-->": "" if is_debug() else "-->",
+    }
+    template_file = Path(__file__).parent / "root.html"
+    return StringIterator(lambda:_iter_html_chunks(template_file, replacements))
