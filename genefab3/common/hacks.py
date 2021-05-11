@@ -32,30 +32,28 @@ def _make_sub(table, targets):
         counts = fetch(mkquery(functargets("COUNT")))
         n_rows = fetch(f"SELECT COUNT(*) FROM `{table.source}` LIMIT 1")[0]
         hasnan = [(n_rows - c) > 0 for c in counts]
-        sub_data, found = {}, lambda v: v is not None
+        sub_data, sub_source = {}, "SCHEMA_HACK:" + random_unique_string()
         for t, m, M, h in zip(targets, minima, maxima, hasnan):
-            _min = m if found(m) else M if found(M) else NaN
-            _max = M if found(M) else _min
+            _min = m if (m is not None) else M if (M is not None) else NaN
+            _max = M if (M is not None) else _min
             _nan = NaN if h else _max
             sub_data[t.strip("`")] = [_min, _max, _nan]
-        sub_source = "SCHEMA_HACK:" + random_unique_string()
         try:
-            DataFrame(sub_data).to_sql(
-                sub_source, connection, if_exists="replace",
-            )
+            _kw = dict(if_exists="replace")
+            DataFrame(sub_data).to_sql(sub_source, connection, **_kw)
         except (OperationalError, PandasDatabaseError) as e:
-            msg = "Schema speedup failed: could create substitute table"
+            table.__del__() # actually will probably clean up on exit anyway...
+            msg = "Schema speedup failed: could not create substitute table"
             raise GeneFabDatabaseException(msg, debug_info=repr(e))
         sub_query = sub(
             r'(select\s+.*\s+from\s+)[^\s]*$', fr'\1`{sub_source}`',
             table.query.rstrip(), flags=IGNORECASE,
         )
         if sub_query == table.query.rstrip():
+            table.__del__() # actually will probably clean up on exit anyway...
             execute(f"DROP TABLE IF EXISTS `{sub_source}`")
-            raise GeneFabConfigurationException(
-                "Schema speedup failed: could not substitute source table",
-                debug_info=table.query.rstrip(),
-            )
+            msg = "Schema speedup failed: could not substitute table in query"
+            raise GeneFabConfigurationException(msg, debug_info=table.query)
         else:
             return sub_source, sub_query
 
@@ -63,17 +61,18 @@ def _make_sub(table, targets):
 def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
     """If context.schema == '1', replaces underlying query with quick retrieval of just values informative for schema"""
     from genefab3.db.sql.streamed_tables import StreamedDataTableWizard
+    table = get(self, context=context, limit=limit, offset=offset)
     if context.schema != "1":
-        return get(self, context=context, limit=limit, offset=offset)
+        return table
     elif isinstance(self, StreamedDataTableWizard):
         msg = f"apply_hack(speed_up_data_schema) for {self.name}"
         GeneFabLogger().info(msg)
-        table = get(self, context=context, limit=limit, offset=offset)
         match = search(r'select\s+(.*)\s+from\s', table.query, flags=IGNORECASE)
         if match:
             targets = match.group(1).split(",")
             sub_source, sub_query = _make_sub(table, targets)
         else:
+            table.__del__() # actually will probably clean up on exit anyway...
             msg = "Schema speedup failed: could not infer target columns"
             raise GeneFabConfigurationException(msg, debug_info=table.query)
         return StreamedDataTable(
