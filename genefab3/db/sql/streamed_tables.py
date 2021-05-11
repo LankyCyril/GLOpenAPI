@@ -138,19 +138,14 @@ class StreamedDataTableWizard():
     @apply_hack(speed_up_data_schema)
     def get(self, *, context, limit=None, offset=0):
         """Interpret arguments and retrieve data as StreamedDataTable by running SQL queries"""
-        query_filter = self._make_query_filter(context, limit, offset)
-        final_targets = ",".join((
-            f"`{self._index_name}`",
-            *(f"`{'/'.join(c)}`" for c in self.columns),
-        ))
-        select = self.make_select(kind="VIEW")
-        msg = f"passing SQLite table {select.name} to StreamedDataTable"
-        GeneFabLogger().info(f"{self.name}; {msg}")
         data = StreamedDataTable(
             sqlite_db=self.sqlite_db,
-            query=f"SELECT {final_targets} FROM `{select.name}` {query_filter}",
-            index_col=self._index_name, override_columns=self.columns,
-            _depends_on=select,
+            source_select=self.make_select(kind="VIEW"),
+            targets=",".join((
+                f"`{self._index_name}`",
+                *(f"`{'/'.join(c)}`" for c in self.columns),
+            )),
+            query_filter=self._make_query_filter(context, limit, offset),
         )
         msg = f"retrieving from SQLite as StreamedDataTable"
         GeneFabLogger().info(f"{self.name}; {msg}")

@@ -257,12 +257,18 @@ class StreamedAnnotationTable(StreamedTable):
 class StreamedDataTable(StreamedTable):
     """Table streamed from SQLite query"""
  
-    def __init__(self, *, sqlite_db, query, na_rep=None, index_col=None, override_columns=None, _depends_on=None):
+    def __init__(self, *, sqlite_db, source_select, targets, query_filter, na_rep=None):
         """Infer index names and columns, retain connection and query information"""
         from genefab3.db.sql.streamed_tables import SQLiteIndexName
         _split3 = lambda c: (c[0].split("/", 2) + ["*", "*"])[:3]
-        self.sqlite_db, self.query, self.na_rep = sqlite_db, query, na_rep
-        self._depends_on = _depends_on # keeps source from being deleted early
+        self.sqlite_db = sqlite_db
+        self.source_select = source_select
+        self.targets = targets
+        self.query_filter = query_filter
+        self.na_rep = na_rep
+        self.query = f"""
+            SELECT {targets} FROM `{source_select.name}` {query_filter}
+        """
         with sql_connection(self.sqlite_db, "tables") as (connection, execute):
             try:
                 cursor = connection.cursor()
@@ -273,23 +279,7 @@ class StreamedDataTable(StreamedTable):
                 _nrows = (execute(_count_query).fetchone() or [0])[0]
                 self.shape = (_nrows, len(self._columns))
             except OperationalError as e:
-                self.__del__()
                 self._reraise(e)
-        if index_col is not None:
-            if self._index_name != index_col:
-                self.__del__()
-                msg = "leftmost SQL column does not match passed index_col"
-                raise NotImplementedError(f"StreamedDataTable: {msg}")
-        if override_columns is not None:
-            if len(self._columns) != len(override_columns):
-                self.__del__()
-                raise GeneFabConfigurationException(
-                    "StreamedDataTable: unexpected length of override_columns",
-                    own_length=len(self._columns),
-                    passed_length=len(override_columns),
-                )
-            else:
-                self._columns = override_columns
         self.accessions = {c[0] for c in self._columns}
         self.n_index_levels = 1
         self.datatypes, self.gct_validity_set = set(), set()
