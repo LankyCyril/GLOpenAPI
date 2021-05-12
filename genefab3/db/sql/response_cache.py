@@ -1,13 +1,14 @@
-from genefab3.db.sql.utils import sql_connection
-from sqlite3 import Binary, OperationalError
 from genefab3.common.logger import GeneFabLogger
+from genefab3.db.sql.utils import sql_connection
+from functools import wraps
+from genefab3.common.types import ResponseContainer
 from urllib.request import quote
+from sqlite3 import Binary, OperationalError
 from datetime import datetime
 from zlib import compress, decompress, error as ZlibError
 from threading import Thread
-from os import path
 from flask import Response
-from genefab3.common.types import ResponseContainer
+from os import path
 
 
 RESPONSE_CACHE_SCHEMAS = (
@@ -24,24 +25,12 @@ _logger = GeneFabLogger()
 _logi, _logw, _loge = _logger.info, _logger.warning, _logger.error
 
 
-def sane_sql_repr(accession):
-    """Enclose accession in single or double quotes, fail if contains both"""
-    if '"' not in accession:
-        return f'"{accession}"'
-    elif "'" not in accession:
-        return f"'{accession}'"
-    else:
-        _r = repr(accession)
-        _loge(f"ResponseCache():\n  accession contains '\"', \"'\": {_r}")
-        raise OperationalError
-
-
 class ResponseCache():
     """LRU response cache; responses are identified by context.identity, dropped if underlying (meta)data changed"""
  
     def __init__(self, sqlite_dbs):
         self.sqlite_db = sqlite_dbs.response_cache["db"]
-        self.maxdbsize = sqlite_dbs.response_cache["maxsize"]
+        self.maxdbsize = sqlite_dbs.response_cache["maxsize"] or float("inf")
         if self.sqlite_db is None:
             _logw("ResponseCache():\n  LRU SQL cache DISABLED by client")
         else:
@@ -51,92 +40,73 @@ class ResponseCache():
                     query = f"CREATE TABLE IF NOT EXISTS `{table}` {schema}"
                     execute(query)
  
+    nothing_if_disabled = lambda f: wraps(f)(lambda self, *args, **kwargs:
+        ResponseContainer(content=None) if self.sqlite_db is None
+        else f(self, *args, **kwargs)
+    )
+ 
+    @nothing_if_disabled
     def put(self, context, obj, response):
         """Store response object blob in response_cache table, if possible; this will happen in a parallel thread"""
-        api_path, _cid = quote(context.full_path), context.identity
-        if self.sqlite_db is None:
-            return
-        elif not obj.accessions:
+        api_path, cid = quote(context.full_path), context.identity
+        if not obj.accessions:
             msg = "None or unrecognized accession names in object"
-            _logw(f"ResponseCache(), did not store:\n  {msg}, {_cid}")
+            _logw(f"ResponseCache(), did not store:\n  {msg}, {cid}")
             return
-        make_delete_accession_entry_command = """DELETE FROM `accessions_used`
-            WHERE `accession` == {} AND `context_identity` == "{}" """.format
-        make_insert_accession_entry_command = """INSERT INTO `accessions_used`
-            (accession, context_identity) VALUES ({}, "{}")""".format
-        def _put():
-            desc = "response_cache"
+        def _put(desc="response_cache"):
             with sql_connection(self.sqlite_db, desc) as (_, execute):
                 blob = Binary(compress(response.get_data()))
                 stored_at = int(datetime.now().timestamp())
                 try:
-                    execute(f"""DELETE FROM `response_cache`
-                        WHERE `context_identity` == "{context.identity}" """)
-                    execute(f"""INSERT INTO `response_cache` (context_identity,
+                    execute("""DELETE FROM `response_cache` WHERE
+                        `context_identity` == ?""", [context.identity])
+                    execute("""INSERT INTO `response_cache` (context_identity,
                         api_path, stored_at, response, nbytes, mimetype)
-                        VALUES ("{context.identity}", "{api_path}", {stored_at},
-                        ?, {blob.nbytes}, "{response.mimetype}")""", [blob])
-                    for acc_repr in (sane_sql_repr(a) for a in obj.accessions):
-                        args = acc_repr, context.identity
-                        execute(make_delete_accession_entry_command(*args))
-                        execute(make_insert_accession_entry_command(*args))
+                        VALUES (?, ?, ?, ?, ?, ?)""", [
+                        context.identity, api_path, stored_at,
+                        blob, blob.nbytes, response.mimetype])
+                    for accession in obj.accessions:
+                        execute("""DELETE FROM `accessions_used` WHERE
+                            `accession` == ? AND `context_identity` == ?""", [
+                            accession, context.identity])
+                        execute("""INSERT INTO `accessions_used`
+                            (accession, context_identity) VALUES (?, ?)""", [
+                            accession, context.identity])
                 except OperationalError:
-                    _loge(f"ResponseCache(), could not store:\n  {_cid}")
+                    _loge(f"ResponseCache(), could not store:\n  {cid}")
                     raise
                 else:
                     _logi(f"ResponseCache(), stored:\n  {context.identity}")
         Thread(target=_put).start()
  
-    def shrink(self, max_iter=100, max_skids=20):
-        """Drop oldest cached responses to keep file size on disk `self.maxdbsize`"""
-        if self.sqlite_db is None:
-            return
-        n_dropped, n_skids = 0, 0
-        target_size = self.maxdbsize or float("inf")
-        for _ in range(max_iter):
-            current_size = path.getsize(self.sqlite_db)
-            if (n_skids < max_skids) and (current_size > target_size):
-                _logi(f"ResponseCache():\n  is being shrunk")
-                _kw = dict(filename=self.sqlite_db, desc="response_cache")
-                with sql_connection(**_kw) as (connection, execute):
-                    query_oldest = f"""SELECT `context_identity`,`stored_at`
-                        FROM `response_cache` WHERE `stored_at` ==
-                        (SELECT MIN(`stored_at`) FROM `response_cache`) LIMIT 1
-                    """
-                    try:
-                        entries = execute(query_oldest).fetchall()
-                        if len(entries) and (len(entries[0]) == 2):
-                            context_identity = entries[0][0]
-                        else:
-                            break
-                        execute(f"""DELETE FROM `accessions_used` WHERE
-                            `context_identity` == "{context_identity}" """)
-                        execute(f"""DELETE FROM `response_cache` WHERE
-                            `context_identity` == "{context_identity}" """)
-                    except OperationalError:
-                        connection.rollback()
-                        break
-                    else:
-                        connection.commit()
-                        n_dropped += 1
-                n_skids += (path.getsize(self.sqlite_db) >= current_size)
+    def _drop_by_context_identity(self, execute, context_identity):
+        """Drop responses with given context.identity"""
+        execute("""DELETE FROM `accessions_used`
+            WHERE `context_identity` == ?""", [context_identity])
+        execute("""DELETE FROM `response_cache`
+            WHERE `context_identity` == ?""", [context_identity])
+ 
+    @nothing_if_disabled
+    def drop(self, accession):
+        """Drop responses for given accession"""
+        with sql_connection(self.sqlite_db, "response_cache") as (_, execute):
+            try:
+                query = """SELECT `context_identity` FROM `accessions_used`
+                    WHERE `accession` == ?"""
+                identity_entries = execute(query, [accession]).fetchall()
+                for context_identity, *_ in identity_entries:
+                    self._drop_by_context_identity(execute, context_identity)
+            except OperationalError as e:
+                msg = "ResponseCache():\n  could not drop responses for %s: %s"
+                _loge(msg, accession, repr(e))
+                raise
             else:
-                break
-        is_too_big = (path.getsize(self.sqlite_db) > target_size)
-        self._report_shrinkage(n_dropped, is_too_big, n_skids)
+                msg = "ResponseCache():\n  dropped %s cached response(s) for %s"
+                _logi(msg, len(identity_entries), accession)
  
-    def _report_shrinkage(self, n_dropped, is_too_big, n_skids):
-        if n_dropped:
-            _logi(f"ResponseCache():\n  shrunk by {n_dropped} entries")
-        elif is_too_big:
-            _logw(f"ResponseCache():\n  could not drop entries to shrink")
-        if n_skids:
-            _logw(f"ResponseCache():\n  file did not shrink {n_skids} times")
- 
+    @nothing_if_disabled
     def drop_all(self):
         """Drop all cached responses"""
-        if self.sqlite_db is None:
-            return
         with sql_connection(self.sqlite_db, "response_cache") as (_, execute):
             try:
                 execute("DELETE FROM `accessions_used`")
@@ -147,42 +117,18 @@ class ResponseCache():
             else:
                 _logi("ResponseCache():\n  dropped all cached Flask responses")
  
-    def drop(self, accession):
-        """Drop responses for given accession"""
-        if self.sqlite_db is None:
-            return
-        with sql_connection(self.sqlite_db, "response_cache") as (_, execute):
-            try:
-                acc_repr = sane_sql_repr(accession)
-                query = f"""SELECT `context_identity` FROM `accessions_used`
-                    WHERE `accession` == {acc_repr}"""
-                identity_entries = execute(query).fetchall()
-                for entry in identity_entries:
-                    context_identity = entry[0]
-                    execute(f"""DELETE FROM `accessions_used`
-                        WHERE `context_identity` == "{context_identity}" """)
-                    execute(f"""DELETE FROM `response_cache`
-                        WHERE `context_identity` == "{context_identity}" """)
-            except OperationalError as e:
-                msg = "ResponseCache():\n  could not drop responses for %s: %s"
-                _loge(msg, accession, repr(e))
-                raise
-            else:
-                msg = "ResponseCache():\n  dropped %s cached response(s) for %s"
-                _logi(msg, len(identity_entries), accession)
- 
+    @nothing_if_disabled
     def get(self, context):
         """Retrieve cached response object blob from response_cache table if possible; otherwise return None"""
-        if self.sqlite_db is None:
-            return ResponseContainer(content=None)
-        query = f"""SELECT `response`, `mimetype` FROM `response_cache`
-            WHERE `context_identity` == "{context.identity}" LIMIT 1"""
         with sql_connection(self.sqlite_db, "response_cache") as (_, execute):
             try:
-                row = execute(query).fetchone()
+                cid = context.identity
+                query = """SELECT `response`, `mimetype` FROM `response_cache`
+                    WHERE `context_identity` == ? LIMIT 1"""
+                row, mimetype = execute(query, [cid]).fetchone() or [None, None]
             except OperationalError:
-                row = None
-        if isinstance(row, tuple) and (len(row) == 2):
+                row, mimetype = None, None
+        if row and mimetype:
             try:
                 response = Response(
                     response=decompress(row[0]), mimetype=row[1],
@@ -197,3 +143,40 @@ class ResponseCache():
         else:
             _logi(f"ResponseCache(), nothing yet for:\n  {context.identity}")
             return ResponseContainer(content=None)
+ 
+    @nothing_if_disabled
+    def shrink(self, max_iter=100, max_skids=20):
+        """Drop oldest cached responses to keep file size on disk `self.maxdbsize`"""
+        # TODO: DRY: very similar to genefab3.db.sql.core SQLiteTable.cleanup()
+        n_dropped, n_skids = 0, 0
+        for _ in range(max_iter):
+            current_size = path.getsize(self.sqlite_db)
+            if (n_skids < max_skids) and (current_size > self.maxdbsize):
+                _logi(f"ResponseCache():\n  is being shrunk")
+                _kw = dict(filename=self.sqlite_db, desc="response_cache")
+                with sql_connection(**_kw) as (connection, execute):
+                    query_oldest = f"""SELECT `context_identity`
+                        FROM `response_cache` WHERE `stored_at` ==
+                        (SELECT MIN(`stored_at`) FROM `response_cache`) LIMIT 1
+                    """
+                    try:
+                        cid = (execute(query_oldest).fetchone() or [None])[0]
+                        if cid is None:
+                            break
+                        else:
+                            self._drop_by_context_identity(execute, cid)
+                    except OperationalError:
+                        connection.rollback()
+                        break
+                    else:
+                        connection.commit()
+                        n_dropped += 1
+                n_skids += (path.getsize(self.sqlite_db) >= current_size)
+            else:
+                break
+        if n_dropped:
+            _logi(f"ResponseCache():\n  shrunk by {n_dropped} entries")
+        elif path.getsize(self.sqlite_db) > self.maxdbsize:
+            _logw(f"ResponseCache():\n  could not drop entries to shrink")
+        if n_skids:
+            _logw(f"ResponseCache():\n  file did not shrink {n_skids} times")

@@ -287,7 +287,8 @@ class SQLiteTable(SQLiteObject):
                         table = (execute(query_oldest).fetchone() or [None])[0]
                         if table is None:
                             break
-                        self.drop(connection=connection, other=table)
+                        else:
+                            self.drop(connection=connection, other=table)
                     except OperationalError:
                         connection.rollback()
                         break
@@ -299,7 +300,7 @@ class SQLiteTable(SQLiteObject):
                 break
         if n_dropped:
             GeneFabLogger().info(f"{desc} shrunk by {n_dropped} entries")
-        elif (path.getsize(self.sqlite_db) > self.maxdbsize):
+        elif path.getsize(self.sqlite_db) > self.maxdbsize:
             GeneFabLogger().warning(f"{desc} could not be shrunk")
         if n_skids:
             GeneFabLogger().warning(f"{desc} did not shrink {n_skids} times")
