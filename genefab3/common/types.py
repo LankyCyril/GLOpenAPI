@@ -118,6 +118,13 @@ class StreamedTable():
     """Generalized streamed table (either from MongoDB or from SQLite)"""
     default_format = "csv"
     cacheable = True
+    def placeholder(self, *, n_column_levels):
+        return type("EmptyStreamedTable", (type(self),), dict(
+            __init__=lambda *a, **k: None, shape=(0, 0),
+            move_index_boundary=lambda *a, **k: None,
+            index_levels=["*"], column_levels=["*"] * n_column_levels,
+            n_index_levels=1, index=[[NaN]], values=[[NaN]],
+        ))()
     @property
     def schema(self): return StreamedSchema(self)
     @property
