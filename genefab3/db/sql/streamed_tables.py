@@ -5,7 +5,7 @@ from genefab3.common.logger import GeneFabLogger
 from genefab3.common.types import StreamedDataTable, NaN
 from genefab3.common.exceptions import GeneFabFileException
 from collections import Counter, OrderedDict
-from numpy import isreal
+from collections.abc import Iterable
 from re import search, sub
 from genefab3.common.hacks import apply_hack, speed_up_data_schema
 from genefab3.db.sql.utils import sql_connection
@@ -85,7 +85,9 @@ class StreamedDataTableWizard():
                 else _raw_name_counts.get(passed_name, 0)
             ),
         )
-        if isreal(full_name):
+        if isinstance(full_name, Iterable): # string or tuple or list
+            return full_name
+        else: # number of occurrences in _raw_name_counts
             if full_name == 0:
                 if ignore_missing:
                     return None
@@ -97,8 +99,6 @@ class StreamedDataTableWizard():
                 sug = "Use full syntax (columns.ACCESSION/ASSAY/COLUMN)"
                 _kw = dict(column=passed_name, suggestion=sug)
                 raise GeneFabFileException(msg, **_kw)
-        else:
-            return full_name
  
     def constrain_columns(self, context):
         """Constrain self.columns to specified columns, if any"""
