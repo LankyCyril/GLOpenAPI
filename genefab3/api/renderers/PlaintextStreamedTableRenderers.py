@@ -79,20 +79,21 @@ def cls(obj, context=None, continuous=None, space_formatter=lambda s: sub(r'\s',
     else:
         target_name = ".".join(obj.metadata_columns[0])
         target = obj._column_key_dispatcher[target_name]
-    if (continuous is None) or (continuous is True):
-        try:
-            lines = _list_continuous_cls(obj, target, target_name)
-        except ValueError:
-            if continuous is True:
-                msg = "Cannot represent target annotation as continuous"
-                _kw = dict(target=target_name, format="cls")
-                raise GeneFabFormatException(msg, **_kw)
-            else:
-                continuous = False
-    if continuous is False:
-        space_formatter = space_formatter or as_is
-        lines = _iter_discrete_cls(obj, target, space_formatter)
-    content = lambda: iter(lines)
+    def content(continuous=continuous, space_formatter=space_formatter):
+        if (continuous is None) or (continuous is True):
+            try:
+                lines = _list_continuous_cls(obj, target, target_name)
+            except ValueError:
+                if continuous is True:
+                    msg = "Cannot represent target annotation as continuous"
+                    _kw = dict(target=target_name, format="cls")
+                    raise GeneFabFormatException(msg, **_kw)
+                else:
+                    continuous = False
+        if continuous is False:
+            space_formatter = space_formatter or as_is
+            lines = _iter_discrete_cls(obj, target, space_formatter)
+        yield from lines
     return content, "text/plain"
 
 
