@@ -94,11 +94,11 @@ class Routes():
 
 
 class ResponseContainer():
-    """Holds content (bytes, strings, streamer function, or Response) and mimetype"""
-    def update(self, content, mimetype):
-        self.content, self.mimetype = content, mimetype
-    def __init__(self, content=None, mimetype=None):
-        self.update(content, mimetype)
+    """Holds content (bytes, strings, streamer function, or Response), mimetype, and originating object"""
+    def update(self, content=None, mimetype=None, obj=None):
+        self.content, self.mimetype, self.obj = content, mimetype, obj
+    def __init__(self, content=None, mimetype=None, obj=None):
+        self.update(content, mimetype, obj)
     @property
     def empty(self):
         return self.content is None

@@ -86,7 +86,7 @@ class CacheableRenderer():
                 content, mimetype = self.dispatch_renderer(
                     obj, context=context, indent=4, default_format="json",
                 )
-                response_container = ResponseContainer(content, mimetype)
+                response_container = ResponseContainer(content, mimetype, obj)
             else:
                 response_cache = ResponseCache(self.genefab3_client.sqlite_dbs)
                 response_container = response_cache.get(context)
@@ -103,10 +103,10 @@ class CacheableRenderer():
                         content, mimetype = self.dispatch_renderer(
                             obj, context=context, default_format=default_format,
                         )
-                        response_container.update(content, mimetype)
+                        response_container.update(content, mimetype, obj)
                         if getattr(obj, "cacheable", None) is True:
-                            if response_cache is not None: # TODO
-                                pass #response_cache.put(context, response_container)
+                            if response_cache is not None:
+                                response_cache.put(response_container, context)
                     _thread = ExceptionPropagatingThread(target=_call_and_cache)
                     _thread.start() # will complete even after timeout errors
                     _thread.join() # will fill container if does not time out
