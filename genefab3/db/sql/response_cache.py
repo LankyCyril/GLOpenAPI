@@ -14,8 +14,8 @@ from os import path
 
 RESPONSE_CACHE_SCHEMAS = (
     ("response_cache", """(
-        `i` INTEGER PRIMARY KEY ASC, `context_identity` TEXT,
-        `chunk` BLOB, `mimetype` TEXT, `retrieved_at` INTEGER
+        `context_identity` TEXT, `i` INTEGER, `chunk` BLOB,
+        `mimetype` TEXT, `retrieved_at` INTEGER
     )"""),
     ("accessions_used", """(
         `context_identity` TEXT, `accession` TEXT
@@ -82,16 +82,17 @@ class ResponseCache():
             _logw(f"{desc} did not store:\n  {context.identity}\n  {problem}")
             return
         def _put():
-            _kw = dict(desc="response_cache")
             retrieved_at = int(datetime.now().timestamp())
+            _kw = dict(desc="response_cache")
             with SQLTransaction(self.sqlite_db, **_kw) as (_, execute):
                 try:
                     execute("""DELETE FROM `response_cache` WHERE
                         `context_identity` == ?""", [context.identity])
-                    for chunk in self._itercompress(response_container.content):
+                    _it = self._itercompress
+                    for i, chunk in enumerate(_it(response_container.content)):
                         execute("""INSERT INTO `response_cache`
-                            (context_identity, chunk, mimetype, retrieved_at)
-                            VALUES (?, ?, ?, ?)""", [context.identity, chunk,
+                            (context_identity, i, chunk, mimetype, retrieved_at)
+                            VALUES (?,?,?,?,?)""", [context.identity, i, chunk,
                             response_container.mimetype, retrieved_at])
                     for accession in response_container.obj.accessions:
                         execute("""DELETE FROM `accessions_used` WHERE
@@ -154,14 +155,14 @@ class ResponseCache():
                 WHERE `context_identity` == ? LIMIT 1"""
             mimetype, = execute(query, [cid]).fetchone() or [None]
             if mimetype is None:
-                raise EOFError
+                raise EOFError("No chunks found in response_cache")
             else:
                 yield mimetype
             query = """SELECT `chunk`,`mimetype` FROM `response_cache`
                 WHERE `context_identity` == ? ORDER BY `i` ASC"""
             for chunk, _mimetype in execute(query, [cid]):
                 if mimetype != _mimetype:
-                    raise OperationalError
+                    raise OperationalError("Stored mimetypes of chunks differ")
                 decompressed_chunk = decompressor.decompress(chunk)
                 if decompressed_chunk:
                     yield decompressed_chunk.decode()
