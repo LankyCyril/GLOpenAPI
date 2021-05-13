@@ -115,14 +115,16 @@ class StudyEntries(list):
             for _, row in raw_tab.iterrows():
                 if "Sample Name" not in row:
                     msg = f"{self._self_identifier} entry missing 'Sample Name'"
-                    raise GeneFabISAException(msg, **status_kwargs)
+                    _kw = copy_except(status_kwargs, "collection")
+                    raise GeneFabISAException(msg, **_kw)
                 else:
                     sample_name = row["Sample Name"]
                 if isinstance(sample_name, Series):
                     if len(set(sample_name)) > 1:
                         _m = "entry has multiple 'Sample Name' values"
                         msg = f"{self._self_identifier} {_m}"
-                        raise GeneFabISAException(msg, **status_kwargs)
+                        _kw = copy_except(status_kwargs, "collection")
+                        raise GeneFabISAException(msg, **_kw)
                     else:
                         sample_name = sample_name.iloc[0]
                 if not isnull(sample_name):

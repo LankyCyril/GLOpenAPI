@@ -4,7 +4,7 @@ from genefab3.common.utils import timestamp36, is_debug
 from pymongo import MongoClient
 from socket import create_connection, error as SocketError
 from types import SimpleNamespace
-from genefab3.common.logger import GeneFabLogger, MongoDBLogger
+from genefab3.common.logger import GeneFabLogger
 from genefab3.db.mongo.utils import iterate_mongo_connections
 from genefab3.db.cacher import CacherThread
 from genefab3.api.renderer import CacheableRenderer
@@ -25,15 +25,12 @@ class GeneFabClient():
             )
             self.sqlite_dbs = self._get_validated_sqlite_dbs(**sqlite_params)
             self.adapter = AdapterClass()
-            self.routes = RoutesClass(genefab3_client=self)
+            self._init_error_handlers()
+            self.routes = self._init_routes(RoutesClass)
             self.cacher_thread = self._ensure_cacher_thread(**cacher_params)
         except TypeError as e:
             msg = "During GeneFabClient() initialization, an exception occurred"
             raise GeneFabConfigurationException(msg, error=repr(e))
-        else:
-            self._init_routes()
-            self._init_warning_handlers()
-            self._init_error_handlers()
  
     def _configure_flask_app(self, *, app, compress_params=None):
         """Modify Flask application, enable compression"""
@@ -54,13 +51,9 @@ class GeneFabClient():
             msg = "Could not connect to internal MongoDB instance"
             raise GeneFabConfigurationException(msg, error=type(e).__name__)
         parsed_cnames = {
-            kind: (collection_names or {}).get(kind, kind)
-            for kind in ("metadata", "metadata_aux", "records", "status", "log")
+            kind: (collection_names or {}).get(kind) or kind
+            for kind in ("metadata", "metadata_aux", "records", "status")
         }
-        for kind in ("metadata", "metadata_aux", "records", "status"):
-            if parsed_cnames[kind] is None:
-                msg = "Collection name cannot be None"
-                raise GeneFabConfigurationException(msg, collection=kind)
         if len(parsed_cnames) != len(set(parsed_cnames.values())):
             msg = "Conflicting collection names specified"
             raise GeneFabConfigurationException(msg, names=parsed_cnames)
@@ -81,6 +74,20 @@ class GeneFabClient():
             raise GeneFabConfigurationException(msg, **sqlite_dbs.__dict__)
         else:
             return sqlite_dbs
+ 
+    def _init_error_handlers(self):
+        """Intercept all exceptions and deliver an HTTP error page with or without traceback depending on debug state"""
+        self.flask_app.errorhandler(Exception)(partial(
+            exception_catcher, debug=is_debug(),
+        ))
+ 
+    def _init_routes(self, RoutesClass):
+        """Route Response-generating methods to Flask endpoints"""
+        routes = RoutesClass(genefab3_client=self)
+        renderer = CacheableRenderer(self)
+        for endpoint, method in routes.items():
+            self.flask_app.route(endpoint, methods=["GET"])(renderer(method))
+        return routes
  
     def _ok_to_loop_cacher_thread(self, enabled):
         """Check if no other instances of genefab3 are talking to MongoDB database"""
@@ -112,20 +119,3 @@ class GeneFabClient():
             return cacher_thread
         else:
             return SimpleNamespace(isAlive=lambda: False)
- 
-    def _init_routes(self):
-        """Route Response-generating methods to Flask endpoints"""
-        renderer = CacheableRenderer(self)
-        for endpoint, method in self.routes.items():
-            self.flask_app.route(endpoint, methods=["GET"])(renderer(method))
- 
-    def _init_warning_handlers(self):
-        """Set up logger to write to MongoDB collection if specified"""
-        GeneFabLogger().addHandler(MongoDBLogger(self.mongo_collections.log))
- 
-    def _init_error_handlers(self):
-        """Intercept all exceptions and deliver an HTTP error page with or without traceback depending on debug state"""
-        self.flask_app.errorhandler(Exception)(partial(
-            exception_catcher,
-            collection=self.mongo_collections.log, debug=is_debug(),
-        ))
