@@ -2,7 +2,6 @@ from genefab3.common.logger import GeneFabLogger
 from genefab3.db.sql.utils import sql_connection
 from functools import wraps
 from genefab3.common.types import ResponseContainer
-from urllib.request import quote
 from sqlite3 import Binary, OperationalError
 from datetime import datetime
 from zlib import compress, decompress, error as ZlibError
@@ -13,8 +12,8 @@ from os import path
 
 RESPONSE_CACHE_SCHEMAS = (
     ("response_cache", """(
-        `context_identity` TEXT, `api_path` TEXT, `stored_at` INTEGER,
-        `response` BLOB, `nbytes` INTEGER, `mimetype` TEXT
+        `context_identity` TEXT, `response` BLOB, `mimetype` TEXT,
+        `retrieved_at` INTEGER
     )"""),
     ("accessions_used", """(
         `context_identity` TEXT, `accession` TEXT
@@ -40,31 +39,31 @@ class ResponseCache():
                     query = f"CREATE TABLE IF NOT EXISTS `{table}` {schema}"
                     execute(query)
  
-    nothing_if_disabled = lambda f: wraps(f)(lambda self, *args, **kwargs:
+    bypass_if_disabled = lambda f: wraps(f)(lambda self, *args, **kwargs:
         ResponseContainer(content=None) if self.sqlite_db is None
         else f(self, *args, **kwargs)
     )
  
-    @nothing_if_disabled
+    @bypass_if_disabled
     def put(self, context, obj, response):
         """Store response object blob in response_cache table, if possible; this will happen in a parallel thread"""
-        api_path, cid = quote(context.full_path), context.identity
+        desc = "ResponseCache(),"
         if not obj.accessions:
-            msg = "None or unrecognized accession names in object"
-            _logw(f"ResponseCache(), did not store:\n  {msg}, {cid}")
+            msg = "none or unrecognized accession names in object"
+            _logw(f"{desc} did not store:\n  {context.identity}\n  {msg}")
             return
-        def _put(desc="response_cache"):
-            with sql_connection(self.sqlite_db, desc) as (_, execute):
+        def _put():
+            _kw = dict(desc="response_cache")
+            with sql_connection(self.sqlite_db, **_kw) as (_, execute):
                 blob = Binary(compress(response.get_data()))
-                stored_at = int(datetime.now().timestamp())
+                retrieved_at = int(datetime.now().timestamp())
                 try:
                     execute("""DELETE FROM `response_cache` WHERE
                         `context_identity` == ?""", [context.identity])
-                    execute("""INSERT INTO `response_cache` (context_identity,
-                        api_path, stored_at, response, nbytes, mimetype)
-                        VALUES (?, ?, ?, ?, ?, ?)""", [
-                        context.identity, api_path, stored_at,
-                        blob, blob.nbytes, response.mimetype])
+                    execute("""INSERT INTO `response_cache`
+                        (context_identity, response, mimetype, retrieved_at)
+                        VALUES (?,?,?,?)""", [
+                        context.identity, blob, response.mimetype, retrieved_at])
                     for accession in obj.accessions:
                         execute("""DELETE FROM `accessions_used` WHERE
                             `accession` == ? AND `context_identity` == ?""", [
@@ -73,10 +72,10 @@ class ResponseCache():
                             (accession, context_identity) VALUES (?, ?)""", [
                             accession, context.identity])
                 except OperationalError:
-                    _loge(f"ResponseCache(), could not store:\n  {cid}")
+                    _loge(f"{desc} could not store:\n  {context.identity}")
                     raise
                 else:
-                    _logi(f"ResponseCache(), stored:\n  {context.identity}")
+                    _logi(f"{desc} stored:\n  {context.identity}")
         Thread(target=_put).start()
  
     def _drop_by_context_identity(self, execute, context_identity):
@@ -86,7 +85,7 @@ class ResponseCache():
         execute("""DELETE FROM `response_cache`
             WHERE `context_identity` == ?""", [context_identity])
  
-    @nothing_if_disabled
+    @bypass_if_disabled
     def drop(self, accession):
         """Drop responses for given accession"""
         with sql_connection(self.sqlite_db, "response_cache") as (_, execute):
@@ -104,7 +103,7 @@ class ResponseCache():
                 msg = "ResponseCache():\n  dropped %s cached response(s) for %s"
                 _logi(msg, len(identity_entries), accession)
  
-    @nothing_if_disabled
+    @bypass_if_disabled
     def drop_all(self):
         """Drop all cached responses"""
         with sql_connection(self.sqlite_db, "response_cache") as (_, execute):
@@ -112,12 +111,12 @@ class ResponseCache():
                 execute("DELETE FROM `accessions_used`")
                 execute("DELETE FROM `response_cache`")
             except OperationalError as e:
-                _loge("ResponseCache().drop_all():\n  failed with %s", repr(e))
+                _loge(f"ResponseCache().drop_all():\n  failed with {e!r}")
                 raise
             else:
                 _logi("ResponseCache():\n  dropped all cached Flask responses")
  
-    @nothing_if_disabled
+    @bypass_if_disabled
     def get(self, context):
         """Retrieve cached response object blob from response_cache table if possible; otherwise return None"""
         with sql_connection(self.sqlite_db, "response_cache") as (_, execute):
@@ -144,7 +143,7 @@ class ResponseCache():
             _logi(f"ResponseCache(), nothing yet for:\n  {context.identity}")
             return ResponseContainer(content=None)
  
-    @nothing_if_disabled
+    @bypass_if_disabled
     def shrink(self, max_iter=100, max_skids=20):
         """Drop oldest cached responses to keep file size on disk `self.maxdbsize`"""
         # TODO: DRY: very similar to genefab3.db.sql.core SQLiteTable.cleanup()
@@ -156,9 +155,7 @@ class ResponseCache():
                 _kw = dict(filename=self.sqlite_db, desc="response_cache")
                 with sql_connection(**_kw) as (connection, execute):
                     query_oldest = f"""SELECT `context_identity`
-                        FROM `response_cache` WHERE `stored_at` ==
-                        (SELECT MIN(`stored_at`) FROM `response_cache`) LIMIT 1
-                    """
+                        FROM `response_cache` ORDER BY `retrieved_at` ASC"""
                     try:
                         cid = (execute(query_oldest).fetchone() or [None])[0]
                         if cid is None:
