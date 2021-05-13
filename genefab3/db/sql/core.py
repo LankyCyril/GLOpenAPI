@@ -280,9 +280,7 @@ class SQLiteTable(SQLiteObject):
                 _kw = dict(filename=self.sqlite_db, desc="tables")
                 with sql_connection(**_kw) as (connection, execute):
                     query_oldest = f"""SELECT `table`
-                        FROM `{self.aux_table}` WHERE `retrieved_at` ==
-                        (SELECT MIN(`retrieved_at`) FROM `{self.aux_table}`)
-                        LIMIT 1"""
+                        FROM `{self.aux_table}` ORDER BY `retrieved_at` ASC"""
                     try:
                         table = (execute(query_oldest).fetchone() or [None])[0]
                         if table is None:
