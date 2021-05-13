@@ -1,7 +1,6 @@
 from genefab3.common.utils import random_unique_string, validate_no_backtick
 from sqlite3 import OperationalError
-from genefab3.common.exceptions import GeneFabDatabaseException
-from genefab3.common.logger import GeneFabLogger
+from genefab3.common.exceptions import GeneFabDatabaseException, GeneFabLogger
 from genefab3.common.types import StreamedDataTable, NaN
 from genefab3.common.exceptions import GeneFabFileException
 from collections import Counter, OrderedDict

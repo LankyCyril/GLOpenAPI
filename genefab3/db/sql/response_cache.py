@@ -1,4 +1,4 @@
-from genefab3.common.logger import GeneFabLogger
+from genefab3.common.exceptions import GeneFabLogger
 from genefab3.db.sql.utils import SQLTransaction
 from functools import wraps
 from genefab3.common.types import ResponseContainer

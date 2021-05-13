@@ -3,7 +3,7 @@ from sqlite3 import OperationalError, Binary
 from genefab3.db.sql.streamed_tables import SQLiteIndexName
 from genefab3.db.sql.utils import SQLTransaction
 from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
-from genefab3.common.logger import GeneFabLogger
+from genefab3.common.exceptions import GeneFabLogger
 from threading import Thread
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.utils import as_is

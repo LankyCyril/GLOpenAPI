@@ -1,4 +1,4 @@
-from genefab3.common.logger import GeneFabLogger
+from genefab3.common.exceptions import GeneFabLogger
 from genefab3.db.mongo.utils import run_mongo_action
 from datetime import datetime
 

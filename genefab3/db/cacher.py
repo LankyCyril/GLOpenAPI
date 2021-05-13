@@ -1,6 +1,6 @@
 from threading import Thread
 from genefab3.db.sql.response_cache import ResponseCache
-from genefab3.common.logger import GeneFabLogger
+from genefab3.common.exceptions import GeneFabLogger
 from genefab3.db.mongo.index import ensure_info_index
 from genefab3.db.mongo.index import update_metadata_value_lookup
 from time import sleep

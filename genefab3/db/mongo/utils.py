@@ -2,8 +2,7 @@ from re import sub, search
 from functools import partial
 from bson.errors import InvalidDocument as InvalidDocumentError
 from collections.abc import ValuesView
-from genefab3.common.logger import GeneFabLogger
-from genefab3.common.exceptions import GeneFabDatabaseException
+from genefab3.common.exceptions import GeneFabLogger, GeneFabDatabaseException
 from pymongo import ASCENDING
 
 

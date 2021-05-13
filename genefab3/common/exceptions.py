@@ -1,8 +1,16 @@
+from functools import lru_cache, partial
+from logging import getLogger, DEBUG
 from sys import exc_info, stderr
 from traceback import format_tb
 from json import dumps
-from functools import partial
 from flask import Response
+
+
+@lru_cache(maxsize=None)
+def GeneFabLogger():
+    logger = getLogger("genefab3")
+    logger.setLevel(DEBUG)
+    return logger
 
 
 class GeneFabException(Exception):

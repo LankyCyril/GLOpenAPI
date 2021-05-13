@@ -1,5 +1,5 @@
 from genefab3.api.parser import KEYVALUE_PARSER_DISPATCHER
-from genefab3.common.logger import GeneFabLogger
+from genefab3.common.exceptions import GeneFabLogger
 from pymongo import ASCENDING
 from genefab3.common.utils import deepcopy_keys
 from genefab3.db.mongo.utils import run_mongo_action

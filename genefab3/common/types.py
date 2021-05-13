@@ -6,8 +6,7 @@ from flask import Response
 from genefab3.common.utils import blackjack, KeyToPosition
 from genefab3.db.sql.utils import SQLTransaction
 from sqlite3 import OperationalError
-from genefab3.common.exceptions import GeneFabDatabaseException
-from genefab3.common.logger import GeneFabLogger
+from genefab3.common.exceptions import GeneFabDatabaseException, GeneFabLogger
 
 
 class ExtNaN(float):

@@ -1,6 +1,6 @@
 from genefab3.db.sql.core import SQLiteBlob, SQLiteTable
 from genefab3.common.utils import as_is
-from genefab3.common.logger import GeneFabLogger
+from genefab3.common.exceptions import GeneFabLogger
 from urllib.request import urlopen
 from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabDataManagerException

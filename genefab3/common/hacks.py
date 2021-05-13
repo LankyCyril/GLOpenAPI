@@ -5,8 +5,7 @@ from genefab3.common.utils import random_unique_string
 from pandas import DataFrame
 from sqlite3 import OperationalError
 from pandas.io.sql import DatabaseError as PandasDatabaseError
-from genefab3.common.exceptions import GeneFabDatabaseException
-from genefab3.common.logger import GeneFabLogger
+from genefab3.common.exceptions import GeneFabDatabaseException, GeneFabLogger
 from genefab3.common.exceptions import GeneFabConfigurationException
 from re import search
 

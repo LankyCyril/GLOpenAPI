@@ -2,7 +2,7 @@ from contextlib import contextmanager, closing
 from genefab3.common.exceptions import GeneFabConfigurationException
 from os import path, access, W_OK
 from sqlite3 import connect, OperationalError
-from genefab3.common.logger import GeneFabLogger
+from genefab3.common.exceptions import GeneFabLogger
 
 
 def apply_pragma(execute, pragma, value, filename, access_warning):

@@ -1,5 +1,5 @@
 from hashlib import md5
-from genefab3.common.logger import GeneFabLogger
+from genefab3.common.exceptions import GeneFabLogger
 from json import dumps
 from base64 import encodebytes
 from zlib import compress

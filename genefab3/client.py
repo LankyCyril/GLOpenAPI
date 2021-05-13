@@ -4,12 +4,11 @@ from genefab3.common.utils import timestamp36, is_debug
 from pymongo import MongoClient
 from socket import create_connection, error as SocketError
 from types import SimpleNamespace
-from genefab3.common.logger import GeneFabLogger
+from genefab3.common.exceptions import GeneFabLogger, exception_catcher
 from genefab3.db.mongo.utils import iterate_mongo_connections
 from genefab3.db.cacher import CacherThread
 from genefab3.api.renderer import CacheableRenderer
 from functools import partial
-from genefab3.common.exceptions import exception_catcher
 
 
 class GeneFabClient():
