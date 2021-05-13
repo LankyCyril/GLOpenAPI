@@ -8,6 +8,7 @@ from zlib import compressobj, decompressobj, Z_FINISH, error as ZlibError
 from sqlite3 import Binary, OperationalError
 from datetime import datetime
 from threading import Thread
+from genefab3.common.hacks import apply_hack, bypass_uncached_views
 from os import path
 
 
@@ -168,9 +169,10 @@ class ResponseCache():
             if decompressed_chunk:
                 yield decompressed_chunk.decode()
  
+    @apply_hack(bypass_uncached_views)
     @bypass_if_disabled
     def get(self, context):
-        """Retrieve cached response object blob from response_cache table if possible; otherwise return None"""
+        """Retrieve cached response object blob from response_cache table if possible; otherwise return empty ResponseContainer()"""
         try:
             for value in self._iterdecompress(context.identity):
                 pass # test retrieval and decompression before returning
@@ -193,7 +195,7 @@ class ResponseCache():
  
     @bypass_if_disabled
     def shrink(self, max_iter=100, max_skids=20):
-        """Drop oldest cached responses to keep file size on disk `self.maxdbsize`"""
+        """Drop oldest cached responses to keep file size on disk under `self.maxdbsize`"""
         # TODO: DRY: very similar to genefab3.db.sql.core SQLiteTable.cleanup()
         n_dropped, n_skids = 0, 0
         for _ in range(max_iter):

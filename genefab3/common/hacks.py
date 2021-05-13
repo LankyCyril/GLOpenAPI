@@ -8,6 +8,7 @@ from pandas.io.sql import DatabaseError as PandasDatabaseError
 from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.logger import GeneFabLogger
 from genefab3.common.exceptions import GeneFabConfigurationException
+from re import search
 
 
 def apply_hack(hack):
@@ -84,3 +85,12 @@ def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
     else:
         msg = "Schema speedup applied to unsupported object type"
         raise GeneFabConfigurationException(msg, type=type(self))
+
+
+def bypass_uncached_views(get, self, context):
+    """If serving favicon, bypass checking response_cache"""
+    if (context.view == "") or search(r'^favicon\.[A-Za-z0-9]+$', context.view):
+        from genefab3.common.types import ResponseContainer
+        return ResponseContainer(content=None)
+    else:
+        return get(self, context)
