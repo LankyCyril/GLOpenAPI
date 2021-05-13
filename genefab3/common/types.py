@@ -124,6 +124,7 @@ class StreamedTable():
             move_index_boundary=lambda *a, **k: None,
             index_levels=["*"], column_levels=["*"] * n_column_levels,
             n_index_levels=1, index=[[NaN]], values=[[NaN]],
+            __getattr__=lambda s, a: (),
         ))()
     @property
     def schema(self): return StreamedSchema(self)
