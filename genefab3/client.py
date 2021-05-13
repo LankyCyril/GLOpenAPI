@@ -92,18 +92,18 @@ class GeneFabClient():
         """Check if no other instances of genefab3 are talking to MongoDB database"""
         if not enabled:
             msg = "CacherThread disabled by client parameter, NOT LOOPING"
-            GeneFabLogger().info(f"{self.mongo_appname}:\n  {msg}")
+            GeneFabLogger(info=f"{self.mongo_appname}:\n  {msg}")
             return False
         else:
             for other in iterate_mongo_connections(self.mongo_client):
                 if other < self.mongo_appname:
                     msg = (f"Found other instance {other}, " +
                         "NOT LOOPING current instance")
-                    GeneFabLogger().info(f"{self.mongo_appname}:\n  {msg}")
+                    GeneFabLogger(info=f"{self.mongo_appname}:\n  {msg}")
                     return False
             else:
                 msg = "No other instances found, STARTING LOOP"
-                GeneFabLogger().info(f"{self.mongo_appname}:\n  {msg}")
+                GeneFabLogger(info=f"{self.mongo_appname}:\n  {msg}")
                 return True
  
     def _ensure_cacher_thread(self, metadata_update_interval=1800, metadata_retry_delay=300, enabled=True):

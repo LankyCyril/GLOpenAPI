@@ -28,7 +28,7 @@ class TempSelect():
             else:
                 query_repr = repr(query.lstrip()[:200] + "...")
                 msg = f"Created temporary SQLite {self.kind}"
-                GeneFabLogger().info(f"{msg} {self.name} from {query_repr}")
+                GeneFabLogger(info=f"{msg} {self.name} from\n  {query_repr}")
  
     def __del__(self):
         with SQLTransaction(self.sqlite_db, "tables") as (_, execute):
@@ -36,10 +36,10 @@ class TempSelect():
                 execute(f"DROP {self.kind} `{self.name}`")
             except OperationalError:
                 msg = f"Failed to drop temporary {self.kind} {self.name}"
-                GeneFabLogger().error(msg)
+                GeneFabLogger(error=msg)
             else:
                 msg = f"Dropped temporary SQLite {self.kind} {self.name}"
-                GeneFabLogger().info(msg)
+                GeneFabLogger(info=msg)
 
 
 class SQLiteIndexName(str): pass
@@ -148,7 +148,7 @@ class StreamedDataTableWizard():
             na_rep=NaN,
         )
         msg = f"retrieving from SQLite as StreamedDataTable"
-        GeneFabLogger().info(f"{self.name}; {msg}")
+        GeneFabLogger(info=f"{self.name};\n  {msg}")
         return data
  
     @staticmethod
@@ -213,7 +213,7 @@ class StreamedDataTableWizard_Single(StreamedDataTableWizard):
         _n, _icd = len(self.columns), self._inverse_column_dispatcher
         _tt = "\n  ".join(("", *_icd))
         msg = f"retrieving {_n} columns from {len(_icd)} table(s):{_tt}"
-        GeneFabLogger().info(f"{self.name}; {msg}")
+        GeneFabLogger(info=f"{self.name}; {msg}")
         join_statement = " NATURAL JOIN ".join(f"`{p}`" for p in _icd)
         columns_as_slashed_columns = [
             f"""`{self._column_dispatcher[rawcol]}`.`{rawcol}`

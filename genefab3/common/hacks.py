@@ -30,11 +30,11 @@ class _TempSchemaSource():
             try:
                 execute(f"DROP TABLE `{self.name}`")
             except OperationalError:
-                msg = f"Failed to drop temporary TABLE {self.name}"
-                GeneFabLogger().error(msg)
+                msg = f"Failed to drop temporary SQLite TABLE {self.name}"
+                GeneFabLogger(error=msg)
             else:
                 msg = f"Dropped temporary SQLite TABLE {self.name}"
-                GeneFabLogger().info(msg)
+                GeneFabLogger(info=msg)
 
 
 def _make_sub(self, table):
@@ -75,8 +75,7 @@ def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
     if context.schema != "1":
         return table
     elif isinstance(self, StreamedDataTableWizard):
-        msg = f"apply_hack(speed_up_data_schema) for {self.name}"
-        GeneFabLogger().info(msg)
+        GeneFabLogger(info=f"apply_hack(speed_up_data_schema) for {self.name}")
         return StreamedDataTable(
             sqlite_db=self.sqlite_db, source_select=_make_sub(self, table),
             targets=table.targets, query_filter=table.query_filter, na_rep=NaN,

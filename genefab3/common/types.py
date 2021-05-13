@@ -384,7 +384,7 @@ class StreamedDataTable(StreamedTable):
             else:
                 if self.shape[0] > 50:
                     msg = "StreamedDataTable with custom na_rep may be slow"
-                    GeneFabLogger().warning(msg)
+                    GeneFabLogger(warning=msg)
                 if self.n_index_levels:
                     with SQLTransaction(**_kw) as (_, execute):
                         for _, *vv in execute(self.query):

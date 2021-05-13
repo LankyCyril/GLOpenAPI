@@ -12,11 +12,11 @@ def apply_pragma(execute, pragma, value, filename, access_warning):
         status = (execute(f"PRAGMA {pragma}").fetchone() or [None])[0]
     except (OSError, FileNotFoundError, OperationalError) as e:
         if access_warning:
-            GeneFabLogger().warning(f"{access_warning}: {e!r}")
+            GeneFabLogger(warning=f"{access_warning}: {e!r}")
     else:
         if str(status) != str(value):
             msg = f"Could not set {pragma} = {value} for database"
-            GeneFabLogger().warning(f"{msg} {filename!r}")
+            GeneFabLogger(warning=f"{msg} {filename!r}")
 
 
 @contextmanager
@@ -28,7 +28,7 @@ def SQLTransaction(filename, desc=None, *, timeout=600):
     else:
         access_warning = f"SQLite database {filename!r} may not be writable"
         if path.exists(filename) and (not access(filename, W_OK)):
-            GeneFabLogger().warning(f"{access_warning}: path.access()")
+            GeneFabLogger(warning=f"{access_warning}: path.access()")
             access_warning = None
         try:
             with closing(connect(filename, timeout=timeout)) as connection:

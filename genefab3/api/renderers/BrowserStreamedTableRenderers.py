@@ -107,10 +107,9 @@ SQUASHED_PREHEADER_CSS = """
 
 def twolevel(obj, context, squash_preheader=False, frozen=0, indent=None):
     """Display StreamedTable with two-level columns using SlickGrid"""
+    GeneFabLogger(info="HTML: converting StreamedTable into interactive table")
     obj.move_index_boundary(to=0)
     title_postfix = f"{context.view} {context.complete_kwargs}"
-    msg = "HTML: converting StreamedTable into interactive table"
-    GeneFabLogger().info(msg)
     def content():
         is_annotation_table = isinstance(obj, StreamedAnnotationTable)
         if is_annotation_table and (context.view != "status"):

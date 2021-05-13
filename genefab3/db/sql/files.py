@@ -29,17 +29,16 @@ class CachedBinaryFile(SQLiteBlob):
     def __download_as_blob(self, urls):
         """Download data from URL as-is"""
         for url in urls:
-            msg = f"{self.name}; trying URL:\n  {url}"
-            GeneFabLogger().info(msg)
+            GeneFabLogger(info=f"{self.name}; trying URL:\n  {url}")
             try:
                 with urlopen(url) as response:
                     data = response.read()
             except URLError:
                 msg = f"{self.name}; tried URL and failed:\n  {url}"
-                GeneFabLogger().warning(msg)
+                GeneFabLogger(warning=msg)
             else:
                 msg = f"{self.name}; successfully fetched blob:\n  {url}"
-                GeneFabLogger().info(msg)
+                GeneFabLogger(info=msg)
                 self.url = url
                 return data
         else:
@@ -65,17 +64,16 @@ class CachedTableFile(SQLiteTable):
         """Try all URLs and push data into temporary file"""
         for url in urls:
             with open(tempfile, mode="wb") as handle:
-                msg = f"{self.name}; trying URL:\n  {url}"
-                GeneFabLogger().info(msg)
+                GeneFabLogger(info=f"{self.name}; trying URL:\n  {url}")
                 try:
                     with urlopen(url) as response:
                         copyfileobj(response, handle)
                 except URLError:
                     msg = f"{self.name}; tried URL and failed:\n  {url}"
-                    GeneFabLogger().warning(msg)
+                    GeneFabLogger(warning=msg)
                 else:
                     msg = f"{self.name}; successfully fetched data:\n  {url}"
-                    GeneFabLogger().info(msg)
+                    GeneFabLogger(info=msg)
                     return url
         else:
             msg = "None of the URLs are reachable for file"
@@ -103,7 +101,7 @@ class CachedTableFile(SQLiteTable):
                     tempfile, sep=sep, compression=compression, **pandas_kws,
                 )
                 msg = f"{self.name}; interpreted as table:\n  {tempfile}"
-                GeneFabLogger().info(msg)
+                GeneFabLogger(info=msg)
                 INPLACE_process(dataframe)
                 return dataframe
             except (IOError, UnicodeDecodeError, CSVError, PandasParserError):

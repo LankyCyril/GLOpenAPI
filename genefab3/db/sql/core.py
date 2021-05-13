@@ -64,7 +64,7 @@ class SQLiteObject():
         """Evaluates to True if underlying data in need of update, otherwise False"""
         if (timestamp_table is None) or (id_field is None):
             msg = "did not pass arguments to self.is_stale(), will never update"
-            GeneFabLogger().warning(f"{type(self).__name__} {msg}")
+            GeneFabLogger(warning=f"{type(self).__name__} {msg}")
         else:
             desc = db_type or f"for {type(self).__name__}"
             self_id_value = getattr(self, id_field)
@@ -78,19 +78,19 @@ class SQLiteObject():
                 return (ret[0][0] < self.timestamp)
             else:
                 msg = "Conflicting timestamp values for SQLiteObject"
-                GeneFabLogger().warning(f"{msg}\n  ({self_id_value})")
+                GeneFabLogger(warning=f"{msg}\n  ({self_id_value})")
                 self.drop(connection=connection)
                 return True
  
     def update(self):
         """Update underlying data in SQLite"""
         msg = "did not define self.update(), will never update"
-        GeneFabLogger().warning(f"{type(self).__name__} {msg}")
+        GeneFabLogger(warning=f"{type(self).__name__} {msg}")
  
     def retrieve(self):
         """Retrieve underlying data from SQLite"""
         msg = "did not define self.retrieve(), will always retrieve `None`"
-        GeneFabLogger().warning(f"{type(self).__name__} {msg}")
+        GeneFabLogger(warning=f"{type(self).__name__} {msg}")
         return None
  
     def cleanup(self):
@@ -236,7 +236,7 @@ class SQLiteTable(SQLiteObject):
             try:
                 for bound, (partname, *_) in zip(bounds, parts):
                     msg = "Creating table for SQLiteObject"
-                    GeneFabLogger().info(f"{msg}:\n  {partname}")
+                    GeneFabLogger(info=f"{msg}:\n  {partname}")
                     dataframe.iloc[:,bound:bound+self.maxpartcols].to_sql(
                         partname, connection, **to_sql_kws,
                     )
@@ -251,7 +251,7 @@ class SQLiteTable(SQLiteObject):
                 raise GeneFabDatabaseException(msg, **_kw)
             else:
                 msg = "All tables inserted for SQLiteObject"
-                GeneFabLogger().info(f"{msg}:\n  {self.table}")
+                GeneFabLogger(info=f"{msg}:\n  {self.table}")
  
     def retrieve(self):
         """Create an StreamedDataTableWizard object dispatching columns to table parts"""
@@ -276,7 +276,7 @@ class SQLiteTable(SQLiteObject):
         for _ in range(max_iter):
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
-                GeneFabLogger().info(f"{desc} is being shrunk")
+                GeneFabLogger(info=f"{desc} is being shrunk")
                 _kw = dict(filename=self.sqlite_db, desc="tables")
                 with SQLTransaction(**_kw) as (connection, execute):
                     query_oldest = f"""SELECT `table`
@@ -297,8 +297,8 @@ class SQLiteTable(SQLiteObject):
             else:
                 break
         if n_dropped:
-            GeneFabLogger().info(f"{desc} shrunk by {n_dropped} entries")
+            GeneFabLogger(info=f"{desc} shrunk by {n_dropped} entries")
         elif path.getsize(self.sqlite_db) > self.maxdbsize:
-            GeneFabLogger().warning(f"{desc} could not be shrunk")
+            GeneFabLogger(warning=f"{desc} could not be shrunk")
         if n_skids:
-            GeneFabLogger().warning(f"{desc} did not shrink {n_skids} times")
+            GeneFabLogger(warning=f"{desc} did not shrink {n_skids} times")
