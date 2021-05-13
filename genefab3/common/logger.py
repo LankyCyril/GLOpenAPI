@@ -1,7 +1,7 @@
 from flask import request
 from datetime import datetime
 from functools import lru_cache
-from logging import getLogger, DEBUG, Handler
+from logging import getLogger, Handler, DEBUG, INFO
 
 
 def log_to_mongo_collection(collection, et=None, ev=None, stack=None, is_exception=False, **kwargs):
@@ -35,7 +35,7 @@ class MongoDBLogger(Handler):
         self.collection = collection
         super().__init__()
     def emit(self, record):
-        if self.collection:
+        if self.collection and (record.levelno > INFO):
             log_to_mongo_collection(
                 self.collection, et=record.levelname, ev=record.getMessage(),
                 stack=record.stack_info, is_exception=False,
