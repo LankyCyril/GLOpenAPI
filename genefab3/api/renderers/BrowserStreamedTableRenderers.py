@@ -111,32 +111,35 @@ def twolevel(obj, context, squash_preheader=False, frozen=0, indent=None):
     title_postfix = f"{context.view} {context.complete_kwargs}"
     msg = "HTML: converting StreamedTable into interactive table"
     GeneFabLogger().info(msg)
-    if isinstance(obj, StreamedAnnotationTable) and (context.view != "status"):
-        formatters = iterate_formatters(obj.columns, context)
-    else:
-        formatters = []
-    if squash_preheader:
-        columns = ((f"{c[0]}<br>{c[1]}", c[2]) for c in obj.columns)
-    else:
-        columns = obj.columns
-    replacements = {
-        "$APPNAME": f"{context.app_name}: {title_postfix}",
-        "$SQUASH_PREHEADER": SQUASHED_PREHEADER_CSS if squash_preheader else "",
-        "$CSVLINK": build_url(context, drop={"format"}) + "format=csv",
-        "$TSVLINK": build_url(context, drop={"format"}) + "format=tsv",
-        "$JSONLINK": build_url(context, drop={"format"}) + "format=json",
-        "$VIEWDEPENDENTLINKS": get_view_dependent_links(obj, context),
-        "$ASSAYSVIEW": build_url(context, "assays"),
-        "$SAMPLESVIEW": build_url(context, "samples"),
-        "$DATAVIEW": build_url(context, "data"),
-        "$COLUMNDATA": _iter_json_chunks(data=columns, length=obj.shape[1]),
-        "$ROWDATA": _iter_json_chunks(data=obj.values, length=obj.shape[0]),
-        "$CONTEXTURL": build_url(context),
-        "$FORMATTERS": "\n".join(formatters),
-        "$FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
-    }
-    template_file = Path(__file__).parent / "dataframe.html"
-    content = lambda: _iter_html_chunks(template_file, replacements)
+    def content():
+        is_annotation_table = isinstance(obj, StreamedAnnotationTable)
+        if is_annotation_table and (context.view != "status"):
+            formatters = iterate_formatters(obj.columns, context)
+        else:
+            formatters = []
+        if squash_preheader:
+            columns = ((f"{c[0]}<br>{c[1]}", c[2]) for c in obj.columns)
+            preheader_css = SQUASHED_PREHEADER_CSS
+        else:
+            columns, preheader_css = obj.columns, ""
+        replacements = {
+            "$APPNAME": f"{context.app_name}: {title_postfix}",
+            "$SQUASH_PREHEADER": preheader_css,
+            "$CSVLINK": build_url(context, drop={"format"}) + "format=csv",
+            "$TSVLINK": build_url(context, drop={"format"}) + "format=tsv",
+            "$JSONLINK": build_url(context, drop={"format"}) + "format=json",
+            "$VIEWDEPENDENTLINKS": get_view_dependent_links(obj, context),
+            "$ASSAYSVIEW": build_url(context, "assays"),
+            "$SAMPLESVIEW": build_url(context, "samples"),
+            "$DATAVIEW": build_url(context, "data"),
+            "$COLUMNDATA": _iter_json_chunks(data=columns, length=obj.shape[1]),
+            "$ROWDATA": _iter_json_chunks(data=obj.values, length=obj.shape[0]),
+            "$CONTEXTURL": build_url(context),
+            "$FORMATTERS": "\n".join(formatters),
+            "$FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
+        }
+        template_file = Path(__file__).parent / "dataframe.html"
+        yield from _iter_html_chunks(template_file, replacements)
     return content, "text/html"
 
 
