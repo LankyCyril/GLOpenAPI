@@ -8,7 +8,7 @@ from collections import Counter, OrderedDict
 from collections.abc import Iterable
 from re import search, sub
 from genefab3.common.hacks import apply_hack, speed_up_data_schema
-from genefab3.db.sql.utils import sql_connection
+from genefab3.db.sql.utils import SQLTransaction
 
 
 class TempSelect():
@@ -19,7 +19,7 @@ class TempSelect():
         self._depends_on = _depends_on # keeps sources from being deleted early
         self.query, self.targets, self.kind = query, targets, kind
         self.name = "TEMP:" + random_unique_string(seed=query)
-        with sql_connection(self.sqlite_db, "tables") as (_, execute):
+        with SQLTransaction(self.sqlite_db, "tables") as (_, execute):
             try:
                 execute(f"CREATE {self.kind} `{self.name}` as {query}")
             except OperationalError:
@@ -32,7 +32,7 @@ class TempSelect():
                 GeneFabLogger().info(f"{msg} {self.name} from {query_repr}")
  
     def __del__(self):
-        with sql_connection(self.sqlite_db, "tables") as (_, execute):
+        with SQLTransaction(self.sqlite_db, "tables") as (_, execute):
             try:
                 execute(f"DROP {self.kind} `{self.name}`")
             except OperationalError:

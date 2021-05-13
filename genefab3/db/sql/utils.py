@@ -20,7 +20,7 @@ def apply_pragma(execute, pragma, value, filename, access_warning):
 
 
 @contextmanager
-def sql_connection(filename, desc=None, *, timeout=600):
+def SQLTransaction(filename, desc=None, *, timeout=600):
     """Preconfigure `filename` if new, allow long timeout (for tasks sent to background), expose connection and execute()"""
     if filename is None:
         msg = f"SQLite database ({desc!r}) was not specified"

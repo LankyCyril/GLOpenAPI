@@ -1,5 +1,5 @@
 from genefab3.common.logger import GeneFabLogger
-from genefab3.db.sql.utils import sql_connection
+from genefab3.db.sql.utils import SQLTransaction
 from functools import wraps
 from genefab3.common.types import ResponseContainer
 from flask import Response
@@ -35,7 +35,7 @@ class ResponseCache():
             _logw("ResponseCache():\n  LRU SQL cache DISABLED by client")
         else:
             _kw = dict(desc="response_cache", timeout=5)
-            with sql_connection(self.sqlite_db, **_kw) as (connection, execute):
+            with SQLTransaction(self.sqlite_db, **_kw) as (connection, execute):
                 for table, schema in RESPONSE_CACHE_SCHEMAS:
                     query = f"CREATE TABLE IF NOT EXISTS `{table}` {schema}"
                     execute(query)
@@ -83,7 +83,7 @@ class ResponseCache():
         def _put():
             _kw = dict(desc="response_cache")
             retrieved_at = int(datetime.now().timestamp())
-            with sql_connection(self.sqlite_db, **_kw) as (_, execute):
+            with SQLTransaction(self.sqlite_db, **_kw) as (_, execute):
                 try:
                     execute("""DELETE FROM `response_cache` WHERE
                         `context_identity` == ?""", [context.identity])
@@ -117,7 +117,7 @@ class ResponseCache():
     @bypass_if_disabled
     def drop(self, accession):
         """Drop responses for given accession"""
-        with sql_connection(self.sqlite_db, "response_cache") as (_, execute):
+        with SQLTransaction(self.sqlite_db, "response_cache") as (_, execute):
             try:
                 query = """SELECT `context_identity` FROM `accessions_used`
                     WHERE `accession` == ?"""
@@ -135,7 +135,7 @@ class ResponseCache():
     @bypass_if_disabled
     def drop_all(self):
         """Drop all cached responses"""
-        with sql_connection(self.sqlite_db, "response_cache") as (_, execute):
+        with SQLTransaction(self.sqlite_db, "response_cache") as (_, execute):
             try:
                 execute("DELETE FROM `accessions_used`")
                 execute("DELETE FROM `response_cache`")
@@ -148,7 +148,7 @@ class ResponseCache():
     def _iterdecompress(self, cid):
         """Iteratively decompress chunks retrieved from database by `context_identity`"""
         decompressor = decompressobj()
-        with sql_connection(self.sqlite_db, "response_cache") as (_, execute):
+        with SQLTransaction(self.sqlite_db, "response_cache") as (_, execute):
             query = """SELECT `mimetype` FROM `response_cache`
                 WHERE `context_identity` == ? LIMIT 1"""
             mimetype, = execute(query, [cid]).fetchone() or [None]
@@ -201,7 +201,7 @@ class ResponseCache():
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
                 _logi(f"ResponseCache():\n  is being shrunk")
                 _kw = dict(filename=self.sqlite_db, desc="response_cache")
-                with sql_connection(**_kw) as (connection, execute):
+                with SQLTransaction(**_kw) as (connection, execute):
                     query_oldest = f"""SELECT `context_identity`
                         FROM `response_cache` ORDER BY `retrieved_at` ASC"""
                     try:

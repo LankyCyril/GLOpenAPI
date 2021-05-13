@@ -1,7 +1,7 @@
 from itertools import count
 from sqlite3 import OperationalError, Binary
 from genefab3.db.sql.streamed_tables import SQLiteIndexName
-from genefab3.db.sql.utils import sql_connection
+from genefab3.db.sql.utils import SQLTransaction
 from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
 from genefab3.common.logger import GeneFabLogger
 from threading import Thread
@@ -24,7 +24,7 @@ class SQLiteObject():
         """Initialize SQLiteObject, ensure tables in `sqlite_db`"""
         self.sqlite_db, self.table_schemas = sqlite_db, table_schemas
         self.changed = None
-        with sql_connection(self.sqlite_db, "tables") as (_, execute):
+        with SQLTransaction(self.sqlite_db, "tables") as (_, execute):
             for table, schema in (table_schemas or {}).items():
                 execute(
                     "CREATE TABLE IF NOT EXISTS `{}` ({})".format(
@@ -70,7 +70,7 @@ class SQLiteObject():
             self_id_value = getattr(self, id_field)
             query = f"""SELECT `timestamp` FROM `{timestamp_table}`
                 WHERE `{id_field}` == "{self_id_value}" """
-        with sql_connection(self.sqlite_db, desc) as (connection, execute):
+        with SQLTransaction(self.sqlite_db, desc) as (connection, execute):
             ret = execute(query).fetchall()
             if len(ret) == 0:
                 return True
@@ -148,7 +148,7 @@ class SQLiteBlob(SQLiteObject):
     def update(self):
         """Run `self.data_getter` and insert result into `self.table` as BLOB"""
         blob = Binary(bytes(self.compressor(self.data_getter())))
-        with sql_connection(self.sqlite_db, "blobs") as (connection, execute):
+        with SQLTransaction(self.sqlite_db, "blobs") as (connection, execute):
             self.drop(connection=connection)
             execute(f"""INSERT INTO `{self.table}`
                 (`identifier`,`blob`,`timestamp`,`retrieved_at`)
@@ -159,7 +159,7 @@ class SQLiteBlob(SQLiteObject):
  
     def retrieve(self):
         """Take `blob` from `self.table` and decompress with `self.decompressor`"""
-        with sql_connection(self.sqlite_db, "blobs") as (connection, execute):
+        with SQLTransaction(self.sqlite_db, "blobs") as (connection, execute):
             query = f"""SELECT `blob` from `{self.table}`
                 WHERE `identifier` == "{self.identifier}" """
             ret = execute(query).fetchall()
@@ -229,7 +229,7 @@ class SQLiteTable(SQLiteObject):
     def update(self, to_sql_kws=dict(index=True, if_exists="replace", chunksize=1024)):
         """Update `self.table` with result of `self.data_getter()`, update `self.aux_table` with timestamps"""
         dataframe = self._validated_dataframe(self.data_getter())
-        with sql_connection(self.sqlite_db, "tables") as (connection, execute):
+        with SQLTransaction(self.sqlite_db, "tables") as (connection, execute):
             self.drop(connection=connection)
             bounds = range(0, dataframe.shape[1], self.maxpartcols)
             parts = SQLiteObject.iterparts(self.table, connection, must_exist=0)
@@ -256,7 +256,7 @@ class SQLiteTable(SQLiteObject):
     def retrieve(self):
         """Create an StreamedDataTableWizard object dispatching columns to table parts"""
         column_dispatcher = OrderedDict()
-        with sql_connection(self.sqlite_db, "tables") as (connection, _):
+        with SQLTransaction(self.sqlite_db, "tables") as (connection, _):
             parts = SQLiteObject.iterparts(self.table, connection)
             for partname, index_name, columns in parts:
                 if index_name not in column_dispatcher:
@@ -278,7 +278,7 @@ class SQLiteTable(SQLiteObject):
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
                 GeneFabLogger().info(f"{desc} is being shrunk")
                 _kw = dict(filename=self.sqlite_db, desc="tables")
-                with sql_connection(**_kw) as (connection, execute):
+                with SQLTransaction(**_kw) as (connection, execute):
                     query_oldest = f"""SELECT `table`
                         FROM `{self.aux_table}` ORDER BY `retrieved_at` ASC"""
                     try:

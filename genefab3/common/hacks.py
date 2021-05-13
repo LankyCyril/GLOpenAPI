@@ -1,5 +1,5 @@
 from functools import wraps
-from genefab3.db.sql.utils import sql_connection
+from genefab3.db.sql.utils import SQLTransaction
 from genefab3.common.types import NaN, StreamedDataTable
 from genefab3.common.utils import random_unique_string
 from pandas import DataFrame
@@ -26,7 +26,7 @@ class _TempSchemaSource():
         self.sqlite_db = sqlite_db
         self.name = "SCHEMA_HACK:" + random_unique_string()
     def __del__(self):
-        with sql_connection(self.sqlite_db, "tables") as (_, execute):
+        with SQLTransaction(self.sqlite_db, "tables") as (_, execute):
             try:
                 execute(f"DROP TABLE `{self.name}`")
             except OperationalError:
@@ -44,7 +44,7 @@ def _make_sub(self, table):
     source_name, query_filter = table.source_select.name, table.query_filter
     mkquery = lambda t: f"SELECT {t} FROM `{source_name}` {query_filter}"
     n_rows_query = f"SELECT COUNT(*) FROM `{source_name}` {query_filter}"
-    with sql_connection(table.sqlite_db, "tables") as (connection, execute):
+    with SQLTransaction(table.sqlite_db, "tables") as (connection, execute):
         fetch = lambda query: execute(query).fetchone()
         minima = fetch(mkquery(functargets("MIN")))
         maxima = fetch(mkquery(functargets("MAX")))
