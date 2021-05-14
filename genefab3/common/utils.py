@@ -6,7 +6,7 @@ from itertools import chain, count
 from base64 import b64encode
 from uuid import uuid3, uuid4
 from contextlib import contextmanager
-from requests import head as request_head
+from requests import get as request_get
 from urllib.error import URLError
 from re import compile
 from genefab3.common.exceptions import GeneFabConfigurationException
@@ -39,9 +39,10 @@ def random_unique_string(seed=""):
 def pick_reachable_url(urls, name=None):
     """Iterate `urls` and get the first reachable URL"""
     def _pick():
+        get_kws = dict(allow_redirects=True, stream=True)
         for url in urls:
             try:
-                with request_head(url, allow_redirects=True) as response:
+                with request_get(url, **get_kws) as response:
                     if response.ok:
                         return url
             except (URLError, OSError):
