@@ -1,6 +1,6 @@
 from genefab3.db.sql.core import SQLiteObject, SQLiteBlob, SQLiteTable
 from genefab3.common.exceptions import GeneFabLogger
-from urllib.request import urlopen
+from requests import get as request_get
 from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabDataManagerException
 from sqlite3 import Binary, OperationalError
@@ -35,9 +35,9 @@ class CachedBinaryFile(SQLiteBlob):
         for url in self.urls:
             GeneFabLogger(info=f"{self.name}; trying URL:\n  {url}")
             try:
-                with urlopen(url) as response:
-                    data = response.read()
-            except URLError:
+                with request_get(url) as response:
+                    data = response.content
+            except (URLError, OSError):
                 msg = f"{self.name}; tried URL and failed:\n  {url}"
                 GeneFabLogger(warning=msg)
             else:
@@ -82,9 +82,12 @@ class CachedTableFile(SQLiteTable):
             with open(tempfile, mode="wb") as handle:
                 GeneFabLogger(info=f"{self.name}; trying URL:\n  {url}")
                 try:
-                    with urlopen(url) as response:
-                        copyfileobj(response, handle)
-                except URLError:
+                    with request_get(url, stream=True) as response:
+                        response.raw.decode_content = False
+                        msg = f"{self.name}:\n  streaming to {handle.name}"
+                        GeneFabLogger(debug=msg)
+                        copyfileobj(response.raw, handle)
+                except (URLError, OSError):
                     msg = f"{self.name}; tried URL and failed:\n  {url}"
                     GeneFabLogger(warning=msg)
                 else:

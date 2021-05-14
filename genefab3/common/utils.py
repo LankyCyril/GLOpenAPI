@@ -7,7 +7,6 @@ from base64 import b64encode
 from uuid import uuid3, uuid4
 from contextlib import contextmanager
 from requests import head as request_head
-from urllib.request import urlopen
 from urllib.error import URLError
 from re import compile
 from genefab3.common.exceptions import GeneFabConfigurationException
@@ -48,18 +47,10 @@ def pick_reachable_url(urls, name=None):
             except (URLError, OSError):
                 continue
         else:
-            for url in urls:
-                try:
-                    urlopen(url)
-                except URLError:
-                    continue
-                else:
-                    return url
+            if name:
+                raise URLError(f"No URLs are reachable for {name}: {urls}")
             else:
-                if name:
-                    raise URLError(f"No URLs are reachable for {name}: {urls}")
-                else:
-                    raise URLError(f"No URLs are reachable: {urls}")
+                raise URLError(f"No URLs are reachable: {urls}")
     yield _pick()
 
 
