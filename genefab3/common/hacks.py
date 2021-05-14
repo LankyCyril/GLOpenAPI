@@ -1,13 +1,13 @@
-from functools import wraps, reduce, partial
-from genefab3.db.sql.utils import sql_connection
+from functools import wraps
+from genefab3.db.sql.utils import SQLTransaction
+from genefab3.common.types import NaN, StreamedDataTable
+from genefab3.common.utils import random_unique_string
+from pandas import DataFrame
 from sqlite3 import OperationalError
-from numpy import nan
-from pandas import DataFrame, merge
-from genefab3.common.exceptions import GeneFabDatabaseException
-from genefab3.common.types import DataDataFrame
-from genefab3.common.exceptions import GeneFabFormatException
-from genefab3.common.logger import GeneFabLogger
+from pandas.io.sql import DatabaseError as PandasDatabaseError
+from genefab3.common.exceptions import GeneFabDatabaseException, GeneFabLogger
 from genefab3.common.exceptions import GeneFabConfigurationException
+from re import search
 
 
 def apply_hack(hack):
@@ -20,73 +20,77 @@ def apply_hack(hack):
     return outer
 
 
-def get_OSDF_Single_schema(self):
-    """Replaces OndemandSQLiteDataFrame_Single.get() with retrieval of just values informative for 'schema=1'"""
-    from genefab3.db.sql.pandas import SQLiteIndexName
-    index_name, data, found = None, {}, lambda v: v is not None
-    with sql_connection(self.sqlite_db, "tables") as (_, execute):
-        fetch = lambda query: execute(query).fetchone()
-        whitelist = {self.index.name, *self.columns.get_level_values(-1)}
-        try:
-            for part, columns in self._inverse_column_dispatcher.items():
-                mktargets = lambda f: ",".join(f"{f}(`{c}`)" for c in columns)
-                mkquery = lambda t: f"SELECT {t} FROM `{part}` LIMIT 1"
-                minima = fetch(mkquery(mktargets("MIN")))
-                maxima = fetch(mkquery(mktargets("MAX")))
-                counts = fetch(mkquery(mktargets("COUNT")))
-                n_rows = fetch(f"SELECT COUNT(*) FROM `{part}` LIMIT 1")[0]
-                hasnan = [(n_rows - c) > 0 for c in counts]
-                for c, m, M, h in zip(columns, minima, maxima, hasnan):
-                    _min = m if found(m) else M if found(M) else nan
-                    _max = M if found(M) else _min
-                    _nan = nan if h else _max
-                    if isinstance(c, SQLiteIndexName):
-                        index_name = str(c)
-                    if c in whitelist:
-                        data[c] = [_min, _max, _nan]
-        except OperationalError as e:
-            _kw = dict(table=self.name, debug_info=repr(e))
-            raise GeneFabDatabaseException("Data could not be retrieved", **_kw)
-        else:
-            dataframe = DataFrame(data)
-            if (set(dataframe.columns) != whitelist):
-                msg = "Failed to apply schema speedup, columns did not match"
-                raise GeneFabDatabaseException(msg, table=self.name)
+class _TempSchemaSource():
+    """Temporary source for hacked table; similar to TempSelect()"""
+    def __init__(self, sqlite_db):
+        self.sqlite_db = sqlite_db
+        self.name = "SCHEMA_HACK:" + random_unique_string()
+    def __del__(self):
+        desc = "tables/hacks/_TempSchemaSource/__del__"
+        with SQLTransaction(self.sqlite_db, desc) as (_, execute):
+            try:
+                execute(f"DROP TABLE `{self.name}`")
+            except OperationalError:
+                msg = f"Failed to drop temporary SQLite TABLE {self.name}"
+                GeneFabLogger(error=msg)
             else:
-                if index_name is not None:
-                    dataframe.set_index(index_name, inplace=True)
-                dataframe = dataframe[self.columns.get_level_values(-1)]
-                dataframe.columns = self.columns
-            return DataDataFrame(dataframe)
+                msg = f"Dropped temporary SQLite TABLE {self.name}"
+                GeneFabLogger(info=msg)
 
 
-def get_OSDF_OuterJoined_schema(self, *, context):
-    """Replaces OndemandSQLiteDataFrame_OuterJoined.get() with retrieval of just values informative for 'schema=1'"""
-    merge_kws = dict(left_index=True, right_index=True, how="outer", sort=False)
-    return DataDataFrame(reduce(
-        partial(merge, **merge_kws),
-        (obj.get(context=context) for obj in self.objs),
-    ))
+def _make_sub(self, table):
+    """Make substitute source and query for quick retrieval of values informative for schema"""
+    sql_targets = [self._index_name, *("/".join(c) for c in self.columns)]
+    functargets = lambda f: ",".join(f"{f}(`{st}`)" for st in sql_targets)
+    source_name, query_filter = table.source_select.name, table.query_filter
+    mkquery = lambda t: f"SELECT {t} FROM `{source_name}` {query_filter}"
+    n_rows_query = f"SELECT COUNT(*) FROM `{source_name}` {query_filter}"
+    desc = "tables/hacks/_make_sub"
+    with SQLTransaction(table.sqlite_db, desc) as (connection, execute):
+        fetch = lambda query: execute(query).fetchone()
+        minima = fetch(mkquery(functargets("MIN")))
+        maxima = fetch(mkquery(functargets("MAX")))
+        counts = fetch(mkquery(functargets("COUNT")))
+        n_rows = fetch(n_rows_query)[0]
+        hasnan = [(n_rows - c) > 0 for c in counts]
+        sub_source = _TempSchemaSource(sqlite_db=table.sqlite_db)
+        sub_data = DataFrame(columns=sql_targets)
+        for t, m, M, h in zip(sql_targets, minima, maxima, hasnan):
+            _min = m if (m is not None) else (M if (M is not None) else NaN)
+            _max = M if (M is not None) else _min
+            _nan = NaN if h else _max
+            sub_data[t] = [_min, _max, _nan]
+        try:
+            sub_data.set_index(self._index_name, inplace=True)
+            sub_data.to_sql(sub_source.name, connection, if_exists="replace")
+        except (OperationalError, PandasDatabaseError) as e:
+            msg = "Schema speedup failed: could not create substitute table"
+            raise GeneFabDatabaseException(msg, debug_info=repr(e))
+        else:
+            return sub_source
 
 
 def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
-    """If context.schema == '1', replaces OndemandSQLiteDataFrame.get() with quick retrieval of just values informative schema"""
+    """If context.schema == '1', replaces underlying query with quick retrieval of just values informative for schema"""
+    from genefab3.db.sql.streamed_tables import StreamedDataTableWizard
+    table = get(self, context=context, limit=limit, offset=offset)
     if context.schema != "1":
-        kwargs = dict(context=context, limit=limit, offset=offset)
-        return get(self, **kwargs)
-    elif context.data_comparisons or context.data_columns or limit or offset:
-        msg = "Table manipulation is not supported when requesting schema"
-        sug = "Remove comparisons and/or column, row slicing from query"
-        raise GeneFabFormatException(msg, suggestion=sug)
+        return table
+    elif isinstance(self, StreamedDataTableWizard):
+        GeneFabLogger(info=f"apply_hack(speed_up_data_schema) for {self.name}")
+        return StreamedDataTable(
+            sqlite_db=self.sqlite_db, source_select=_make_sub(self, table),
+            targets=table.targets, query_filter=table.query_filter, na_rep=NaN,
+        )
     else:
-        from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_Single
-        from genefab3.db.sql.pandas import OndemandSQLiteDataFrame_OuterJoined
-        msg = f"apply_hack(speed_up_data_schema) for {self.name}"
-        GeneFabLogger().info(msg)
-        if isinstance(self, OndemandSQLiteDataFrame_Single):
-            return get_OSDF_Single_schema(self)
-        elif isinstance(self, OndemandSQLiteDataFrame_OuterJoined):
-            return get_OSDF_OuterJoined_schema(self, context=context)
-        else:
-            msg = "Schema speedup applied to unsupported object type"
-            raise GeneFabConfigurationException(msg, type=type(self))
+        msg = "Schema speedup applied to unsupported object type"
+        raise GeneFabConfigurationException(msg, type=type(self))
+
+
+def bypass_uncached_views(get, self, context):
+    """If serving favicon, bypass checking response_cache"""
+    if (context.view == "") or search(r'^favicon\.[A-Za-z0-9]+$', context.view):
+        from genefab3.common.types import ResponseContainer
+        return ResponseContainer(content=None)
+    else:
+        return get(self, context)

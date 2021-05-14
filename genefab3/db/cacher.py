@@ -1,6 +1,6 @@
 from threading import Thread
 from genefab3.db.sql.response_cache import ResponseCache
-from genefab3.common.logger import GeneFabLogger
+from genefab3.common.exceptions import GeneFabLogger
 from genefab3.db.mongo.index import ensure_info_index
 from genefab3.db.mongo.index import update_metadata_value_lookup
 from time import sleep
@@ -47,12 +47,12 @@ class CacherThread(Thread):
                 delay = self.metadata_update_interval
             else:
                 delay = self.metadata_retry_delay
-            GeneFabLogger().info(f"{self._id}:\n  Sleeping for {delay} seconds")
+            GeneFabLogger(info=f"{self._id}:\n  Sleeping for {delay} seconds")
             sleep(delay)
  
     def recache_metadata(self):
         """Instantiate each available dataset; if contents changed, dataset automatically updates db.metadata"""
-        GeneFabLogger().info(f"{self._id}:\n  Checking metadata cache")
+        GeneFabLogger(info=f"{self._id}:\n  Checking metadata cache")
         try:
             collection = self.mongo_collections.metadata
             accessions = OrderedDict(
@@ -61,7 +61,7 @@ class CacherThread(Thread):
                 updated=set(), stale=set(), dropped=set(), failed=set(),
             )
         except Exception as e:
-            GeneFabLogger().error(f"{self._id}:\n  {repr(e)}")
+            GeneFabLogger(error=f"{self._id}:\n  {e!r}")
             return None, False
         def _iterate():
             for a in accessions["cached"] - accessions["live"]:
@@ -81,8 +81,8 @@ class CacherThread(Thread):
             mongo_client = self.genefab3_client.mongo_client
             n_apps = sum(1 for _ in iterate_mongo_connections(mongo_client))
             msg = f"Total number of active MongoDB connections: {n_apps}"
-            GeneFabLogger().info(msg)
-        GeneFabLogger().info(f"{self._id}, datasets:\n  " + ", ".join(
+            GeneFabLogger(info=msg)
+        GeneFabLogger(info=f"{self._id}, datasets:\n  " + ", ".join(
             f"{k}={len(v)}" for k, v in accessions.items()
         ))
         return accessions, True
