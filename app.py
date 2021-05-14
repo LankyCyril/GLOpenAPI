@@ -35,7 +35,6 @@ genefab3_client = GeneFabClient(
         ),
     ),
     cacher_params=dict(
-        enabled=False,
         metadata_update_interval=1800,
         metadata_retry_delay=300,
     ),
