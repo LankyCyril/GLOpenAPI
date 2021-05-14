@@ -1,5 +1,5 @@
 from genefab3.common.utils import copy_except
-from genefab3.common.exceptions import GeneFabISAException
+from genefab3.common.exceptions import GeneFabISAException, GeneFabLogger
 from re import search, sub
 from collections import defaultdict
 from genefab3.common.exceptions import GeneFabConfigurationException
@@ -76,7 +76,12 @@ class Investigation(dict):
         json = df.drop(columns=nn, errors="ignore").to_dict(orient="records")
         for entry in json:
             for key in set(entry.keys()):
-                match = search(r'^Comment\s*\[\s*(.+[^\s]\s*)\]\s*$', key)
+                try:
+                    match = search(r'^Comment\s*\[\s*(.+[^\s]\s*)\]\s*$', key)
+                except TypeError as e:
+                    msg = f"ISA: json key is not a string: {key!r}"
+                    GeneFabLogger(error=msg, exc_info=e)
+                    raise
                 if match:
                     field, value = match.group(1), entry[key]
                     del entry[key]
@@ -154,29 +159,34 @@ class StudyEntries(list):
         json = {"Id": {f"{self._self_identifier} Name": name}}
         protocol_ref, qualifiable = nan, None
         for column, value in row.items():
-            field, subfield, extra = self._parse_field(column)
-            if field == "Protocol REF":
-                protocol_ref = value
-            elif self._is_not_qualifier(field): # top-level field
-                if not subfield: # e.g. "Source Name"
-                    qualifiable = self._INPLACE_add_toplevel_field(
-                        json, field, value, protocol_ref,
-                    )
-                else: # e.g. "Characteristics[Age]"
-                    qualifiable = self._INPLACE_add_metadatalike(
-                        json, field, subfield, value, protocol_ref,
-                        status_kwargs,
-                    )
-            else: # qualify entry at pointer with second-level field
-                if qualifiable is None:
-                    msg = "Qualifier before main field"
-                    _kw = copy_except(status_kwargs, "collection")
-                    raise GeneFabISAException(msg, field=value, **_kw)
-                else:
-                    self._INPLACE_qualify(
-                        qualifiable, field, subfield, value,
-                        status_kwargs={**status_kwargs, "name": name},
-                    )
+            try:
+                field, subfield, extra = self._parse_field(column)
+            except TypeError as e:
+                msg = f"ISA: column is not a string: {column!r}"
+                GeneFabLogger(warning=msg, exc_info=e)
+            else:
+                if field == "Protocol REF":
+                    protocol_ref = value
+                elif self._is_not_qualifier(field): # top-level field
+                    if not subfield: # e.g. "Source Name"
+                        qualifiable = self._INPLACE_add_toplevel_field(
+                            json, field, value, protocol_ref,
+                        )
+                    else: # e.g. "Characteristics[Age]"
+                        qualifiable = self._INPLACE_add_metadatalike(
+                            json, field, subfield, value, protocol_ref,
+                            status_kwargs,
+                        )
+                else: # qualify entry at pointer with second-level field
+                    if qualifiable is None:
+                        msg = "Qualifier before main field"
+                        _kw = copy_except(status_kwargs, "collection")
+                        raise GeneFabISAException(msg, field=value, **_kw)
+                    else:
+                        self._INPLACE_qualify(
+                            qualifiable, field, subfield, value,
+                            status_kwargs={**status_kwargs, "name": name},
+                        )
         return json
  
     def _parse_field(self, column):
