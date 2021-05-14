@@ -207,17 +207,17 @@ class ResponseCache():
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
                 desc = "response_cache/shrink"
                 _kw = dict(filename=self.sqlite_db, desc=desc)
-                with SQLTransaction(**_kw) as (connection, execute):
+                with SQLTransaction(**_kw) as (_, execute):
                     query_oldest = f"""SELECT `context_identity`
                         FROM `response_cache` ORDER BY `retrieved_at` ASC"""
+                    cid = (execute(query_oldest).fetchone() or [None])[0]
+                    if cid is None:
+                        break
+                with SQLTransaction(**_kw) as (connection, execute):
                     try:
-                        cid = (execute(query_oldest).fetchone() or [None])[0]
-                        if cid is None:
-                            break
-                        else:
-                            msg = f"ResponseCache.shrink():\n  dropping {cid}"
-                            GeneFabLogger(info=msg)
-                            self._drop_by_context_identity(execute, cid)
+                        msg = f"ResponseCache.shrink():\n  dropping {cid}"
+                        GeneFabLogger(info=msg)
+                        self._drop_by_context_identity(execute, cid)
                     except OperationalError as e:
                         msg= f"Rolling back shrinkage due to {e!r}"
                         GeneFabLogger(error=msg)

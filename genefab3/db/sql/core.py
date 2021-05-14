@@ -55,7 +55,8 @@ class SQLiteObject():
     @classmethod
     def drop_all_parts(cls, table, connection):
         """During an open connection, drop all parts of `table`"""
-        for partname, *_ in cls.iterparts(table, connection, must_exist=True):
+        _iterparts = cls.iterparts(table, connection, must_exist=True)
+        for partname, *_ in list(_iterparts):
             try:
                 connection.execute(f"DROP TABLE IF EXISTS `{partname}`")
             except Exception as e:
@@ -244,16 +245,16 @@ class SQLiteTable(SQLiteObject):
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
                 _kw = dict(filename=self.sqlite_db, desc="tables/cleanup")
-                with SQLTransaction(**_kw) as (connection, execute):
+                with SQLTransaction(**_kw) as (_, execute):
                     query_oldest = f"""SELECT `table`
                         FROM `{self.aux_table}` ORDER BY `retrieved_at` ASC"""
+                    table = (execute(query_oldest).fetchone() or [None])[0]
+                    if table is None:
+                        break
+                with SQLTransaction(**_kw) as (connection, _):
                     try:
-                        table = (execute(query_oldest).fetchone() or [None])[0]
-                        if table is None:
-                            break
-                        else:
-                            GeneFabLogger(info=f"{desc} shrinking: {table}")
-                            self.drop(connection=connection, other=table)
+                        GeneFabLogger(info=f"{desc} purging: {table}")
+                        self.drop(connection=connection, other=table)
                     except OperationalError as e:
                         msg= f"Rolling back shrinkage due to {e!r}"
                         GeneFabLogger(error=msg)
