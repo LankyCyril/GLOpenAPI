@@ -220,7 +220,7 @@ class ResponseCache():
                         self._drop_by_context_identity(execute, cid)
                     except OperationalError as e:
                         msg= f"Rolling back shrinkage due to {e!r}"
-                        GeneFabLogger(error=msg)
+                        GeneFabLogger(error=msg, exc_info=e)
                         connection.rollback()
                         break
                     else:

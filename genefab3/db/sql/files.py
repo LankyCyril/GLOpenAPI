@@ -37,9 +37,9 @@ class CachedBinaryFile(SQLiteBlob):
             try:
                 with request_get(url) as response:
                     data = response.content
-            except (URLError, OSError):
+            except (URLError, OSError) as e:
                 msg = f"{self.name}; tried URL and failed:\n  {url}"
-                GeneFabLogger(warning=msg)
+                GeneFabLogger(warning=msg, exc_info=e)
             else:
                 msg = f"{self.name}; successfully fetched blob:\n  {url}"
                 GeneFabLogger(info=msg)
@@ -87,9 +87,9 @@ class CachedTableFile(SQLiteTable):
                         msg = f"{self.name}:\n  streaming to {handle.name}"
                         GeneFabLogger(debug=msg)
                         copyfileobj(response.raw, handle)
-                except (URLError, OSError):
+                except (URLError, OSError) as e:
                     msg = f"{self.name}; tried URL and failed:\n  {url}"
-                    GeneFabLogger(warning=msg)
+                    GeneFabLogger(warning=msg, exc_info=e)
                 else:
                     msg = f"{self.name}; successfully fetched data:\n  {url}"
                     GeneFabLogger(info=msg)
@@ -154,7 +154,7 @@ class CachedTableFile(SQLiteTable):
                         GeneFabLogger(info=f"{msg}:\n  {self.name}, {tempname}")
                 except (OperationalError, PandasDatabaseError, ValueError) as e:
                     msg = "Failed to insert SQLite chunk (or chunk part)"
-                    GeneFabLogger(error=f"{msg}:\n  {self.name}, {e!r}")
+                    GeneFabLogger(error=f"{msg}:\n  {self.name}", exc_info=e)
                     connection.rollback()
                     return
             parts = SQLiteObject.iterparts(self.table, connection, must_exist=0)

@@ -30,9 +30,9 @@ class _TempSchemaSource():
         with SQLTransaction(self.sqlite_db, desc) as (_, execute):
             try:
                 execute(f"DROP TABLE `{self.name}`")
-            except OperationalError:
+            except OperationalError as e:
                 msg = f"Failed to drop temporary SQLite TABLE {self.name}"
-                GeneFabLogger(error=msg)
+                GeneFabLogger(error=msg, exc_info=e)
             else:
                 msg = f"Dropped temporary SQLite TABLE {self.name}"
                 GeneFabLogger(info=msg)

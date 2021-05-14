@@ -61,7 +61,7 @@ class CacherThread(Thread):
                 updated=set(), stale=set(), dropped=set(), failed=set(),
             )
         except Exception as e:
-            GeneFabLogger(error=f"{self._id}:\n  {e!r}")
+            GeneFabLogger(error=f"{self._id}:\n  {e!r}", exc_info=e)
             return None, False
         def _iterate():
             for a in accessions["cached"] - accessions["live"]:
@@ -124,6 +124,8 @@ class CacherThread(Thread):
                             warning="No samples", accession=dataset.accession,
                         )
                 except Exception as e:
+                    msg = f"{self._id} @ {dataset.accession} samples:\n  {e!r}"
+                    GeneFabLogger(error=msg, exc_info=e)
                     return e
                 else:
                     return None
@@ -146,11 +148,14 @@ class CacherThread(Thread):
             else:
                 dataset = None
         except Exception as e:
+            msg = f"{self._id} @ {accession}:\n  {e!r}"
             if has_cache:
                 status = "stale"
                 report = f"failed to retrieve ({repr(e)}), kept stale"
+                GeneFabLogger(warning=msg, exc_info=e)
             else:
                 status, report = "failed", f"failed to retrieve ({repr(e)})"
+                GeneFabLogger(error=msg, exc_info=e)
             return status, report, e
         if dataset is not None: # files have changed OR needs to be re-inserted
             self.drop_single_dataset_metadata(accession)
