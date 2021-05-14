@@ -10,9 +10,9 @@ genefab_logger = getLogger("genefab3")
 genefab_logger.setLevel(DEBUG)
 
 
-def GeneFabLogger(**kwargs):
+def GeneFabLogger(exc_info=None, **kwargs):
     for func, message in kwargs.items():
-        getattr(genefab_logger, func)(message)
+        getattr(genefab_logger, func)(message, exc_info=exc_info)
     return genefab_logger
 
 
