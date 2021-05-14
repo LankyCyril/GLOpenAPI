@@ -13,12 +13,15 @@ from genefab3.db.sql.utils import SQLTransaction
 class TempSelect():
     """Temporary table or view generated from `query`"""
  
-    def __init__(self, *, sqlite_db, query, targets, kind="TABLE", _depends_on=None):
+    def __init__(self, *, sqlite_db, query, targets, kind="TABLE", _depends_on=None, msg=None):
         self.sqlite_db = sqlite_db
         self._depends_on = _depends_on # keeps sources from being deleted early
         self.query, self.targets, self.kind = query, targets, kind
         self.name = "TEMP:" + random_unique_string(seed=query)
-        with SQLTransaction(self.sqlite_db, "tables") as (_, execute):
+        desc = "tables/TempSelect"
+        with SQLTransaction(self.sqlite_db, desc) as (_, execute):
+            if msg:
+                GeneFabLogger(info=msg)
             try:
                 execute(f"CREATE {self.kind} `{self.name}` as {query}")
             except OperationalError:
@@ -31,7 +34,8 @@ class TempSelect():
                 GeneFabLogger(info=f"{msg} {self.name} from\n  {query_repr}")
  
     def __del__(self):
-        with SQLTransaction(self.sqlite_db, "tables") as (_, execute):
+        desc = "tables/TempSelect/__del__"
+        with SQLTransaction(self.sqlite_db, desc) as (_, execute):
             try:
                 execute(f"DROP {self.kind} `{self.name}`")
             except OperationalError:
@@ -147,7 +151,7 @@ class StreamedDataTableWizard():
             query_filter=self._make_query_filter(context, limit, offset),
             na_rep=NaN,
         )
-        msg = f"retrieving from SQLite as StreamedDataTable"
+        msg = f"staged to retrieve from SQLite as StreamedDataTable"
         GeneFabLogger(info=f"{self.name};\n  {msg}")
         return data
  
@@ -211,9 +215,8 @@ class StreamedDataTableWizard_Single(StreamedDataTableWizard):
     def make_select(self, kind):
         """Temporarily expose requested data as SQL table or view"""
         _n, _icd = len(self.columns), self._inverse_column_dispatcher
-        _tt = "\n  ".join(("", *_icd))
-        msg = f"retrieving {_n} columns from {len(_icd)} table(s):{_tt}"
-        GeneFabLogger(info=f"{self.name}; {msg}")
+        _li, _tt = len(_icd), "\n  ".join(("", *_icd))
+        msg = f"{self.name}; retrieving {_n} columns from {_li} table(s):{_tt}"
         join_statement = " NATURAL JOIN ".join(f"`{p}`" for p in _icd)
         columns_as_slashed_columns = [
             f"""`{self._column_dispatcher[rawcol]}`.`{rawcol}`
@@ -224,7 +227,7 @@ class StreamedDataTableWizard_Single(StreamedDataTableWizard):
             SELECT `{self._index_name}`,{','.join(columns_as_slashed_columns)}
             FROM {join_statement}"""
         return TempSelect(
-            sqlite_db=self.sqlite_db, kind=kind, query=query, targets=[
+            sqlite_db=self.sqlite_db, kind=kind, query=query, msg=msg, targets=[
                 f"`{self._columns_raw2slashed[rawcol]}`"
                 for *_, rawcol in self.columns
             ],

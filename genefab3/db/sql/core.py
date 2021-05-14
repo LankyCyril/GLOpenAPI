@@ -21,7 +21,8 @@ class SQLiteObject():
         """Initialize SQLiteObject, ensure tables in `sqlite_db`"""
         self.sqlite_db, self.table_schemas = sqlite_db, table_schemas
         self.changed = None
-        with SQLTransaction(self.sqlite_db, "tables") as (_, execute):
+        desc = "tables/ensure_schema"
+        with SQLTransaction(self.sqlite_db, desc) as (_, execute):
             for table, schema in (table_schemas or {}).items():
                 execute(
                     "CREATE TABLE IF NOT EXISTS `{}` ({})".format(
@@ -55,7 +56,13 @@ class SQLiteObject():
     def drop_all_parts(cls, table, connection):
         """During an open connection, drop all parts of `table`"""
         for partname, *_ in cls.iterparts(table, connection, must_exist=True):
-            connection.execute(f"DROP TABLE IF EXISTS `{partname}`")
+            try:
+                connection.execute(f"DROP TABLE IF EXISTS `{partname}`")
+            except Exception as e:
+                GeneFabLogger(error=f"Could not drop {partname}: {e!r}")
+                raise
+            else:
+                GeneFabLogger(info=f"Dropped {partname} (if it existed)")
  
     def is_stale(self, *, timestamp_table=None, id_field=None, db_type=None):
         """Evaluates to True if underlying data in need of update, otherwise False"""
@@ -63,7 +70,8 @@ class SQLiteObject():
             msg = "did not pass arguments to self.is_stale(), will never update"
             GeneFabLogger(warning=f"{type(self).__name__} {msg}")
         else:
-            desc = db_type or f"for {type(self).__name__}"
+            db_type = db_type or f"{type(self).__name__}"
+            desc = f"{db_type}/is_stale"
             self_id_value = getattr(self, id_field)
             query = f"""SELECT `timestamp` FROM `{timestamp_table}`
                 WHERE `{id_field}` == "{self_id_value}" """
@@ -131,8 +139,15 @@ class SQLiteBlob(SQLiteObject):
  
     def drop(self, *, connection, other=None):
         identifier = other or self.identifier
-        connection.execute(f"""DELETE FROM `{self.table}`
-            WHERE `identifier` == "{identifier}" """)
+        try:
+            connection.execute(f"""DELETE FROM `{self.table}`
+                WHERE `identifier` == "{identifier}" """)
+        except Exception as e:
+            msg = f"Could not delete from {self.table}: {identifier}: {e!r}"
+            GeneFabLogger(error=msg)
+            raise
+        else:
+            GeneFabLogger(info=f"Deleted from {self.table}: {identifier}")
  
     def is_stale(self):
         """Evaluates to True if underlying data in need of update, otherwise False"""
@@ -143,7 +158,8 @@ class SQLiteBlob(SQLiteObject):
  
     def retrieve(self):
         """Take `blob` from `self.table` and decompress with `self.decompressor`"""
-        with SQLTransaction(self.sqlite_db, "blobs") as (connection, execute):
+        desc = "blobs/retrieve"
+        with SQLTransaction(self.sqlite_db, desc) as (connection, execute):
             query = f"""SELECT `blob` from `{self.table}`
                 WHERE `identifier` == "{self.identifier}" """
             ret = execute(query).fetchall()
@@ -185,8 +201,15 @@ class SQLiteTable(SQLiteObject):
  
     def drop(self, *, connection, other=None):
         table = other or self.table
-        connection.execute(f"""DELETE FROM `{self.aux_table}`
-            WHERE `table` == "{table}" """)
+        try:
+            connection.execute(f"""DELETE FROM `{self.aux_table}`
+                WHERE `table` == "{table}" """)
+        except Exception as e:
+            msg = f"Could not delete from {self.aux_table}: {table}: {e!r}"
+            GeneFabLogger(error=msg)
+            raise
+        else:
+            GeneFabLogger(info=f"Deleted from {self.aux_table}: {table}")
         SQLiteObject.drop_all_parts(table, connection)
  
     def is_stale(self):
@@ -199,7 +222,8 @@ class SQLiteTable(SQLiteObject):
     def retrieve(self):
         """Create an StreamedDataTableWizard object dispatching columns to table parts"""
         column_dispatcher = OrderedDict()
-        with SQLTransaction(self.sqlite_db, "tables") as (connection, _):
+        desc = "tables/retrieve"
+        with SQLTransaction(self.sqlite_db, desc) as (connection, _):
             parts = SQLiteObject.iterparts(self.table, connection)
             for partname, index_name, columns in parts:
                 if index_name not in column_dispatcher:
@@ -219,8 +243,7 @@ class SQLiteTable(SQLiteObject):
         for _ in range(max_iter):
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
-                GeneFabLogger(info=f"{desc} is being shrunk")
-                _kw = dict(filename=self.sqlite_db, desc="tables")
+                _kw = dict(filename=self.sqlite_db, desc="tables/cleanup")
                 with SQLTransaction(**_kw) as (connection, execute):
                     query_oldest = f"""SELECT `table`
                         FROM `{self.aux_table}` ORDER BY `retrieved_at` ASC"""
@@ -229,8 +252,11 @@ class SQLiteTable(SQLiteObject):
                         if table is None:
                             break
                         else:
+                            GeneFabLogger(info=f"{desc} shrinking: {table}")
                             self.drop(connection=connection, other=table)
-                    except OperationalError:
+                    except OperationalError as e:
+                        msg= f"Rolling back shrinkage due to {e!r}"
+                        GeneFabLogger(error=msg)
                         connection.rollback()
                         break
                     else:

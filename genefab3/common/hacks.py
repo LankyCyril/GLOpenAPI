@@ -26,7 +26,8 @@ class _TempSchemaSource():
         self.sqlite_db = sqlite_db
         self.name = "SCHEMA_HACK:" + random_unique_string()
     def __del__(self):
-        with SQLTransaction(self.sqlite_db, "tables") as (_, execute):
+        desc = "tables/hacks/_TempSchemaSource/__del__"
+        with SQLTransaction(self.sqlite_db, desc) as (_, execute):
             try:
                 execute(f"DROP TABLE `{self.name}`")
             except OperationalError:
@@ -44,7 +45,8 @@ def _make_sub(self, table):
     source_name, query_filter = table.source_select.name, table.query_filter
     mkquery = lambda t: f"SELECT {t} FROM `{source_name}` {query_filter}"
     n_rows_query = f"SELECT COUNT(*) FROM `{source_name}` {query_filter}"
-    with SQLTransaction(table.sqlite_db, "tables") as (connection, execute):
+    desc = "tables/hacks/_make_sub"
+    with SQLTransaction(table.sqlite_db, desc) as (connection, execute):
         fetch = lambda query: execute(query).fetchone()
         minima = fetch(mkquery(functargets("MIN")))
         maxima = fetch(mkquery(functargets("MAX")))

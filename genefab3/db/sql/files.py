@@ -54,7 +54,8 @@ class CachedBinaryFile(SQLiteBlob):
         """Run `self.__download_as_blob()` and insert result (optionally compressed) into `self.table` as BLOB"""
         blob = Binary(bytes(self.compressor(self.__download_as_blob())))
         retrieved_at = int(datetime.now().timestamp())
-        with SQLTransaction(self.sqlite_db, "blobs") as (connection, execute):
+        desc = "blobs/update"
+        with SQLTransaction(self.sqlite_db, desc) as (connection, execute):
             self.drop(connection=connection)
             execute(f"""INSERT INTO `{self.table}`
                 (`identifier`,`blob`,`timestamp`,`retrieved_at`)
@@ -128,7 +129,8 @@ class CachedTableFile(SQLiteTable):
     def update(self, to_sql_kws=dict(index=True, if_exists="append", chunksize=1024)):
         """Update `self.table` with result of `self.__download_as_pandas_chunks()`, update `self.aux_table` with timestamps"""
         columns, width, bounds, temppartnames = None, None, None, None
-        with SQLTransaction(self.sqlite_db, "tables") as (connection, execute):
+        desc = "tables/update"
+        with SQLTransaction(self.sqlite_db, desc) as (connection, execute):
             for csv_chunk in self.__download_as_pandas_chunks():
                 try:
                     columns = csv_chunk.columns if columns is None else columns

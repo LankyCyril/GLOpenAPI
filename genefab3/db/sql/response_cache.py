@@ -35,7 +35,7 @@ class ResponseCache():
         if self.sqlite_db is None:
             _logw("ResponseCache():\n  LRU SQL cache DISABLED by client")
         else:
-            _kw = dict(desc="response_cache", timeout=5)
+            _kw = dict(desc="response_cache/ensure_schema", timeout=5)
             with SQLTransaction(self.sqlite_db, **_kw) as (connection, execute):
                 for table, schema in RESPONSE_CACHE_SCHEMAS:
                     query = f"CREATE TABLE IF NOT EXISTS `{table}` {schema}"
@@ -83,7 +83,7 @@ class ResponseCache():
             return
         def _put():
             retrieved_at = int(datetime.now().timestamp())
-            _kw = dict(desc="response_cache")
+            _kw = dict(desc="response_cache/put")
             with SQLTransaction(self.sqlite_db, **_kw) as (_, execute):
                 try:
                     execute("""DELETE FROM `response_cache` WHERE
@@ -119,7 +119,8 @@ class ResponseCache():
     @bypass_if_disabled
     def drop(self, accession):
         """Drop responses for given accession"""
-        with SQLTransaction(self.sqlite_db, "response_cache") as (_, execute):
+        desc = "response_cache/drop"
+        with SQLTransaction(self.sqlite_db, desc) as (_, execute):
             try:
                 query = """SELECT `context_identity` FROM `accessions_used`
                     WHERE `accession` == ?"""
@@ -137,7 +138,8 @@ class ResponseCache():
     @bypass_if_disabled
     def drop_all(self):
         """Drop all cached responses"""
-        with SQLTransaction(self.sqlite_db, "response_cache") as (_, execute):
+        desc = "response_cache/drop_all"
+        with SQLTransaction(self.sqlite_db, desc) as (_, execute):
             try:
                 execute("DELETE FROM `accessions_used`")
                 execute("DELETE FROM `response_cache`")
@@ -150,7 +152,8 @@ class ResponseCache():
     def _iterdecompress(self, cid):
         """Iteratively decompress chunks retrieved from database by `context_identity`"""
         decompressor = decompressobj()
-        with SQLTransaction(self.sqlite_db, "response_cache") as (_, execute):
+        desc = "response_cache/_iterdecompress"
+        with SQLTransaction(self.sqlite_db, desc) as (_, execute):
             query = """SELECT `mimetype` FROM `response_cache`
                 WHERE `context_identity` == ? LIMIT 1"""
             mimetype, = execute(query, [cid]).fetchone() or [None]
@@ -202,8 +205,8 @@ class ResponseCache():
         for _ in range(max_iter):
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
-                _logi(f"ResponseCache():\n  is being shrunk")
-                _kw = dict(filename=self.sqlite_db, desc="response_cache")
+                desc = "response_cache/shrink"
+                _kw = dict(filename=self.sqlite_db, desc=desc)
                 with SQLTransaction(**_kw) as (connection, execute):
                     query_oldest = f"""SELECT `context_identity`
                         FROM `response_cache` ORDER BY `retrieved_at` ASC"""
@@ -212,8 +215,12 @@ class ResponseCache():
                         if cid is None:
                             break
                         else:
+                            msg = f"ResponseCache.shrink():\n  dropping {cid}"
+                            GeneFabLogger(info=msg)
                             self._drop_by_context_identity(execute, cid)
-                    except OperationalError:
+                    except OperationalError as e:
+                        msg= f"Rolling back shrinkage due to {e!r}"
+                        GeneFabLogger(error=msg)
                         connection.rollback()
                         break
                     else:

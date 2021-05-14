@@ -290,7 +290,8 @@ class StreamedDataTable(StreamedTable):
         self.query = f"""
             SELECT {targets} FROM `{source_select.name}` {query_filter}
         """
-        with SQLTransaction(self.sqlite_db, "tables") as (connection, execute):
+        desc = "tables/StreamedDataTable"
+        with SQLTransaction(self.sqlite_db, desc) as (connection, execute):
             try:
                 cursor = connection.cursor()
                 cursor.execute(self.query)
@@ -355,7 +356,8 @@ class StreamedDataTable(StreamedTable):
         """Iterate index line by line, like in pandas"""
         if self.n_index_levels:
             index_query = f"SELECT `{self._index_name}` FROM ({self.query})"
-            with SQLTransaction(self.sqlite_db, "tables") as (_, execute):
+            desc = "tables/StreamedDataTable/index"
+            with SQLTransaction(self.sqlite_db, desc) as (_, execute):
                 try:
                     if self.na_rep is None:
                         yield from execute(index_query)
@@ -371,7 +373,8 @@ class StreamedDataTable(StreamedTable):
     @property
     def values(self):
         """Iterate values line by line, like in pandas"""
-        _kw = dict(filename=self.sqlite_db, desc="tables")
+        desc = "tables/StreamedDataTable/values"
+        _kw = dict(filename=self.sqlite_db, desc=desc)
         try:
             if self.na_rep is None:
                 if self.n_index_levels:
