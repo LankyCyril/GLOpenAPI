@@ -4,9 +4,9 @@ from urllib.request import urlopen
 from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabDataManagerException
 from sqlite3 import Binary, OperationalError
-from genefab3.db.sql.utils import SQLTransaction
 from datetime import datetime
-from genefab3.common.utils import as_is
+from genefab3.db.sql.utils import SQLTransaction
+from genefab3.common.utils import as_is, random_unique_string
 from shutil import copyfileobj
 from tempfile import TemporaryDirectory
 from os import path
@@ -14,7 +14,6 @@ from csv import Error as CSVError, Sniffer
 from pandas import read_csv
 from pandas.errors import ParserError as PandasParserError
 from pandas.io.sql import DatabaseError as PandasDatabaseError
-from genefab3.common.exceptions import GeneFabDatabaseException
 from genefab3.common.exceptions import GeneFabFileException
  
 
@@ -54,14 +53,13 @@ class CachedBinaryFile(SQLiteBlob):
     def update(self):
         """Run `self.__download_as_blob()` and insert result (optionally compressed) into `self.table` as BLOB"""
         blob = Binary(bytes(self.compressor(self.__download_as_blob())))
+        retrieved_at = int(datetime.now().timestamp())
         with SQLTransaction(self.sqlite_db, "blobs") as (connection, execute):
             self.drop(connection=connection)
             execute(f"""INSERT INTO `{self.table}`
                 (`identifier`,`blob`,`timestamp`,`retrieved_at`)
                 VALUES(?,?,?,?)""", [
-                self.identifier, blob,
-                self.timestamp, int(datetime.now().timestamp()),
-            ])
+                self.identifier, blob, self.timestamp, retrieved_at])
 
 
 class CachedTableFile(SQLiteTable):
@@ -96,7 +94,7 @@ class CachedTableFile(SQLiteTable):
             msg = "None of the URLs are reachable for file"
             raise GeneFabDataManagerException(msg, name=self.name, urls=urls)
  
-    def __download_as_pandas_dataframe(self):
+    def __download_as_pandas_chunks(self, chunksize=1024):
         """Download and parse data from URL as a table"""
         with TemporaryDirectory() as tempdir:
             tempfile = path.join(tempdir, self.name)
@@ -114,41 +112,52 @@ class CachedTableFile(SQLiteTable):
             try:
                 with _open(tempfile, mode="rt", newline="") as handle:
                     sep = Sniffer().sniff(handle.read(2**20)).delimiter
-                dataframe = read_csv(
-                    tempfile, sep=sep, compression=compression,
-                    **self.pandas_kws,
+                _reader_kw = dict(
+                    sep=sep, compression=compression,
+                    chunksize=chunksize, **self.pandas_kws,
                 )
-                msg = f"{self.name}; interpreted as table:\n  {tempfile}"
-                GeneFabLogger(info=msg)
-                self.INPLACE_process(dataframe)
-                return dataframe
+                for i, csv_chunk in enumerate(read_csv(tempfile, **_reader_kw)):
+                    self.INPLACE_process(csv_chunk)
+                    msg = f"interpreted table chunk {i}:\n  {tempfile}"
+                    GeneFabLogger(info=f"{self.name}; {msg}")
+                    yield csv_chunk
             except (IOError, UnicodeDecodeError, CSVError, PandasParserError):
                 msg = "Not recognized as a table file"
                 raise GeneFabFileException(msg, name=self.name, url=self.url)
  
-    def update(self, to_sql_kws=dict(index=True, if_exists="replace", chunksize=1024)):
-        """Update `self.table` with result of `self.__download_as_pandas_dataframe()`, update `self.aux_table` with timestamps"""
-        dataframe = self.__download_as_pandas_dataframe()
+    def update(self, to_sql_kws=dict(index=True, if_exists="append", chunksize=1024)):
+        """Update `self.table` with result of `self.__download_as_pandas_chunks()`, update `self.aux_table` with timestamps"""
+        columns, width, bounds, temppartnames = None, None, None, None
         with SQLTransaction(self.sqlite_db, "tables") as (connection, execute):
-            self.drop(connection=connection)
-            bounds = range(0, dataframe.shape[1], self.maxpartcols)
+            for csv_chunk in self.__download_as_pandas_chunks():
+                try:
+                    columns = csv_chunk.columns if columns is None else columns
+                    if width is None:
+                        width = csv_chunk.shape[1]
+                        bounds = bounds or range(0, width, self.maxpartcols)
+                        _pn = lambda: "DLPT:" + random_unique_string()
+                        temppartnames = temppartnames or [_pn() for _ in bounds]
+                    if (csv_chunk.shape[1] != width):
+                        raise ValueError("Inconsistent chunk width")
+                    if (csv_chunk.columns != columns).any():
+                        raise ValueError("Inconsistent chunk column names")
+                    for bound, tempname in zip(bounds, temppartnames):
+                        csv_chunk.iloc[:,bound:bound+self.maxpartcols].to_sql(
+                            tempname, connection, **to_sql_kws,
+                        )
+                        msg = "Extended table for CachedTableFile"
+                        GeneFabLogger(info=f"{msg}:\n  {self.name}, {tempname}")
+                except (OperationalError, PandasDatabaseError, ValueError) as e:
+                    msg = "Failed to insert SQLite chunk (or chunk part)"
+                    GeneFabLogger(error=f"{msg}:\n  {self.name}, {e!r}")
+                    connection.rollback()
+                    return
             parts = SQLiteObject.iterparts(self.table, connection, must_exist=0)
-            try:
-                for bound, (partname, *_) in zip(bounds, parts):
-                    msg = "Creating table for SQLiteObject"
-                    GeneFabLogger(info=f"{msg}:\n  {partname}")
-                    dataframe.iloc[:,bound:bound+self.maxpartcols].to_sql(
-                        partname, connection, **to_sql_kws,
-                    )
-                execute(f"""INSERT INTO `{self.aux_table}`
-                    (`table`,`timestamp`,`retrieved_at`) VALUES(?,?,?)""", [
-                    self.table, self.timestamp, int(datetime.now().timestamp()),
-                ])
-            except (OperationalError, PandasDatabaseError) as e:
-                self.drop(connection=connection)
-                msg = "Failed to insert SQLite table (or table part)"
-                _kw = dict(part=partname, debug_info=repr(e))
-                raise GeneFabDatabaseException(msg, **_kw)
-            else:
-                msg = "All tables inserted for SQLiteObject"
-                GeneFabLogger(info=f"{msg}:\n  {self.table}")
+            for tempname, (partname, *_) in zip(temppartnames, parts):
+                execute(f"ALTER TABLE `{tempname}` RENAME TO `{partname}`")
+            execute(f"""INSERT INTO `{self.aux_table}`
+                (`table`,`timestamp`,`retrieved_at`) VALUES(?,?,?)""", [
+                self.table, self.timestamp, int(datetime.now().timestamp()),
+            ])
+            msg = "Finished extending; all parts inserted for CachedTableFile"
+            GeneFabLogger(info=f"{msg}:\n  {self.name}\n  {self.table}")
