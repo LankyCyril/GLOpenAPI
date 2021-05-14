@@ -40,6 +40,7 @@ def get(*, genefab3_client, sqlite_dbs, context):
     table = StreamedAnnotationTable(
         cursor=chain(
             [sqlite_db_report(n, d) for n, d in sqlite_dbs.__dict__.items()],
+            [mongo_db_report(genefab3_client.mongo_client)],
             genefab3_client.mongo_collections.status.aggregate([
                 {"$group": {"_id": {
                     "id": {c: f"${c}" for c in ID_COLUMNS},
