@@ -37,7 +37,7 @@ def get(*, genefab3_client, sqlite_dbs, context):
     for _ in iterate_terminal_leaves(context.query):
         msg = "Metadata queries are not valid for view"
         raise GeneFabParserException(msg, view="status")
-    return StreamedAnnotationTable(
+    table = StreamedAnnotationTable(
         cursor=chain(
             [sqlite_db_report(n, d) for n, d in sqlite_dbs.__dict__.items()],
             genefab3_client.mongo_collections.status.aggregate([
@@ -52,3 +52,5 @@ def get(*, genefab3_client, sqlite_dbs, context):
         ),
         na_rep=None,
     )
+    table.cacheable = False
+    return table
