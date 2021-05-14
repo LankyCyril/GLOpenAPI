@@ -25,16 +25,17 @@ genefab3_client = GeneFabClient(
     ),
     sqlite_params=dict(
         blobs=dict(
-            db="./.genefab3.sqlite3/blobs.db", maxsize=None,
+            db="./.genefab3.sqlite3/blobs_.db", maxsize=None,
         ),
         tables=dict(
-            db="./.genefab3.sqlite3/tables.db", maxsize=48*GiB,
+            db="./.genefab3.sqlite3/tables_.db", maxsize=48*GiB,
         ),
         response_cache=dict(
-            db="./.genefab3.sqlite3/response-cache.db", maxsize=24*GiB,
+            db="./.genefab3.sqlite3/response-cache_.db", maxsize=24*GiB,
         ),
     ),
     cacher_params=dict(
+        enabled=False,
         metadata_update_interval=1800,
         metadata_retry_delay=300,
     ),
