@@ -12,7 +12,6 @@ from io import BytesIO, StringIO
 from os import path
 from logging import getLogger, CRITICAL
 from isatools.isatab import load_investigation
-from pandas.errors import ParserError
 
 
 class Investigation(dict):
@@ -293,20 +292,10 @@ class IsaFromZip():
  
     def _read_tab(self, handle, status_kwargs):
         """Read TSV file, absorbing encoding errors, and allowing for duplicate column names"""
-        byte_tee = BytesIO(handle.read())
-        reader_kwargs = dict(
-            sep="\t", comment="#", header=None, index_col=False,
+        safe_handle = StringIO(handle.read().decode(errors="replace"))
+        raw_tab = read_csv(
+            safe_handle, sep="\t", comment="#", header=None, index_col=False,
         )
-        try:
-            raw_tab = read_csv(byte_tee, **reader_kwargs)
-        except (UnicodeDecodeError, ParserError) as e:
-            byte_tee.seek(0)
-            string_tee = StringIO(byte_tee.read().decode(errors="replace"))
-            raw_tab = read_csv(string_tee, **reader_kwargs)
-            update_status(
-                **status_kwargs, report_type="parser message", status="warning",
-                error=e, warning="Absorbing exception when parsing file",
-            )
         raw_tab.columns = raw_tab.iloc[0,:]
         raw_tab.columns.name = None
         return raw_tab.drop(index=[0]).drop_duplicates().reset_index(drop=True)
