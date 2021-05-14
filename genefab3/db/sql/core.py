@@ -1,19 +1,16 @@
-from itertools import count
-from sqlite3 import OperationalError, Binary
-from genefab3.db.sql.streamed_tables import SQLiteIndexName
 from genefab3.db.sql.utils import SQLTransaction
 from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
+from itertools import count
+from sqlite3 import OperationalError
+from genefab3.db.sql.streamed_tables import SQLiteIndexName
 from genefab3.common.exceptions import GeneFabLogger
 from threading import Thread
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.common.utils import as_is
-from datetime import datetime
 from genefab3.common.exceptions import GeneFabDatabaseException
 from math import inf
-from pandas import DataFrame
 from collections import OrderedDict
 from genefab3.db.sql.streamed_tables import StreamedDataTableWizard_Single
-from pandas.io.sql import DatabaseError as PandasDatabaseError
 from os import path
 
 
@@ -112,7 +109,7 @@ class SQLiteObject():
 class SQLiteBlob(SQLiteObject):
     """Represents an SQLiteObject initialized with a spec suitable for a binary blob"""
  
-    def __init__(self, *, sqlite_db, identifier, table, timestamp, data_getter, compressor=None, decompressor=None, maxdbsize=None):
+    def __init__(self, *, sqlite_db, identifier, table, timestamp, compressor=None, decompressor=None, maxdbsize=None):
         if not table.startswith("BLOBS:"):
             msg = "Table name for SQLiteBlob must start with 'BLOBS:'"
             raise GeneFabConfigurationException(msg, table=table)
@@ -129,7 +126,6 @@ class SQLiteBlob(SQLiteObject):
             )
             self.identifier = validate_no_doublequote(identifier, "identifier")
             self.table, self.timestamp = table, timestamp
-            self.data_getter = data_getter
             self.compressor = compressor or as_is
             self.decompressor = decompressor or as_is
  
@@ -144,18 +140,6 @@ class SQLiteBlob(SQLiteObject):
             self, timestamp_table=self.table, id_field="identifier",
             db_type="blobs",
         )
- 
-    def update(self):
-        """Run `self.data_getter` and insert result into `self.table` as BLOB"""
-        blob = Binary(bytes(self.compressor(self.data_getter())))
-        with SQLTransaction(self.sqlite_db, "blobs") as (connection, execute):
-            self.drop(connection=connection)
-            execute(f"""INSERT INTO `{self.table}`
-                (`identifier`,`blob`,`timestamp`,`retrieved_at`)
-                VALUES(?,?,?,?)""", [
-                self.identifier, blob,
-                self.timestamp, int(datetime.now().timestamp()),
-            ])
  
     def retrieve(self):
         """Take `blob` from `self.table` and decompress with `self.decompressor`"""
@@ -177,7 +161,7 @@ class SQLiteBlob(SQLiteObject):
 class SQLiteTable(SQLiteObject):
     """Represents an SQLiteObject initialized with a spec suitable for a generic table"""
  
-    def __init__(self, *, sqlite_db, table, aux_table, timestamp, data_getter, maxpartcols=998, maxdbsize=None):
+    def __init__(self, *, sqlite_db, table, aux_table, timestamp, maxpartcols=998, maxdbsize=None):
         if not table.startswith("TABLE:"):
             msg = "Table name for SQLiteTable must start with 'TABLE:'"
             raise GeneFabConfigurationException(msg, table=table)
@@ -198,7 +182,6 @@ class SQLiteTable(SQLiteObject):
             )
             self.aux_table, self.timestamp = aux_table, timestamp
             self.maxpartcols, self.maxdbsize = maxpartcols, maxdbsize or inf
-            self.data_getter = data_getter
  
     def drop(self, *, connection, other=None):
         table = other or self.table
@@ -212,46 +195,6 @@ class SQLiteTable(SQLiteObject):
             self, timestamp_table=self.aux_table, id_field="table",
             db_type="tables",
         )
- 
-    def _validated_dataframe(self, dataframe):
-        if not isinstance(dataframe, DataFrame):
-            msg = "Cached table not represented as pandas DataFrame(s)"
-            raise NotImplementedError(msg)
-        elif dataframe.index.nlevels != 1:
-            msg = "MultiIndex in cached DataFrame"
-            raise NotImplementedError(msg)
-        elif dataframe.columns.nlevels != 1:
-            msg = "MultiIndex columns in cached DataFrame"
-            raise NotImplementedError(msg)
-        else:
-            return dataframe
- 
-    def update(self, to_sql_kws=dict(index=True, if_exists="replace", chunksize=1024)):
-        """Update `self.table` with result of `self.data_getter()`, update `self.aux_table` with timestamps"""
-        dataframe = self._validated_dataframe(self.data_getter())
-        with SQLTransaction(self.sqlite_db, "tables") as (connection, execute):
-            self.drop(connection=connection)
-            bounds = range(0, dataframe.shape[1], self.maxpartcols)
-            parts = SQLiteObject.iterparts(self.table, connection, must_exist=0)
-            try:
-                for bound, (partname, *_) in zip(bounds, parts):
-                    msg = "Creating table for SQLiteObject"
-                    GeneFabLogger(info=f"{msg}:\n  {partname}")
-                    dataframe.iloc[:,bound:bound+self.maxpartcols].to_sql(
-                        partname, connection, **to_sql_kws,
-                    )
-                execute(f"""INSERT INTO `{self.aux_table}`
-                    (`table`,`timestamp`,`retrieved_at`) VALUES(?,?,?)""", [
-                    self.table, self.timestamp, int(datetime.now().timestamp()),
-                ])
-            except (OperationalError, PandasDatabaseError) as e:
-                self.drop(connection=connection)
-                msg = "Failed to insert SQLite table (or table part)"
-                _kw = dict(part=partname, debug_info=repr(e))
-                raise GeneFabDatabaseException(msg, **_kw)
-            else:
-                msg = "All tables inserted for SQLiteObject"
-                GeneFabLogger(info=f"{msg}:\n  {self.table}")
  
     def retrieve(self):
         """Create an StreamedDataTableWizard object dispatching columns to table parts"""
