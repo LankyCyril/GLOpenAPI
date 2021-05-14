@@ -29,7 +29,7 @@ class Dataset():
             isa_name, isa_desc = next(iter(isa_files.items()))
             urls = isa_desc.get("urls", ())
             isa_file = CachedBinaryFile(
-                name=isa_name, identifier=f"{accession}/ISA/{isa_name}",
+                name=isa_name, identifier=f"BLOB:{accession}/ISA/{isa_name}",
                 sqlite_db=self.sqlite_db, maxdbsize=self.maxdbsize,
                 urls=urls, timestamp=isa_desc.get("timestamp", -1),
             )

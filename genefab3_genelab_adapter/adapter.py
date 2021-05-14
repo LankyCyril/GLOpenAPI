@@ -1,5 +1,4 @@
-from urllib.request import urlopen
-from json import loads
+from requests import get as request_get
 from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabDataManagerException
 from pandas import Timestamp, json_normalize
@@ -66,9 +65,9 @@ KNOWN_DATATYPES = {
 def read_json(url):
     """Get parsed JSON from URL"""
     try:
-        with urlopen(url) as response:
-            return loads(response.read().decode())
-    except URLError:
+        with request_get(url) as response:
+            return response.json()
+    except (URLError, OSError):
         raise GeneFabDataManagerException("Not found", url=url)
 
 

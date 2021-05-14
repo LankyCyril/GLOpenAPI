@@ -1,15 +1,19 @@
-from genefab3.db.sql.core import SQLiteBlob, SQLiteTable
-from genefab3.common.utils import as_is
-from genefab3.common.logger import GeneFabLogger
-from urllib.request import urlopen
+from genefab3.db.sql.core import SQLiteObject, SQLiteBlob, SQLiteTable
+from genefab3.common.exceptions import GeneFabLogger
+from requests import get as request_get
 from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabDataManagerException
+from sqlite3 import Binary, OperationalError
+from datetime import datetime
+from genefab3.db.sql.utils import SQLTransaction
+from genefab3.common.utils import as_is, random_unique_string
 from shutil import copyfileobj
 from tempfile import TemporaryDirectory
 from os import path
 from csv import Error as CSVError, Sniffer
 from pandas import read_csv
 from pandas.errors import ParserError as PandasParserError
+from pandas.io.sql import DatabaseError as PandasDatabaseError
 from genefab3.common.exceptions import GeneFabFileException
  
 
@@ -18,81 +22,87 @@ class CachedBinaryFile(SQLiteBlob):
  
     def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, table="BLOBS:blobs", compressor=None, decompressor=None, maxdbsize=None):
         """Interpret file descriptors; inherit functionality from SQLiteBlob; define equality (hashableness) of self"""
-        self.name, self.url, self.timestamp = name, None, timestamp
-        self.identifier = identifier
-        self.table = table
+        self.name = name
+        self.url, self.urls = None, urls
         SQLiteBlob.__init__(
-            self, identifier=identifier, timestamp=timestamp,
-            data_getter=lambda: self.__download_as_blob(urls),
-            sqlite_db=sqlite_db, maxdbsize=maxdbsize, table=table,
+            self, sqlite_db=sqlite_db, maxdbsize=maxdbsize,
+            table=table, identifier=identifier, timestamp=timestamp,
             compressor=compressor, decompressor=decompressor,
         )
  
-    def __download_as_blob(self, urls):
+    def __download_as_blob(self):
         """Download data from URL as-is"""
-        self.url, data = None, None
-        for url in urls:
-            msg = f"{self.name}; trying URL:\n  {url}"
-            GeneFabLogger().info(msg)
+        for url in self.urls:
+            GeneFabLogger(info=f"{self.name}; trying URL:\n  {url}")
             try:
-                with urlopen(url) as response:
-                    data = response.read()
-            except URLError:
+                with request_get(url) as response:
+                    data = response.content
+            except (URLError, OSError):
                 msg = f"{self.name}; tried URL and failed:\n  {url}"
-                GeneFabLogger().warning(msg)
+                GeneFabLogger(warning=msg)
             else:
                 msg = f"{self.name}; successfully fetched blob:\n  {url}"
-                GeneFabLogger().info(msg)
+                GeneFabLogger(info=msg)
                 self.url = url
                 return data
         else:
             msg = "None of the URLs are reachable for file"
-            raise GeneFabDataManagerException(msg, name=self.name, urls=urls)
+            _kw = dict(name=self.name, urls=self.urls)
+            raise GeneFabDataManagerException(msg, **_kw)
+ 
+    def update(self):
+        """Run `self.__download_as_blob()` and insert result (optionally compressed) into `self.table` as BLOB"""
+        blob = Binary(bytes(self.compressor(self.__download_as_blob())))
+        retrieved_at = int(datetime.now().timestamp())
+        desc = "blobs/update"
+        with SQLTransaction(self.sqlite_db, desc) as (connection, execute):
+            self.drop(connection=connection)
+            execute(f"""INSERT INTO `{self.table}`
+                (`identifier`,`blob`,`timestamp`,`retrieved_at`)
+                VALUES(?,?,?,?)""", [
+                self.identifier, blob, self.timestamp, retrieved_at])
 
 
 class CachedTableFile(SQLiteTable):
     """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxpartwidth=1000, maxdbsize=None, **pandas_kws):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxdbsize=None, **pandas_kws):
         """Interpret file descriptors; inherit functionality from SQLiteTable; define equality (hashableness) of self"""
-        self.name, self.url, self.timestamp = name, None, timestamp
-        self.identifier = identifier
-        self.aux_table = aux_table
-        self.table = f"TABLE:{identifier}"
+        self.name, self.identifier = name, identifier
+        self.url, self.urls = None, urls
+        self.pandas_kws, self.INPLACE_process = pandas_kws, INPLACE_process
         SQLiteTable.__init__(
-            self, identifier=f"TABLE:{identifier}", timestamp=timestamp,
-            data_getter=lambda: self.__download_as_pandas_dataframe(
-                urls, pandas_kws, INPLACE_process,
-            ),
-            sqlite_db=sqlite_db, maxdbsize=maxdbsize,
-            table=self.table, aux_table=aux_table, maxpartwidth=maxpartwidth,
+            self, sqlite_db=sqlite_db, maxdbsize=maxdbsize,
+            table=identifier, aux_table=aux_table, timestamp=timestamp,
         )
  
     def __copyfileobj(self, urls, tempfile):
         """Try all URLs and push data into temporary file"""
         for url in urls:
             with open(tempfile, mode="wb") as handle:
-                msg = f"{self.name}; trying URL:\n  {url}"
-                GeneFabLogger().info(msg)
+                GeneFabLogger(info=f"{self.name}; trying URL:\n  {url}")
                 try:
-                    with urlopen(url) as response:
-                        copyfileobj(response, handle)
-                except URLError:
+                    with request_get(url, stream=True) as response:
+                        response.raw.decode_content = False
+                        msg = f"{self.name}:\n  streaming to {handle.name}"
+                        GeneFabLogger(debug=msg)
+                        copyfileobj(response.raw, handle)
+                except (URLError, OSError):
                     msg = f"{self.name}; tried URL and failed:\n  {url}"
-                    GeneFabLogger().warning(msg)
+                    GeneFabLogger(warning=msg)
                 else:
                     msg = f"{self.name}; successfully fetched data:\n  {url}"
-                    GeneFabLogger().info(msg)
+                    GeneFabLogger(info=msg)
                     return url
         else:
             msg = "None of the URLs are reachable for file"
             raise GeneFabDataManagerException(msg, name=self.name, urls=urls)
  
-    def __download_as_pandas_dataframe(self, urls, pandas_kws, INPLACE_process=as_is):
+    def __download_as_pandas_chunks(self, chunksize=1024):
         """Download and parse data from URL as a table"""
         with TemporaryDirectory() as tempdir:
             tempfile = path.join(tempdir, self.name)
-            self.url = self.__copyfileobj(urls, tempfile)
+            self.url = self.__copyfileobj(self.urls, tempfile)
             with open(tempfile, mode="rb") as handle:
                 magic = handle.read(3)
             if magic == b"\x1f\x8b\x08":
@@ -106,13 +116,53 @@ class CachedTableFile(SQLiteTable):
             try:
                 with _open(tempfile, mode="rt", newline="") as handle:
                     sep = Sniffer().sniff(handle.read(2**20)).delimiter
-                dataframe = read_csv(
-                    tempfile, sep=sep, compression=compression, **pandas_kws,
+                _reader_kw = dict(
+                    sep=sep, compression=compression,
+                    chunksize=chunksize, **self.pandas_kws,
                 )
-                msg = f"{self.name}; interpreted as table:\n  {tempfile}"
-                GeneFabLogger().info(msg)
-                INPLACE_process(dataframe)
-                return dataframe
+                for i, csv_chunk in enumerate(read_csv(tempfile, **_reader_kw)):
+                    self.INPLACE_process(csv_chunk)
+                    msg = f"interpreted table chunk {i}:\n  {tempfile}"
+                    GeneFabLogger(info=f"{self.name}; {msg}")
+                    yield csv_chunk
             except (IOError, UnicodeDecodeError, CSVError, PandasParserError):
                 msg = "Not recognized as a table file"
                 raise GeneFabFileException(msg, name=self.name, url=self.url)
+ 
+    def update(self, to_sql_kws=dict(index=True, if_exists="append", chunksize=1024)):
+        """Update `self.table` with result of `self.__download_as_pandas_chunks()`, update `self.aux_table` with timestamps"""
+        columns, width, bounds, temppartnames = None, None, None, None
+        desc = "tables/update"
+        with SQLTransaction(self.sqlite_db, desc) as (connection, execute):
+            for csv_chunk in self.__download_as_pandas_chunks():
+                try:
+                    columns = csv_chunk.columns if columns is None else columns
+                    if width is None:
+                        width = csv_chunk.shape[1]
+                        bounds = bounds or range(0, width, self.maxpartcols)
+                        _pn = lambda: "DLPT:" + random_unique_string()
+                        temppartnames = temppartnames or [_pn() for _ in bounds]
+                    if (csv_chunk.shape[1] != width):
+                        raise ValueError("Inconsistent chunk width")
+                    if (csv_chunk.columns != columns).any():
+                        raise ValueError("Inconsistent chunk column names")
+                    for bound, tempname in zip(bounds, temppartnames):
+                        csv_chunk.iloc[:,bound:bound+self.maxpartcols].to_sql(
+                            tempname, connection, **to_sql_kws,
+                        )
+                        msg = "Extended table for CachedTableFile"
+                        GeneFabLogger(info=f"{msg}:\n  {self.name}, {tempname}")
+                except (OperationalError, PandasDatabaseError, ValueError) as e:
+                    msg = "Failed to insert SQLite chunk (or chunk part)"
+                    GeneFabLogger(error=f"{msg}:\n  {self.name}, {e!r}")
+                    connection.rollback()
+                    return
+            parts = SQLiteObject.iterparts(self.table, connection, must_exist=0)
+            for tempname, (partname, *_) in zip(temppartnames, parts):
+                execute(f"ALTER TABLE `{tempname}` RENAME TO `{partname}`")
+            execute(f"""INSERT INTO `{self.aux_table}`
+                (`table`,`timestamp`,`retrieved_at`) VALUES(?,?,?)""", [
+                self.table, self.timestamp, int(datetime.now().timestamp()),
+            ])
+            msg = "Finished extending; all parts inserted for CachedTableFile"
+            GeneFabLogger(info=f"{msg}:\n  {self.name}\n  {self.table}")

@@ -28,7 +28,7 @@ genefab3_client = GeneFabClient(
             db="./.genefab3.sqlite3/blobs.db", maxsize=None,
         ),
         tables=dict(
-            db="./.genefab3.sqlite3/tables.db", maxsize=36*GiB,
+            db="./.genefab3.sqlite3/tables.db", maxsize=48*GiB,
         ),
         response_cache=dict(
             db="./.genefab3.sqlite3/response-cache.db", maxsize=24*GiB,

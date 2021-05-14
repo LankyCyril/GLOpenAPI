@@ -77,7 +77,8 @@
         <b>Download:</b> as
         <a style="color:#D10" href="$CSVLINK">csv</a>,
         <a style="color:#D10" href="$TSVLINK">tsv</a>,
-        <a style="color:#D10" href="$JSONLINK">json</a>$VIEWDEPENDENTLINKS.
+        <a style="color:#D10" href="$JSONLINK">json</a
+        >$VIEWDEPENDENTLINKS.
         <b>Switch view level:</b>
         <a style="color:#D10" href="$ASSAYSVIEW">assays</a>,
         <a style="color:#D10" href="$SAMPLESVIEW">samples</a>,
@@ -107,7 +108,7 @@ var basic_formatter = function(r,c,v,d,x) {
             ? "<font color=green>True</font>" : (
                 ((v === false) || (v === "False"))
                 ? "<font color='#FAA'>False</font>" : (
-                    ((v === null) || (v === "NaN"))
+                    ((v === null) || (v === "NaN") || (v !== v))
                     ? "<i style='color:#BBB'>NaN</i>" : v ))
 };
 
@@ -122,7 +123,7 @@ var data = $ROWDATA;
 
 var context_url = "$CONTEXTURL";
 var fr_assays = function(v, postfix) {
-    return ((v === null) || (v === "NaN"))
+    return ((v === null) || (v === "NaN") || (v !== v))
         ? "<i style='color:#BBB'>NaN</i>"
         : (((v === false) || (v === "False"))
             ? "<font style='color:#FAA'>False</font>"
@@ -130,7 +131,7 @@ var fr_assays = function(v, postfix) {
               context_url + escape(postfix) + "'>True</a>");
 }
 var fr_samples = function(v, postfix) {
-    return ((v === null) || (v === "NaN"))
+    return ((v === null) || (v === "NaN") || (v !== v))
         ? "<i style='color:#BBB'>NaN</i>"
         : "<a class='filter' href='" +
           context_url + escape(postfix) + "=" + escape(v) + "'>" + v + "</a>";
@@ -177,8 +178,9 @@ for (var i = columns.length; i --> 0;) {
     var longest = c.name;
     for (var j = data.length; j --> 0;) {
         var value = data[j][field];
-        if ((value !== null) && (value.toString().length > longest.length))
-            longest = value;
+        if ((value !== null) && (value === value) && (value !== undefined))
+            if (value.toString().length > longest.length)
+                longest = value;
     }
     var widthchecker = $("<span>"+longest+"&nbsp;&times;</span>").hide();
     $("body").append(widthchecker);
@@ -233,9 +235,9 @@ grid.onSort.subscribe(function(e, args) {
             var v1 = r1[f], v2 = r2[f];
             var sign = sortcols[i].sortAsc ? 1 : -1;
             var ans = sign * (
-                ((v1 === "NaN") || (v1 === null))
-                ? (((v2 === "NaN") || (v2 === null)) ? 0 : -1)
-                : (((v2 === "NaN") || (v2 === null))
+                ((v1 === "NaN") || (v1 === null) || (v1 !== v1))
+                ? (((v2 === "NaN") || (v2 === null) || (v2 !== v2)) ? 0 : -1)
+                : (((v2 === "NaN") || (v2 === null) || (v2 !== v2))
                     ? 1 : v1.toString().localeCompare(
                         v2, undefined, {numeric: true}
                     )
