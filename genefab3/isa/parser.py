@@ -1,5 +1,5 @@
 from genefab3.common.utils import copy_except
-from genefab3.common.exceptions import GeneFabISAException, GeneFabLogger
+from genefab3.common.exceptions import GeneFabISAException
 from re import search, sub
 from collections import defaultdict
 from genefab3.common.exceptions import GeneFabConfigurationException
@@ -22,13 +22,13 @@ class Investigation(dict):
         for real_name, isatools_name, target, pattern in self._key_dispatcher:
             if isatools_name in raw_investigation:
                 content = raw_investigation[isatools_name]
+                _kw = dict(coerce_comments=True, status_kwargs=status_kwargs)
                 if isinstance(content, list):
                     json = [
-                        self._jsonify(df, coerce_comments=True)
-                        for df in content
+                        self._jsonify(df, **_kw) for df in content
                     ]
                 else:
-                    json = self._jsonify(content, coerce_comments=True)
+                    json = self._jsonify(content, **_kw)
                 if isinstance(json, list):
                     if (len(json) == 1) and isinstance(json[0], list):
                         json = json[0]
@@ -70,30 +70,31 @@ class Investigation(dict):
         ("Study Contacts", "s_contacts", None, None),
     ]
  
-    def _jsonify(self, df, coerce_comments=True):
+    def _jsonify(self, df, coerce_comments, status_kwargs):
         """Convert individual dataframe to JSON"""
         nn = range(0, df.shape[1])
         json = df.drop(columns=nn, errors="ignore").to_dict(orient="records")
         for entry in json:
             for key in set(entry.keys()):
-                try:
+                if isinstance(key, str):
                     match = search(r'^Comment\s*\[\s*(.+[^\s]\s*)\]\s*$', key)
-                except TypeError as e:
-                    msg = f"ISA: json key is not a string: {key!r}"
-                    GeneFabLogger(error=msg, exc_info=e)
-                    raise
-                if match:
-                    field, value = match.group(1), entry[key]
-                    del entry[key]
-                    if "Comment" not in entry:
-                        entry["Comment"] = {}
-                    if coerce_comments:
-                        field = field.capitalize()
-                        if field not in entry["Comment"]:
-                            entry["Comment"][field] = []
-                        entry["Comment"][field].append(value)
-                    else:
-                        entry["Comment"][field] = value
+                    if match:
+                        field, value = match.group(1), entry[key]
+                        del entry[key]
+                        if "Comment" not in entry:
+                            entry["Comment"] = {}
+                        if coerce_comments:
+                            field = field.capitalize()
+                            if field not in entry["Comment"]:
+                                entry["Comment"][field] = []
+                            entry["Comment"][field].append(value)
+                        else:
+                            entry["Comment"][field] = value
+                else:
+                    update_status(
+                        **status_kwargs, status="warning", tab="Investigation",
+                        warning="ISA field is not a string", field=repr(key),
+                    )
             if coerce_comments and ("Comment" in entry):
                 for field in set(entry["Comment"].keys()):
                     value_set = set(entry["Comment"][field])
@@ -159,11 +160,13 @@ class StudyEntries(list):
         json = {"Id": {f"{self._self_identifier} Name": name}}
         protocol_ref, qualifiable = nan, None
         for column, value in row.items():
-            try:
-                field, subfield, extra = self._parse_field(column)
-            except TypeError as e:
-                msg = f"ISA: column is not a string: {column!r}"
-                GeneFabLogger(warning=msg, exc_info=e)
+            field, subfield, extra = self._parse_field(column)
+            if field is None:
+                update_status(
+                    **status_kwargs, status="warning",
+                    tab=self._self_identifier, field=repr(column),
+                    warning="ISA field is not a string",
+                )
             else:
                 if field == "Protocol REF":
                     protocol_ref = value
@@ -191,13 +194,16 @@ class StudyEntries(list):
  
     def _parse_field(self, column):
         """Interpret field like 'Source Name' or 'Characteristics[sex,http://purl.obolibrary.org/obo/PATO_0000047,EFO]"""
-        matcher = search(r'(.+[^\s])\s*\[\s*(.+[^\s])\s*\]\s*$', column)
-        if matcher:
-            field = matcher.group(1)
-            subfield, *extra = matcher.group(2).split(",")
-            return field, subfield, extra
+        if isinstance(column, str):
+            matcher = search(r'(.+[^\s])\s*\[\s*(.+[^\s])\s*\]\s*$', column)
+            if matcher:
+                field = matcher.group(1)
+                subfield, *extra = matcher.group(2).split(",")
+                return field, subfield, extra
+            else:
+                return column, None, []
         else:
-            return column, None, []
+            return None, None, None
  
     def _is_not_qualifier(self, field):
         """Check if `column` is none of 'Term Accession Number', 'Unit', 'Comment', any '.* REF'"""
