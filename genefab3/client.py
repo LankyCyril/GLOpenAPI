@@ -40,8 +40,10 @@ class GeneFabClient():
     def _get_mongo_db_connection(self, *, db_name, client_params=None, collection_names=None, locale="en_US", units_formatter=None, test_timeout=10):
         """Check MongoDB server is running, connect to database `db_name`"""
         self.mongo_appname = f"GeneFab3({timestamp36()})"
-        _kw = dict(**(client_params or {}), appname=self.mongo_appname)
-        mongo_client = MongoClient(**_kw)
+        mongo_client = MongoClient(
+            maxIdleTimeMS=60000, **(client_params or {}),
+            appname=self.mongo_appname,
+        )
         try:
             host_and_port = (mongo_client.HOST, mongo_client.PORT)
             with create_connection(host_and_port, timeout=test_timeout):

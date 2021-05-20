@@ -25,7 +25,7 @@ is_expression_profiling = lambda sample, filename: get_tech_type(sample) in {
 }
 
 KNOWN_DATATYPES = {
-    r'.*_metadata_.*[_-]ISA\.zip$': datatype("isa", internal=True),
+    r'.*_metadata_.*\.zip$': datatype("isa", internal=True),
     r'^GLDS-[0-9]+_.*annotReport\.txt$': datatype("annotation report"),
     r'^GLDS-[0-9]+_.*_raw\.fastq(\.gz)?$': datatype("raw reads"),
     r'^GLDS-[0-9]+_.*_trimmed\.fastq(\.gz)?$': datatype("trimmed reads"),

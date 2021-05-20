@@ -60,7 +60,7 @@ class SQLiteObject():
             try:
                 connection.execute(f"DROP TABLE IF EXISTS `{partname}`")
             except Exception as e:
-                GeneFabLogger(error=f"Could not drop {partname}: {e!r}")
+                GeneFabLogger(error=f"Could not drop {partname}", exc_info=e)
                 raise
             else:
                 GeneFabLogger(info=f"Dropped {partname} (if it existed)")
@@ -144,8 +144,8 @@ class SQLiteBlob(SQLiteObject):
             connection.execute(f"""DELETE FROM `{self.table}`
                 WHERE `identifier` == "{identifier}" """)
         except Exception as e:
-            msg = f"Could not delete from {self.table}: {identifier}: {e!r}"
-            GeneFabLogger(error=msg)
+            msg = f"Could not delete from {self.table}: {identifier}"
+            GeneFabLogger(error=msg, exc_info=e)
             raise
         else:
             GeneFabLogger(info=f"Deleted from {self.table}: {identifier}")
@@ -206,8 +206,8 @@ class SQLiteTable(SQLiteObject):
             connection.execute(f"""DELETE FROM `{self.aux_table}`
                 WHERE `table` == "{table}" """)
         except Exception as e:
-            msg = f"Could not delete from {self.aux_table}: {table}: {e!r}"
-            GeneFabLogger(error=msg)
+            msg = f"Could not delete from {self.aux_table}: {table}"
+            GeneFabLogger(error=msg, exc_info=e)
             raise
         else:
             GeneFabLogger(info=f"Deleted from {self.aux_table}: {table}")
@@ -257,7 +257,7 @@ class SQLiteTable(SQLiteObject):
                         self.drop(connection=connection, other=table)
                     except OperationalError as e:
                         msg= f"Rolling back shrinkage due to {e!r}"
-                        GeneFabLogger(error=msg)
+                        GeneFabLogger(error=msg, exc_info=e)
                         connection.rollback()
                         break
                     else:

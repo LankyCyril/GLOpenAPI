@@ -38,9 +38,9 @@ class TempSelect():
         with SQLTransaction(self.sqlite_db, desc) as (_, execute):
             try:
                 execute(f"DROP {self.kind} `{self.name}`")
-            except OperationalError:
+            except OperationalError as e:
                 msg = f"Failed to drop temporary {self.kind} {self.name}"
-                GeneFabLogger(error=msg)
+                GeneFabLogger(error=msg, exc_info=e)
             else:
                 msg = f"Dropped temporary SQLite {self.kind} {self.name}"
                 GeneFabLogger(info=msg)

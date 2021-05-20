@@ -33,7 +33,7 @@ def apply_pragma(execute, pragma, value, filename, potential_access_warning):
         status = (execute(f"PRAGMA {pragma}").fetchone() or [None])[0]
     except (OSError, FileNotFoundError, OperationalError) as e:
         if potential_access_warning:
-            GeneFabLogger(warning=f"{potential_access_warning}: {e!r}")
+            GeneFabLogger(warning=f"{potential_access_warning}", exc_info=e)
     else:
         if str(status) != str(value):
             msg = f"Could not set {pragma} = {value} for database"
