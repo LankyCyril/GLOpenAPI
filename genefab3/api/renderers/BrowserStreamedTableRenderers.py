@@ -1,4 +1,7 @@
+from genefab3.api.parser import space_quote
+from urllib.request import quote
 from re import compile, escape
+from functools import partial
 from pathlib import Path
 from genefab3.common.exceptions import GeneFabLogger
 from genefab3.common.types import StreamedAnnotationTable
@@ -8,11 +11,12 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 
 def build_url(context, target_view=None, drop=set()):
     """Rebuild URL from request, alter based on `replace` and `drop`"""
-    return "".join(sum((
-        [f"{arg}={v}&" if v else f"{arg}&" for v in values]
-        for arg, values in context.complete_kwargs.items() if arg not in drop),
-        [context.url_root.rstrip("/")+"/", (target_view or context.view), "/?"],
-    ))
+    path = context.url_root.rstrip("/") + "/" + (target_view or context.view)
+    return path + "/?" + "".join(
+        f"{space_quote(arg)}={space_quote(v)}&" if v else f"{space_quote(arg)}&"
+        for arg, values in context.complete_kwargs.items() if arg not in drop
+        for v in values
+    )
 
 
 def get_browser_glds_formatter(context, i):
@@ -109,7 +113,8 @@ def twolevel(obj, context, squash_preheader=False, frozen=0, indent=None):
     """Display StreamedTable with two-level columns using SlickGrid"""
     GeneFabLogger(info="HTML: converting StreamedTable into interactive table")
     obj.move_index_boundary(to=0)
-    title_postfix = f"{context.view} {context.complete_kwargs}"
+    repr_quote = partial(quote, safe=" /'\",;:[{}]")
+    title_postfix = repr_quote(f"{context.view} {context.complete_kwargs}")
     def content():
         is_annotation_table = isinstance(obj, StreamedAnnotationTable)
         if is_annotation_table and (context.view != "status"):
