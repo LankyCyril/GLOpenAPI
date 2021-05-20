@@ -1,5 +1,6 @@
 from functools import lru_cache, partial
 from flask import request
+from genefab3.common.utils import space_quote, QPIPE, is_regex
 from urllib.request import quote, unquote
 from json import dumps
 from re import sub, search
@@ -34,9 +35,6 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
     "c": partial(KeyValueParsers.kvp_column, category="column"),
 })
 
-
-space_quote = partial(quote, safe=" /")
-is_regex = lambda v: search(r'^\/.*\/$', v)
 
 
 def make_safe_token(token, allow_regex=False):
@@ -152,7 +150,7 @@ class KeyValueParsers():
         """Interpret single key-value pair for dataset / assay constraint"""
         if (not fields) and value: # mixed syntax: 'id=GLDS-1|GLDS-2/assay-B'
             query, projection_keys = {"$or": []}, ()
-            for expr in value.split("|"):
+            for expr in value.split(QPIPE):
                 query["$or"].append({
                     f"{category}.{field}": part for field, part in zip(
                         ["accession", "assay name", "sample name"],
@@ -189,16 +187,16 @@ class KeyValueParsers():
             if is_regex(value):
                 query = {lookup_key: {"$regex": value[1:-1]}}
             else:
-                query = {lookup_key: {"$in": value.split("|")}}
+                query = {lookup_key: {"$in": value.split(QPIPE)}}
             projection_keys = {projection_key}
         else: # metadata field or one of metadata fields must exist
             block_match = search(r'\.[^\.]+\.*$', lookup_key)
-            if (not block_match) or (block_match.group().count("|") == 0):
+            if (not block_match) or (block_match.group().count(QPIPE) == 0):
                 query = {lookup_key: {"$exists": True}} # single field exists
                 projection_keys = {projection_key}
             else: # either of the fields exists (OR condition)
                 head = lookup_key[:block_match.start()]
-                targets = block_match.group().strip(".").split("|")
+                targets = block_match.group().strip(".").split(QPIPE)
                 projection_keys = {f"{head}.{target}" for target in targets}
                 _pfx = "." if (block_match.group()[-1] == ".") else ""
                 lookup_keys = {k+_pfx for k in projection_keys}

@@ -1,7 +1,5 @@
-from genefab3.api.parser import space_quote
-from urllib.request import quote
+from genefab3.common.utils import space_quote, repr_quote
 from re import compile, escape
-from functools import partial
 from pathlib import Path
 from genefab3.common.exceptions import GeneFabLogger
 from genefab3.common.types import StreamedAnnotationTable
@@ -113,7 +111,6 @@ def twolevel(obj, context, squash_preheader=False, frozen=0, indent=None):
     """Display StreamedTable with two-level columns using SlickGrid"""
     GeneFabLogger(info="HTML: converting StreamedTable into interactive table")
     obj.move_index_boundary(to=0)
-    repr_quote = partial(quote, safe=" /'\",;:[{}]")
     title_postfix = repr_quote(f"{context.view} {context.complete_kwargs}")
     def content():
         is_annotation_table = isinstance(obj, StreamedAnnotationTable)
