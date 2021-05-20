@@ -9,6 +9,13 @@ class DefaultRoutes(Routes):
     def favicon(self, imgtype, context=None):
         return b''
  
+    @Routes.register_endpoint("/js/<filename>")
+    def js(self, filename, context=None):
+        return views.static.get(
+            directory="js", filename=filename,
+            mimetype="application/javascript",
+        )
+ 
     @Routes.register_endpoint("/")
     def root(self, context):
         return views.root.get(
