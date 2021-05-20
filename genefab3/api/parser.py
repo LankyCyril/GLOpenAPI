@@ -1,12 +1,11 @@
 from functools import lru_cache, partial
 from flask import request
-from urllib.request import quote
+from urllib.request import quote, unquote
 from json import dumps
-from genefab3.db.mongo.utils import is_safe_token, is_regex
+from re import sub, search
 from genefab3.common.exceptions import GeneFabParserException
 from genefab3.common.utils import EmptyIterator, BranchTracer
 from genefab3.common.exceptions import GeneFabConfigurationException
-from re import search
 
 
 CONTEXT_ARGUMENTS = {"debug": "0", "format": None, "schema": "0"}
@@ -34,6 +33,21 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
     "column": partial(KeyValueParsers.kvp_column, category="column"),
     "c": partial(KeyValueParsers.kvp_column, category="column"),
 })
+
+
+space_quote = partial(quote, safe=" /")
+is_regex = lambda v: search(r'^\/.*\/$', v)
+
+
+def make_safe_token(token, allow_regex=False):
+    """Quote special characters, ensure not a $-command. Note: SQL queries are sanitized in genefab3.db.sql.streamed_tables"""
+    quoted_token = space_quote(token)
+    if allow_regex and ("$" not in sub(r'\$\/$', "", quoted_token)):
+        return quoted_token
+    elif "$" not in quoted_token:
+        return quoted_token
+    else:
+        raise GeneFabParserException("Forbidden argument", field=quoted_token)
 
 
 class Context():
@@ -68,21 +82,19 @@ class Context():
  
     def update(self, arg, values=("",), auto_reduce=True):
         """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections"""
-        (category, *fields), keyvalue = arg.split("."), {arg: values}
-        if not is_safe_token(arg):
-            raise GeneFabParserException("Forbidden argument", arg=arg)
-        elif arg in CONTEXT_ARGUMENTS:
+        category, *fields = map(make_safe_token, arg.split("."))
+        if arg in CONTEXT_ARGUMENTS:
             parser = EmptyIterator
         elif category in KEYVALUE_PARSER_DISPATCHER():
             parser = KEYVALUE_PARSER_DISPATCHER()[category]
         else:
-            raise GeneFabParserException("Unrecognized argument", **keyvalue)
+            _kw = {arg: values}
+            raise GeneFabParserException("Unrecognized argument", **_kw)
         def _it():
-            for value in values:
-                if not is_safe_token(value, allow_regex=(arg=="file.filename")):
-                    raise GeneFabParserException("Forbidden value", arg=value)
-                else:
-                    yield from parser(arg=arg, fields=fields, value=value)
+            allow_regex = (arg=="file.filename")
+            _make_safe_token = partial(make_safe_token, allow_regex=allow_regex)
+            for value in map(_make_safe_token, values):
+                yield from parser(arg=arg, fields=fields, value=value)
         n_iter, _en_it = None, enumerate(_it(), 1)
         for n_iter, (query, projection_keys, columns, comparisons) in _en_it:
             self.projection.update({k: True for k in projection_keys})
@@ -123,12 +135,13 @@ class Context():
     def update_attributes(self):
         """Push remaining request arguments into self as attributes, set defaults"""
         for k, v in request.args.items():
+            safe_v = make_safe_token(v)
             if k not in self.processed_args:
                 if not hasattr(self, k):
-                    setattr(self, k, v)
+                    setattr(self, k, safe_v)
                 else:
                     msg = "Cannot set context"
-                    raise GeneFabConfigurationException(msg, **{k: v})
+                    raise GeneFabConfigurationException(msg, **{k: safe_v})
         for k, v in CONTEXT_ARGUMENTS.items():
             setattr(self, k, getattr(self, k, v))
 
@@ -199,13 +212,15 @@ class KeyValueParsers():
             raise GeneFabParserException(msg, **{arg: v}, constraint=category)
         else:
             expr = f"{'.'.join(fields)}={value}" if value else ".".join(fields)
-        if not ({"<", "=", ">"} & set(expr)):
+            unq_expr = unquote(expr)
+        if not ({"<", "=", ">"} & set(unq_expr)):
             yield None, (), [expr], ()
         else:
-            match = search(r'^([^<>=]+)(<|<=|=|==|>=|>)([^<>=]*)$', expr)
+            match = search(r'^([^<>=]+)(<|<=|=|==|>=|>)([^<>=]*)$', unq_expr)
             if match:
                 name, op, value = match.groups()
-                yield None, (), (), [f"`{name}` {op} {value}"]
+                comparison = f"`{space_quote(name)}` {op} {space_quote(value)}"
+                yield None, (), (), [comparison]
             else:
                 msg = "Unparseable expression"
                 raise GeneFabParserException(msg, expression=expr)
