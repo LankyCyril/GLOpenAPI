@@ -123,6 +123,7 @@ def twolevel(obj, context, squash_preheader=False, frozen=0, indent=None):
             columns, preheader_css = obj.columns, ""
         replacements = {
             "$APPNAME": f"{context.app_name}: {title_postfix}",
+            "$URL_ROOT": context.url_root,
             "$SQUASH_PREHEADER": preheader_css,
             "$CSVLINK": build_url(context, drop={"format"}) + "format=csv",
             "$TSVLINK": build_url(context, drop={"format"}) + "format=tsv",
