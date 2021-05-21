@@ -169,7 +169,9 @@ def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
 
 def bypass_uncached_views(get, self, context):
     """If serving favicon, bypass checking response_cache"""
-    if (context.view == "") or search(r'^favicon\.[A-Za-z0-9]+$', context.view):
+    is_favicon = search(r'^favicon\.[A-Za-z0-9]+$', context.view)
+    is_static_lib = search(r'^libs\/', context.view)
+    if (context.view == "") or is_favicon or is_static_lib:
         from genefab3.common.types import ResponseContainer
         return ResponseContainer(content=None)
     else:
