@@ -65,7 +65,7 @@ class ResponseCache():
             elif isinstance(uncompressed_chunk, bytes):
                 chunk = compressor.compress(uncompressed_chunk)
             else:
-                _type = type(uncompressed_chunk)
+                _type = type(uncompressed_chunk).__name__
                 raise TypeError("Content chunk is not str or bytes", _type)
             if chunk:
                 yield Binary(chunk)

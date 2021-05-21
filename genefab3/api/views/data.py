@@ -11,6 +11,7 @@ from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.db.sql.files import CachedTableFile, CachedBinaryFile
 from genefab3.common.types import PhoenixIterator
 from genefab3.db.mongo.utils import aggregate_file_descriptors_by_context
+from urllib.request import quote
 from urllib.error import HTTPError
 
 
@@ -233,8 +234,9 @@ def get(*, mongo_collections, locale, context, sqlite_dbs, adapter):
             msg = "File information missing for entry"
             raise GeneFabDatabaseException(msg, entry=d)
     if n_descriptors == 0:
+        cfp = quote(context.full_path)
         msg = "No file found matching specified constraints"
-        raise HTTPError(context.full_path, 404, msg, hdrs=None, fp=None)
+        raise HTTPError(cfp, 404, msg, hdrs=None, fp=None)
     elif context.format == "raw":
         if n_descriptors == 1:
             return file_redirect(next(descriptors))

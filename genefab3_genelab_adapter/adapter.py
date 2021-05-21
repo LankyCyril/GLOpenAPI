@@ -132,7 +132,7 @@ class GeneLabAdapter(Adapter):
                 matched_patterns.add(pattern)
         if len(matched_patterns) > 1:
             msg = "File name matches more than one predefined pattern"
-            _kw = dict(filename=filename, patterns=sorted(matched_patterns))
+            _kw = dict(filename=filename, debug_info=sorted(matched_patterns))
             raise GeneFabConfigurationException(msg, **_kw)
         return entry
  
