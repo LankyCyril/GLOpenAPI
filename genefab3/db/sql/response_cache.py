@@ -33,7 +33,8 @@ class ResponseCache():
         self.sqlite_db = sqlite_dbs.response_cache["db"]
         self.maxdbsize = sqlite_dbs.response_cache["maxsize"] or float("inf")
         if self.sqlite_db is None:
-            _logw("ResponseCache():\n  LRU SQL cache DISABLED in GeneFabClient")
+            msg = "LRU SQL cache DISABLED by client parameter"
+            _logw(f"ResponseCache():\n  {msg}")
         else:
             _kw = dict(desc="response_cache/ensure_schema", timeout=5)
             with SQLTransaction(self.sqlite_db, **_kw) as (connection, execute):
