@@ -1,12 +1,12 @@
 from functools import lru_cache, partial
 from flask import request
-from genefab3.common.utils import make_safe_token, space_quote, QPIPE, is_regex
 from urllib.request import quote, unquote
 from json import dumps
-from re import search
+from genefab3.common.utils import is_debug, EmptyIterator, BranchTracer
 from genefab3.common.exceptions import GeneFabParserException
-from genefab3.common.utils import EmptyIterator, BranchTracer
+from genefab3.common.utils import make_safe_token, space_quote, QPIPE, is_regex
 from genefab3.common.exceptions import GeneFabConfigurationException
+from re import search
 
 
 CONTEXT_ARGUMENTS = {"debug": "0", "format": None, "schema": "0"}
@@ -65,6 +65,8 @@ class Context():
             "data_comparisons": self.data_comparisons,
             "format": self.format, "schema": self.schema, "debug": self.debug,
         }))
+        if self.debug != "0" and (not is_debug()):
+            raise GeneFabParserException("Setting 'debug' is not allowed")
  
     def update(self, arg, values=("",), auto_reduce=True):
         """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections"""
