@@ -61,7 +61,7 @@
             .or-selects {display: inline-block}
         </style>
     </head>
-<script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/1.12.4/jquery.min.js'></script>
+<script src='$URL_ROOT/libs/js/jquery-3.6.0.slim.min.js'></script>
 <script>
 
 var url_root = "$URL_ROOT";
@@ -92,7 +92,7 @@ function refresh_all_dropdowns() {
             var section_data = metadata[section_key];
             for (var i = 0;; i++) {
                 var section = $(this).find("select.level-"+i);
-                if (section.length > 0) {
+                if ((section.length > 0) && (section_data !== undefined)) {
                     var current_value = section.val();
                     if (current_value in section_data) {
                         section_key = current_value;

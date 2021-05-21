@@ -31,8 +31,8 @@ class ValueCheckedRecord():
                 dumped = dumps(value, sort_keys=True, default=funcdump)
                 self.base64value = compress(encodebytes(dumped.encode()))
             except TypeError as e:
-                msg = "ValueCheckedRecord(): " + str(e)
-                _kw = dict(identifier=identifier, value=value)
+                msg, _erep = "ValueCheckedRecord(): TypeError", repr(e)
+                _kw = dict(identifier=identifier, value=value, debug_info=_erep)
                 raise GeneFabConfigurationException(msg, **_kw)
             else:
                 self.changed, n_stale_entries = True, 0

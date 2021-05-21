@@ -1,4 +1,3 @@
-from re import sub, search
 from functools import partial
 from bson.errors import InvalidDocument as InvalidDocumentError
 from collections.abc import ValuesView
@@ -16,12 +15,6 @@ def iterate_mongo_connections(mongo_client):
 
 
 isempty = lambda v: (v != v) or (v == "") or (v is None)
-is_regex = lambda v: search(r'^\/.*\/$', v)
-
-
-def is_safe_token(v, allow_regex=False):
-    """Check if value is safe for PyMongo queries"""
-    return "$" not in (sub(r'\$\/$', "", v) if allow_regex else v)
 
 
 def is_unit_formattable(e, unit_key):

@@ -33,7 +33,8 @@ class ResponseCache():
         self.sqlite_db = sqlite_dbs.response_cache["db"]
         self.maxdbsize = sqlite_dbs.response_cache["maxsize"] or float("inf")
         if self.sqlite_db is None:
-            _logw("ResponseCache():\n  LRU SQL cache DISABLED by client")
+            msg = "LRU SQL cache DISABLED by client parameter"
+            _logw(f"ResponseCache():\n  {msg}")
         else:
             _kw = dict(desc="response_cache/ensure_schema", timeout=5)
             with SQLTransaction(self.sqlite_db, **_kw) as (connection, execute):
@@ -65,7 +66,7 @@ class ResponseCache():
             elif isinstance(uncompressed_chunk, bytes):
                 chunk = compressor.compress(uncompressed_chunk)
             else:
-                _type = type(uncompressed_chunk)
+                _type = type(uncompressed_chunk).__name__
                 raise TypeError("Content chunk is not str or bytes", _type)
             if chunk:
                 yield Binary(chunk)

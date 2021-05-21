@@ -29,12 +29,17 @@ class GeneFabClient():
             self.cacher_thread = self._ensure_cacher_thread(**cacher_params)
         except TypeError as e:
             msg = "During GeneFabClient() initialization, an exception occurred"
-            raise GeneFabConfigurationException(msg, error=repr(e))
+            raise GeneFabConfigurationException(msg, debug_info=repr(e))
  
     def _configure_flask_app(self, *, app, compress_params=None):
         """Modify Flask application, enable compression"""
         app.config = {**getattr(app, "config", {}), **(compress_params or {})}
         Compress(app)
+        @app.after_request
+        def apply_headers(response):
+            response.headers["X-Frame-Options"] = "SAMEORIGIN"
+            response.headers["X-XSS-Protection"] = "1; mode=block"
+            return response
         return app
  
     def _get_mongo_db_connection(self, *, db_name, client_params=None, collection_names=None, locale="en_US", units_formatter=None, test_timeout=10):
@@ -57,7 +62,7 @@ class GeneFabClient():
         }
         if len(parsed_cnames) != len(set(parsed_cnames.values())):
             msg = "Conflicting collection names specified"
-            raise GeneFabConfigurationException(msg, names=parsed_cnames)
+            raise GeneFabConfigurationException(msg, debug_info=parsed_cnames)
         else:
             mongo_collections = SimpleNamespace(**{
                 kind: (mongo_client[db_name][cname] if cname else None)
@@ -72,7 +77,8 @@ class GeneFabClient():
         )
         if len({v.get("db") for v in sqlite_dbs.__dict__.values()}) != 3:
             msg = "SQL databases must all be distinct to avoid name conflicts"
-            raise GeneFabConfigurationException(msg, **sqlite_dbs.__dict__)
+            _kw = dict(debug_info=sqlite_dbs.__dict__)
+            raise GeneFabConfigurationException(msg, **_kw)
         else:
             return sqlite_dbs
  

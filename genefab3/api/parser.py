@@ -1,10 +1,10 @@
 from functools import lru_cache, partial
 from flask import request
-from urllib.request import quote
+from urllib.request import quote, unquote
 from json import dumps
-from genefab3.db.mongo.utils import is_safe_token, is_regex
+from genefab3.common.utils import is_debug, EmptyIterator, BranchTracer
 from genefab3.common.exceptions import GeneFabParserException
-from genefab3.common.utils import EmptyIterator, BranchTracer
+from genefab3.common.utils import make_safe_token, space_quote, QPIPE, is_regex
 from genefab3.common.exceptions import GeneFabConfigurationException
 from re import search
 
@@ -65,24 +65,24 @@ class Context():
             "data_comparisons": self.data_comparisons,
             "format": self.format, "schema": self.schema, "debug": self.debug,
         }))
+        if self.debug != "0" and (not is_debug()):
+            raise GeneFabParserException("Setting 'debug' is not allowed")
  
     def update(self, arg, values=("",), auto_reduce=True):
         """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections"""
-        (category, *fields), keyvalue = arg.split("."), {arg: values}
-        if not is_safe_token(arg):
-            raise GeneFabParserException("Forbidden argument", arg=arg)
-        elif arg in CONTEXT_ARGUMENTS:
+        category, *fields = map(make_safe_token, arg.split("."))
+        if arg in CONTEXT_ARGUMENTS:
             parser = EmptyIterator
         elif category in KEYVALUE_PARSER_DISPATCHER():
             parser = KEYVALUE_PARSER_DISPATCHER()[category]
         else:
-            raise GeneFabParserException("Unrecognized argument", **keyvalue)
+            _kw = {arg: values}
+            raise GeneFabParserException("Unrecognized argument", **_kw)
         def _it():
-            for value in values:
-                if not is_safe_token(value, allow_regex=(arg=="file.filename")):
-                    raise GeneFabParserException("Forbidden value", arg=value)
-                else:
-                    yield from parser(arg=arg, fields=fields, value=value)
+            allow_regex = (arg=="file.filename")
+            _make_safe_token = partial(make_safe_token, allow_regex=allow_regex)
+            for value in map(_make_safe_token, values):
+                yield from parser(arg=arg, fields=fields, value=value)
         n_iter, _en_it = None, enumerate(_it(), 1)
         for n_iter, (query, projection_keys, columns, comparisons) in _en_it:
             self.projection.update({k: True for k in projection_keys})
@@ -123,12 +123,13 @@ class Context():
     def update_attributes(self):
         """Push remaining request arguments into self as attributes, set defaults"""
         for k, v in request.args.items():
+            safe_v = make_safe_token(v)
             if k not in self.processed_args:
                 if not hasattr(self, k):
-                    setattr(self, k, v)
+                    setattr(self, k, safe_v)
                 else:
                     msg = "Cannot set context"
-                    raise GeneFabConfigurationException(msg, **{k: v})
+                    raise GeneFabConfigurationException(msg, **{k: safe_v})
         for k, v in CONTEXT_ARGUMENTS.items():
             setattr(self, k, getattr(self, k, v))
 
@@ -139,7 +140,7 @@ class KeyValueParsers():
         """Interpret single key-value pair for dataset / assay constraint"""
         if (not fields) and value: # mixed syntax: 'id=GLDS-1|GLDS-2/assay-B'
             query, projection_keys = {"$or": []}, ()
-            for expr in value.split("|"):
+            for expr in value.split(QPIPE):
                 query["$or"].append({
                     f"{category}.{field}": part for field, part in zip(
                         ["accession", "assay name", "sample name"],
@@ -176,16 +177,16 @@ class KeyValueParsers():
             if is_regex(value):
                 query = {lookup_key: {"$regex": value[1:-1]}}
             else:
-                query = {lookup_key: {"$in": value.split("|")}}
+                query = {lookup_key: {"$in": value.split(QPIPE)}}
             projection_keys = {projection_key}
         else: # metadata field or one of metadata fields must exist
             block_match = search(r'\.[^\.]+\.*$', lookup_key)
-            if (not block_match) or (block_match.group().count("|") == 0):
+            if (not block_match) or (block_match.group().count(QPIPE) == 0):
                 query = {lookup_key: {"$exists": True}} # single field exists
                 projection_keys = {projection_key}
             else: # either of the fields exists (OR condition)
                 head = lookup_key[:block_match.start()]
-                targets = block_match.group().strip(".").split("|")
+                targets = block_match.group().strip(".").split(QPIPE)
                 projection_keys = {f"{head}.{target}" for target in targets}
                 _pfx = "." if (block_match.group()[-1] == ".") else ""
                 lookup_keys = {k+_pfx for k in projection_keys}
@@ -199,13 +200,20 @@ class KeyValueParsers():
             raise GeneFabParserException(msg, **{arg: v}, constraint=category)
         else:
             expr = f"{'.'.join(fields)}={value}" if value else ".".join(fields)
-        if not ({"<", "=", ">"} & set(expr)):
+            unq_expr = unquote(expr)
+        if not ({"<", "=", ">"} & set(unq_expr)):
             yield None, (), [expr], ()
         else:
-            match = search(r'^([^<>=]+)(<|<=|=|==|>=|>)([^<>=]*)$', expr)
+            match = search(r'^([^<>=]+)(<|<=|=|==|>=|>)([^<>=]*)$', unq_expr)
             if match:
                 name, op, value = match.groups()
-                yield None, (), (), [f"`{name}` {op} {value}"]
+                try:
+                    float(value)
+                except ValueError:
+                    msg = "Only comparisons to numbers are currently supported"
+                    raise GeneFabParserException(msg, **{arg: value})
+                else:
+                    yield None, (), (), [f"`{space_quote(name)}` {op} {value}"]
             else:
                 msg = "Unparseable expression"
                 raise GeneFabParserException(msg, expression=expr)

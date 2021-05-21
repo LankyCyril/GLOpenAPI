@@ -10,7 +10,7 @@ from re import search, sub
 from genefab3.common.exceptions import GeneFabConfigurationException
 from warnings import catch_warnings, filterwarnings
 from dateutil.parser import UnknownTimezoneWarning
-from functools import lru_cache, partial
+from functools import lru_cache
 
 
 datatype = lambda t, **kw: dict(datatype=t, **kw)
@@ -84,9 +84,9 @@ def as_timestamp(dataframe, column, default=-1):
         return dataframe[column].apply(safe_timestamp)
 
 
-class GeneLabAdapterBaseClass(Adapter):
+class GeneLabAdapter(Adapter):
  
-    def __init__(self, root_urls):
+    def __init__(self, root_urls=["https://genelab-data.ndc.nasa.gov"]):
         with pick_reachable_url(root_urls) as genelab_root:
             self.constants = SimpleNamespace(
                 GENELAB_ROOT=genelab_root,
@@ -132,7 +132,7 @@ class GeneLabAdapterBaseClass(Adapter):
                 matched_patterns.add(pattern)
         if len(matched_patterns) > 1:
             msg = "File name matches more than one predefined pattern"
-            _kw = dict(filename=filename, patterns=sorted(matched_patterns))
+            _kw = dict(filename=filename, debug_info=sorted(matched_patterns))
             raise GeneFabConfigurationException(msg, **_kw)
         return entry
  
@@ -200,16 +200,3 @@ class GeneLabAdapterBaseClass(Adapter):
             )
         else:
             return [ns for p, ns in positions_and_matches]
-
-
-GeneLabAdapter = partial(
-    GeneLabAdapterBaseClass, root_urls=["https://genelab-data.ndc.nasa.gov"],
-)
-
-
-StagingGeneLabAdapter = partial(
-    GeneLabAdapterBaseClass, root_urls=[
-        "https://genelab-webapps-stage-1.arc.nasa.gov",
-        "https://genelab-data.ndc.nasa.gov",
-    ],
-)

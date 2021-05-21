@@ -62,7 +62,7 @@ class StreamedDataTableWizard():
         if set(passed_last_level) <= set(own_last_level):
             self._columns = passed_columns
         else:
-            msg = f"Setting foreign column(s) to StreamedDataTableWizard"
+            msg = "Setting foreign column(s) to StreamedDataTableWizard"
             foreign = sorted(set(passed_last_level) - set(own_last_level))
             raise GeneFabFileException(msg, columns=foreign)
  
