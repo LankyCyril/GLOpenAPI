@@ -4,13 +4,13 @@ from urllib.error import HTTPError
 from flask import Response
 
 
-def get(*, directory, filename, mimetype):
+def get(*, directory, filename, mode, mimetype):
     """Pass contents of `filename` without the awfully designed `flask.url_for`"""
     parent = Path(__file__).parent.parent.parent.parent
     safe_filename = quote(filename)
     def content():
         try:
-            with open(parent / directory / safe_filename, mode="rt") as handle:
+            with open(parent / directory / safe_filename, mode=mode) as handle:
                 yield from handle
         except (FileNotFoundError, IOError, OSError):
             msg = "File not found"
