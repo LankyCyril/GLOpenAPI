@@ -1,12 +1,14 @@
-from functools import wraps, reduce, partial
+from functools import wraps
 from genefab3.db.sql.utils import SQLTransaction
 from genefab3.common.types import NaN, StreamedDataTable
-from pandas import DataFrame
 from sqlite3 import OperationalError
-from genefab3.common.exceptions import GeneFabDatabaseException, GeneFabLogger
+from genefab3.common.exceptions import GeneFabDatabaseException
+from pandas import DataFrame
+from pandas import concat, Index
+from genefab3.common.exceptions import GeneFabFormatException, GeneFabLogger
+from collections import OrderedDict
 from genefab3.common.exceptions import GeneFabConfigurationException
 from re import search
-from pandas import merge
 
 
 def apply_hack(hack):
@@ -24,8 +26,7 @@ def get_sub_df(obj, partname, partcols):
     from genefab3.db.sql.streamed_tables import SQLiteIndexName
     found = lambda v: v is not None
     index_name, data = None, {}
-    desc = "hacks/get_sub_df"
-    with SQLTransaction(obj.sqlite_db, desc) as (connection, execute):
+    with SQLTransaction(obj.sqlite_db, "hacks/get_sub_df") as (_, execute):
         try:
             fetch = lambda query: execute(query).fetchone()
             mktargets = lambda f: ",".join(f"{f}(`{c}`)" for c in partcols)
@@ -50,6 +51,35 @@ def get_sub_df(obj, partname, partcols):
     if index_name is not None:
         dataframe.set_index(index_name, inplace=True)
     return dataframe
+
+
+def get_part_index(obj, partname):
+    """Retrieve index values (row name) of part of `obj`"""
+    index_query = f"SELECT `{obj._index_name}` FROM `{partname}`"
+    with SQLTransaction(obj.sqlite_db, "hacks/get_part_index") as (_, execute):
+        return {ix for ix, *_ in execute(index_query)}
+
+
+def merge_subs(self, sub_dfs, sub_indices):
+    """Merge subs 'by hand,' focing NaNs into subs whose full indices are smaller than full index pool"""
+    index_pool = set.union(set(), *sub_indices.values())
+    def _inject_NaN_if_outer(partname, sub_df):
+        if sub_indices.get(partname, set()) != index_pool:
+            mod_sub_df = sub_df.copy()
+            mod_sub_df.iloc[-1] = NaN
+            return mod_sub_df
+        else:
+            return sub_df
+    sub_merged = concat(axis=1, objs=[
+        _inject_NaN_if_outer(partname, sub_df).reset_index(drop=True)
+        for partname, sub_df in sub_dfs.items()
+    ])
+    ixs = sum([list(sub_df.index) for sub_df in sub_dfs.values()], [])
+    min_ix = min(ix for ix in ixs if ix == ix)
+    max_ix = max(ix for ix in ixs if ix == ix)
+    nan_ix = NaN if any(ix != ix for ix in ixs) else max_ix
+    sub_merged.index = Index([min_ix, max_ix, nan_ix], name=self._index_name)
+    return sub_merged
 
 
 class StreamedDataTableSub(StreamedDataTable):
@@ -101,16 +131,18 @@ def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
     """If context.schema == '1', replaces underlying query with quick retrieval of just values informative for schema"""
     if context.schema != "1":
         return get(self, context=context, limit=limit, offset=offset)
-    elif context.data_comparisons:
-        msg = "Using column comparisons when requesting schema"
-        raise NotImplementedError(msg)
+    elif context.data_columns or context.data_comparisons:
+        msg = "Data schema does not support column subsetting / comparisons"
+        sug = "Remove comparisons and/or column, row slicing from query"
+        raise GeneFabFormatException(msg, suggestion=sug)
     else:
         from genefab3.db.sql.streamed_tables import (
             SQLiteIndexName,
             StreamedDataTableWizard_Single, StreamedDataTableWizard_OuterJoined,
         )
         GeneFabLogger(info=f"apply_hack(speed_up_data_schema) for {self.name}")
-        sub_dfs, sub_columns, index_name = [], [], []
+        sub_dfs, sub_indices = OrderedDict(), {}
+        sub_columns, index_name = [], []
         def _extend_parts(obj):
             for partname, partcols in obj._inverse_column_dispatcher.items():
                 if isinstance(partcols[0], SQLiteIndexName):
@@ -119,8 +151,8 @@ def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
                     sub_df = get_sub_df(obj, partname, partcols)
                 else:
                     sub_df = get_sub_df(obj, partname, [*index_name, *partcols])
-                print(sub_df.T)
-                sub_dfs.append(sub_df)
+                sub_indices[partname] = get_part_index(obj, partname)
+                sub_dfs[partname] = sub_df
                 _ocr2f = obj._columns_raw2full
                 sub_columns.extend(_ocr2f[c] for c in sub_df.columns)
         if isinstance(self, StreamedDataTableWizard_Single):
@@ -131,9 +163,7 @@ def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
         else:
             msg = "Schema speedup applied to unsupported object type"
             raise GeneFabConfigurationException(msg, type=type(self))
-        _kw = dict(left_index=True, right_index=True, how="outer", sort=False)
-        sub_merged = reduce(partial(merge, **_kw), sub_dfs)
-        print(sub_merged.T)
+        sub_merged = merge_subs(self, sub_dfs, sub_indices)
         return StreamedDataTableSub(sub_merged, sub_columns)
 
 
