@@ -205,8 +205,13 @@ class KeyValueParsers():
             match = search(r'^([^<>=]+)(<|<=|=|==|>=|>)([^<>=]*)$', unq_expr)
             if match:
                 name, op, value = match.groups()
-                comparison = f"`{space_quote(name)}` {op} {space_quote(value)}"
-                yield None, (), (), [comparison]
+                try:
+                    float(value)
+                except ValueError:
+                    msg = "Only comparisons to numbers are currently supported"
+                    raise GeneFabParserException(msg, **{arg: value})
+                else:
+                    yield None, (), (), [f"`{space_quote(name)}` {op} {value}"]
             else:
                 msg = "Unparseable expression"
                 raise GeneFabParserException(msg, expression=expr)
