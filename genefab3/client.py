@@ -35,6 +35,11 @@ class GeneFabClient():
         """Modify Flask application, enable compression"""
         app.config = {**getattr(app, "config", {}), **(compress_params or {})}
         Compress(app)
+        @app.after_request
+        def apply_headers(response):
+            response.headers["X-Frame-Options"] = "SAMEORIGIN"
+            response.headers["X-XSS-Protection"] = "1; mode=block"
+            return response
         return app
  
     def _get_mongo_db_connection(self, *, db_name, client_params=None, collection_names=None, locale="en_US", units_formatter=None, test_timeout=10):
