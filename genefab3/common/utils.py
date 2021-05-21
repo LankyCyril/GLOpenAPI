@@ -1,7 +1,8 @@
 from numpy import generic as NumpyGenericType, base_repr
 from datetime import datetime
 from copy import deepcopy
-from re import search, compile
+from re import search, sub, compile
+from genefab3.common.exceptions import GeneFabParserException
 from functools import partial, reduce
 from urllib.request import quote
 from os import environ
@@ -26,11 +27,21 @@ copy_except = lambda d, *kk: {k: v for k, v in d.items() if k not in kk}
 deepcopy_except = lambda d, *kk: deepcopy({k: d[k] for k in d if k not in kk})
 deepcopy_keys = lambda d, *kk: deepcopy({k: d[k] for k in kk})
 
-
 is_regex = lambda v: search(r'^\/.*\/$', v)
-repr_quote = partial(quote, safe=" /'\",;:[{}]")
+repr_quote = partial(quote, safe=" /'\",;:[{}]=")
 space_quote = partial(quote, safe=" /")
 QPIPE = quote("|")
+
+
+def make_safe_token(token, allow_regex=False):
+    """Quote special characters, ensure not a $-command. Note: SQL queries are sanitized in genefab3.db.sql.streamed_tables"""
+    quoted_token = space_quote(token)
+    if allow_regex and ("$" not in sub(r'\$\/$', "", quoted_token)):
+        return quoted_token
+    elif "$" not in quoted_token:
+        return quoted_token
+    else:
+        raise GeneFabParserException("Forbidden argument", field=quoted_token)
 
 
 def is_debug(markers={"development", "staging", "stage", "debug", "debugging"}):

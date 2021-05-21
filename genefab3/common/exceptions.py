@@ -23,12 +23,14 @@ class GeneFabException(Exception):
             f'{k}={repr(v)}' for k, v in kwargs.items() if k != "debug_info"
         ))
     def __str__(self):
+        from genefab3.common.utils import repr_quote
         if len(self.args) == 0:
-            return "Error"
+            s =  "Error"
         elif len(self.args) == 1:
-            return self.args[0]
+            s = self.args[0]
         else:
-            return self.args[0] + ". Happened with: " + ", ".join(self.args[1:])
+            s = self.args[0] + ". Happened with: " + ", ".join(self.args[1:])
+        return repr_quote(s)
 
 
 class GeneFabConfigurationException(GeneFabException):
@@ -48,6 +50,7 @@ class GeneFabParserException(GeneFabException):
 
 
 def interpret_exception(e, debug=False):
+    from genefab3.common.utils import repr_quote, space_quote
     exc_type, exc_value, exc_tb = exc_info()
     if isinstance(e, NotImplementedError):
         code, reason = 501, "Not Implemented"
@@ -58,8 +61,13 @@ def interpret_exception(e, debug=False):
     info = dict(
         code=code, reason=reason,
         exception_type=exc_type.__name__, exception_value=str(exc_value),
-        args=[] if isinstance(e, GeneFabException) else getattr(e, "args", []),
-        kwargs={k: kwargs[k] for k in kwargs if (debug or (k != "debug_info"))},
+        args=[] if isinstance(e, GeneFabException) else [
+            repr_quote(repr(a)) for a in getattr(e, "args", [])
+        ],
+        kwargs={
+            space_quote(k): repr_quote(repr(kwargs[k]))
+            for k in kwargs if (debug or (k != "debug_info"))
+        },
     )
     if isinstance(e, GeneFabException) and getattr(e, "suggestion", None):
         info["suggestion"] = e.suggestion

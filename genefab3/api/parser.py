@@ -1,9 +1,9 @@
 from functools import lru_cache, partial
 from flask import request
-from genefab3.common.utils import space_quote, QPIPE, is_regex
+from genefab3.common.utils import make_safe_token, space_quote, QPIPE, is_regex
 from urllib.request import quote, unquote
 from json import dumps
-from re import sub, search
+from re import search
 from genefab3.common.exceptions import GeneFabParserException
 from genefab3.common.utils import EmptyIterator, BranchTracer
 from genefab3.common.exceptions import GeneFabConfigurationException
@@ -34,18 +34,6 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
     "column": partial(KeyValueParsers.kvp_column, category="column"),
     "c": partial(KeyValueParsers.kvp_column, category="column"),
 })
-
-
-
-def make_safe_token(token, allow_regex=False):
-    """Quote special characters, ensure not a $-command. Note: SQL queries are sanitized in genefab3.db.sql.streamed_tables"""
-    quoted_token = space_quote(token)
-    if allow_regex and ("$" not in sub(r'\$\/$', "", quoted_token)):
-        return quoted_token
-    elif "$" not in quoted_token:
-        return quoted_token
-    else:
-        raise GeneFabParserException("Forbidden argument", field=quoted_token)
 
 
 class Context():
