@@ -140,7 +140,7 @@ class KeyValueParsers():
         """Interpret single key-value pair for dataset / assay constraint"""
         if (not fields) and value: # mixed syntax: 'id=GLDS-1|GLDS-2/assay-B'
             query, projection_keys = {"$or": []}, ()
-            for expr in value.split(QPIPE):
+            for expr in unquote(value).split("|"):
                 query["$or"].append({
                     f"{category}.{field}": part for field, part in zip(
                         ["accession", "assay name", "sample name"],
@@ -175,9 +175,9 @@ class KeyValueParsers():
             lookup_key, projection_key = arg + _dot_postfix, arg
         if value: # metadata field must equal value or one of values
             if is_regex(value):
-                query = {lookup_key: {"$regex": value[1:-1]}}
+                query = {lookup_key: {"$regex": unquote(value)[1:-1]}}
             else:
-                query = {lookup_key: {"$in": value.split(QPIPE)}}
+                query = {lookup_key: {"$in": unquote(value).split("|")}}
             projection_keys = {projection_key}
         else: # metadata field or one of metadata fields must exist
             block_match = search(r'\.[^\.]+\.*$', lookup_key)
