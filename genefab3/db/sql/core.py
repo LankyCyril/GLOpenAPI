@@ -22,7 +22,7 @@ class SQLiteObject():
         self.sqlite_db, self.table_schemas = sqlite_db, table_schemas
         self.changed = None
         desc = "tables/ensure_schema"
-        with SQLTransaction(self.sqlite_db, desc) as (_, execute):
+        with SQLTransaction(self.sqlite_db, desc, exclusive=1) as (_, execute):
             for table, schema in (table_schemas or {}).items():
                 execute(
                     "CREATE TABLE IF NOT EXISTS `{}` ({})".format(
@@ -251,7 +251,7 @@ class SQLiteTable(SQLiteObject):
                     table = (execute(query_oldest).fetchone() or [None])[0]
                     if table is None:
                         break
-                with SQLTransaction(**_kw) as (connection, _):
+                with SQLTransaction(**_kw, exclusive=1) as (connection, _):
                     try:
                         GeneFabLogger(info=f"{desc} purging: {table}")
                         self.drop(connection=connection, other=table)

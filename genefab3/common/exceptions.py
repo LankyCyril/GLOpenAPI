@@ -7,7 +7,7 @@ from flask import Response
 
 
 genefab_logger = getLogger("genefab3")
-genefab_logger.setLevel(DEBUG+1)
+genefab_logger.setLevel(DEBUG)
 
 
 def GeneFabLogger(exc_info=None, **kwargs):

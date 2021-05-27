@@ -36,7 +36,9 @@ class ResponseCache():
             msg = "LRU SQL cache DISABLED by client parameter"
             _logw(f"ResponseCache():\n  {msg}")
         else:
-            _kw = dict(desc="response_cache/ensure_schema", timeout=5)
+            _kw = dict(
+                desc="response_cache/ensure_schema", timeout=5, exclusive=1,
+            )
             with SQLTransaction(self.sqlite_db, **_kw) as (connection, execute):
                 for table, schema in RESPONSE_CACHE_SCHEMAS:
                     query = f"CREATE TABLE IF NOT EXISTS `{table}` {schema}"
@@ -84,7 +86,7 @@ class ResponseCache():
             return
         def _put():
             retrieved_at = int(datetime.now().timestamp())
-            _kw = dict(desc="response_cache/put")
+            _kw = dict(desc="response_cache/put", exclusive=1)
             with SQLTransaction(self.sqlite_db, **_kw) as (_, execute):
                 try:
                     execute("""DELETE FROM `response_cache` WHERE
@@ -121,7 +123,7 @@ class ResponseCache():
     def drop(self, accession):
         """Drop responses for given accession"""
         desc = "response_cache/drop"
-        with SQLTransaction(self.sqlite_db, desc) as (_, execute):
+        with SQLTransaction(self.sqlite_db, desc, exclusive=1) as (_, execute):
             try:
                 query = """SELECT `context_identity` FROM `accessions_used`
                     WHERE `accession` == ?"""
@@ -140,7 +142,7 @@ class ResponseCache():
     def drop_all(self):
         """Drop all cached responses"""
         desc = "response_cache/drop_all"
-        with SQLTransaction(self.sqlite_db, desc) as (_, execute):
+        with SQLTransaction(self.sqlite_db, desc, exclusive=1) as (_, execute):
             try:
                 execute("DELETE FROM `accessions_used`")
                 execute("DELETE FROM `response_cache`")
@@ -207,7 +209,7 @@ class ResponseCache():
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
                 desc = "response_cache/shrink"
-                _kw = dict(filename=self.sqlite_db, desc=desc)
+                _kw = dict(filename=self.sqlite_db, desc=desc, exclusive=1)
                 with SQLTransaction(**_kw) as (_, execute):
                     query_oldest = f"""SELECT `context_identity`
                         FROM `response_cache` ORDER BY `retrieved_at` ASC"""
