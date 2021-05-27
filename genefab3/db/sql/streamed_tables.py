@@ -1,6 +1,6 @@
 from genefab3.common.utils import random_unique_string, validate_no_backtick
 from sqlite3 import OperationalError
-from genefab3.common.exceptions import GeneFabDatabaseException, GeneFabLogger
+from genefab3.common.exceptions import GeneFabLogger, GeneFabDatabaseException
 from genefab3.common.types import StreamedDataTable, NaN
 from genefab3.common.exceptions import GeneFabFileException
 from collections import Counter, OrderedDict
@@ -24,11 +24,8 @@ class TempSelect():
                 GeneFabLogger(info=msg)
             try:
                 execute(f"CREATE {self.kind} `{self.name}` as {query}")
-            except OperationalError:
-                msg = f"Failed to create temporary {self.kind}"
-                _kw = dict(name=self.name, debug_info=query)
-                GeneFabLogger(error=f"{msg}; name={self.name}, query={query!r}")
-                raise GeneFabDatabaseException(msg, **_kw)
+            except OperationalError as e:
+                StreamedDataTable._reraise(self, e)
             else:
                 query_repr = repr(query.lstrip()[:200] + "...")
                 msg = f"Created temporary SQLite {self.kind}"
