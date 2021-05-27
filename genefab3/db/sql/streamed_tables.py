@@ -27,6 +27,7 @@ class TempSelect():
             except OperationalError:
                 msg = f"Failed to create temporary {self.kind}"
                 _kw = dict(name=self.name, debug_info=query)
+                GeneFabLogger(error=f"{msg}; name={self.name}, query={query!r}")
                 raise GeneFabDatabaseException(msg, **_kw)
             else:
                 query_repr = repr(query.lstrip()[:200] + "...")
