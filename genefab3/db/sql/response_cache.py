@@ -36,13 +36,10 @@ class ResponseCache():
             msg = "LRU SQL cache DISABLED by client parameter"
             _logw(f"ResponseCache():\n  {msg}")
         else:
-            _kw = dict(
-                desc="response_cache/ensure_schema", timeout=5, exclusive=1,
-            )
-            with SQLTransaction(self.sqlite_db, **_kw) as (connection, execute):
+            _kw = dict(desc="response_cache/ensure_schema")
+            with SQLTransaction(self.sqlite_db, **_kw) as (_, execute):
                 for table, schema in RESPONSE_CACHE_SCHEMAS:
-                    query = f"CREATE TABLE IF NOT EXISTS `{table}` {schema}"
-                    execute(query)
+                    execute(f"CREATE TABLE IF NOT EXISTS `{table}` {schema}")
  
     bypass_if_disabled = lambda f: wraps(f)(lambda self, *args, **kwargs:
         ResponseContainer(content=None) if self.sqlite_db is None

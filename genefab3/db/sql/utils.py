@@ -5,6 +5,7 @@ from filelock import FileLock
 from genefab3.common.exceptions import GeneFabConfigurationException
 from sqlite3 import connect, OperationalError
 from genefab3.common.utils import timestamp36
+from genefab3.common.exceptions import GeneFabDatabaseException
 
 
 def check_database_validity(filename, desc):
@@ -75,8 +76,8 @@ def SQLTransaction(filename, desc=None, *, exclusive=False, timeout=600):
                     _logger.debug(f"{desc} @ {_tid}: committing transaction")
                     connection.commit()
         except (OSError, FileNotFoundError, OperationalError) as e:
-            msg = f"Could not connect to SQLite database {filename!r}"
-            raise GeneFabConfigurationException(msg, debug_info=repr(e))
+            msg = "Data could not be retrieved"
+            raise GeneFabDatabaseException(msg, debug_info=repr(e))
         finally:
             if exclusive:
                 _logger.debug(f"{desc} @ {_tid}: released lock")
