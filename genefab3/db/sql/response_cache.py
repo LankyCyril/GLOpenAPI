@@ -22,8 +22,8 @@ RESPONSE_CACHE_SCHEMAS = (
     )"""),
 )
 
-_logger = GeneFabLogger()
-_logi, _logw, _loge = _logger.info, _logger.warning, _logger.error
+_logi, _logw = GeneFabLogger.info, GeneFabLogger.warning
+_loge = GeneFabLogger.error
 
 
 class ResponseCache():
@@ -216,11 +216,11 @@ class ResponseCache():
                 with SQLTransaction(**_kw) as (connection, execute):
                     try:
                         msg = f"ResponseCache.shrink():\n  dropping {cid}"
-                        GeneFabLogger(info=msg)
+                        GeneFabLogger.info(msg)
                         self._drop_by_context_identity(execute, cid)
                     except OperationalError as e:
                         msg= f"Rolling back shrinkage due to {e!r}"
-                        GeneFabLogger(error=msg, exc_info=e)
+                        GeneFabLogger.error(msg, exc_info=e)
                         connection.rollback()
                         break
                     else:

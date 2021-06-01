@@ -33,16 +33,16 @@ class CachedBinaryFile(SQLiteBlob):
     def __download_as_blob(self):
         """Download data from URL as-is"""
         for url in self.urls:
-            GeneFabLogger(info=f"{self.name}; trying URL:\n  {url}")
+            GeneFabLogger.info(f"{self.name}; trying URL:\n  {url}")
             try:
                 with request_get(url) as response:
                     data = response.content
             except (URLError, OSError) as e:
                 msg = f"{self.name}; tried URL and failed:\n  {url}"
-                GeneFabLogger(warning=msg, exc_info=e)
+                GeneFabLogger.warning(msg, exc_info=e)
             else:
                 msg = f"{self.name}; successfully fetched blob:\n  {url}"
-                GeneFabLogger(info=msg)
+                GeneFabLogger.info(msg)
                 self.url = url
                 return data
         else:
@@ -80,19 +80,19 @@ class CachedTableFile(SQLiteTable):
         """Try all URLs and push data into temporary file"""
         for url in urls:
             with open(tempfile, mode="wb") as handle:
-                GeneFabLogger(info=f"{self.name}; trying URL:\n  {url}")
+                GeneFabLogger.info(f"{self.name}; trying URL:\n  {url}")
                 try:
                     with request_get(url, stream=True) as response:
                         response.raw.decode_content = False
                         msg = f"{self.name}:\n  streaming to {handle.name}"
-                        GeneFabLogger(debug=msg)
+                        GeneFabLogger.debug(msg)
                         copyfileobj(response.raw, handle)
                 except (URLError, OSError) as e:
                     msg = f"{self.name}; tried URL and failed:\n  {url}"
-                    GeneFabLogger(warning=msg, exc_info=e)
+                    GeneFabLogger.warning(msg, exc_info=e)
                 else:
                     msg = f"{self.name}; successfully fetched data:\n  {url}"
-                    GeneFabLogger(info=msg)
+                    GeneFabLogger.info(msg)
                     return url
         else:
             msg = "None of the URLs are reachable for file"
@@ -123,7 +123,7 @@ class CachedTableFile(SQLiteTable):
                 for i, csv_chunk in enumerate(read_csv(tempfile, **_reader_kw)):
                     self.INPLACE_process(csv_chunk)
                     msg = f"interpreted table chunk {i}:\n  {tempfile}"
-                    GeneFabLogger(info=f"{self.name}; {msg}")
+                    GeneFabLogger.info(f"{self.name}; {msg}")
                     yield csv_chunk
             except (IOError, UnicodeDecodeError, CSVError, PandasParserError):
                 msg = "Not recognized as a table file"
@@ -152,10 +152,10 @@ class CachedTableFile(SQLiteTable):
                             partname, connection, **to_sql_kws,
                         )
                         msg = "Extended table for CachedTableFile"
-                        GeneFabLogger(info=f"{msg}:\n  {self.name}, {partname}")
+                        GeneFabLogger.info(f"{msg}:\n  {self.name}, {partname}")
                 except (OperationalError, PandasDatabaseError, ValueError) as e:
                     msg = "Failed to insert SQLite chunk (or chunk part)"
-                    GeneFabLogger(error=f"{msg}:\n  {self.name}", exc_info=e)
+                    GeneFabLogger.error(f"{msg}:\n  {self.name}", exc_info=e)
                     connection.rollback()
                     return
             execute(f"""INSERT INTO `{self.aux_table}`
@@ -163,4 +163,4 @@ class CachedTableFile(SQLiteTable):
                 self.table, self.timestamp, int(datetime.now().timestamp()),
             ])
             msg = "Finished extending; all parts inserted for CachedTableFile"
-            GeneFabLogger(info=f"{msg}:\n  {self.name}\n  {self.table}")
+            GeneFabLogger.info(f"{msg}:\n  {self.name}\n  {self.table}")

@@ -6,14 +6,8 @@ from json import dumps
 from flask import Response
 
 
-genefab_logger = getLogger("genefab3")
-genefab_logger.setLevel(DEBUG)
-
-
-def GeneFabLogger(exc_info=None, **kwargs):
-    for func, message in kwargs.items():
-        getattr(genefab_logger, func)(message, exc_info=exc_info)
-    return genefab_logger
+GeneFabLogger = getLogger("genefab3")
+GeneFabLogger.setLevel(DEBUG)
 
 
 class GeneFabException(Exception):
