@@ -98,7 +98,7 @@ class GeneLabAdapter(Adapter):
                 COLD_FILELISTINGS_MASK=(
                     genelab_root + "/genelab/data/study/filelistings/{}"
                 ),
-                ALT_FILEPATH="/genelab/static/media/dataset/",
+                SHORT_MEDIA_PATH="/genelab/static/media/dataset/",
             )
         super().__init__()
  
@@ -118,10 +118,10 @@ class GeneLabAdapter(Adapter):
         version_info = "?version={}".format(row["version"])
         entry = {
             "urls": [
+                (self.constants.GENELAB_ROOT + self.constants.SHORT_MEDIA_PATH +
+                    quote(filename) + version_info),
                 (self.constants.GENELAB_ROOT + quote(row["remote_url"]) +
                     version_info),
-                (self.constants.GENELAB_ROOT + self.constants.ALT_FILEPATH +
-                    quote(filename) + version_info),
             ],
             "timestamp": row["timestamp"],
         }

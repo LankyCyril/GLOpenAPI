@@ -1,6 +1,6 @@
 from genefab3.common.utils import random_unique_string, validate_no_backtick
 from sqlite3 import OperationalError
-from genefab3.common.exceptions import GeneFabDatabaseException, GeneFabLogger
+from genefab3.common.exceptions import GeneFabLogger, GeneFabDatabaseException
 from genefab3.common.types import StreamedDataTable, NaN
 from genefab3.common.exceptions import GeneFabFileException
 from collections import Counter, OrderedDict
@@ -19,15 +19,13 @@ class TempSelect():
         self.query, self.targets, self.kind = query, targets, kind
         self.name = "TEMP:" + random_unique_string(seed=query)
         desc = "tables/TempSelect"
-        with SQLTransaction(self.sqlite_db, desc) as (_, execute):
+        with SQLTransaction(self.sqlite_db, desc, exclusive=1) as (_, execute):
             if msg:
                 GeneFabLogger(info=msg)
             try:
                 execute(f"CREATE {self.kind} `{self.name}` as {query}")
-            except OperationalError:
-                msg = f"Failed to create temporary {self.kind}"
-                _kw = dict(name=self.name, debug_info=query)
-                raise GeneFabDatabaseException(msg, **_kw)
+            except OperationalError as e:
+                StreamedDataTable._reraise(self, e)
             else:
                 query_repr = repr(query.lstrip()[:200] + "...")
                 msg = f"Created temporary SQLite {self.kind}"
@@ -35,7 +33,7 @@ class TempSelect():
  
     def __del__(self):
         desc = "tables/TempSelect/__del__"
-        with SQLTransaction(self.sqlite_db, desc) as (_, execute):
+        with SQLTransaction(self.sqlite_db, desc, exclusive=1) as (_, execute):
             try:
                 execute(f"DROP {self.kind} `{self.name}`")
             except OperationalError as e:

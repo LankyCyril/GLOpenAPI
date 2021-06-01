@@ -13,13 +13,21 @@ class DefaultRoutes(Routes):
     def js(self, filename, context=None):
         return views.static.get(
             directory="libs/js", filename=filename,
-            mimetype="application/javascript",
+            mode="rt", mimetype="application/javascript",
         )
  
     @Routes.register_endpoint("/libs/css/<filename>")
     def css(self, filename, context=None):
         return views.static.get(
-            directory="libs/css", filename=filename, mimetype="text/css",
+            directory="libs/css", filename=filename,
+            mode="rt", mimetype="text/css",
+        )
+ 
+    @Routes.register_endpoint("/libs/css/images/<filename>")
+    def css_image(self, filename, context=None):
+        return views.static.get(
+            directory="libs/css/images", filename=filename,
+            mode="rb", mimetype="image/gif",
         )
  
     @Routes.register_endpoint("/")

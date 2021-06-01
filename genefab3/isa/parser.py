@@ -12,6 +12,7 @@ from io import BytesIO, StringIO
 from os import path
 from logging import getLogger, CRITICAL
 from isatools.isatab import load_investigation
+from pandas.errors import ParserError as PandasParserError
 
 
 class Investigation(dict):
@@ -297,14 +298,17 @@ class IsaFromZip():
  
     def _read_investigation(self, handle):
         """Load investigation tab with isatools, safeguard input for engine='python', suppress isatools' logger"""
-        safe_handle = StringIO(
-            sub( # make number of double quotes inside fields even:
-                r'([^\n\t])\"([^\n\t])', r'\1""\2',
-                handle.read().decode(errors="replace")
-            ),
-        )
+        safe_string = handle.read().decode(errors="replace")
         getLogger("isatools").setLevel(CRITICAL+1)
-        return load_investigation(safe_handle)
+        try:
+            return load_investigation(StringIO(safe_string))
+        except PandasParserError:
+            # we see this if there are unmatched double quotes in text;
+            # attempt to make number of double quotes inside fields even:
+            safe_string_with_even_quotes = sub(
+                r'([^\n\t])\"([^\n\t])', r'\1""\2', safe_string,
+            )
+            return load_investigation(StringIO(safe_string_with_even_quotes))
  
     def _read_tab(self, handle, status_kwargs):
         """Read TSV file, absorbing encoding errors, and allowing for duplicate column names"""

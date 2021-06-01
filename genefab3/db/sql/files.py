@@ -6,7 +6,7 @@ from genefab3.common.exceptions import GeneFabDataManagerException
 from sqlite3 import Binary, OperationalError
 from datetime import datetime
 from genefab3.db.sql.utils import SQLTransaction
-from genefab3.common.utils import as_is, random_unique_string
+from genefab3.common.utils import as_is
 from shutil import copyfileobj
 from tempfile import TemporaryDirectory
 from os import path
@@ -54,8 +54,8 @@ class CachedBinaryFile(SQLiteBlob):
         """Run `self.__download_as_blob()` and insert result (optionally compressed) into `self.table` as BLOB"""
         blob = Binary(bytes(self.compressor(self.__download_as_blob())))
         retrieved_at = int(datetime.now().timestamp())
-        desc = "blobs/update"
-        with SQLTransaction(self.sqlite_db, desc) as (connection, execute):
+        _kw = dict(desc="blobs/update", exclusive=1)
+        with SQLTransaction(self.sqlite_db, **_kw) as (connection, execute):
             self.drop(connection=connection)
             execute(f"""INSERT INTO `{self.table}`
                 (`identifier`,`blob`,`timestamp`,`retrieved_at`)
@@ -131,35 +131,33 @@ class CachedTableFile(SQLiteTable):
  
     def update(self, to_sql_kws=dict(index=True, if_exists="append", chunksize=1024)):
         """Update `self.table` with result of `self.__download_as_pandas_chunks()`, update `self.aux_table` with timestamps"""
-        columns, width, bounds, temppartnames = None, None, None, None
-        desc = "tables/update"
-        with SQLTransaction(self.sqlite_db, desc) as (connection, execute):
+        columns, width, bounds = None, None, None
+        _kw = dict(desc="tables/update", exclusive=1)
+        with SQLTransaction(self.sqlite_db, **_kw) as (connection, execute):
             for csv_chunk in self.__download_as_pandas_chunks():
                 try:
                     columns = csv_chunk.columns if columns is None else columns
                     if width is None:
                         width = csv_chunk.shape[1]
                         bounds = bounds or range(0, width, self.maxpartcols)
-                        _pn = lambda: "DLPT:" + random_unique_string()
-                        temppartnames = temppartnames or [_pn() for _ in bounds]
                     if (csv_chunk.shape[1] != width):
                         raise ValueError("Inconsistent chunk width")
                     if (csv_chunk.columns != columns).any():
                         raise ValueError("Inconsistent chunk column names")
-                    for bound, tempname in zip(bounds, temppartnames):
+                    parts = SQLiteObject.iterparts(
+                        self.table, connection, must_exist=0,
+                    )
+                    for bound, (partname, *_) in zip(bounds, parts):
                         csv_chunk.iloc[:,bound:bound+self.maxpartcols].to_sql(
-                            tempname, connection, **to_sql_kws,
+                            partname, connection, **to_sql_kws,
                         )
                         msg = "Extended table for CachedTableFile"
-                        GeneFabLogger(info=f"{msg}:\n  {self.name}, {tempname}")
+                        GeneFabLogger(info=f"{msg}:\n  {self.name}, {partname}")
                 except (OperationalError, PandasDatabaseError, ValueError) as e:
                     msg = "Failed to insert SQLite chunk (or chunk part)"
                     GeneFabLogger(error=f"{msg}:\n  {self.name}", exc_info=e)
                     connection.rollback()
                     return
-            parts = SQLiteObject.iterparts(self.table, connection, must_exist=0)
-            for tempname, (partname, *_) in zip(temppartnames, parts):
-                execute(f"ALTER TABLE `{tempname}` RENAME TO `{partname}`")
             execute(f"""INSERT INTO `{self.aux_table}`
                 (`table`,`timestamp`,`retrieved_at`) VALUES(?,?,?)""", [
                 self.table, self.timestamp, int(datetime.now().timestamp()),
