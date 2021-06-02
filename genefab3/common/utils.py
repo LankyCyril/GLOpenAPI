@@ -30,7 +30,6 @@ deepcopy_keys = lambda d, *kk: deepcopy({k: d[k] for k in kk})
 is_regex = lambda v: search(r'^\/.*\/$', v)
 repr_quote = partial(quote, safe=" /'\",;:[{}]=")
 space_quote = partial(quote, safe=" /")
-QPIPE = quote("|")
 
 
 def make_safe_token(token, allow_regex=False):

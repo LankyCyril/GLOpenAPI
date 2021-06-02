@@ -17,13 +17,13 @@ def ensure_info_index(mongo_collections, locale):
     if "id" not in mongo_collections.metadata.index_information():
         msgmask = "Generating index for metadata collection ('{}'), key 'id'"
         id_fields = METADATA_AUX_TEMPLATE["id"].keys()
-        GeneFabLogger(info=msgmask.format(mongo_collections.metadata.name))
+        GeneFabLogger.info(msgmask.format(mongo_collections.metadata.name))
         mongo_collections.metadata.create_index(
             name="id", keys=[(f"id.{f}", ASCENDING) for f in id_fields],
             collation={"locale": locale, "numericOrdering": True},
         )
         msgmask = "Index generated for metadata collection ('{}'), key 'id'"
-        GeneFabLogger(info=msgmask.format(mongo_collections.metadata.name))
+        GeneFabLogger.info(msgmask.format(mongo_collections.metadata.name))
 
 
 def INPLACE_update_metadata_value_lookup_keys(index, mongo_collections, final_key_blacklist={"comment"}):
@@ -61,7 +61,7 @@ def INPLACE_update_metadata_value_lookup_values(index, mongo_collections):
 def update_metadata_value_lookup(mongo_collections, cacher_id, keys=("investigation", "study", "assay")):
     """Collect existing keys and values for lookups"""
     m = "{}:\n  reindexing metadata lookup records ('{}')"
-    GeneFabLogger(info=m.format(cacher_id, mongo_collections.metadata_aux.name))
+    GeneFabLogger.info(m.format(cacher_id, mongo_collections.metadata_aux.name))
     index = deepcopy_keys(METADATA_AUX_TEMPLATE, *keys)
     INPLACE_update_metadata_value_lookup_keys(index, mongo_collections)
     INPLACE_update_metadata_value_lookup_values(index, mongo_collections)
@@ -76,4 +76,4 @@ def update_metadata_value_lookup(mongo_collections, cacher_id, keys=("investigat
                         data={"content": index[isa_category][subkey]},
                     )
     m = "{}:\n  finished reindexing metadata lookup records ('{}')"
-    GeneFabLogger(info=m.format(cacher_id, mongo_collections.metadata_aux.name))
+    GeneFabLogger.info(m.format(cacher_id, mongo_collections.metadata_aux.name))

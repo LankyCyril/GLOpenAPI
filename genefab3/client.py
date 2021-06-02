@@ -9,6 +9,8 @@ from genefab3.db.mongo.utils import iterate_mongo_connections
 from genefab3.db.cacher import CacherThread
 from genefab3.api.renderer import CacheableRenderer
 from functools import partial
+from filelock import FileLock
+from genefab3.db.sql.utils import get_lockfile
 
 
 class GeneFabClient():
@@ -100,18 +102,18 @@ class GeneFabClient():
         """Check if no other instances of genefab3 are talking to MongoDB database"""
         if not enabled:
             msg = "CacherThread disabled by client parameter, NOT LOOPING"
-            GeneFabLogger(info=f"{self.mongo_appname}:\n  {msg}")
+            GeneFabLogger.info(f"{self.mongo_appname}:\n  {msg}")
             return False
         else:
             for other in iterate_mongo_connections(self.mongo_client):
                 if other < self.mongo_appname:
                     msg = (f"Found other instance {other}, " +
                         "NOT LOOPING current instance")
-                    GeneFabLogger(info=f"{self.mongo_appname}:\n  {msg}")
+                    GeneFabLogger.info(f"{self.mongo_appname}:\n  {msg}")
                     return False
             else:
                 msg = "No other instances found, STARTING LOOP"
-                GeneFabLogger(info=f"{self.mongo_appname}:\n  {msg}")
+                GeneFabLogger.info(f"{self.mongo_appname}:\n  {msg}")
                 return True
  
     def _ensure_cacher_thread(self, metadata_update_interval=1800, metadata_retry_delay=300, enabled=True):
@@ -126,3 +128,23 @@ class GeneFabClient():
             return cacher_thread
         else:
             return SimpleNamespace(isAlive=lambda: False)
+ 
+    def __del__(self):
+        """Clean up open connections"""
+        if not self.cacher_thread.isAlive():
+            GeneFabLogger.info("Finishing up: closing MongoDB connection")
+            self.mongo_client.close()
+        for db_spec in self.sqlite_dbs.__dict__.values():
+            msg = f"{self.mongo_appname} finishing up:\n  this instance's lock"
+            filename = db_spec.get("db")
+            if filename is not None:
+                try:
+                    GeneFabLogger.info(f"{msg} on {filename}: releasing...")
+                    FileLock(get_lockfile(filename)).release()
+                    GeneFabLogger.info(f"{msg} on {filename}: released!")
+                except FileNotFoundError:
+                    pass
+                except:
+                    GeneFabLogger.error(
+                        f"{msg} on {filename}: FAILED to release",
+                    )

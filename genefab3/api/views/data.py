@@ -24,7 +24,7 @@ def fail_if_files_not_joinable(getset):
         msg = "Cannot combine data for multiple technology types"
         _kw = dict(technology_types=getset("technology type"))
     elif getset("file", "joinable") != {True}:
-        msg = "Cannot combine files of this datatype from multiple assays"
+        msg = "Cannot combine files of this datatype from one or more assays"
         _kw = dict(
             datatype=getset("file", "datatype").pop(),
             accessions=getset("accession"), assay_names=getset("assay name"),

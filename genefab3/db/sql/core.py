@@ -21,8 +21,14 @@ class SQLiteObject():
         """Initialize SQLiteObject, ensure tables in `sqlite_db`"""
         self.sqlite_db, self.table_schemas = sqlite_db, table_schemas
         self.changed = None
+        self.Transaction = lambda desc: SQLTransaction(
+            filename=self.sqlite_db, desc=desc, locking_tier=False,
+        )
+        self.LockingTierTransaction = lambda desc: SQLTransaction(
+            filename=self.sqlite_db, desc=desc, locking_tier=True,
+        )
         desc = "tables/ensure_schema"
-        with SQLTransaction(self.sqlite_db, desc, exclusive=1) as (_, execute):
+        with self.Transaction(desc) as (_, execute):
             for table, schema in (table_schemas or {}).items():
                 execute(
                     "CREATE TABLE IF NOT EXISTS `{}` ({})".format(
@@ -60,43 +66,49 @@ class SQLiteObject():
             try:
                 connection.execute(f"DROP TABLE IF EXISTS `{partname}`")
             except Exception as e:
-                GeneFabLogger(error=f"Could not drop {partname}", exc_info=e)
+                GeneFabLogger.error(f"Could not drop {partname}", exc_info=e)
                 raise
             else:
-                GeneFabLogger(info=f"Dropped {partname} (if it existed)")
+                GeneFabLogger.info(f"Dropped {partname} (if it existed)")
  
     def is_stale(self, *, timestamp_table=None, id_field=None, db_type=None):
         """Evaluates to True if underlying data in need of update, otherwise False"""
         if (timestamp_table is None) or (id_field is None):
             msg = "did not pass arguments to self.is_stale(), will never update"
-            GeneFabLogger(warning=f"{type(self).__name__} {msg}")
+            GeneFabLogger.warning(f"{type(self).__name__} {msg}")
         else:
             db_type = db_type or f"{type(self).__name__}"
             desc = f"{db_type}/is_stale"
             self_id_value = getattr(self, id_field)
             query = f"""SELECT `timestamp` FROM `{timestamp_table}`
                 WHERE `{id_field}` == "{self_id_value}" """
-        with SQLTransaction(self.sqlite_db, desc) as (connection, execute):
+        with self.Transaction(desc) as (_, execute):
             ret = execute(query).fetchall()
             if len(ret) == 0:
-                return True
+                _staleness = True
             elif (len(ret) == 1) and (len(ret[0]) == 1):
-                return (ret[0][0] < self.timestamp)
+                _staleness = (ret[0][0] < self.timestamp)
             else:
+                _staleness = None
+        if _staleness is None:
+            with self.LockingTierTransaction(desc) as (connection, _):
                 msg = "Conflicting timestamp values for SQLiteObject"
-                GeneFabLogger(warning=f"{msg}\n  ({self_id_value})")
+                GeneFabLogger.warning(f"{msg}\n  ({self_id_value})")
                 self.drop(connection=connection)
-                return True
+            _staleness = True
+        if _staleness is True:
+            GeneFabLogger.info(f"{self_id_value} is stale, staging update")
+        return _staleness
  
     def update(self):
         """Update underlying data in SQLite"""
         msg = "did not define self.update(), will never update"
-        GeneFabLogger(warning=f"{type(self).__name__} {msg}")
+        GeneFabLogger.warning(f"{type(self).__name__} {msg}")
  
     def retrieve(self):
         """Retrieve underlying data from SQLite"""
         msg = "did not define self.retrieve(), will always retrieve `None`"
-        GeneFabLogger(warning=f"{type(self).__name__} {msg}")
+        GeneFabLogger.warning(f"{type(self).__name__} {msg}")
         return None
  
     def cleanup(self):
@@ -145,10 +157,10 @@ class SQLiteBlob(SQLiteObject):
                 WHERE `identifier` == "{identifier}" """)
         except Exception as e:
             msg = f"Could not delete from {self.table}: {identifier}"
-            GeneFabLogger(error=msg, exc_info=e)
+            GeneFabLogger.error(msg, exc_info=e)
             raise
         else:
-            GeneFabLogger(info=f"Deleted from {self.table}: {identifier}")
+            GeneFabLogger.info(f"Deleted from {self.table}: {identifier}")
  
     def is_stale(self):
         """Evaluates to True if underlying data in need of update, otherwise False"""
@@ -159,8 +171,7 @@ class SQLiteBlob(SQLiteObject):
  
     def retrieve(self):
         """Take `blob` from `self.table` and decompress with `self.decompressor`"""
-        desc = "blobs/retrieve"
-        with SQLTransaction(self.sqlite_db, desc) as (connection, execute):
+        with self.Transaction("blobs/retrieve") as (_, execute):
             query = f"""SELECT `blob` from `{self.table}`
                 WHERE `identifier` == "{self.identifier}" """
             ret = execute(query).fetchall()
@@ -168,11 +179,16 @@ class SQLiteBlob(SQLiteObject):
                 msg = "No data found"
                 raise GeneFabDatabaseException(msg, identifier=self.identifier)
             elif (len(ret) == 1) and (len(ret[0]) == 1):
-                return self.decompressor(ret[0][0])
+                data = self.decompressor(ret[0][0])
             else:
+                data = None
+        if data is None:
+            with self.Transaction("blobs/retrieve") as (connection, _):
                 self.drop(connection=connection)
                 msg = "Entries conflict (will attempt to fix on next request)"
                 raise GeneFabDatabaseException(msg, identifier=self.identifier)
+        else:
+            return data
 
 
 class SQLiteTable(SQLiteObject):
@@ -207,10 +223,10 @@ class SQLiteTable(SQLiteObject):
                 WHERE `table` == "{table}" """)
         except Exception as e:
             msg = f"Could not delete from {self.aux_table}: {table}"
-            GeneFabLogger(error=msg, exc_info=e)
+            GeneFabLogger.error(msg, exc_info=e)
             raise
         else:
-            GeneFabLogger(info=f"Deleted from {self.aux_table}: {table}")
+            GeneFabLogger.info(f"Deleted from {self.aux_table}: {table}")
         SQLiteObject.drop_all_parts(table, connection)
  
     def is_stale(self):
@@ -223,8 +239,7 @@ class SQLiteTable(SQLiteObject):
     def retrieve(self):
         """Create an StreamedDataTableWizard object dispatching columns to table parts"""
         column_dispatcher = OrderedDict()
-        desc = "tables/retrieve"
-        with SQLTransaction(self.sqlite_db, desc) as (connection, _):
+        with self.Transaction("tables/retrieve") as (connection, _):
             parts = SQLiteObject.iterparts(self.table, connection)
             for partname, index_name, columns in parts:
                 if index_name not in column_dispatcher:
@@ -240,24 +255,24 @@ class SQLiteTable(SQLiteObject):
  
     def cleanup(self, max_iter=100, max_skids=20):
         """Check size of underlying database file, drop oldest tables to keep file size under `self.maxdbsize`"""
-        desc, n_dropped, n_skids = f"SQLiteTable():\n  {self.sqlite_db}", 0, 0
+        n_dropped, n_skids = 0, 0
         for _ in range(max_iter):
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
-                _kw = dict(filename=self.sqlite_db, desc="tables/cleanup")
-                with SQLTransaction(**_kw) as (_, execute):
+                desc = "tables/cleanup"
+                with self.Transaction(desc) as (_, execute):
                     query_oldest = f"""SELECT `table`
                         FROM `{self.aux_table}` ORDER BY `retrieved_at` ASC"""
                     table = (execute(query_oldest).fetchone() or [None])[0]
                     if table is None:
                         break
-                with SQLTransaction(**_kw, exclusive=1) as (connection, _):
+                with self.LockingTierTransaction(desc) as (connection, _):
                     try:
-                        GeneFabLogger(info=f"{desc} purging: {table}")
+                        GeneFabLogger.info(f"{desc} purging: {table}")
                         self.drop(connection=connection, other=table)
                     except OperationalError as e:
                         msg= f"Rolling back shrinkage due to {e!r}"
-                        GeneFabLogger(error=msg, exc_info=e)
+                        GeneFabLogger.error(msg, exc_info=e)
                         connection.rollback()
                         break
                     else:
@@ -266,9 +281,10 @@ class SQLiteTable(SQLiteObject):
                 n_skids += (path.getsize(self.sqlite_db) >= current_size)
             else:
                 break
+        desc = f"SQLiteTable():\n  {self.sqlite_db}"
         if n_dropped:
-            GeneFabLogger(info=f"{desc} shrunk by {n_dropped} entries")
+            GeneFabLogger.info(f"{desc} shrunk by {n_dropped} entries")
         elif path.getsize(self.sqlite_db) > self.maxdbsize:
-            GeneFabLogger(warning=f"{desc} could not be shrunk")
+            GeneFabLogger.warning(f"{desc} could not be shrunk")
         if n_skids:
-            GeneFabLogger(warning=f"{desc} did not shrink {n_skids} times")
+            GeneFabLogger.warning(f"{desc} did not shrink {n_skids} times")

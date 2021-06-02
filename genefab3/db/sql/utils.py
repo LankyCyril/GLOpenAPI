@@ -16,11 +16,20 @@ def check_database_validity(filename, desc):
     else:
         access_warning = f"SQLite database {filename!r} may not be writable"
         if path.exists(filename) and (not access(filename, W_OK)):
-            GeneFabLogger(warning=f"{access_warning}: path.access()")
+            GeneFabLogger.warning(f"{access_warning}: path.access()")
             potential_access_warning = None
         else:
             potential_access_warning = access_warning
         return potential_access_warning
+
+
+def get_lockfile(filename):
+    return f"{filename}.lock"
+
+
+@contextmanager
+def nullcontext():
+    yield
 
 
 def apply_pragma(execute, pragma, value, filename, potential_access_warning):
@@ -30,54 +39,71 @@ def apply_pragma(execute, pragma, value, filename, potential_access_warning):
         status = (execute(f"PRAGMA {pragma}").fetchone() or [None])[0]
     except (OSError, FileNotFoundError, OperationalError) as e:
         if potential_access_warning:
-            GeneFabLogger(warning=f"{potential_access_warning}", exc_info=e)
+            GeneFabLogger.warning(f"{potential_access_warning}", exc_info=e)
     else:
         if str(status) != str(value):
             msg = f"Could not set {pragma} = {value} for database"
-            GeneFabLogger(warning=f"{msg} {filename!r}")
+            GeneFabLogger.warning(f"{msg} {filename!r}")
+
+
+def apply_all_pragmas(filename, execute, timeout, potential_access_warning):
+    """Apply all relevant PRAGMAs at once: auto_vacuum, WAL, wal_autocheckpoint, busy_timeout"""
+    args = filename, potential_access_warning
+    apply_pragma(execute, "auto_vacuum", "1", *args)
+    apply_pragma(execute, "journal_mode", "wal", *args)
+    apply_pragma(execute, "wal_autocheckpoint", "0", *args)
+    apply_pragma(execute, "busy_timeout", str(int(timeout*1000)), *args)
 
 
 @contextmanager
-def nullcontext():
-    yield
-
-
-@contextmanager
-def SQLTransaction(filename, desc=None, *, exclusive=False, timeout=600):
+def SQLTransaction(filename, desc=None, *, locking_tier=False, timeout=600):
     """Preconfigure `filename` if new, allow long timeout (for tasks sent to background), expose connection and execute()"""
-    desc, _tid, _logger = desc or filename, timestamp36(), GeneFabLogger()
+    desc, _tid, _logd = desc or filename, timestamp36(), GeneFabLogger.debug
     potential_access_warning = check_database_validity(filename, desc)
-    if exclusive:
-        _logger.debug(f"{desc} @ {_tid}: acquiring lock...")
-        lock = FileLock(f"{filename}.lock")
-    else:
-        lock = nullcontext()
+    if locking_tier:
+        _logd(f"{desc} @ {_tid}: acquiring lock...")
+    lock = FileLock(get_lockfile(filename)) if locking_tier else nullcontext()
     with lock:
-        if exclusive:
-            _logger.debug(f"{desc} @ {_tid}: acquired lock!")
+        if locking_tier:
+            _logd(f"{desc} @ {_tid}: acquired lock!")
         try:
-            with closing(connect(filename, timeout=timeout)) as connection:
-                _logger.debug(f"{desc} @ {_tid}: begin transaction")
-                execute = connection.cursor().execute
-                args = filename, potential_access_warning
-                busy_timeout = str(timeout*1000)
-                apply_pragma(execute, "auto_vacuum", "1", *args)
-                apply_pragma(execute, "journal_mode", "wal", *args)
-                apply_pragma(execute, "wal_checkpoint", "0", *args)
-                apply_pragma(execute, "busy_timeout", busy_timeout, *args)
+            _kw = dict(timeout=timeout, isolation_level=None)
+            with closing(connect(filename, **_kw)) as connection:
+                _logd(f"{desc} @ {_tid}: begin transaction")
+                execute = connection.execute
+                apply_all_pragmas(
+                    filename, execute, timeout, potential_access_warning,
+                )
+                execute("BEGIN")
                 try:
                     yield connection, execute
                 except Exception as e:
                     connection.rollback()
                     msg = "rolling back transaction due to"
-                    _logger.warning(f"{desc} @ {_tid}: {msg} {e!r}")
+                    GeneFabLogger.warning(f"{desc} @ {_tid}: {msg} {e!r}")
                     raise
                 else:
-                    _logger.debug(f"{desc} @ {_tid}: committing transaction")
+                    _logd(f"{desc} @ {_tid}: committing transaction")
                     connection.commit()
         except (OSError, FileNotFoundError, OperationalError) as e:
             msg = "Data could not be retrieved"
             raise GeneFabDatabaseException(msg, debug_info=repr(e))
         finally:
-            if exclusive:
-                _logger.debug(f"{desc} @ {_tid}: released lock")
+            if locking_tier:
+                _logd(f"{desc} @ {_tid}: released lock")
+            connection.close()
+
+
+def reraise_operational_error(obj, e):
+    """If OperationalError is due to too many columns in request, tell user; otherwise, raise generic error"""
+    if "too many columns" in str(e).lower():
+        msg = "Too many columns requested"
+        sug = "Limit request to fewer than 2000 columns"
+        raise GeneFabDatabaseException(msg, suggestion=sug)
+    else:
+        msg = "Data could not be retrieved"
+        try:
+            debug_info = [repr(e), obj.query]
+        except AttributeError:
+            debug_info = repr(e)
+        raise GeneFabDatabaseException(msg, debug_info=debug_info)

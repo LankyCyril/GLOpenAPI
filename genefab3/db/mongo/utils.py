@@ -94,7 +94,7 @@ def run_mongo_action(action, collection, *, query=None, data=None, documents=Non
         error_message = "unsupported action"
     if unused_arguments:
         message = "run_mongo_transaction('%s'): %s unused in this action"
-        GeneFabLogger().warning(message, action, unused_arguments)
+        GeneFabLogger.warning(message, action, unused_arguments)
     if error_message:
         raise GeneFabDatabaseException(
             error_message, action=action, collection=collection,

@@ -140,7 +140,7 @@ def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
             SQLiteIndexName,
             StreamedDataTableWizard_Single, StreamedDataTableWizard_OuterJoined,
         )
-        GeneFabLogger(info=f"apply_hack(speed_up_data_schema) for {self.name}")
+        GeneFabLogger.info(f"apply_hack(speed_up_data_schema) for {self.name}")
         sub_dfs, sub_indices = OrderedDict(), {}
         sub_columns, index_name = [], []
         def _extend_parts(obj):

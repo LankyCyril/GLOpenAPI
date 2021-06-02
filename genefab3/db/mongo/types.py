@@ -43,7 +43,7 @@ class ValueCheckedRecord():
                         n_stale_entries += 1
                 if (n_stale_entries != 0) or self.changed:
                     msg = f"ValueCheckedRecord updated:\n  {identifier}"
-                    GeneFabLogger(info=msg)
+                    GeneFabLogger.info(msg)
                     with collection.database.client.start_session() as session:
                         with session.start_transaction():
                             run_mongo_action(

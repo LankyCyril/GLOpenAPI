@@ -20,9 +20,15 @@ get_tech_type = lambda sample: (sample
     .get("Investigation", {}).get("Study Assays", {})
     .get("Study Assay Technology Type", "").lower()
 )
-is_expression_profiling = lambda sample, filename: get_tech_type(sample) in {
-    "rna sequencing (rna-seq)", "microarray", "dna microarray",
+is_microarray = lambda sample, filename: get_tech_type(sample) in {
+    "microarray", "dna microarray",
 }
+is_rna_seq = lambda sample, filename: get_tech_type(sample) in {
+    "rna sequencing (rna-seq)",
+}
+is_expression_profiling = lambda sample, filename: (
+    is_microarray(sample, filename) or is_rna_seq(sample, filename)
+)
 
 KNOWN_DATATYPES = {
     r'.*_metadata_.*\.zip$': datatype("isa", internal=True),
@@ -53,12 +59,18 @@ KNOWN_DATATYPES = {
         tabletype("differential expression"),
     r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_contrasts\.csv$':
         datatype("differential expression contrasts"),
-    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_output_table\.csv$':
+    r'^GLDS-[0-9]+_array(_all-samples)?_visualization_output_table\.csv$':
         tabletype("visualization table",
-            internal=True, condition=is_expression_profiling),
-    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_visualization_PCA_table\.csv$':
+            internal=True, condition=is_microarray),
+    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_visualization_output_table\.csv$':
+        tabletype("visualization table",
+            internal=True, condition=is_rna_seq),
+    r'^GLDS-[0-9]+_array(_all-samples)?_visualization_PCA_table\.csv$':
         tabletype("pca", index_name="sample name", index_subset="sample name",
-            internal=True, condition=is_expression_profiling),
+            internal=True, condition=is_microarray),
+    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_visualization_PCA_table\.csv$':
+        tabletype("pca", index_name="sample name", index_subset="sample name",
+            internal=True, condition=is_rna_seq),
 }
 
 
