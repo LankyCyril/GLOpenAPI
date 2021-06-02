@@ -63,7 +63,7 @@ def SQLTransaction(filename, desc=None, *, locking_tier=False, timeout=600):
                 busy_timeout = str(timeout*1000)
                 apply_pragma(execute, "auto_vacuum", "1", *args)
                 apply_pragma(execute, "journal_mode", "wal", *args)
-                apply_pragma(execute, "wal_checkpoint", "0", *args)
+                apply_pragma(execute, "wal_autocheckpoint", "0", *args)
                 apply_pragma(execute, "busy_timeout", busy_timeout, *args)
                 try:
                     yield connection, execute
