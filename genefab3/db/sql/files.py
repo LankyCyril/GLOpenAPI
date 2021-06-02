@@ -5,7 +5,6 @@ from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabDataManagerException
 from sqlite3 import Binary, OperationalError
 from datetime import datetime
-from genefab3.db.sql.utils import SQLTransaction
 from genefab3.common.utils import as_is
 from shutil import copyfileobj
 from tempfile import TemporaryDirectory
@@ -54,8 +53,8 @@ class CachedBinaryFile(SQLiteBlob):
         """Run `self.__download_as_blob()` and insert result (optionally compressed) into `self.table` as BLOB"""
         blob = Binary(bytes(self.compressor(self.__download_as_blob())))
         retrieved_at = int(datetime.now().timestamp())
-        _kw = dict(desc="blobs/update", exclusive=1)
-        with SQLTransaction(self.sqlite_db, **_kw) as (connection, execute):
+        desc = "blobs/update"
+        with self.LockingTierTransaction(desc) as (connection, execute):
             self.drop(connection=connection)
             execute(f"""INSERT INTO `{self.table}`
                 (`identifier`,`blob`,`timestamp`,`retrieved_at`)
@@ -132,8 +131,8 @@ class CachedTableFile(SQLiteTable):
     def update(self, to_sql_kws=dict(index=True, if_exists="append", chunksize=1024)):
         """Update `self.table` with result of `self.__download_as_pandas_chunks()`, update `self.aux_table` with timestamps"""
         columns, width, bounds = None, None, None
-        _kw = dict(desc="tables/update", exclusive=1)
-        with SQLTransaction(self.sqlite_db, **_kw) as (connection, execute):
+        desc = "tables/update"
+        with self.LockingTierTransaction(desc) as (connection, execute):
             for csv_chunk in self.__download_as_pandas_chunks():
                 try:
                     columns = csv_chunk.columns if columns is None else columns

@@ -43,17 +43,17 @@ def nullcontext():
 
 
 @contextmanager
-def SQLTransaction(filename, desc=None, *, exclusive=False, timeout=600):
+def SQLTransaction(filename, desc=None, *, locking_tier=False, timeout=600):
     """Preconfigure `filename` if new, allow long timeout (for tasks sent to background), expose connection and execute()"""
     desc, _tid = desc or filename, timestamp36()
     potential_access_warning = check_database_validity(filename, desc)
-    if exclusive:
+    if locking_tier:
         GeneFabLogger.debug(f"{desc} @ {_tid}: acquiring lock...")
         lock = FileLock(f"{filename}.lock")
     else:
         lock = nullcontext()
     with lock:
-        if exclusive:
+        if locking_tier:
             GeneFabLogger.debug(f"{desc} @ {_tid}: acquired lock!")
         try:
             with closing(connect(filename, timeout=timeout)) as connection:
@@ -80,5 +80,5 @@ def SQLTransaction(filename, desc=None, *, exclusive=False, timeout=600):
             msg = "Data could not be retrieved"
             raise GeneFabDatabaseException(msg, debug_info=repr(e))
         finally:
-            if exclusive:
+            if locking_tier:
                 GeneFabLogger.debug(f"{desc} @ {_tid}: released lock")

@@ -32,12 +32,18 @@ class ResponseCache():
     def __init__(self, sqlite_dbs):
         self.sqlite_db = sqlite_dbs.response_cache["db"]
         self.maxdbsize = sqlite_dbs.response_cache["maxsize"] or float("inf")
+        self.Transaction = lambda desc: SQLTransaction(
+            filename=self.sqlite_db, desc=desc, locking_tier=False,
+        )
+        self.LockingTierTransaction = lambda desc: SQLTransaction(
+            filename=self.sqlite_db, desc=desc, locking_tier=True,
+        )
         if self.sqlite_db is None:
             msg = "LRU SQL cache DISABLED by client parameter"
             _logw(f"ResponseCache():\n  {msg}")
         else:
-            _kw = dict(desc="response_cache/ensure_schema")
-            with SQLTransaction(self.sqlite_db, **_kw) as (_, execute):
+            desc = "response_cache/ensure_schema"
+            with self.Transaction(desc) as (_, execute):
                 for table, schema in RESPONSE_CACHE_SCHEMAS:
                     execute(f"CREATE TABLE IF NOT EXISTS `{table}` {schema}")
  
@@ -76,15 +82,15 @@ class ResponseCache():
     @bypass_if_disabled
     def put(self, response_container, context):
         """Store response object blob in response_cache table, if possible; this will happen in a parallel thread"""
-        desc = "ResponseCache(),"
         problem = self._validate_content_type(response_container)
         if problem:
-            _logw(f"{desc} did not store:\n  {context.identity}\n  {problem}")
+            msg = f"{context.identity}\n  {problem}"
+            _logw(f"ResponseCache(), did not store:\n  {msg}")
             return
         def _put():
             retrieved_at = int(datetime.now().timestamp())
-            _kw = dict(desc="response_cache/put", exclusive=1)
-            with SQLTransaction(self.sqlite_db, **_kw) as (_, execute):
+            desc = "response_cache/put"
+            with self.LockingTierTransaction(desc) as (_, execute):
                 try:
                     execute("""DELETE FROM `response_cache` WHERE
                         `context_identity` == ?""", [context.identity])
@@ -103,10 +109,10 @@ class ResponseCache():
                             accession, context.identity])
                 except (OperationalError, ZlibError, TypeError) as e:
                     msg = f"{context.identity}, {e!r}"
-                    _loge(f"{desc} could not store:\n  {msg}")
+                    _loge(f"ResponseCache(), could not store:\n  {msg}")
                     raise
                 else:
-                    _logi(f"{desc} stored:\n  {context.identity}")
+                    _logi(f"ResponseCache(), stored:\n  {context.identity}")
         Thread(target=_put).start()
  
     def _drop_by_context_identity(self, execute, context_identity):
@@ -119,8 +125,7 @@ class ResponseCache():
     @bypass_if_disabled
     def drop(self, accession):
         """Drop responses for given accession"""
-        desc = "response_cache/drop"
-        with SQLTransaction(self.sqlite_db, desc, exclusive=1) as (_, execute):
+        with self.LockingTierTransaction("response_cache/drop") as (_, execute):
             try:
                 query = """SELECT `context_identity` FROM `accessions_used`
                     WHERE `accession` == ?"""
@@ -139,7 +144,7 @@ class ResponseCache():
     def drop_all(self):
         """Drop all cached responses"""
         desc = "response_cache/drop_all"
-        with SQLTransaction(self.sqlite_db, desc, exclusive=1) as (_, execute):
+        with self.LockingTierTransaction(desc) as (_, execute):
             try:
                 execute("DELETE FROM `accessions_used`")
                 execute("DELETE FROM `response_cache`")
@@ -152,8 +157,7 @@ class ResponseCache():
     def _iterdecompress(self, cid):
         """Iteratively decompress chunks retrieved from database by `context_identity`"""
         decompressor = decompressobj()
-        desc = "response_cache/_iterdecompress"
-        with SQLTransaction(self.sqlite_db, desc) as (_, execute):
+        with self.Transaction("response_cache/_iterdecompress") as (_, execute):
             query = """SELECT `mimetype` FROM `response_cache`
                 WHERE `context_identity` == ? LIMIT 1"""
             mimetype, = execute(query, [cid]).fetchone() or [None]
@@ -206,14 +210,13 @@ class ResponseCache():
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
                 desc = "response_cache/shrink"
-                _kw = dict(filename=self.sqlite_db, desc=desc, exclusive=1)
-                with SQLTransaction(**_kw) as (_, execute):
+                with self.Transaction(desc) as (_, execute):
                     query_oldest = f"""SELECT `context_identity`
                         FROM `response_cache` ORDER BY `retrieved_at` ASC"""
                     cid = (execute(query_oldest).fetchone() or [None])[0]
                     if cid is None:
                         break
-                with SQLTransaction(**_kw) as (connection, execute):
+                with self.LockingTierTransaction(desc) as (connection, execute):
                     try:
                         msg = f"ResponseCache.shrink():\n  dropping {cid}"
                         GeneFabLogger.info(msg)
