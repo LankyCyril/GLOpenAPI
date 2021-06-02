@@ -1,6 +1,6 @@
 from os import path, access, W_OK
 from genefab3.common.exceptions import GeneFabLogger
-from contextlib import contextmanager, closing
+from contextlib import contextmanager
 from filelock import FileLock
 from genefab3.common.exceptions import GeneFabConfigurationException
 from sqlite3 import connect, OperationalError
@@ -45,30 +45,27 @@ def apply_pragma(execute, pragma, value, filename, potential_access_warning):
 def apply_all_pragmas(filename, execute, timeout, potential_access_warning):
     """Apply all relevant PRAGMAs at once: auto_vacuum, WAL, wal_autocheckpoint, busy_timeout"""
     args = filename, potential_access_warning
-    busy_timeout = str(timeout*1000)
     apply_pragma(execute, "auto_vacuum", "1", *args)
     apply_pragma(execute, "journal_mode", "wal", *args)
     apply_pragma(execute, "wal_autocheckpoint", "0", *args)
-    apply_pragma(execute, "busy_timeout", busy_timeout, *args)
+    apply_pragma(execute, "busy_timeout", str(int(timeout*1000)), *args)
 
 
 @contextmanager
 def SQLTransaction(filename, desc=None, *, locking_tier=False, timeout=600):
     """Preconfigure `filename` if new, allow long timeout (for tasks sent to background), expose connection and execute()"""
-    desc, _tid = desc or filename, timestamp36()
+    desc, _tid, _logd = desc or filename, timestamp36(), GeneFabLogger.debug
     potential_access_warning = check_database_validity(filename, desc)
     if locking_tier:
-        GeneFabLogger.debug(f"{desc} @ {_tid}: acquiring lock...")
-        lock = FileLock(f"{filename}.lock")
-    else:
-        lock = nullcontext()
+        _logd(f"{desc} @ {_tid}: acquiring lock...")
+    lock = FileLock(f"{filename}.lock") if locking_tier else nullcontext()
     with lock:
         if locking_tier:
-            GeneFabLogger.debug(f"{desc} @ {_tid}: acquired lock!")
+            _logd(f"{desc} @ {_tid}: acquired lock!")
         try:
             _kw = dict(timeout=timeout, isolation_level=None)
-            with closing(connect(filename, **_kw)) as connection:
-                GeneFabLogger.debug(f"{desc} @ {_tid}: begin transaction")
+            with connect(filename, **_kw) as connection:
+                _logd(f"{desc} @ {_tid}: begin transaction")
                 execute = connection.execute
                 apply_all_pragmas(
                     filename, execute, timeout, potential_access_warning,
@@ -82,15 +79,16 @@ def SQLTransaction(filename, desc=None, *, locking_tier=False, timeout=600):
                     GeneFabLogger.warning(f"{desc} @ {_tid}: {msg} {e!r}")
                     raise
                 else:
-                    msg = "committing transaction"
-                    GeneFabLogger.debug(f"{desc} @ {_tid}: {msg}")
+                    _logd(f"{desc} @ {_tid}: committing transaction")
                     connection.commit()
+                finally:
+                    connection.close()
         except (OSError, FileNotFoundError, OperationalError) as e:
             msg = "Data could not be retrieved"
             raise GeneFabDatabaseException(msg, debug_info=repr(e))
         finally:
             if locking_tier:
-                GeneFabLogger.debug(f"{desc} @ {_tid}: released lock")
+                _logd(f"{desc} @ {_tid}: released lock")
 
 
 def reraise_operational_error(obj, e):

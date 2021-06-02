@@ -134,8 +134,7 @@ class CachedTableFile(SQLiteTable):
         """Update `self.table` with result of `self.__download_as_pandas_chunks()`, update `self.aux_table` with timestamps"""
         columns, width, bounds, desc = None, None, None, "tables/update"
         with self.LockingTierTransaction(desc) as (connection, execute):
-            execute(f"""DELETE FROM `{self.aux_table}`
-                WHERE `table` == ? """, [self.table])
+            self.drop(connection=connection)
             connection.commit()
             for csv_chunk in self.__download_as_pandas_chunks():
                 try:

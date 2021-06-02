@@ -96,6 +96,8 @@ class SQLiteObject():
                 GeneFabLogger.warning(f"{msg}\n  ({self_id_value})")
                 self.drop(connection=connection)
             _staleness = True
+        if _staleness is True:
+            GeneFabLogger.info(f"{self_id_value} is stale, staging update")
         return _staleness
  
     def update(self):
