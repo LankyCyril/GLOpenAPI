@@ -1,6 +1,6 @@
 from os import path, access, W_OK
 from genefab3.common.exceptions import GeneFabLogger
-from contextlib import contextmanager
+from contextlib import contextmanager, closing
 from filelock import FileLock
 from genefab3.common.exceptions import GeneFabConfigurationException
 from sqlite3 import connect, OperationalError
@@ -21,6 +21,10 @@ def check_database_validity(filename, desc):
         else:
             potential_access_warning = access_warning
         return potential_access_warning
+
+
+def get_lockfile(filename):
+    return f"{filename}.lock"
 
 
 @contextmanager
@@ -58,13 +62,13 @@ def SQLTransaction(filename, desc=None, *, locking_tier=False, timeout=600):
     potential_access_warning = check_database_validity(filename, desc)
     if locking_tier:
         _logd(f"{desc} @ {_tid}: acquiring lock...")
-    lock = FileLock(f"{filename}.lock") if locking_tier else nullcontext()
+    lock = FileLock(get_lockfile(filename)) if locking_tier else nullcontext()
     with lock:
         if locking_tier:
             _logd(f"{desc} @ {_tid}: acquired lock!")
         try:
             _kw = dict(timeout=timeout, isolation_level=None)
-            with connect(filename, **_kw) as connection:
+            with closing(connect(filename, **_kw)) as connection:
                 _logd(f"{desc} @ {_tid}: begin transaction")
                 execute = connection.execute
                 apply_all_pragmas(
@@ -81,14 +85,13 @@ def SQLTransaction(filename, desc=None, *, locking_tier=False, timeout=600):
                 else:
                     _logd(f"{desc} @ {_tid}: committing transaction")
                     connection.commit()
-                finally:
-                    connection.close()
         except (OSError, FileNotFoundError, OperationalError) as e:
             msg = "Data could not be retrieved"
             raise GeneFabDatabaseException(msg, debug_info=repr(e))
         finally:
             if locking_tier:
                 _logd(f"{desc} @ {_tid}: released lock")
+            connection.close()
 
 
 def reraise_operational_error(obj, e):
