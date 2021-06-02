@@ -4,9 +4,9 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
 from flask import Response
 from genefab3.common.utils import blackjack, KeyToPosition
-from genefab3.db.sql.utils import SQLTransaction
+from genefab3.db.sql.utils import SQLTransaction, reraise_operational_error
 from sqlite3 import OperationalError
-from genefab3.common.exceptions import GeneFabDatabaseException, GeneFabLogger
+from genefab3.common.exceptions import GeneFabLogger
 
 
 class ExtNaN(float):
@@ -301,21 +301,10 @@ class StreamedDataTable(StreamedTable):
                 _nrows = (execute(_count_query).fetchone() or [0])[0]
                 self.shape = (_nrows, len(self._columns))
             except OperationalError as e:
-                self._reraise(e)
+                reraise_operational_error(self, e)
         self.accessions = {c[0] for c in self._columns}
         self.n_index_levels = 1
         self.datatypes, self.gct_validity_set = set(), set()
- 
-    def _reraise(self, e):
-        """Raise own exception on OperationalError"""
-        if "too many columns" in str(e).lower():
-            msg = "Too many columns requested"
-            sug = "Limit request to fewer than 2000 columns"
-            raise GeneFabDatabaseException(msg, suggestion=sug)
-        else:
-            msg = "Data could not be retrieved"
-            debug_info = [repr(e), self.query]
-            raise GeneFabDatabaseException(msg, debug_info=debug_info)
  
     @property
     def gct_valid(self):
@@ -366,7 +355,7 @@ class StreamedDataTable(StreamedTable):
                         for value, *_ in execute(index_query):
                             yield _na_tup if value is None else (value,)
                 except OperationalError as e:
-                    self._reraise(e)
+                    reraise_operational_error(self, e)
         else:
             yield from ([] for _ in range(self.shape[0]))
  
@@ -397,4 +386,4 @@ class StreamedDataTable(StreamedTable):
                         for vv in execute(self.query):
                             yield [self.na_rep if v is None else v for v in vv]
         except OperationalError as e:
-            self._reraise(e)
+            reraise_operational_error(self, e)

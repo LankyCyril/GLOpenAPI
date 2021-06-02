@@ -1,5 +1,5 @@
 from genefab3.common.utils import random_unique_string, validate_no_backtick
-from genefab3.db.sql.utils import SQLTransaction
+from genefab3.db.sql.utils import SQLTransaction, reraise_operational_error
 from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabLogger, GeneFabDatabaseException
 from genefab3.common.types import StreamedDataTable, NaN
@@ -27,7 +27,7 @@ class TempSelect():
             try:
                 execute(f"CREATE {self.kind} `{self.name}` as {query}")
             except OperationalError as e:
-                StreamedDataTable._reraise(self, e)
+                reraise_operational_error(self, e)
             else:
                 query_repr = repr(query.lstrip()[:200] + "...")
                 msg = f"Created temporary SQLite {self.kind}"

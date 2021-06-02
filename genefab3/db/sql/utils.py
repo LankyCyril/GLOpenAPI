@@ -89,3 +89,18 @@ def SQLTransaction(filename, desc=None, *, locking_tier=False, timeout=600):
         finally:
             if locking_tier:
                 GeneFabLogger.debug(f"{desc} @ {_tid}: released lock")
+
+
+def reraise_operational_error(obj, e):
+    """If OperationalError is due to too many columns in request, tell user; otherwise, raise generic error"""
+    if "too many columns" in str(e).lower():
+        msg = "Too many columns requested"
+        sug = "Limit request to fewer than 2000 columns"
+        raise GeneFabDatabaseException(msg, suggestion=sug)
+    else:
+        msg = "Data could not be retrieved"
+        try:
+            debug_info = [repr(e), obj.query]
+        except AttributeError:
+            debug_info = repr(e)
+        raise GeneFabDatabaseException(msg, debug_info=debug_info)
