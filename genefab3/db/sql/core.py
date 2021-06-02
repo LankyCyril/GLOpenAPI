@@ -28,7 +28,7 @@ class SQLiteObject():
             filename=self.sqlite_db, desc=desc, locking_tier=True,
         )
         desc = "tables/ensure_schema"
-        with self.LockingTierTransaction(desc) as (_, execute):
+        with self.Transaction(desc) as (_, execute):
             for table, schema in (table_schemas or {}).items():
                 execute(
                     "CREATE TABLE IF NOT EXISTS `{}` ({})".format(

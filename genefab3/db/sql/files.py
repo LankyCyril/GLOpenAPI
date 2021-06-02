@@ -60,6 +60,8 @@ class CachedBinaryFile(SQLiteBlob):
                 (`identifier`,`blob`,`timestamp`,`retrieved_at`)
                 VALUES(?,?,?,?)""", [
                 self.identifier, blob, self.timestamp, retrieved_at])
+            msg = f"Inserted new blob into {self.table}"
+            GeneFabLogger.info(f"{msg}:\n  {self.identifier}")
 
 
 class CachedTableFile(SQLiteTable):
@@ -130,8 +132,10 @@ class CachedTableFile(SQLiteTable):
  
     def update(self, to_sql_kws=dict(index=True, if_exists="append", chunksize=1024)):
         """Update `self.table` with result of `self.__download_as_pandas_chunks()`, update `self.aux_table` with timestamps"""
-        columns, width, bounds = None, None, None
-        desc = "tables/update"
+        columns, width, bounds, desc = None, None, None, "tables/update"
+        with self.LockingTierTransaction(desc) as (_, execute):
+            execute(f"""DELETE FROM `{self.aux_table}`
+                WHERE `table` == ? """, [self.table])
         with self.LockingTierTransaction(desc) as (connection, execute):
             for csv_chunk in self.__download_as_pandas_chunks():
                 try:
