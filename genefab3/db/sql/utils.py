@@ -23,6 +23,11 @@ def check_database_validity(filename, desc):
         return potential_access_warning
 
 
+@contextmanager
+def nullcontext():
+    yield
+
+
 def apply_pragma(execute, pragma, value, filename, potential_access_warning):
     """Apply PRAGMA, test result, warn if unable to apply"""
     try:
@@ -37,9 +42,14 @@ def apply_pragma(execute, pragma, value, filename, potential_access_warning):
             GeneFabLogger.warning(f"{msg} {filename!r}")
 
 
-@contextmanager
-def nullcontext():
-    yield
+def apply_all_pragmas(filename, execute, timeout, potential_access_warning):
+    """Apply all relevant PRAGMAs at once: auto_vacuum, WAL, wal_autocheckpoint, busy_timeout"""
+    args = filename, potential_access_warning
+    busy_timeout = str(timeout*1000)
+    apply_pragma(execute, "auto_vacuum", "1", *args)
+    apply_pragma(execute, "journal_mode", "wal", *args)
+    apply_pragma(execute, "wal_autocheckpoint", "0", *args)
+    apply_pragma(execute, "busy_timeout", busy_timeout, *args)
 
 
 @contextmanager
@@ -59,12 +69,9 @@ def SQLTransaction(filename, desc=None, *, locking_tier=False, timeout=600):
             with closing(connect(filename, timeout=timeout)) as connection:
                 GeneFabLogger.debug(f"{desc} @ {_tid}: begin transaction")
                 execute = connection.cursor().execute
-                args = filename, potential_access_warning
-                busy_timeout = str(timeout*1000)
-                apply_pragma(execute, "auto_vacuum", "1", *args)
-                apply_pragma(execute, "journal_mode", "wal", *args)
-                apply_pragma(execute, "wal_autocheckpoint", "0", *args)
-                apply_pragma(execute, "busy_timeout", busy_timeout, *args)
+                apply_all_pragmas(
+                    filename, execute, timeout, potential_access_warning,
+                )
                 try:
                     yield connection, execute
                 except Exception as e:
