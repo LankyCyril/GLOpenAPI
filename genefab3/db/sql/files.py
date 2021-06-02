@@ -99,7 +99,7 @@ class CachedTableFile(SQLiteTable):
             msg = "None of the URLs are reachable for file"
             raise GeneFabDataManagerException(msg, name=self.name, urls=urls)
  
-    def __download_as_pandas_chunks(self, chunksize=256):
+    def __download_as_pandas_chunks(self, chunksize=1024):
         """Download and parse data from URL as a table"""
         with TemporaryDirectory() as tempdir:
             tempfile = path.join(tempdir, self.name)
@@ -130,7 +130,7 @@ class CachedTableFile(SQLiteTable):
                 msg = "Not recognized as a table file"
                 raise GeneFabFileException(msg, name=self.name, url=self.url)
  
-    def update(self, to_sql_kws=dict(index=True, if_exists="append", chunksize=256)):
+    def update(self, to_sql_kws=dict(index=True, if_exists="append", chunksize=1024)):
         """Update `self.table` with result of `self.__download_as_pandas_chunks()`, update `self.aux_table` with timestamps"""
         columns, width, bounds, desc = None, None, None, "tables/update"
         with self.LockingTierTransaction(desc) as (connection, execute):
