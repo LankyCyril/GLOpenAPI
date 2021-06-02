@@ -66,12 +66,14 @@ def SQLTransaction(filename, desc=None, *, locking_tier=False, timeout=600):
         if locking_tier:
             GeneFabLogger.debug(f"{desc} @ {_tid}: acquired lock!")
         try:
-            with closing(connect(filename, timeout=timeout)) as connection:
+            _kw = dict(timeout=timeout, isolation_level=None)
+            with closing(connect(filename, **_kw)) as connection:
                 GeneFabLogger.debug(f"{desc} @ {_tid}: begin transaction")
-                execute = connection.cursor().execute
+                execute = connection.execute
                 apply_all_pragmas(
                     filename, execute, timeout, potential_access_warning,
                 )
+                execute("BEGIN")
                 try:
                     yield connection, execute
                 except Exception as e:

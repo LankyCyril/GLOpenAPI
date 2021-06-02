@@ -133,10 +133,10 @@ class CachedTableFile(SQLiteTable):
     def update(self, to_sql_kws=dict(index=True, if_exists="append", chunksize=1024)):
         """Update `self.table` with result of `self.__download_as_pandas_chunks()`, update `self.aux_table` with timestamps"""
         columns, width, bounds, desc = None, None, None, "tables/update"
-        with self.LockingTierTransaction(desc) as (_, execute):
+        with self.LockingTierTransaction(desc) as (connection, execute):
             execute(f"""DELETE FROM `{self.aux_table}`
                 WHERE `table` == ? """, [self.table])
-        with self.LockingTierTransaction(desc) as (connection, execute):
+            connection.commit()
             for csv_chunk in self.__download_as_pandas_chunks():
                 try:
                     columns = csv_chunk.columns if columns is None else columns
