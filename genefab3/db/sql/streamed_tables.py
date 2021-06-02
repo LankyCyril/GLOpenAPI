@@ -18,10 +18,10 @@ class TempSelect():
         self._depends_on = _depends_on # keeps sources from being deleted early
         self.query, self.targets, self.kind = query, targets, kind
         self.name = "TEMP:" + random_unique_string(seed=query)
-        self.LockingTierTransaction = lambda desc: SQLTransaction(
-            filename=self.sqlite_db, desc=desc, locking_tier=True,
+        self.Transaction = lambda desc: SQLTransaction(
+            filename=self.sqlite_db, desc=desc, locking_tier=False,
         )
-        with self.LockingTierTransaction("TempSelect") as (_, execute):
+        with self.Transaction("TempSelect") as (_, execute):
             if msg:
                 GeneFabLogger.info(msg)
             try:
@@ -34,7 +34,7 @@ class TempSelect():
                 GeneFabLogger.info(f"{msg} {self.name} from\n  {query_repr}")
  
     def __del__(self):
-        with self.LockingTierTransaction("TempSelect/__del__") as (_, execute):
+        with self.Transaction("TempSelect/__del__") as (_, execute):
             try:
                 execute(f"DROP {self.kind} `{self.name}`")
             except OperationalError as e:
