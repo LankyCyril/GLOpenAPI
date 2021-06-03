@@ -71,7 +71,7 @@ class SQLiteObject():
             else:
                 GeneFabLogger.info(f"Dropped {partname} (if it existed)")
  
-    def is_stale(self, *, timestamp_table=None, id_field=None, db_type=None):
+    def is_stale(self, *, timestamp_table=None, id_field=None, db_type=None, ignore_conflicts=False):
         """Evaluates to True if underlying data in need of update, otherwise False"""
         if (timestamp_table is None) or (id_field is None):
             msg = "did not pass arguments to self.is_stale(), will never update"
@@ -90,7 +90,7 @@ class SQLiteObject():
                 _staleness = (ret[0][0] < self.timestamp)
             else:
                 _staleness = None
-        if _staleness is None:
+        if (_staleness is None) and (not ignore_conflicts):
             with self.LockingTierTransaction(desc) as (connection, _):
                 msg = "Conflicting timestamp values for SQLiteObject"
                 GeneFabLogger.warning(f"{msg}\n  ({self_id_value})")
@@ -162,11 +162,11 @@ class SQLiteBlob(SQLiteObject):
         else:
             GeneFabLogger.info(f"Deleted from {self.table}: {identifier}")
  
-    def is_stale(self):
+    def is_stale(self, ignore_conflicts=False):
         """Evaluates to True if underlying data in need of update, otherwise False"""
         return SQLiteObject.is_stale(
             self, timestamp_table=self.table, id_field="identifier",
-            db_type="blobs",
+            db_type="blobs", ignore_conflicts=ignore_conflicts,
         )
  
     def retrieve(self):
@@ -229,11 +229,11 @@ class SQLiteTable(SQLiteObject):
             GeneFabLogger.info(f"Deleted from {self.aux_table}: {table}")
         SQLiteObject.drop_all_parts(table, connection)
  
-    def is_stale(self):
+    def is_stale(self, ignore_conflicts=False):
         """Evaluates to True if underlying data in need of update, otherwise False"""
         return SQLiteObject.is_stale(
             self, timestamp_table=self.aux_table, id_field="table",
-            db_type="tables",
+            db_type="tables", ignore_conflicts=ignore_conflicts,
         )
  
     def retrieve(self):

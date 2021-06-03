@@ -55,6 +55,8 @@ class CachedBinaryFile(SQLiteBlob):
         retrieved_at = int(datetime.now().timestamp())
         desc = "blobs/update"
         with self.LockingTierTransaction(desc) as (connection, execute):
+            if self.is_stale(ignore_conflicts=True) is False:
+                return # data was updated while waiting to acquire lock
             self.drop(connection=connection)
             execute(f"""INSERT INTO `{self.table}`
                 (`identifier`,`blob`,`timestamp`,`retrieved_at`)
@@ -134,6 +136,8 @@ class CachedTableFile(SQLiteTable):
         """Update `self.table` with result of `self.__download_as_pandas_chunks()`, update `self.aux_table` with timestamps"""
         columns, width, bounds, desc = None, None, None, "tables/update"
         with self.LockingTierTransaction(desc) as (connection, execute):
+            if self.is_stale(ignore_conflicts=True) is False:
+                return # data was updated while waiting to acquire lock
             self.drop(connection=connection)
             connection.commit()
             for csv_chunk in self.__download_as_pandas_chunks():
