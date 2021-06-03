@@ -5,10 +5,8 @@ from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabDataManagerException
 from sqlite3 import Binary, OperationalError
 from datetime import datetime
-from genefab3.common.utils import as_is
-from shutil import copyfileobj
-from tempfile import TemporaryDirectory
-from os import path
+from genefab3.common.utils import as_is, pick_reachable_url
+from contextlib import contextmanager
 from csv import Error as CSVError, Sniffer
 from pandas import read_csv
 from pandas.errors import ParserError as PandasParserError
@@ -79,60 +77,46 @@ class CachedTableFile(SQLiteTable):
             table=identifier, aux_table=aux_table, timestamp=timestamp,
         )
  
-    def __copyfileobj(self, urls, tempfile):
-        """Try all URLs and push data into temporary file"""
-        for url in urls:
-            with open(tempfile, mode="wb") as handle:
-                GeneFabLogger.info(f"{self.name}; trying URL:\n  {url}")
-                try:
-                    with request_get(url, stream=True) as response:
-                        response.raw.decode_content = False
-                        msg = f"{self.name}:\n  streaming to {handle.name}"
-                        GeneFabLogger.debug(msg)
-                        copyfileobj(response.raw, handle)
-                except (URLError, OSError) as e:
-                    msg = f"{self.name}; tried URL and failed:\n  {url}"
-                    GeneFabLogger.warning(msg, exc_info=e)
-                else:
-                    msg = f"{self.name}; successfully fetched data:\n  {url}"
-                    GeneFabLogger.info(msg)
-                    return url
-        else:
-            msg = "None of the URLs are reachable for file"
-            raise GeneFabDataManagerException(msg, name=self.name, urls=urls)
- 
-    def __download_as_pandas_chunks(self, chunksize=256):
+    def __download_as_pandas_chunks(self, chunksize=512, sniff_ahead=2**20):
         """Download and parse data from URL as a table"""
-        with TemporaryDirectory() as tempdir:
-            tempfile = path.join(tempdir, self.name)
-            self.url = self.__copyfileobj(self.urls, tempfile)
-            with open(tempfile, mode="rb") as handle:
-                magic = handle.read(3)
+        @contextmanager
+        def _get_raw_stream(url):
+            try:
+                with request_get(url, stream=True) as response:
+                    response.raw.decode_content = True
+                    msg = f"{self.name}; streaming data:\n  {url}"
+                    GeneFabLogger.info(msg)
+                    yield response.raw
+            except (URLError, OSError) as e:
+                msg = f"{self.name}; tried URL and failed:\n  {url}"
+                GeneFabLogger.warning(msg, exc_info=e)
+        with pick_reachable_url(self.urls, name=self.name) as url:
+            with _get_raw_stream(url) as stream:
+                magic = stream.read(3)
             if magic == b"\x1f\x8b\x08":
                 compression = "gzip"
-                from gzip import open as _open
             elif magic == b"\x42\x5a\x68":
                 compression = "bz2"
-                from bz2 import open as _open
             else:
-                compression, _open = "infer", open
+                compression = "infer"
             try:
-                with _open(tempfile, mode="rt", newline="") as handle:
-                    sep = Sniffer().sniff(handle.read(2**20)).delimiter
+                with _get_raw_stream(url) as stream:
+                    sniffable = stream.read(sniff_ahead).decode()
+                    sep = Sniffer().sniff(sniffable).delimiter
                 _reader_kw = dict(
                     sep=sep, compression=compression,
                     chunksize=chunksize, **self.pandas_kws,
                 )
-                for i, csv_chunk in enumerate(read_csv(tempfile, **_reader_kw)):
+                for i, csv_chunk in enumerate(read_csv(url, **_reader_kw)):
                     self.INPLACE_process(csv_chunk)
-                    msg = f"interpreted table chunk {i}:\n  {tempfile}"
+                    msg = f"interpreted table chunk {i}:\n  {url}"
                     GeneFabLogger.info(f"{self.name}; {msg}")
                     yield csv_chunk
             except (IOError, UnicodeDecodeError, CSVError, PandasParserError):
                 msg = "Not recognized as a table file"
                 raise GeneFabFileException(msg, name=self.name, url=self.url)
  
-    def update(self, to_sql_kws=dict(index=True, if_exists="append", chunksize=256)):
+    def update(self, to_sql_kws=dict(index=True, if_exists="append", chunksize=512)):
         """Update `self.table` with result of `self.__download_as_pandas_chunks()`, update `self.aux_table` with timestamps"""
         columns, width, bounds, desc = None, None, None, "tables/update"
         with self.LockingTierTransaction(desc) as (connection, execute):
