@@ -128,23 +128,3 @@ class GeneFabClient():
             return cacher_thread
         else:
             return SimpleNamespace(isAlive=lambda: False)
- 
-    def __del__(self):
-        """Clean up open connections"""
-        if not self.cacher_thread.isAlive():
-            GeneFabLogger.info("Finishing up: closing MongoDB connection")
-            self.mongo_client.close()
-        for db_spec in self.sqlite_dbs.__dict__.values():
-            msg = f"{self.mongo_appname} finishing up:\n  this instance's lock"
-            filename = db_spec.get("db")
-            if filename is not None:
-                try:
-                    GeneFabLogger.info(f"{msg} on {filename}: releasing...")
-                    FileLock(get_lockfile(filename)).release()
-                    GeneFabLogger.info(f"{msg} on {filename}: released!")
-                except FileNotFoundError:
-                    pass
-                except:
-                    GeneFabLogger.error(
-                        f"{msg} on {filename}: FAILED to release",
-                    )
