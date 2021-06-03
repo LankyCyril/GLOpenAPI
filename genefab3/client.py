@@ -9,8 +9,6 @@ from genefab3.db.mongo.utils import iterate_mongo_connections
 from genefab3.db.cacher import CacherThread
 from genefab3.api.renderer import CacheableRenderer
 from functools import partial
-from filelock import FileLock
-from genefab3.db.sql.utils import get_lockfile
 
 
 class GeneFabClient():

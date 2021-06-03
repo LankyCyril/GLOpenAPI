@@ -19,7 +19,7 @@ from genefab3.common.exceptions import GeneFabFileException
 class CachedBinaryFile(SQLiteBlob):
     """Represents an SQLiteObject that stores up-to-date file contents as a binary blob"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, table="BLOBS:blobs", compressor=None, decompressor=None, maxdbsize=None):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, table="BLOBS:blobs", accession=None, compressor=None, decompressor=None, maxdbsize=None):
         """Interpret file descriptors; inherit functionality from SQLiteBlob; define equality (hashableness) of self"""
         self.name = name
         self.url, self.urls = None, urls
@@ -27,6 +27,7 @@ class CachedBinaryFile(SQLiteBlob):
             self, sqlite_db=sqlite_db, maxdbsize=maxdbsize,
             table=table, identifier=identifier, timestamp=timestamp,
             compressor=compressor, decompressor=decompressor,
+            accession=accession,
         )
  
     def __download_as_blob(self):
@@ -55,6 +56,8 @@ class CachedBinaryFile(SQLiteBlob):
         retrieved_at = int(datetime.now().timestamp())
         desc = "blobs/update"
         with self.LockingTierTransaction(desc) as (connection, execute):
+            if self.is_stale(ignore_conflicts=True) is False:
+                return # data was updated while waiting to acquire lock
             self.drop(connection=connection)
             execute(f"""INSERT INTO `{self.table}`
                 (`identifier`,`blob`,`timestamp`,`retrieved_at`)
@@ -67,7 +70,7 @@ class CachedBinaryFile(SQLiteBlob):
 class CachedTableFile(SQLiteTable):
     """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxdbsize=None, **pandas_kws):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, accession=None, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxdbsize=None, **pandas_kws):
         """Interpret file descriptors; inherit functionality from SQLiteTable; define equality (hashableness) of self"""
         self.name, self.identifier = name, identifier
         self.url, self.urls = None, urls
@@ -75,6 +78,7 @@ class CachedTableFile(SQLiteTable):
         SQLiteTable.__init__(
             self, sqlite_db=sqlite_db, maxdbsize=maxdbsize,
             table=identifier, aux_table=aux_table, timestamp=timestamp,
+            accession=accession,
         )
  
     def __copyfileobj(self, urls, tempfile):
@@ -134,6 +138,8 @@ class CachedTableFile(SQLiteTable):
         """Update `self.table` with result of `self.__download_as_pandas_chunks()`, update `self.aux_table` with timestamps"""
         columns, width, bounds, desc = None, None, None, "tables/update"
         with self.LockingTierTransaction(desc) as (connection, execute):
+            if self.is_stale(ignore_conflicts=True) is False:
+                return # data was updated while waiting to acquire lock
             self.drop(connection=connection)
             connection.commit()
             for csv_chunk in self.__download_as_pandas_chunks():

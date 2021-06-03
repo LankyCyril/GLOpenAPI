@@ -1,8 +1,9 @@
-from os import path, access, W_OK
-from genefab3.common.exceptions import GeneFabLogger
-from contextlib import contextmanager, closing
-from filelock import FileLock
 from genefab3.common.exceptions import GeneFabConfigurationException
+from os import path, access, W_OK, stat, remove
+from genefab3.common.exceptions import GeneFabLogger
+from datetime import datetime
+from filelock import FileLock
+from contextlib import contextmanager, closing
 from sqlite3 import connect, OperationalError
 from genefab3.common.utils import timestamp36
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -14,7 +15,7 @@ def check_database_validity(filename, desc):
         msg = f"SQLite database ({desc!r}) was not specified"
         raise GeneFabConfigurationException(msg)
     else:
-        access_warning = f"SQLite database {filename!r} may not be writable"
+        access_warning = f"SQLite file {filename!r} may not be writable"
         if path.exists(filename) and (not access(filename, W_OK)):
             GeneFabLogger.warning(f"{access_warning}: path.access()")
             potential_access_warning = None
@@ -23,13 +24,42 @@ def check_database_validity(filename, desc):
         return potential_access_warning
 
 
-def get_lockfile(filename):
-    return f"{filename}.lock"
-
-
-@contextmanager
-def nullcontext():
-    yield
+def get_filelock(filename, accession, locking_tier, potential_access_warning, max_filelock_age_seconds=3600):
+    """If `locking_tier`, stage lockfile and activate DEBUG-level logger"""
+    if locking_tier:
+        directory, name = path.split(filename)
+        if accession is None:
+            lockfilename = path.join(directory, f".{name}.lock")
+        else:
+            lockfilename = path.join(directory, f".{name}.{accession}.lock")
+        try:
+            lockfile_ctime = datetime.fromtimestamp(stat(lockfilename).st_ctime)
+        except FileNotFoundError:
+            lockfile_ctime = datetime.now()
+        except Exception as e:
+            msg = f"{lockfilename} is inaccessible"
+            raise GeneFabConfigurationException(msg, debug_info=repr(e))
+        if (not access(lockfilename, W_OK)) and potential_access_warning:
+            GeneFabLogger.warning(f"{lockfilename} may not be writable")
+        lock_age_seconds = (datetime.now() - lockfile_ctime).total_seconds()
+        if lock_age_seconds > max_filelock_age_seconds:
+            try:
+                GeneFabLogger.debug(f"Releasing stale lock {lockfilename}")
+                remove(lockfilename)
+            except FileNotFoundError:
+                pass
+            except Exception as e:
+                msg = f"{lockfilename} is inaccessible"
+                raise GeneFabConfigurationException(msg, debug_info=repr(e))
+        lock = FileLock(lockfilename)
+        log_if_lock = GeneFabLogger.debug
+    else:
+        @contextmanager
+        def nullcontext():
+            yield
+        lock = nullcontext()
+        log_if_lock = lambda *a, **k: None
+    return lock, log_if_lock
 
 
 def apply_pragma(execute, pragma, value, filename, potential_access_warning):
@@ -56,20 +86,20 @@ def apply_all_pragmas(filename, execute, timeout, potential_access_warning):
 
 
 @contextmanager
-def SQLTransaction(filename, desc=None, *, locking_tier=False, timeout=600):
+def SQLTransaction(filename, desc=None, *, accession=None, locking_tier=False, timeout=600):
     """Preconfigure `filename` if new, allow long timeout (for tasks sent to background), expose connection and execute()"""
-    desc, _tid, _logd = desc or filename, timestamp36(), GeneFabLogger.debug
+    desc, _tid = desc or filename, timestamp36()
     potential_access_warning = check_database_validity(filename, desc)
-    if locking_tier:
-        _logd(f"{desc} @ {_tid}: acquiring lock...")
-    lock = FileLock(get_lockfile(filename)) if locking_tier else nullcontext()
+    lock, log_if_lock = get_filelock(
+        filename, accession, locking_tier, potential_access_warning,
+    )
+    log_if_lock(f"{desc} @ {_tid}: acquiring lock...")
     with lock:
-        if locking_tier:
-            _logd(f"{desc} @ {_tid}: acquired lock!")
+        log_if_lock(f"{desc} @ {_tid}: acquired lock!")
         try:
             _kw = dict(timeout=timeout, isolation_level=None)
             with closing(connect(filename, **_kw)) as connection:
-                _logd(f"{desc} @ {_tid}: begin transaction")
+                log_if_lock(f"{desc} @ {_tid}: begin transaction")
                 execute = connection.execute
                 apply_all_pragmas(
                     filename, execute, timeout, potential_access_warning,
@@ -83,14 +113,14 @@ def SQLTransaction(filename, desc=None, *, locking_tier=False, timeout=600):
                     GeneFabLogger.warning(f"{desc} @ {_tid}: {msg} {e!r}")
                     raise
                 else:
-                    _logd(f"{desc} @ {_tid}: committing transaction")
+                    msg = f"{desc} @ {_tid}: committing transaction"
+                    GeneFabLogger.debug(msg)
                     connection.commit()
         except (OSError, FileNotFoundError, OperationalError) as e:
             msg = "Data could not be retrieved"
             raise GeneFabDatabaseException(msg, debug_info=repr(e))
         finally:
-            if locking_tier:
-                _logd(f"{desc} @ {_tid}: released lock")
+            log_if_lock(f"{desc} @ {_tid}: released lock")
             connection.close()
 
 
