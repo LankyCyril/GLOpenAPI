@@ -1,6 +1,7 @@
 from genefab3.common.exceptions import GeneFabConfigurationException
 from os import path, access, W_OK, stat, remove
 from genefab3.common.exceptions import GeneFabLogger
+from hashlib import md5
 from datetime import datetime
 from filelock import FileLock
 from contextlib import contextmanager, closing
@@ -24,14 +25,15 @@ def check_database_validity(filename, desc):
         return potential_access_warning
 
 
-def get_filelock(filename, accession, locking_tier, potential_access_warning, max_filelock_age_seconds=3600):
+def get_filelock(filename, identifier, locking_tier, potential_access_warning, max_filelock_age_seconds=3600):
     """If `locking_tier`, stage lockfile and activate DEBUG-level logger"""
     if locking_tier:
         directory, name = path.split(filename)
-        if accession is None:
+        if identifier is None:
             lockfilename = path.join(directory, f".{name}.lock")
         else:
-            lockfilename = path.join(directory, f".{name}.{accession}.lock")
+            id_hash = md5(identifier.encode()).hexdigest()
+            lockfilename = path.join(directory, f".{name}.{id_hash}.lock")
         try:
             lockfile_ctime = datetime.fromtimestamp(stat(lockfilename).st_ctime)
         except FileNotFoundError:
@@ -86,12 +88,12 @@ def apply_all_pragmas(filename, execute, timeout, potential_access_warning):
 
 
 @contextmanager
-def SQLTransaction(filename, desc=None, *, accession=None, locking_tier=False, timeout=600):
+def SQLTransaction(filename, desc=None, *, identifier=None, locking_tier=False, timeout=600):
     """Preconfigure `filename` if new, allow long timeout (for tasks sent to background), expose connection and execute()"""
     desc, _tid = desc or filename, timestamp36()
     potential_access_warning = check_database_validity(filename, desc)
     lock, log_if_lock = get_filelock(
-        filename, accession, locking_tier, potential_access_warning,
+        filename, identifier, locking_tier, potential_access_warning,
     )
     log_if_lock(f"{desc} @ {_tid}: acquiring lock...")
     with lock:

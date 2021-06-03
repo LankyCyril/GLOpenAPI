@@ -19,7 +19,7 @@ from genefab3.common.exceptions import GeneFabFileException
 class CachedBinaryFile(SQLiteBlob):
     """Represents an SQLiteObject that stores up-to-date file contents as a binary blob"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, table="BLOBS:blobs", accession=None, compressor=None, decompressor=None, maxdbsize=None):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, table="BLOBS:blobs", compressor=None, decompressor=None, maxdbsize=None):
         """Interpret file descriptors; inherit functionality from SQLiteBlob; define equality (hashableness) of self"""
         self.name = name
         self.url, self.urls = None, urls
@@ -27,7 +27,6 @@ class CachedBinaryFile(SQLiteBlob):
             self, sqlite_db=sqlite_db, maxdbsize=maxdbsize,
             table=table, identifier=identifier, timestamp=timestamp,
             compressor=compressor, decompressor=decompressor,
-            accession=accession,
         )
  
     def __download_as_blob(self):
@@ -70,7 +69,7 @@ class CachedBinaryFile(SQLiteBlob):
 class CachedTableFile(SQLiteTable):
     """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, accession=None, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxdbsize=None, **pandas_kws):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxdbsize=None, **pandas_kws):
         """Interpret file descriptors; inherit functionality from SQLiteTable; define equality (hashableness) of self"""
         self.name, self.identifier = name, identifier
         self.url, self.urls = None, urls
@@ -78,7 +77,6 @@ class CachedTableFile(SQLiteTable):
         SQLiteTable.__init__(
             self, sqlite_db=sqlite_db, maxdbsize=maxdbsize,
             table=identifier, aux_table=aux_table, timestamp=timestamp,
-            accession=accession,
         )
  
     def __copyfileobj(self, urls, tempfile):
