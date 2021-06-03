@@ -140,7 +140,7 @@ def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, ada
         name=filename, identifier=identifier,
         urls=descriptor["file"].get("urls", ()),
         timestamp=descriptor["file"].get("timestamp", -1),
-        sqlite_db=sqlite_db, **_kws,
+        sqlite_db=sqlite_db, accession=accession, **_kws,
     )
     data = file.data
     if isinstance(data, StreamedDataTableWizard):

@@ -17,15 +17,18 @@ from os import path
 class SQLiteObject():
     """Universal wrapper for cached objects"""
  
-    def __init__(self, *, sqlite_db, table_schemas=None):
+    def __init__(self, *, sqlite_db, accession=None, table_schemas=None):
         """Initialize SQLiteObject, ensure tables in `sqlite_db`"""
         self.sqlite_db, self.table_schemas = sqlite_db, table_schemas
+        self.accession = accession
         self.changed = None
         self.Transaction = lambda desc: SQLTransaction(
-            filename=self.sqlite_db, desc=desc, locking_tier=False,
+            filename=self.sqlite_db, desc=desc, accession=accession,
+            locking_tier=False,
         )
         self.LockingTierTransaction = lambda desc: SQLTransaction(
-            filename=self.sqlite_db, desc=desc, locking_tier=True,
+            filename=self.sqlite_db, desc=desc, accession=accession,
+            locking_tier=True,
         )
         desc = "tables/ensure_schema"
         with self.Transaction(desc) as (_, execute):
@@ -130,7 +133,7 @@ class SQLiteObject():
 class SQLiteBlob(SQLiteObject):
     """Represents an SQLiteObject initialized with a spec suitable for a binary blob"""
  
-    def __init__(self, *, sqlite_db, identifier, table, timestamp, compressor=None, decompressor=None, maxdbsize=None):
+    def __init__(self, *, sqlite_db, identifier, table, timestamp, accession=None, compressor=None, decompressor=None, maxdbsize=None):
         if not table.startswith("BLOBS:"):
             msg = "Table name for SQLiteBlob must start with 'BLOBS:'"
             raise GeneFabConfigurationException(msg, table=table)
@@ -138,7 +141,8 @@ class SQLiteBlob(SQLiteObject):
             raise NotImplementedError("SQLiteBlob() with set `maxdbsize`")
         else:
             SQLiteObject.__init__(
-                self, sqlite_db=sqlite_db, table_schemas={
+                self, sqlite_db=sqlite_db, accession=accession,
+                table_schemas={
                     table: {
                         "identifier": "TEXT", "blob": "BLOB",
                         "timestamp": "INTEGER", "retrieved_at": "INTEGER",
@@ -194,7 +198,7 @@ class SQLiteBlob(SQLiteObject):
 class SQLiteTable(SQLiteObject):
     """Represents an SQLiteObject initialized with a spec suitable for a generic table"""
  
-    def __init__(self, *, sqlite_db, table, aux_table, timestamp, maxpartcols=998, maxdbsize=None):
+    def __init__(self, *, sqlite_db, table, aux_table, timestamp, accession=None, maxpartcols=998, maxdbsize=None):
         if not table.startswith("TABLE:"):
             msg = "Table name for SQLiteTable must start with 'TABLE:'"
             raise GeneFabConfigurationException(msg, table=table)
@@ -203,7 +207,8 @@ class SQLiteTable(SQLiteObject):
             raise GeneFabConfigurationException(msg, aux_table=aux_table)
         else:
             SQLiteObject.__init__(
-                self, sqlite_db=sqlite_db, table_schemas={
+                self, sqlite_db=sqlite_db, accession=accession,
+                table_schemas={
                     aux_table: {
                         "table": "TEXT",
                         "timestamp": "INTEGER", "retrieved_at": "INTEGER",

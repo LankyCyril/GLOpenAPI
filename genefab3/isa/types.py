@@ -32,6 +32,7 @@ class Dataset():
                 name=isa_name, identifier=f"BLOB:{accession}/ISA/{isa_name}",
                 sqlite_db=self.sqlite_db, maxdbsize=self.maxdbsize,
                 urls=urls, timestamp=isa_desc.get("timestamp", -1),
+                accession=accession,
             )
             self.isa = IsaFromZip(
                 data=isa_file.data,
