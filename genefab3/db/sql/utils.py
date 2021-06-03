@@ -1,6 +1,7 @@
 from genefab3.common.exceptions import GeneFabConfigurationException
 from os import path, access, W_OK, stat, remove
 from genefab3.common.exceptions import GeneFabLogger
+from glob import iglob
 from hashlib import md5
 from datetime import datetime
 from filelock import FileLock
@@ -25,34 +26,51 @@ def check_database_validity(filename, desc):
         return potential_access_warning
 
 
-def get_filelock(filename, identifier, locking_tier, potential_access_warning, max_filelock_age_seconds=3600):
+def clear_lock_if_stale(lockfilename, potential_access_warning, max_filelock_age_seconds=7200):
+    """If `lockfilename` has not been accessed in `max_filelock_age_seconds`, assume junk and remove"""
+    try:
+        lockfile_ctime = datetime.fromtimestamp(stat(lockfilename).st_ctime)
+    except FileNotFoundError:
+        lockfile_ctime = datetime.now()
+    except Exception as e:
+        msg = f"{lockfilename} is inaccessible"
+        raise GeneFabConfigurationException(msg, debug_info=repr(e))
+    if (not access(lockfilename, W_OK)) and potential_access_warning:
+        GeneFabLogger.warning(f"{lockfilename} may not be writable")
+        potential_access_warning = None
+    lock_age_seconds = (datetime.now() - lockfile_ctime).total_seconds()
+    if lock_age_seconds > max_filelock_age_seconds:
+        try:
+            msg = f"{lockfilename} ({lock_age_seconds} seconds old)"
+            GeneFabLogger.debug(f"Clearing stale lock:\n  {msg}")
+            remove(lockfilename)
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            msg = f"{lockfilename} is inaccessible"
+            raise GeneFabConfigurationException(msg, debug_info=repr(e))
+    return potential_access_warning
+
+
+def clear_stale_locks(filename, potential_access_warning):
+    """Clear all stale locks associated with `filename`"""
+    directory, name = path.split(filename)
+    for lockfilename in iglob(f"{directory}/.{name}*.lock"):
+        potential_access_warning = clear_lock_if_stale(
+            lockfilename, potential_access_warning,
+        )
+
+
+def get_filelock(filename, identifier, locking_tier, potential_access_warning):
     """If `locking_tier`, stage lockfile and activate DEBUG-level logger"""
     if locking_tier:
+        clear_stale_locks(filename, potential_access_warning)
         directory, name = path.split(filename)
         if identifier is None:
             lockfilename = path.join(directory, f".{name}.lock")
         else:
             id_hash = md5(identifier.encode()).hexdigest()
             lockfilename = path.join(directory, f".{name}.{id_hash}.lock")
-        try:
-            lockfile_ctime = datetime.fromtimestamp(stat(lockfilename).st_ctime)
-        except FileNotFoundError:
-            lockfile_ctime = datetime.now()
-        except Exception as e:
-            msg = f"{lockfilename} is inaccessible"
-            raise GeneFabConfigurationException(msg, debug_info=repr(e))
-        if (not access(lockfilename, W_OK)) and potential_access_warning:
-            GeneFabLogger.warning(f"{lockfilename} may not be writable")
-        lock_age_seconds = (datetime.now() - lockfile_ctime).total_seconds()
-        if lock_age_seconds > max_filelock_age_seconds:
-            try:
-                GeneFabLogger.debug(f"Releasing stale lock {lockfilename}")
-                remove(lockfilename)
-            except FileNotFoundError:
-                pass
-            except Exception as e:
-                msg = f"{lockfilename} is inaccessible"
-                raise GeneFabConfigurationException(msg, debug_info=repr(e))
         lock = FileLock(lockfilename)
         log_if_lock = GeneFabLogger.debug
     else:
