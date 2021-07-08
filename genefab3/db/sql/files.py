@@ -98,7 +98,7 @@ class CachedTableFile(SQLiteTable):
                 GeneFabLogger.info(f"{self.name}; trying URL:\n  {url}")
                 try:
                     with request_get(url, stream=True) as response:
-                        response.raw.decode_content = False
+                        response.raw.decode_content = True
                         msg = f"{self.name}:\n  streaming to {tempfile}"
                         GeneFabLogger.debug(msg)
                         copyfileobj(response.raw, handle)
