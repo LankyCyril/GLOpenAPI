@@ -1,4 +1,5 @@
-from logging import getLogger, DEBUG
+from os import environ
+from logging import getLogger, DEBUG, INFO
 from sys import exc_info, stderr
 from traceback import format_tb
 from functools import partial
@@ -6,8 +7,16 @@ from json import dumps
 from flask import Response
 
 
+def is_debug(markers={"development", "staging", "stage", "debug", "debugging"}):
+    """Determine if app is running in debug mode"""
+    return environ.get("FLASK_ENV", None) in markers
+
+
 GeneFabLogger = getLogger("genefab3")
-GeneFabLogger.setLevel(DEBUG)
+if is_debug():
+    GeneFabLogger.setLevel(DEBUG)
+else:
+    GeneFabLogger.setLevel(INFO)
 
 
 class GeneFabException(Exception):

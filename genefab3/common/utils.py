@@ -5,7 +5,6 @@ from re import search, sub, compile
 from genefab3.common.exceptions import GeneFabParserException
 from functools import partial, reduce
 from urllib.request import quote
-from os import environ
 from itertools import chain, count
 from base64 import b64encode
 from uuid import uuid3, uuid4
@@ -41,11 +40,6 @@ def make_safe_token(token, allow_regex=False):
         return quoted_token
     else:
         raise GeneFabParserException("Forbidden argument", field=quoted_token)
-
-
-def is_debug(markers={"development", "staging", "stage", "debug", "debugging"}):
-    """Determine if app is running in debug mode"""
-    return environ.get("FLASK_ENV", None) in markers
 
 
 def random_unique_string(seed=""):

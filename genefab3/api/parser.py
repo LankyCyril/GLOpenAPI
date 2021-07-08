@@ -2,8 +2,8 @@ from functools import lru_cache, partial
 from flask import request
 from urllib.request import quote, unquote
 from json import dumps
-from genefab3.common.utils import is_debug, EmptyIterator, BranchTracer
-from genefab3.common.exceptions import GeneFabParserException
+from genefab3.common.utils import EmptyIterator, BranchTracer
+from genefab3.common.exceptions import is_debug, GeneFabParserException
 from genefab3.common.utils import make_safe_token, space_quote, is_regex
 from genefab3.common.exceptions import GeneFabConfigurationException
 from re import search

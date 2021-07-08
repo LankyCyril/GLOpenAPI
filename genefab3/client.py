@@ -1,6 +1,6 @@
-from genefab3.common.exceptions import GeneFabConfigurationException
+from genefab3.common.exceptions import GeneFabConfigurationException, is_debug
 from flask_compress import Compress
-from genefab3.common.utils import timestamp36, is_debug
+from genefab3.common.utils import timestamp36
 from pymongo import MongoClient
 from socket import create_connection, error as SocketError
 from types import SimpleNamespace
