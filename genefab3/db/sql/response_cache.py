@@ -211,7 +211,7 @@ class ResponseCache():
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
                 desc = "response_cache/shrink"
                 with self.Transaction(desc) as (_, execute):
-                    query_oldest = f"""SELECT `context_identity`
+                    query_oldest = """SELECT `context_identity`
                         FROM `response_cache` ORDER BY `retrieved_at` ASC"""
                     cid = (execute(query_oldest).fetchone() or [None])[0]
                     if cid is None:
@@ -235,6 +235,6 @@ class ResponseCache():
         if n_dropped:
             _logi(f"ResponseCache():\n  shrunk by {n_dropped} entries")
         elif path.getsize(self.sqlite_db) > self.maxdbsize:
-            _logw(f"ResponseCache():\n  could not drop entries to shrink")
+            _logw("ResponseCache():\n  could not drop entries to shrink")
         if n_skids:
             _logw(f"ResponseCache():\n  file did not shrink {n_skids} times")

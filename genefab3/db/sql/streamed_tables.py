@@ -150,7 +150,7 @@ class StreamedDataTableWizard():
             query_filter=self._make_query_filter(context, limit, offset),
             na_rep=NaN,
         )
-        msg = f"staged to retrieve from SQLite as StreamedDataTable"
+        msg = "staged to retrieve from SQLite as StreamedDataTable"
         GeneFabLogger.info(f"{self.name};\n  {msg}")
         return data
  

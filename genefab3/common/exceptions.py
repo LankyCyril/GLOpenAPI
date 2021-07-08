@@ -71,7 +71,7 @@ def interpret_exception(e, debug=False):
 def exception_catcher(e, debug=False):
     from genefab3.common.utils import json_permissive_default
     info, traceback_lines = interpret_exception(e, debug=debug)
-    tb_preface = f"Traceback (most recent call last):\n"
+    tb_preface = "Traceback (most recent call last):\n"
     traceback = "".join(traceback_lines)
     print(tb_preface, traceback, repr(e), sep="", file=stderr)
     dumps_permissive = partial(dumps, default=json_permissive_default)
