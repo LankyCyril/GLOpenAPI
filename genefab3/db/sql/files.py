@@ -81,8 +81,10 @@ class CachedTableFile(SQLiteTable):
     @contextmanager
     def __tempfile(self):
         """Create self-destructing temporary file named by UUID"""
-        dirname = path.dirname(self.sqlite_db)
-        filename = path.join(dirname, random_unique_string(self.identifier))
+        filename = path.join(
+            path.dirname(self.sqlite_db),
+            "temp-" + random_unique_string(self.identifier) + ".raw",
+        )
         try:
             yield filename
         finally:
