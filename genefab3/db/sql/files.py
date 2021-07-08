@@ -14,7 +14,9 @@ from pandas import read_csv
 from pandas.errors import ParserError as PandasParserError
 from pandas.io.sql import DatabaseError as PandasDatabaseError
 from genefab3.common.exceptions import GeneFabFileException
- 
+from genefab3.common.exceptions import GeneFabDatabaseException
+from genefab3.common.hacks import NoCommitConnection, ExecuteMany
+
 
 class CachedBinaryFile(SQLiteBlob):
     """Represents an SQLiteObject that stores up-to-date file contents as a binary blob"""
@@ -151,7 +153,6 @@ class CachedTableFile(SQLiteTable):
             if self.is_stale(ignore_conflicts=True) is False:
                 return # data was updated while waiting to acquire lock
             self.drop(connection=connection)
-            connection.commit()
             for csv_chunk in self.__download_as_pandas(chunksize=chunksize):
                 try:
                     columns = csv_chunk.columns if columns is None else columns
@@ -166,17 +167,18 @@ class CachedTableFile(SQLiteTable):
                         self.table, connection, must_exist=0,
                     )
                     for bound, (partname, *_) in zip(bounds, parts):
-                        csv_chunk.iloc[:,bound:bound+self.maxpartcols].to_sql(
-                            partname, connection, **to_sql_kws,
-                            chunksize=chunksize,
+                        bounded = csv_chunk.iloc[:,bound:bound+self.maxpartcols]
+                        bounded.to_sql(
+                            partname, NoCommitConnection(connection),
+                            **to_sql_kws, chunksize=chunksize,
+                            method=ExecuteMany(partname, bounded.shape[1]),
                         )
                         msg = "Extended table for CachedTableFile"
                         GeneFabLogger.info(f"{msg}:\n  {self.name}, {partname}")
                 except (OperationalError, PandasDatabaseError, ValueError) as e:
-                    msg = "Failed to insert SQLite chunk (or chunk part)"
-                    GeneFabLogger.error(f"{msg}:\n  {self.name}", exc_info=e)
-                    connection.rollback() # explicit, no fail, keep stale
-                    return
+                    msg = "Failed to insert SQL chunk or chunk part"
+                    _kw = dict(name=self.name, debug_info=repr(e))
+                    raise GeneFabDatabaseException(msg, name=self.name)
             execute(f"""INSERT INTO `{self.aux_table}`
                 (`table`,`timestamp`,`retrieved_at`) VALUES(?,?,?)""", [
                 self.table, self.timestamp, int(datetime.now().timestamp()),

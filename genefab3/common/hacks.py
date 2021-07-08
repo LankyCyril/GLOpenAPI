@@ -1,4 +1,4 @@
-from functools import wraps
+from functools import wraps, partial
 from genefab3.common.types import NaN, StreamedDataTable
 from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -175,3 +175,22 @@ def bypass_uncached_views(get, self, context):
         return ResponseContainer(content=None)
     else:
         return get(self, context)
+
+
+class NoCommitConnection():
+    """Wrapper for sqlite3 connection that forcefully prevents commits (for pandas.to_sql)"""
+    def __init__(self, connection):
+        self.__connection = connection
+    def __getattr__(self, attr):
+        if attr == "commit":
+            return lambda: None
+        else:
+            return getattr(self.__connection, attr)
+
+
+def ExecuteMany(partname, width):
+    """Generate a `method` function for `pandas.to_sql` that uses `connection.executemany`"""
+    qmarks = ",".join(["?"]*(width+1)) # include index
+    def mkinsert(pd_table, conn, keys, data_iter, name=partname):
+        conn.executemany(f"INSERT INTO `{name}` VALUES({qmarks})", data_iter)
+    return mkinsert
