@@ -108,9 +108,9 @@ def fds_exceed(filename, maxcount):
             raise GeneFabConfigurationException(msg)
 
 
-class SQLT():
+class SQLTransactions():
  
-    def __init__(self, sqlite_db, timeout=600, identifier=None, cwd="/tmp/genefab3", max_filelock_age_seconds=7200):
+    def __init__(self, sqlite_db, identifier=None, timeout=600, cwd="/tmp/genefab3", max_filelock_age_seconds=7200):
         try:
             makedirs(cwd, exist_ok=True)
         except OSError:
@@ -129,11 +129,14 @@ class SQLT():
             else:
                 id_hash = md5(identifier.encode()).hexdigest()
                 self._lockfilename = path.join(cwd, f"{name}.{id_hash}.lock")
-            clear_lock_if_stale(self._lockfilename, raise_errors=True)
+            clear_lock_if_stale(
+                self._lockfilename, raise_errors=True,
+                max_filelock_age_seconds=max_filelock_age_seconds,
+            )
  
     @contextmanager
-    def _connect(self, desc, _tid):
-        prelude = f"SQLT._connect ({desc} @ {_tid})"
+    def _connect(self, fulldesc, _tid):
+        prelude = f"SQLTransactions._connect @ {_tid} ({fulldesc})"
         try:
             _kw = dict(timeout=self.timeout, isolation_level=None)
             with closing(connect(self.sqlite_db, **_kw)) as connection:
@@ -158,14 +161,18 @@ class SQLT():
             connection.close()
             def _clear_stale_locks():
                 for lockfilename in iglob(f"{self.cwd}/*.lock"):
-                    clear_lock_if_stale(lockfilename, raise_errors=False)
+                    clear_lock_if_stale(
+                        lockfilename, raise_errors=False,
+                        max_filelock_age_seconds=self.max_filelock_age_seconds,
+                    )
             Thread(target=_clear_stale_locks).start()
  
     @contextmanager
     def readable(self, desc=None):
-        """2PL: lock that is non-exclusive w.r.t. other `SQLT.readable`s, but exclusive w.r.t. `SQLT.writable`"""
-        desc, _tid = desc or self.sqlite_db, timestamp36()
-        prelude = f"SQLT.readable ({desc} @ {_tid})"
+        """2PL: lock that is non-exclusive w.r.t. other `SQLTransactions.readable`s, but exclusive w.r.t. `SQLTransactions.writable`"""
+        fulldesc = f"{desc or ''}:{self.sqlite_db}:{self.identifier or ''}"
+        _tid = timestamp36()
+        prelude = f"SQLTransactions.readable @ {_tid} ({fulldesc})"
         _logd(f"{prelude}: waiting for write locks to release...")
         with FileLock(self._lockfilename) as lock:
             # grow handle count; prevents new write locks:
@@ -175,15 +182,16 @@ class SQLT():
                 # able to lock on, because read handle count is above zero:
                 lock.release()
                 # finally, initiate SQL connection:
-                with self._connect(desc, _tid) as (connection, execute):
+                with self._connect(fulldesc, _tid) as (connection, execute):
                     yield connection, execute
                 _logd(f"{prelude}: decreasing read lock count (--)")
  
     @contextmanager
     def writable(self, desc=None, poll_interval=.1):
-        """2PL: lock that is exclusive w.r.t. both `SQLT.readable`s and `SQLT.writable`s"""
-        desc, _tid = desc or self.sqlite_db, timestamp36()
-        prelude = f"SQLT.writable ({desc} @ {_tid})"
+        """2PL: lock that is exclusive w.r.t. both `SQLTransactions.readable`s and `SQLTransactions.writable`s"""
+        fulldesc = f"{desc or ''}:{self.sqlite_db}:{self.identifier or ''}"
+        _tid = timestamp36()
+        prelude = f"SQLTransactions.writable @ {_tid} ({fulldesc})"
         _logd(f"{prelude}: obtaining write lock...")
         # obtain hard lock; prevents all other locks:
         with FileLock(self._lockfilename):
@@ -193,7 +201,7 @@ class SQLT():
             while fds_exceed(self._lockfilename, 1):
                 sleep(poll_interval)
             # finally, initiate SQL connection:
-            with self._connect(desc) as (connection, execute):
+            with self._connect(fulldesc, _tid) as (connection, execute):
                 yield connection, execute
                 _logd(f"{prelude}: releasing write lock")
 
