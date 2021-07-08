@@ -114,7 +114,7 @@ class CachedTableFile(SQLiteTable):
             _kw = dict(name=self.name, urls=self.urls)
             raise GeneFabDataManagerException(msg, **_kw)
  
-    def __download_as_pandas_chunks(self, chunksize=512, sniff_ahead=2**20):
+    def __download_as_pandas(self, chunksize, sniff_ahead=2**20):
         """Download and parse data from URL as a table"""
         with self.__tempfile() as tempfile:
             self.url = self.__copyfileobj(tempfile)
@@ -130,7 +130,7 @@ class CachedTableFile(SQLiteTable):
                 compression, _open = "infer", open
             try:
                 with _open(tempfile, mode="rt", newline="") as handle:
-                    sep = Sniffer().sniff(handle.read(2**20)).delimiter
+                    sep = Sniffer().sniff(handle.read(sniff_ahead)).delimiter
                 _reader_kw = dict(
                     sep=sep, compression=compression,
                     chunksize=chunksize, **self.pandas_kws,
@@ -144,15 +144,15 @@ class CachedTableFile(SQLiteTable):
                 msg = "Not recognized as a table file"
                 raise GeneFabFileException(msg, name=self.name, url=self.url)
  
-    def update(self, to_sql_kws=dict(index=True, if_exists="append", chunksize=512), desc="tables/update"):
-        """Update `self.table` with result of `self.__download_as_pandas_chunks()`, update `self.aux_table` with timestamps"""
+    def update(self, to_sql_kws=dict(index=True, if_exists="append"), chunksize=512, desc="tables/update"):
+        """Update `self.table` with result of `self.__download_as_pandas()`, update `self.aux_table` with timestamps"""
         columns, width, bounds = None, None, None
         with self.sqltransactions.exclusive(desc) as (connection, execute):
             if self.is_stale(ignore_conflicts=True) is False:
                 return # data was updated while waiting to acquire lock
             self.drop(connection=connection)
             connection.commit()
-            for csv_chunk in self.__download_as_pandas_chunks():
+            for csv_chunk in self.__download_as_pandas(chunksize=chunksize):
                 try:
                     columns = csv_chunk.columns if columns is None else columns
                     if width is None:
@@ -168,6 +168,7 @@ class CachedTableFile(SQLiteTable):
                     for bound, (partname, *_) in zip(bounds, parts):
                         csv_chunk.iloc[:,bound:bound+self.maxpartcols].to_sql(
                             partname, connection, **to_sql_kws,
+                            chunksize=chunksize,
                         )
                         msg = "Extended table for CachedTableFile"
                         GeneFabLogger.info(f"{msg}:\n  {self.name}, {partname}")
