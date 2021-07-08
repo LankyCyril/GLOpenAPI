@@ -5,8 +5,10 @@ from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabDataManagerException
 from sqlite3 import Binary, OperationalError
 from datetime import datetime
-from genefab3.common.utils import as_is, pick_reachable_url
+from genefab3.common.utils import as_is, random_unique_string
 from contextlib import contextmanager
+from os import path, remove
+from shutil import copyfileobj
 from csv import Error as CSVError, Sniffer
 from pandas import read_csv
 from pandas.errors import ParserError as PandasParserError
@@ -77,39 +79,64 @@ class CachedTableFile(SQLiteTable):
             table=identifier, aux_table=aux_table, timestamp=timestamp,
         )
  
+    @contextmanager
+    def __tempfile(self):
+        """Create self-destructing temporary file named by UUID"""
+        dirname = path.dirname(self.sqlite_db)
+        filename = path.join(dirname, random_unique_string(self.identifier))
+        try:
+            yield filename
+        finally:
+            if path.isfile(filename):
+                remove(filename)
+ 
+    def __copyfileobj(self, tempfile):
+        """Try all URLs and push data into temporary file"""
+        for url in self.urls:
+            with open(tempfile, mode="wb") as handle:
+                GeneFabLogger.info(f"{self.name}; trying URL:\n  {url}")
+                try:
+                    with request_get(url, stream=True) as response:
+                        response.raw.decode_content = False
+                        msg = f"{self.name}:\n  streaming to {tempfile}"
+                        GeneFabLogger.debug(msg)
+                        copyfileobj(response.raw, handle)
+                except (URLError, OSError) as e:
+                    msg = f"{self.name}; tried URL and failed:\n  {url}"
+                    GeneFabLogger.warning(msg, exc_info=e)
+                else:
+                    msg = f"{self.name}; successfully fetched data:\n  {url}"
+                    GeneFabLogger.info(msg)
+                    return url
+        else:
+            msg = "None of the URLs are reachable for file"
+            _kw = dict(name=self.name, urls=self.urls)
+            raise GeneFabDataManagerException(msg, **_kw)
+ 
     def __download_as_pandas_chunks(self, chunksize=512, sniff_ahead=2**20):
         """Download and parse data from URL as a table"""
-        @contextmanager
-        def _get_raw_stream(url):
-            try:
-                with request_get(url, stream=True) as response:
-                    response.raw.decode_content = True
-                    msg = f"{self.name}; streaming data:\n  {url}"
-                    GeneFabLogger.info(msg)
-                    yield response.raw
-            except (URLError, OSError) as e:
-                msg = f"{self.name}; tried URL and failed:\n  {url}"
-                GeneFabLogger.warning(msg, exc_info=e)
-        with pick_reachable_url(self.urls, name=self.name) as url:
-            with _get_raw_stream(url) as stream:
-                magic = stream.read(3)
+        with self.__tempfile() as tempfile:
+            self.url = self.__copyfileobj(tempfile)
+            with open(tempfile, mode="rb") as handle:
+                magic = handle.read(3)
             if magic == b"\x1f\x8b\x08":
                 compression = "gzip"
+                from gzip import open as _open
             elif magic == b"\x42\x5a\x68":
                 compression = "bz2"
+                from bz2 import open as _open
             else:
-                compression = "infer"
+                compression, _open = "infer", open
             try:
-                with _get_raw_stream(url) as stream:
-                    sniffable = stream.read(sniff_ahead).decode()
-                    sep = Sniffer().sniff(sniffable).delimiter
+                with _open(tempfile, mode="rt", newline="") as handle:
+                    sep = Sniffer().sniff(handle.read(2**20)).delimiter
                 _reader_kw = dict(
                     sep=sep, compression=compression,
                     chunksize=chunksize, **self.pandas_kws,
                 )
-                for i, csv_chunk in enumerate(read_csv(url, **_reader_kw)):
+                for i, csv_chunk in enumerate(read_csv(tempfile, **_reader_kw)):
                     self.INPLACE_process(csv_chunk)
-                    msg = f"interpreted table chunk {i}:\n  {url}"
+                    msg = f"interpreted table chunk {i}:\n  {tempfile}"
                     GeneFabLogger.info(f"{self.name}; {msg}")
                     yield csv_chunk
             except (IOError, UnicodeDecodeError, CSVError, PandasParserError):
