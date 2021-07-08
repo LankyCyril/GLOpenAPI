@@ -175,7 +175,7 @@ class CachedTableFile(SQLiteTable):
                 except (OperationalError, PandasDatabaseError, ValueError) as e:
                     msg = "Failed to insert SQLite chunk (or chunk part)"
                     GeneFabLogger.error(f"{msg}:\n  {self.name}", exc_info=e)
-                    connection.rollback()
+                    connection.rollback() # explicit, no fail, keep stale
                     return
             execute(f"""INSERT INTO `{self.aux_table}`
                 (`table`,`timestamp`,`retrieved_at`) VALUES(?,?,?)""", [

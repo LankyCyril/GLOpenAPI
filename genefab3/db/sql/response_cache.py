@@ -216,7 +216,7 @@ class ResponseCache():
                     except OperationalError as e:
                         msg= f"Rolling back shrinkage due to {e!r}"
                         GeneFabLogger.error(msg, exc_info=e)
-                        connection.rollback()
+                        connection.rollback() # explicit, to be able to continue
                         break
                     else:
                         connection.commit()
