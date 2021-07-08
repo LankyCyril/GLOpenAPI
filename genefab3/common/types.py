@@ -364,26 +364,25 @@ class StreamedDataTable(StreamedTable):
     def values(self):
         """Iterate values line by line, like in pandas"""
         desc = "tables/StreamedDataTable/values"
-        _kw = dict(filename=self.sqlite_db, desc=desc)
         try:
             if self.na_rep is None:
                 if self.n_index_levels:
-                    with self.sqltransactions.concurrent(**_kw) as (_, execute):
+                    with self.sqltransactions.concurrent(desc) as (_, execute):
                         for _, *vv in execute(self.query):
                             yield vv
                 else:
-                    with self.sqltransactions.concurrent(**_kw) as (_, execute):
+                    with self.sqltransactions.concurrent(desc) as (_, execute):
                         yield from execute(self.query)
             else:
                 if self.shape[0] > 50:
                     msg = "StreamedDataTable with custom na_rep may be slow"
                     GeneFabLogger.warning(msg)
                 if self.n_index_levels:
-                    with self.sqltransactions.concurrent(**_kw) as (_, execute):
+                    with self.sqltransactions.concurrent(desc) as (_, execute):
                         for _, *vv in execute(self.query):
                             yield [self.na_rep if v is None else v for v in vv]
                 else:
-                    with self.sqltransactions.concurrent(**_kw) as (_, execute):
+                    with self.sqltransactions.concurrent(desc) as (_, execute):
                         for vv in execute(self.query):
                             yield [self.na_rep if v is None else v for v in vv]
         except OperationalError as e:
