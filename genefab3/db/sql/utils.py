@@ -1,5 +1,5 @@
 from genefab3.common.exceptions import GeneFabConfigurationException
-from os import path, access, W_OK, stat, remove
+from os import path, access, W_OK, stat, remove, makedirs
 from genefab3.common.exceptions import GeneFabLogger, GeneFabDatabaseException
 from datetime import datetime
 from filelock import Timeout as FileLockTimeoutError, FileLock
@@ -104,7 +104,7 @@ def apply_pragma(execute, pragma, value, filename, potential_access_warning):
             GeneFabLogger.warning(f"{msg} {filename!r}")
 
 
-def apply_all_pragmas(filename, execute, timeout, potential_access_warning):
+def apply_all_pragmas(filename, execute, timeout, potential_access_warning=None):
     """Apply all relevant PRAGMAs at once: auto_vacuum, WAL, wal_autocheckpoint, busy_timeout"""
     args = filename, potential_access_warning
     apply_pragma(execute, "auto_vacuum", "1", *args)
@@ -150,6 +150,101 @@ def SQLTransaction(filename, desc=None, *, identifier=None, locking_tier=False, 
             connection.close()
             if locking_tier:
                 Thread(target=lambda: clear_stale_locks(filename)).start()
+
+
+class SQLT():
+ 
+    def __init__(self, sqlite_db, timeout=600, identifier=None, cwd="/tmp/genefab3", max_filelock_age_seconds=7200):
+        try:
+            makedirs(cwd, exist_ok=True)
+        except OSError:
+            raise GeneFabConfigurationException(f"{cwd} is not writable")
+        if sqlite_db is None:
+            raise GeneFabConfigurationException("`sqlite_db` cannot be None")
+        elif call(["touch", path.join(cwd, ".check")]) != 0:
+            raise GeneFabConfigurationException(f"{cwd} is not writable")
+        else:
+            self.sqlite_db, self.timeout = sqlite_db, timeout
+            self.max_filelock_age_seconds = max_filelock_age_seconds
+            self.cwd, self.identifier = cwd, identifier
+            _, name = path.split(sqlite_db)
+            if identifier is None:
+                self.prefix = path.join(cwd, name)
+            else:
+                id_hash = md5(identifier.encode()).hexdigest()
+                self.prefix = path.join(cwd, f"{name}.{id_hash}")
+ 
+    @contextmanager
+    def lock(self, postfix, *, exclusive):
+        lockfilename = f"{self.prefix}.{postfix}.lock"
+        clear_lock_if_stale(
+            lockfilename, raise_errors=True,
+            max_filelock_age_seconds=self.max_filelock_age_seconds,
+        )
+        if exclusive:
+            with FileLock(lockfilename) as lock:
+                yield lock
+        else:
+            watch = True
+            def _keep_acquiring(timeout=.05):
+                while watch:
+                    try:
+                        with FileLock(lockfilename, timeout=timeout):
+                            pass
+                    except FileLockTimeoutError:
+                        pass
+            watcher = Thread(target=_keep_acquiring)
+            watcher.start()
+            yield
+            watch = False
+ 
+    @contextmanager
+    def _connect(self, desc=None):
+        desc, _tid = desc or self.sqlite_db, timestamp36()
+        try:
+            _kw = dict(timeout=self.timeout, isolation_level=None)
+            with closing(connect(self.sqlite_db, **_kw)) as connection:
+                GeneFabLogger.debug(f"{desc} @ {_tid}: begin transaction")
+                execute = connection.execute
+                apply_all_pragmas(self.sqlite_db, execute, self.timeout)
+                execute("BEGIN")
+                try:
+                    yield connection, execute
+                except Exception as e:
+                    connection.rollback()
+                    msg = "rolling back transaction due to"
+                    GeneFabLogger.warning(f"{desc} @ {_tid}: {msg} {e!r}")
+                    raise
+                else:
+                    msg = f"{desc} @ {_tid}: committing transaction"
+                    GeneFabLogger.debug(msg)
+                    connection.commit()
+        except (OSError, FileNotFoundError, OperationalError) as e:
+            msg = "Data could not be retrieved"
+            raise GeneFabDatabaseException(msg, debug_info=repr(e))
+        finally:
+            #log_if_lock(f"{desc} @ {_tid}: released lock")
+            connection.close()
+            #if locking_tier:
+            #    Thread(target=lambda: clear_stale_locks(filename)).start()
+ 
+    @contextmanager
+    def readable(self, desc=None):
+        read_lock = self.lock("r", exclusive=False)
+        write_lock = self.lock("w", exclusive=True, release_immediately=True)
+        with read_lock: # prevents NEW self.writable from locking on
+            with write_lock: # waits for EXISTING self.writable to finish
+                with self.connect(desc) as (connection, execute):
+                    yield connection, execute
+ 
+    @contextmanager
+    def writable(self, desc=None):
+        read_lock = self.lock("r", exclusive=True)
+        write_lock = self.lock("w", exclusive=True)
+        with read_lock: # waits for EXISTING self.readable to finish
+            with write_lock: # prevents all other operations from locking on
+                with self.connect(desc) as (connection, execute):
+                    yield connection, execute
 
 
 def reraise_operational_error(obj, e):
