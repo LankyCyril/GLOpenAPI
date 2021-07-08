@@ -146,7 +146,7 @@ class CachedTableFile(SQLiteTable):
                 msg = "Not recognized as a table file"
                 raise GeneFabFileException(msg, name=self.name, url=self.url)
  
-    def update(self, to_sql_kws=dict(index=True, if_exists="append"), chunksize=512, desc="tables/update"):
+    def update(self, to_sql_kws=dict(index=True, if_exists="append"), chunksize=256, desc="tables/update"):
         """Update `self.table` with result of `self.__download_as_pandas()`, update `self.aux_table` with timestamps"""
         columns, width, bounds = None, None, None
         with self.sqltransactions.exclusive(desc) as (connection, execute):
