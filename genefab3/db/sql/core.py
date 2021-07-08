@@ -24,7 +24,7 @@ class SQLiteObject():
         self.changed = None
         self.sqltransactions = SQLTransactions(sqlite_db, identifier)
         desc = "tables/ensure_schema"
-        with self.sqltransactions.readable(desc) as (_, execute):
+        with self.sqltransactions.concurrent(desc) as (_, execute):
             for table, schema in (table_schemas or {}).items():
                 execute(
                     "CREATE TABLE IF NOT EXISTS `{}` ({})".format(
@@ -78,7 +78,7 @@ class SQLiteObject():
             self_id_value = getattr(self, id_field)
             query = f"""SELECT `timestamp` FROM `{timestamp_table}`
                 WHERE `{id_field}` == "{self_id_value}" """
-        with self.sqltransactions.readable(desc) as (_, execute):
+        with self.sqltransactions.concurrent(desc) as (_, execute):
             ret = execute(query).fetchall()
             if len(ret) == 0:
                 _staleness = True
@@ -87,7 +87,7 @@ class SQLiteObject():
             else:
                 _staleness = None
         if (_staleness is None) and (not ignore_conflicts):
-            with self.sqltransactions.writable(desc) as (connection, _):
+            with self.sqltransactions.exclusive(desc) as (connection, _):
                 msg = "Conflicting timestamp values for SQLiteObject"
                 GeneFabLogger.warning(f"{msg}\n  ({self_id_value})")
                 self.drop(connection=connection)
@@ -168,7 +168,7 @@ class SQLiteBlob(SQLiteObject):
  
     def retrieve(self, desc="blobs/retrieve"):
         """Take `blob` from `self.table` and decompress with `self.decompressor`"""
-        with self.sqltransactions.readable(desc) as (_, execute):
+        with self.sqltransactions.concurrent(desc) as (_, execute):
             query = f"""SELECT `blob` from `{self.table}`
                 WHERE `identifier` == "{self.identifier}" """
             ret = execute(query).fetchall()
@@ -180,7 +180,7 @@ class SQLiteBlob(SQLiteObject):
             else:
                 data = None
         if data is None:
-            with self.sqltransactions.readable(desc) as (connection, _):
+            with self.sqltransactions.concurrent(desc) as (connection, _):
                 self.drop(connection=connection)
                 msg = "Entries conflict (will attempt to fix on next request)"
                 raise GeneFabDatabaseException(msg, identifier=self.identifier)
@@ -240,7 +240,7 @@ class SQLiteTable(SQLiteObject):
     def retrieve(self, desc="tables/retrieve"):
         """Create an StreamedDataTableWizard object dispatching columns to table parts"""
         column_dispatcher = OrderedDict()
-        with self.sqltransactions.readable(desc) as (connection, _):
+        with self.sqltransactions.concurrent(desc) as (connection, _):
             parts = SQLiteObject.iterparts(self.table, connection)
             for partname, index_name, columns in parts:
                 if index_name not in column_dispatcher:
@@ -260,13 +260,13 @@ class SQLiteTable(SQLiteObject):
         for _ in range(max_iter):
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
-                with self.sqltransactions.readable(desc) as (_, execute):
+                with self.sqltransactions.concurrent(desc) as (_, execute):
                     query_oldest = f"""SELECT `table`
                         FROM `{self.aux_table}` ORDER BY `retrieved_at` ASC"""
                     table = (execute(query_oldest).fetchone() or [None])[0]
                     if table is None:
                         break
-                with self.sqltransactions.writable(desc) as (connection, _):
+                with self.sqltransactions.exclusive(desc) as (connection, _):
                     try:
                         GeneFabLogger.info(f"{desc} purging: {table}")
                         self.drop(connection=connection, other=table)

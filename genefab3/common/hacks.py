@@ -25,7 +25,7 @@ def get_sub_df(obj, partname, partcols):
     from genefab3.db.sql.streamed_tables import SQLiteIndexName
     found = lambda v: v is not None
     index_name, data = None, {}
-    with obj.sqltransactions.readable("hacks/get_sub_df") as (_, execute):
+    with obj.sqltransactions.concurrent("hacks/get_sub_df") as (_, execute):
         try:
             fetch = lambda query: execute(query).fetchone()
             mktargets = lambda f: ",".join(f"{f}(`{c}`)" for c in partcols)
@@ -55,7 +55,7 @@ def get_sub_df(obj, partname, partcols):
 def get_part_index(obj, partname):
     """Retrieve index values (row name) of part of `obj`"""
     index_query = f"SELECT `{obj._index_name}` FROM `{partname}`"
-    with obj.sqltransactions.readable("hacks/get_part_index") as (_, execute):
+    with obj.sqltransactions.concurrent("hacks/get_part_index") as (_, execute):
         return {ix for ix, *_ in execute(index_query)}
 
 

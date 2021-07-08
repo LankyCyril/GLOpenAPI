@@ -292,7 +292,7 @@ class StreamedDataTable(StreamedTable):
             SELECT {targets} FROM `{source_select.name}` {query_filter}
         """
         desc = "tables/StreamedDataTable"
-        with self.sqltransactions.readable(desc) as (connection, execute):
+        with self.sqltransactions.concurrent(desc) as (connection, execute):
             try:
                 cursor = connection.cursor()
                 cursor.execute(self.query)
@@ -347,7 +347,7 @@ class StreamedDataTable(StreamedTable):
         if self.n_index_levels:
             index_query = f"SELECT `{self._index_name}` FROM ({self.query})"
             desc = "tables/StreamedDataTable/index"
-            with self.sqltransactions.readable(desc) as (_, execute):
+            with self.sqltransactions.concurrent(desc) as (_, execute):
                 try:
                     if self.na_rep is None:
                         yield from execute(index_query)
@@ -368,22 +368,22 @@ class StreamedDataTable(StreamedTable):
         try:
             if self.na_rep is None:
                 if self.n_index_levels:
-                    with self.sqltransactions.readable(**_kw) as (_, execute):
+                    with self.sqltransactions.concurrent(**_kw) as (_, execute):
                         for _, *vv in execute(self.query):
                             yield vv
                 else:
-                    with self.sqltransactions.readable(**_kw) as (_, execute):
+                    with self.sqltransactions.concurrent(**_kw) as (_, execute):
                         yield from execute(self.query)
             else:
                 if self.shape[0] > 50:
                     msg = "StreamedDataTable with custom na_rep may be slow"
                     GeneFabLogger.warning(msg)
                 if self.n_index_levels:
-                    with self.sqltransactions.readable(**_kw) as (_, execute):
+                    with self.sqltransactions.concurrent(**_kw) as (_, execute):
                         for _, *vv in execute(self.query):
                             yield [self.na_rep if v is None else v for v in vv]
                 else:
-                    with self.sqltransactions.readable(**_kw) as (_, execute):
+                    with self.sqltransactions.concurrent(**_kw) as (_, execute):
                         for vv in execute(self.query):
                             yield [self.na_rep if v is None else v for v in vv]
         except OperationalError as e:

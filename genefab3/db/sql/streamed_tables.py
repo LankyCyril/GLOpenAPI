@@ -19,7 +19,7 @@ class TempSelect():
         self.query, self.targets, self.kind = query, targets, kind
         self.name = "TEMP:" + random_unique_string(seed=query)
         self.sqltransactions = SQLTransactions(self.sqlite_db, self.name)
-        with self.sqltransactions.writable("TempSelect") as (_, execute):
+        with self.sqltransactions.exclusive("TempSelect") as (_, execute):
             if msg:
                 GeneFabLogger.info(msg)
             try:
@@ -32,7 +32,7 @@ class TempSelect():
                 GeneFabLogger.info(f"{msg} {self.name} from\n  {query_repr}")
  
     def __del__(self, desc="TempSelect/__del__"):
-        with self.sqltransactions.writable(desc) as (_, execute):
+        with self.sqltransactions.exclusive(desc) as (_, execute):
             try:
                 execute(f"DROP {self.kind} `{self.name}`")
             except OperationalError as e:

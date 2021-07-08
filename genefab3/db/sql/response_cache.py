@@ -38,8 +38,7 @@ class ResponseCache():
             _logw(f"ResponseCache():\n  {msg}")
         else:
             desc = "response_cache/ensure_schema"
-            # using a `readable` transaction is fine here due to IF NOT EXISTS:
-            with self.sqltransactions.readable(desc) as (_, execute):
+            with self.sqltransactions.concurrent(desc) as (_, execute):
                 for table, schema in RESPONSE_CACHE_SCHEMAS:
                     execute(f"CREATE TABLE IF NOT EXISTS `{table}` {schema}")
  
@@ -85,7 +84,7 @@ class ResponseCache():
             return
         def _put(desc="response_cache/put"):
             retrieved_at = int(datetime.now().timestamp())
-            with self.sqltransactions.writable(desc) as (_, execute):
+            with self.sqltransactions.exclusive(desc) as (_, execute):
                 try:
                     execute("""DELETE FROM `response_cache` WHERE
                         `context_identity` == ?""", [context.identity])
@@ -120,7 +119,7 @@ class ResponseCache():
     @bypass_if_disabled
     def drop(self, accession, desc="response_cache/drop"):
         """Drop responses for given accession"""
-        with self.sqltransactions.writable(desc) as (_, execute):
+        with self.sqltransactions.exclusive(desc) as (_, execute):
             try:
                 query = """SELECT `context_identity` FROM `accessions_used`
                     WHERE `accession` == ?"""
@@ -138,7 +137,7 @@ class ResponseCache():
     @bypass_if_disabled
     def drop_all(self, desc="response_cache/drop_all"):
         """Drop all cached responses"""
-        with self.sqltransactions.writable(desc) as (_, execute):
+        with self.sqltransactions.exclusive(desc) as (_, execute):
             try:
                 execute("DELETE FROM `accessions_used`")
                 execute("DELETE FROM `response_cache`")
@@ -151,7 +150,7 @@ class ResponseCache():
     def _iterdecompress(self, cid, desc="response_cache/_iterdecompress"):
         """Iteratively decompress chunks retrieved from database by `context_identity`"""
         decompressor = decompressobj()
-        with self.sqltransactions.readable(desc) as (_, execute):
+        with self.sqltransactions.concurrent(desc) as (_, execute):
             query = """SELECT `mimetype` FROM `response_cache`
                 WHERE `context_identity` == ? LIMIT 1"""
             mimetype, = execute(query, [cid]).fetchone() or [None]
@@ -203,13 +202,13 @@ class ResponseCache():
         for _ in range(max_iter):
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
-                with self.sqltransactions.readable(desc) as (_, execute):
+                with self.sqltransactions.concurrent(desc) as (_, execute):
                     query_oldest = """SELECT `context_identity`
                         FROM `response_cache` ORDER BY `retrieved_at` ASC"""
                     cid = (execute(query_oldest).fetchone() or [None])[0]
                     if cid is None:
                         break
-                with self.sqltransactions.writable(desc) as (connection, execute):
+                with self.sqltransactions.exclusive(desc) as (connection, execute):
                     try:
                         msg = f"ResponseCache.shrink():\n  dropping {cid}"
                         GeneFabLogger.info(msg)

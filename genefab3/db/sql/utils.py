@@ -168,11 +168,11 @@ class SQLTransactions():
             Thread(target=_clear_stale_locks).start()
  
     @contextmanager
-    def readable(self, desc=None):
-        """2PL: lock that is non-exclusive w.r.t. other `SQLTransactions.readable`s, but exclusive w.r.t. `SQLTransactions.writable`"""
+    def concurrent(self, desc=None):
+        """2PL: lock that is non-exclusive w.r.t. other `SQLTransactions.concurrent`s, but exclusive w.r.t. `SQLTransactions.exclusive`"""
         fulldesc = f"{desc or ''}:{self.sqlite_db}:{self.identifier or ''}"
         _tid = timestamp36()
-        prelude = f"SQLTransactions.readable @ {_tid} ({fulldesc})"
+        prelude = f"SQLTransactions.concurrent @ {_tid} ({fulldesc})"
         _logd(f"{prelude}: waiting for write locks to release...")
         with FileLock(self._lockfilename) as lock:
             # grow handle count; prevents new write locks:
@@ -187,11 +187,11 @@ class SQLTransactions():
                 _logd(f"{prelude}: decreasing read lock count (--)")
  
     @contextmanager
-    def writable(self, desc=None, poll_interval=.1):
-        """2PL: lock that is exclusive w.r.t. both `SQLTransactions.readable`s and `SQLTransactions.writable`s"""
+    def exclusive(self, desc=None, poll_interval=.1):
+        """2PL: lock that is exclusive w.r.t. both `SQLTransactions.concurrent`s and `SQLTransactions.exclusive`s"""
         fulldesc = f"{desc or ''}:{self.sqlite_db}:{self.identifier or ''}"
         _tid = timestamp36()
-        prelude = f"SQLTransactions.writable @ {_tid} ({fulldesc})"
+        prelude = f"SQLTransactions.exclusive @ {_tid} ({fulldesc})"
         _logd(f"{prelude}: obtaining write lock...")
         # obtain hard lock; prevents all other locks:
         with FileLock(self._lockfilename):
