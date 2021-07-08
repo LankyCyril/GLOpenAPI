@@ -1,4 +1,4 @@
-from genefab3.db.sql.utils import SQLTransaction
+from genefab3.db.sql.utils import SQLTransactions
 from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
 from itertools import count
 from sqlite3 import OperationalError
@@ -22,16 +22,9 @@ class SQLiteObject():
         self.sqlite_db, self.table_schemas = sqlite_db, table_schemas
         self.identifier = identifier
         self.changed = None
-        self.Transaction = lambda desc: SQLTransaction(
-            filename=self.sqlite_db, desc=desc, identifier=identifier,
-            locking_tier=False,
-        )
-        self.LockingTierTransaction = lambda desc: SQLTransaction(
-            filename=self.sqlite_db, desc=desc, identifier=identifier,
-            locking_tier=True,
-        )
+        self.sqltransactions = SQLTransactions(sqlite_db, identifier)
         desc = "tables/ensure_schema"
-        with self.Transaction(desc) as (_, execute):
+        with self.sqltransactions.concurrent(desc) as (_, execute):
             for table, schema in (table_schemas or {}).items():
                 execute(
                     "CREATE TABLE IF NOT EXISTS `{}` ({})".format(
@@ -85,7 +78,11 @@ class SQLiteObject():
             self_id_value = getattr(self, id_field)
             query = f"""SELECT `timestamp` FROM `{timestamp_table}`
                 WHERE `{id_field}` == "{self_id_value}" """
-        with self.Transaction(desc) as (_, execute):
+        if ignore_conflicts:
+            read_transaction = self.sqltransactions.unconditional
+        else:
+            read_transaction = self.sqltransactions.concurrent
+        with read_transaction(desc) as (_, execute):
             ret = execute(query).fetchall()
             if len(ret) == 0:
                 _staleness = True
@@ -94,7 +91,7 @@ class SQLiteObject():
             else:
                 _staleness = None
         if (_staleness is None) and (not ignore_conflicts):
-            with self.LockingTierTransaction(desc) as (connection, _):
+            with self.sqltransactions.exclusive(desc) as (connection, _):
                 msg = "Conflicting timestamp values for SQLiteObject"
                 GeneFabLogger.warning(f"{msg}\n  ({self_id_value})")
                 self.drop(connection=connection)
@@ -173,9 +170,9 @@ class SQLiteBlob(SQLiteObject):
             db_type="blobs", ignore_conflicts=ignore_conflicts,
         )
  
-    def retrieve(self):
+    def retrieve(self, desc="blobs/retrieve"):
         """Take `blob` from `self.table` and decompress with `self.decompressor`"""
-        with self.Transaction("blobs/retrieve") as (_, execute):
+        with self.sqltransactions.concurrent(desc) as (_, execute):
             query = f"""SELECT `blob` from `{self.table}`
                 WHERE `identifier` == "{self.identifier}" """
             ret = execute(query).fetchall()
@@ -187,7 +184,7 @@ class SQLiteBlob(SQLiteObject):
             else:
                 data = None
         if data is None:
-            with self.Transaction("blobs/retrieve") as (connection, _):
+            with self.sqltransactions.concurrent(desc) as (connection, _):
                 self.drop(connection=connection)
                 msg = "Entries conflict (will attempt to fix on next request)"
                 raise GeneFabDatabaseException(msg, identifier=self.identifier)
@@ -244,10 +241,10 @@ class SQLiteTable(SQLiteObject):
             db_type="tables", ignore_conflicts=ignore_conflicts,
         )
  
-    def retrieve(self):
+    def retrieve(self, desc="tables/retrieve"):
         """Create an StreamedDataTableWizard object dispatching columns to table parts"""
         column_dispatcher = OrderedDict()
-        with self.Transaction("tables/retrieve") as (connection, _):
+        with self.sqltransactions.concurrent(desc) as (connection, _):
             parts = SQLiteObject.iterparts(self.table, connection)
             for partname, index_name, columns in parts:
                 if index_name not in column_dispatcher:
@@ -258,30 +255,29 @@ class SQLiteTable(SQLiteObject):
             raise GeneFabDatabaseException("No data found", table=self.table)
         else:
             return StreamedDataTableWizard_Single(
-                self.sqlite_db, column_dispatcher,
+                self.sqlite_db, column_dispatcher, identifier=self.identifier,
             )
  
-    def cleanup(self, max_iter=100, max_skids=20):
+    def cleanup(self, max_iter=100, max_skids=20, desc="tables/cleanup"):
         """Check size of underlying database file, drop oldest tables to keep file size under `self.maxdbsize`"""
         n_dropped, n_skids = 0, 0
         for _ in range(max_iter):
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
-                desc = "tables/cleanup"
-                with self.Transaction(desc) as (_, execute):
+                with self.sqltransactions.concurrent(desc) as (_, execute):
                     query_oldest = f"""SELECT `table`
                         FROM `{self.aux_table}` ORDER BY `retrieved_at` ASC"""
                     table = (execute(query_oldest).fetchone() or [None])[0]
                     if table is None:
                         break
-                with self.LockingTierTransaction(desc) as (connection, _):
+                with self.sqltransactions.exclusive(desc) as (connection, _):
                     try:
                         GeneFabLogger.info(f"{desc} purging: {table}")
                         self.drop(connection=connection, other=table)
                     except OperationalError as e:
                         msg= f"Rolling back shrinkage due to {e!r}"
                         GeneFabLogger.error(msg, exc_info=e)
-                        connection.rollback()
+                        connection.rollback() # explicit, to be able to continue
                         break
                     else:
                         connection.commit()

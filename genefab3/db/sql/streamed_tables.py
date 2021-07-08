@@ -1,5 +1,5 @@
 from genefab3.common.utils import random_unique_string, validate_no_backtick
-from genefab3.db.sql.utils import SQLTransaction, reraise_operational_error
+from genefab3.db.sql.utils import SQLTransactions, reraise_operational_error
 from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabLogger, GeneFabDatabaseException
 from genefab3.common.types import StreamedDataTable, NaN
@@ -18,10 +18,8 @@ class TempSelect():
         self._depends_on = _depends_on # keeps sources from being deleted early
         self.query, self.targets, self.kind = query, targets, kind
         self.name = "TEMP:" + random_unique_string(seed=query)
-        self.Transaction = lambda desc: SQLTransaction(
-            filename=self.sqlite_db, desc=desc, locking_tier=False,
-        )
-        with self.Transaction("TempSelect") as (_, execute):
+        self.sqltransactions = SQLTransactions(self.sqlite_db, self.name)
+        with self.sqltransactions.exclusive("TempSelect") as (_, execute):
             if msg:
                 GeneFabLogger.info(msg)
             try:
@@ -33,8 +31,8 @@ class TempSelect():
                 msg = f"Created temporary SQLite {self.kind}"
                 GeneFabLogger.info(f"{msg} {self.name} from\n  {query_repr}")
  
-    def __del__(self):
-        with self.Transaction("TempSelect/__del__") as (_, execute):
+    def __del__(self, desc="TempSelect/__del__"):
+        with self.sqltransactions.exclusive(desc) as (_, execute):
             try:
                 execute(f"DROP {self.kind} `{self.name}`")
             except OperationalError as e:
@@ -150,7 +148,7 @@ class StreamedDataTableWizard():
             query_filter=self._make_query_filter(context, limit, offset),
             na_rep=NaN,
         )
-        msg = f"staged to retrieve from SQLite as StreamedDataTable"
+        msg = "staged to retrieve from SQLite as StreamedDataTable"
         GeneFabLogger.info(f"{self.name};\n  {msg}")
         return data
  
@@ -176,9 +174,11 @@ class StreamedDataTableWizard():
 class StreamedDataTableWizard_Single(StreamedDataTableWizard):
     """StreamedDataTable to be retrieved from SQLite, possibly from multiple parts of same tabular file"""
  
-    def __init__(self, sqlite_db, column_dispatcher):
+    def __init__(self, sqlite_db, column_dispatcher, identifier=None):
         """Interpret `column_dispatcher`"""
         self.sqlite_db = sqlite_db
+        self.identifier = identifier
+        self.sqltransactions = SQLTransactions(sqlite_db, identifier)
         self._column_dispatcher = column_dispatcher
         self.name = None
         self._columns, _index_names = [], set()

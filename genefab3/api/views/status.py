@@ -27,7 +27,7 @@ def sqlite_db_report(db_name, descriptor):
 
 def mongo_db_report(mongo_client):
     return {"information": {
-        "report type": f"number of active MongoDB connections",
+        "report type": "number of active MongoDB connections",
         "status": sum(1 for _ in iterate_mongo_connections(mongo_client)),
         "report timestamp": int(datetime.now().timestamp()),
     }}

@@ -4,7 +4,7 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
 from flask import Response
 from genefab3.common.utils import blackjack, KeyToPosition
-from genefab3.db.sql.utils import SQLTransaction, reraise_operational_error
+from genefab3.db.sql.utils import SQLTransactions, reraise_operational_error
 from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabLogger
 
@@ -284,6 +284,7 @@ class StreamedDataTable(StreamedTable):
         _split3 = lambda c: (c[0].split("/", 2) + ["*", "*"])[:3]
         self.sqlite_db = sqlite_db
         self.source_select = source_select
+        self.sqltransactions = SQLTransactions(sqlite_db, source_select.name)
         self.targets = targets
         self.query_filter = query_filter
         self.na_rep = na_rep
@@ -291,7 +292,7 @@ class StreamedDataTable(StreamedTable):
             SELECT {targets} FROM `{source_select.name}` {query_filter}
         """
         desc = "tables/StreamedDataTable"
-        with SQLTransaction(self.sqlite_db, desc) as (connection, execute):
+        with self.sqltransactions.concurrent(desc) as (connection, execute):
             try:
                 cursor = connection.cursor()
                 cursor.execute(self.query)
@@ -346,7 +347,7 @@ class StreamedDataTable(StreamedTable):
         if self.n_index_levels:
             index_query = f"SELECT `{self._index_name}` FROM ({self.query})"
             desc = "tables/StreamedDataTable/index"
-            with SQLTransaction(self.sqlite_db, desc) as (_, execute):
+            with self.sqltransactions.concurrent(desc) as (_, execute):
                 try:
                     if self.na_rep is None:
                         yield from execute(index_query)
@@ -363,26 +364,25 @@ class StreamedDataTable(StreamedTable):
     def values(self):
         """Iterate values line by line, like in pandas"""
         desc = "tables/StreamedDataTable/values"
-        _kw = dict(filename=self.sqlite_db, desc=desc)
         try:
             if self.na_rep is None:
                 if self.n_index_levels:
-                    with SQLTransaction(**_kw) as (_, execute):
+                    with self.sqltransactions.concurrent(desc) as (_, execute):
                         for _, *vv in execute(self.query):
                             yield vv
                 else:
-                    with SQLTransaction(**_kw) as (_, execute):
+                    with self.sqltransactions.concurrent(desc) as (_, execute):
                         yield from execute(self.query)
             else:
                 if self.shape[0] > 50:
                     msg = "StreamedDataTable with custom na_rep may be slow"
                     GeneFabLogger.warning(msg)
                 if self.n_index_levels:
-                    with SQLTransaction(**_kw) as (_, execute):
+                    with self.sqltransactions.concurrent(desc) as (_, execute):
                         for _, *vv in execute(self.query):
                             yield [self.na_rep if v is None else v for v in vv]
                 else:
-                    with SQLTransaction(**_kw) as (_, execute):
+                    with self.sqltransactions.concurrent(desc) as (_, execute):
                         for vv in execute(self.query):
                             yield [self.na_rep if v is None else v for v in vv]
         except OperationalError as e:

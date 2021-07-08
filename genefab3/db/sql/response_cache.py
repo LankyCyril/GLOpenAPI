@@ -1,5 +1,5 @@
 from genefab3.common.exceptions import GeneFabLogger
-from genefab3.db.sql.utils import SQLTransaction
+from genefab3.db.sql.utils import SQLTransactions
 from functools import wraps
 from genefab3.common.types import ResponseContainer
 from flask import Response
@@ -32,18 +32,13 @@ class ResponseCache():
     def __init__(self, sqlite_dbs):
         self.sqlite_db = sqlite_dbs.response_cache["db"]
         self.maxdbsize = sqlite_dbs.response_cache["maxsize"] or float("inf")
-        self.Transaction = lambda desc: SQLTransaction(
-            filename=self.sqlite_db, desc=desc, locking_tier=False,
-        )
-        self.LockingTierTransaction = lambda desc: SQLTransaction(
-            filename=self.sqlite_db, desc=desc, locking_tier=True,
-        )
         if self.sqlite_db is None:
             msg = "LRU SQL cache DISABLED by client parameter"
             _logw(f"ResponseCache():\n  {msg}")
         else:
+            self.sqltransactions = SQLTransactions(self.sqlite_db)
             desc = "response_cache/ensure_schema"
-            with self.Transaction(desc) as (_, execute):
+            with self.sqltransactions.concurrent(desc) as (_, execute):
                 for table, schema in RESPONSE_CACHE_SCHEMAS:
                     execute(f"CREATE TABLE IF NOT EXISTS `{table}` {schema}")
  
@@ -87,10 +82,9 @@ class ResponseCache():
             msg = f"{context.identity}\n  {problem}"
             _logw(f"ResponseCache(), did not store:\n  {msg}")
             return
-        def _put():
+        def _put(desc="response_cache/put"):
             retrieved_at = int(datetime.now().timestamp())
-            desc = "response_cache/put"
-            with self.LockingTierTransaction(desc) as (_, execute):
+            with self.sqltransactions.exclusive(desc) as (_, execute):
                 try:
                     execute("""DELETE FROM `response_cache` WHERE
                         `context_identity` == ?""", [context.identity])
@@ -123,9 +117,9 @@ class ResponseCache():
             WHERE `context_identity` == ?""", [context_identity])
  
     @bypass_if_disabled
-    def drop(self, accession):
+    def drop(self, accession, desc="response_cache/drop"):
         """Drop responses for given accession"""
-        with self.LockingTierTransaction("response_cache/drop") as (_, execute):
+        with self.sqltransactions.exclusive(desc) as (_, execute):
             try:
                 query = """SELECT `context_identity` FROM `accessions_used`
                     WHERE `accession` == ?"""
@@ -141,10 +135,9 @@ class ResponseCache():
                 _logi(msg, len(identity_entries), accession)
  
     @bypass_if_disabled
-    def drop_all(self):
+    def drop_all(self, desc="response_cache/drop_all"):
         """Drop all cached responses"""
-        desc = "response_cache/drop_all"
-        with self.LockingTierTransaction(desc) as (_, execute):
+        with self.sqltransactions.exclusive(desc) as (_, execute):
             try:
                 execute("DELETE FROM `accessions_used`")
                 execute("DELETE FROM `response_cache`")
@@ -154,10 +147,10 @@ class ResponseCache():
             else:
                 _logi("ResponseCache():\n  dropped all cached Flask responses")
  
-    def _iterdecompress(self, cid):
+    def _iterdecompress(self, cid, desc="response_cache/_iterdecompress"):
         """Iteratively decompress chunks retrieved from database by `context_identity`"""
         decompressor = decompressobj()
-        with self.Transaction("response_cache/_iterdecompress") as (_, execute):
+        with self.sqltransactions.concurrent(desc) as (_, execute):
             query = """SELECT `mimetype` FROM `response_cache`
                 WHERE `context_identity` == ? LIMIT 1"""
             mimetype, = execute(query, [cid]).fetchone() or [None]
@@ -197,26 +190,25 @@ class ResponseCache():
             return ResponseContainer(content=None)
         else:
             _logi(f"ResponseCache(), retrieving:\n  {context.identity}")
-            iterator = self._iterdecompress(context.identity) # second pass
+            iterator = self._iterdecompress(context.identity) # second pass # TODO PhoenixIterator?
             mimetype = next(iterator)
             return ResponseContainer(lambda: iterator, mimetype)
  
     @bypass_if_disabled
-    def shrink(self, max_iter=100, max_skids=20):
+    def shrink(self, max_iter=100, max_skids=20, desc="response_cache/shrink"):
         """Drop oldest cached responses to keep file size on disk under `self.maxdbsize`"""
         # TODO: DRY: very similar to genefab3.db.sql.core SQLiteTable.cleanup()
         n_dropped, n_skids = 0, 0
         for _ in range(max_iter):
             current_size = path.getsize(self.sqlite_db)
             if (n_skids < max_skids) and (current_size > self.maxdbsize):
-                desc = "response_cache/shrink"
-                with self.Transaction(desc) as (_, execute):
-                    query_oldest = f"""SELECT `context_identity`
+                with self.sqltransactions.concurrent(desc) as (_, execute):
+                    query_oldest = """SELECT `context_identity`
                         FROM `response_cache` ORDER BY `retrieved_at` ASC"""
                     cid = (execute(query_oldest).fetchone() or [None])[0]
                     if cid is None:
                         break
-                with self.LockingTierTransaction(desc) as (connection, execute):
+                with self.sqltransactions.exclusive(desc) as (connection, execute):
                     try:
                         msg = f"ResponseCache.shrink():\n  dropping {cid}"
                         GeneFabLogger.info(msg)
@@ -224,7 +216,7 @@ class ResponseCache():
                     except OperationalError as e:
                         msg= f"Rolling back shrinkage due to {e!r}"
                         GeneFabLogger.error(msg, exc_info=e)
-                        connection.rollback()
+                        connection.rollback() # explicit, to be able to continue
                         break
                     else:
                         connection.commit()
@@ -235,6 +227,6 @@ class ResponseCache():
         if n_dropped:
             _logi(f"ResponseCache():\n  shrunk by {n_dropped} entries")
         elif path.getsize(self.sqlite_db) > self.maxdbsize:
-            _logw(f"ResponseCache():\n  could not drop entries to shrink")
+            _logw("ResponseCache():\n  could not drop entries to shrink")
         if n_skids:
             _logw(f"ResponseCache():\n  file did not shrink {n_skids} times")

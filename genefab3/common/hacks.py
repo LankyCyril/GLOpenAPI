@@ -1,5 +1,4 @@
-from functools import wraps
-from genefab3.db.sql.utils import SQLTransaction
+from functools import wraps, partial
 from genefab3.common.types import NaN, StreamedDataTable
 from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabDatabaseException
@@ -26,7 +25,7 @@ def get_sub_df(obj, partname, partcols):
     from genefab3.db.sql.streamed_tables import SQLiteIndexName
     found = lambda v: v is not None
     index_name, data = None, {}
-    with SQLTransaction(obj.sqlite_db, "hacks/get_sub_df") as (_, execute):
+    with obj.sqltransactions.concurrent("hacks/get_sub_df") as (_, execute):
         try:
             fetch = lambda query: execute(query).fetchone()
             mktargets = lambda f: ",".join(f"{f}(`{c}`)" for c in partcols)
@@ -56,7 +55,7 @@ def get_sub_df(obj, partname, partcols):
 def get_part_index(obj, partname):
     """Retrieve index values (row name) of part of `obj`"""
     index_query = f"SELECT `{obj._index_name}` FROM `{partname}`"
-    with SQLTransaction(obj.sqlite_db, "hacks/get_part_index") as (_, execute):
+    with obj.sqltransactions.concurrent("hacks/get_part_index") as (_, execute):
         return {ix for ix, *_ in execute(index_query)}
 
 
@@ -176,3 +175,22 @@ def bypass_uncached_views(get, self, context):
         return ResponseContainer(content=None)
     else:
         return get(self, context)
+
+
+class NoCommitConnection():
+    """Wrapper for sqlite3 connection that forcefully prevents commits (for pandas.to_sql)"""
+    def __init__(self, connection):
+        self.__connection = connection
+    def __getattr__(self, attr):
+        if attr == "commit":
+            return lambda: None
+        else:
+            return getattr(self.__connection, attr)
+
+
+def ExecuteMany(partname, width):
+    """Generate a `method` function for `pandas.to_sql` that uses `connection.executemany`"""
+    qmarks = ",".join(["?"]*(width+1)) # include index
+    def mkinsert(pd_table, conn, keys, data_iter, name=partname):
+        conn.executemany(f"INSERT INTO `{name}` VALUES({qmarks})", data_iter)
+    return mkinsert

@@ -2,7 +2,7 @@ from collections import defaultdict
 from natsort import natsorted
 from pathlib import Path
 from json import dumps
-from genefab3.common.utils import is_debug
+from genefab3.common.exceptions import is_debug
 from genefab3.api.renderers.BrowserStreamedTableRenderers import _iter_html_chunks
 from genefab3.common.types import StringIterator
 

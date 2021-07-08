@@ -1,4 +1,5 @@
-from logging import getLogger, DEBUG
+from os import environ
+from logging import getLogger, DEBUG, INFO
 from sys import exc_info, stderr
 from traceback import format_tb
 from functools import partial
@@ -6,8 +7,16 @@ from json import dumps
 from flask import Response
 
 
+def is_debug(markers={"development", "staging", "stage", "debug", "debugging"}):
+    """Determine if app is running in debug mode"""
+    return environ.get("FLASK_ENV", None) in markers
+
+
 GeneFabLogger = getLogger("genefab3")
-GeneFabLogger.setLevel(DEBUG)
+if is_debug():
+    GeneFabLogger.setLevel(DEBUG)
+else:
+    GeneFabLogger.setLevel(INFO)
 
 
 class GeneFabException(Exception):
@@ -71,7 +80,7 @@ def interpret_exception(e, debug=False):
 def exception_catcher(e, debug=False):
     from genefab3.common.utils import json_permissive_default
     info, traceback_lines = interpret_exception(e, debug=debug)
-    tb_preface = f"Traceback (most recent call last):\n"
+    tb_preface = "Traceback (most recent call last):\n"
     traceback = "".join(traceback_lines)
     print(tb_preface, traceback, repr(e), sep="", file=stderr)
     dumps_permissive = partial(dumps, default=json_permissive_default)
