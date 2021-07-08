@@ -32,11 +32,11 @@ class ResponseCache():
     def __init__(self, sqlite_dbs):
         self.sqlite_db = sqlite_dbs.response_cache["db"]
         self.maxdbsize = sqlite_dbs.response_cache["maxsize"] or float("inf")
-        self.sqltransactions = SQLTransactions(self.sqlite_db)
         if self.sqlite_db is None:
             msg = "LRU SQL cache DISABLED by client parameter"
             _logw(f"ResponseCache():\n  {msg}")
         else:
+            self.sqltransactions = SQLTransactions(self.sqlite_db)
             desc = "response_cache/ensure_schema"
             with self.sqltransactions.concurrent(desc) as (_, execute):
                 for table, schema in RESPONSE_CACHE_SCHEMAS:
