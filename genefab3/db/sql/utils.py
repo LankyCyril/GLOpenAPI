@@ -168,6 +168,16 @@ class SQLTransactions():
             Thread(target=_clear_stale_locks).start()
  
     @contextmanager
+    def unconditional(self, desc=None):
+        """2PL bypass: ignore read and write locks, initiate transaction immediately"""
+        fulldesc = f"{desc or ''}:{self.sqlite_db}:{self.identifier or ''}"
+        _tid = timestamp36()
+        prelude = f"SQLTransactions.unconditional @ {_tid} ({fulldesc})"
+        _logd(f"{prelude}: staging transaction immediately")
+        with self._connect(fulldesc, _tid) as (connection, execute):
+            yield connection, execute
+ 
+    @contextmanager
     def concurrent(self, desc=None):
         """2PL: lock that is non-exclusive w.r.t. other `SQLTransactions.concurrent`s, but exclusive w.r.t. `SQLTransactions.exclusive`"""
         fulldesc = f"{desc or ''}:{self.sqlite_db}:{self.identifier or ''}"

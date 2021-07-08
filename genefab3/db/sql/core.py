@@ -78,7 +78,11 @@ class SQLiteObject():
             self_id_value = getattr(self, id_field)
             query = f"""SELECT `timestamp` FROM `{timestamp_table}`
                 WHERE `{id_field}` == "{self_id_value}" """
-        with self.sqltransactions.concurrent(desc) as (_, execute):
+        if ignore_conflicts:
+            read_transaction = self.sqltransactions.unconditional
+        else:
+            read_transaction = self.sqltransactions.concurrent
+        with read_transaction(desc) as (_, execute):
             ret = execute(query).fetchall()
             if len(ret) == 0:
                 _staleness = True
