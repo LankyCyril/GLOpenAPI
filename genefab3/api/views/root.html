@@ -59,6 +59,15 @@
             a.del {color: #AAA; font-style: italic; margin-left: 3pt; text-decoration: none}
             .list-item:not(:first-child) em.key {visibility: hidden}
             .or-selects {display: inline-block}
+            #footer {margin-top: 24pt; height: 2.5in; max-height: 2.5in; background: #DDD; color: #555}
+            #footer table, #footer table * {border: 0; line-height: 1.6; font-size: 11pt}
+            #footer table td {vertical-align: top; padding-top: .15in}
+            #footer img {height: 2.2in; width: 2.2in; padding-left: .15in; padding-bottom: .15in}
+            #footer b.h3 {display: inline-block; transform: scale(1,1.25); margin-bottom: 4pt}
+            #subfooter {text-align: center; width: 95; color: #555; margin-top: 8pt; font-size: 9pt}
+            #footer a {color: #555; font-size: 11pt}
+            #subfooter a {color: #555; font-size: 9pt}
+            #footer a:hover, #subfooter a:hover {color: #D10; text-decoration: underline}
         </style>
     </head>
 <script src='$URL_ROOT/libs/js/jquery-3.6.0.slim.min.js'></script>
@@ -742,6 +751,38 @@ $(document).ready(function() {
                     </div>
                 </div>
             </div> DEBUG-->
+        </div>
+        <div id='footer'>
+            <table style='width: 95%'><tr>
+                <td>
+                    <img src='https://genelab.nasa.gov/sites/default/files/inline-images/GeneLab_patch.png'>
+                </td>
+                <td>
+                    <b class='h3'>CONTACTS</b><br>
+                    NASA Official: Sylvain Costes<br>
+                    <a href='https://genelab.nasa.gov/help/contact'><b>Questions and Feedback</b></a><br><br>
+                    <b class='h3'>SITE INFORMATION</b><br>
+                    &gt; <a href='https://genelab.nasa.gov/overview'>NASA GeneLab Overview</a><br>
+                    &gt; <a href='https://genelab.nasa.gov/terms'>Terms and Conditions</a><br>
+                    &gt; <a href='https://www.nasa.gov/about/highlights/HP_Privacy.html'>NASA Privacy Policy and Notices</a>
+                </td>
+                <td>
+                    <b class='h3'>OTHER RESOURCES</b><br>
+                    &gt; <a href='https://www.nasa.gov/spacebio'>NASA Space Biology Program</a><br>
+                    &gt; <a href='https://www.nasa.gov/ames/research/space-biosciences/'>NASA Ames Space Biosciences Division</a><br>
+                    &gt; <a href='https://lsda.jsc.nasa.gov/'>NASA Life Sciences Data Archive</a><br>
+                    &gt; <a href='https://psi.nasa.gov/'>NASA Physical Science Informatics</a><br>
+                    &gt; <a href='https://www.issnationallab.org/'>Center for the Advancement of Science in Space</a>
+                </td>
+            </tr></table>
+        </div>
+        <div id='subfooter'>
+            <a href='https://www.nasa.gov/'>NASA</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <a href='http://odeo.hq.nasa.gov/nofear.html'>No Fear Act</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <a href='http://www.nasa.gov/FOIA'>FOIA</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <a href='https://www.usa.gov/'>USA.gov</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <a href='https://get.adobe.com/reader/'>Get Acrobat Reader</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <a href='mailto:genelab-outreach@lists.nasa.gov'>Contact</a>
         </div>
     </body>
 </html>
