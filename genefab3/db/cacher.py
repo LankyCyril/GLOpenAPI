@@ -12,21 +12,23 @@ from genefab3.db.mongo.utils import run_mongo_action, harmonize_document
 from genefab3.db.mongo.status import drop_status, update_status
 
 
-class CacherThread(Thread):
+class MetadataCacherThread(Thread):
     """Lives in background and keeps local metadata cache, metadata index, and response cache up to date"""
     CLIENT_ATTRIBUTES_TO_COPY = (
       "adapter", "mongo_collections", "locale", "sqlite_dbs", "units_formatter",
     )
  
-    def __init__(self, *, genefab3_client, metadata_update_interval, metadata_retry_delay):
+    def __init__(self, *, genefab3_client, full_update_interval, full_update_retry_delay, dataset_update_interval):
         """Prepare background thread that iteratively watches for changes to datasets"""
         self.genefab3_client = genefab3_client
-        _id = genefab3_client.mongo_appname.replace("GeneFab3", "CacherThread")
-        self._id = _id
+        self._id = genefab3_client.mongo_appname.replace(
+            "GeneFab3", "MetadataCacherThread",
+        )
         for attr in self.CLIENT_ATTRIBUTES_TO_COPY:
             setattr(self, attr, getattr(genefab3_client, attr))
-        self.metadata_update_interval = metadata_update_interval
-        self.metadata_retry_delay = metadata_retry_delay
+        self.full_update_interval = full_update_interval
+        self.full_update_retry_delay = full_update_retry_delay
+        self.dataset_update_interval = dataset_update_interval
         self.response_cache = ResponseCache(self.sqlite_dbs)
         self.status_kwargs = dict(collection=self.mongo_collections.status)
         super().__init__()
@@ -44,9 +46,9 @@ class CacherThread(Thread):
                     for acc in accessions["failed"] | accessions["dropped"]:
                         self.response_cache.drop(acc)
                 self.response_cache.shrink()
-                delay = self.metadata_update_interval
+                delay = self.full_update_interval
             else:
-                delay = self.metadata_retry_delay
+                delay = self.full_update_retry_delay
             GeneFabLogger.info(f"{self._id}:\n  Sleeping for {delay} seconds")
             sleep(delay)
  
@@ -82,6 +84,7 @@ class CacherThread(Thread):
             n_apps = sum(1 for _ in iterate_mongo_connections(mongo_client))
             msg = f"Total number of active MongoDB connections: {n_apps}"
             GeneFabLogger.info(msg)
+            sleep(self.dataset_update_interval)
         GeneFabLogger.info(f"{self._id}, datasets:\n  " + ", ".join(
             f"{k}={len(v)}" for k, v in accessions.items()
         ))

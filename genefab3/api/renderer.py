@@ -121,7 +121,7 @@ class CacheableRenderer():
                         context, method, args, kwargs,
                     )
             finally:
-                if not self.genefab3_client.cacher_thread.isAlive():
+                if not self.genefab3_client.metadata_cacher_thread.isAlive():
                     self.genefab3_client.mongo_client.close()
             return response_container.make_response()
         return wrapper

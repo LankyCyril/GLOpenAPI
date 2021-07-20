@@ -28,9 +28,11 @@ genefab3_client = GeneFabClient(
             db="./.genefab3.sqlite3/response-cache.db", maxsize=24*GiB,
         ),
     ),
-    cacher_params=dict(
-        metadata_update_interval=1800,
-        metadata_retry_delay=300,
+    metadata_cacher_params=dict(
+        enabled=True,
+        full_update_interval=21600, # sec between full update cycles
+        full_update_retry_delay=600, # sec before retrying if server unreachable
+        dataset_update_interval=60, # sec between updating each dataset
     ),
     flask_params=dict(
         app=flask_app,

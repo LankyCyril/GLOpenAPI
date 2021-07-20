@@ -6,7 +6,7 @@ from socket import create_connection, error as SocketError
 from types import SimpleNamespace
 from genefab3.common.exceptions import GeneFabLogger, exception_catcher
 from genefab3.db.mongo.utils import iterate_mongo_connections
-from genefab3.db.cacher import CacherThread
+from genefab3.db.cacher import MetadataCacherThread
 from genefab3.api.renderer import CacheableRenderer
 from functools import partial
 
@@ -14,7 +14,7 @@ from functools import partial
 class GeneFabClient():
     """Routes Response-generating methods, continuously caches metadata and responses"""
  
-    def __init__(self, *, AdapterClass, RoutesClass, mongo_params, sqlite_params, cacher_params, flask_params):
+    def __init__(self, *, AdapterClass, RoutesClass, mongo_params, sqlite_params, metadata_cacher_params, flask_params):
         """Initialize metadata cacher (with adapter), response cacher, routes"""
         try:
             self.flask_app = self._configure_flask_app(**flask_params)
@@ -26,7 +26,9 @@ class GeneFabClient():
             self.adapter = AdapterClass()
             self._init_error_handlers()
             self.routes = self._init_routes(RoutesClass)
-            self.cacher_thread = self._ensure_cacher_thread(**cacher_params)
+            self.metadata_cacher_thread = self._ensure_metadata_cacher_thread(
+                **metadata_cacher_params,
+            )
         except TypeError as e:
             msg = "During GeneFabClient() initialization, an exception occurred"
             raise GeneFabConfigurationException(msg, debug_info=repr(e))
@@ -96,33 +98,34 @@ class GeneFabClient():
             self.flask_app.route(endpoint, methods=["GET"])(renderer(method))
         return routes
  
-    def _ok_to_loop_cacher_thread(self, enabled):
+    def _ok_to_loop_metadata_cacher_thread(self, enabled):
         """Check if no other instances of genefab3 are talking to MongoDB database"""
         if not enabled:
-            msg = "CacherThread disabled by client parameter, NOT LOOPING"
-            GeneFabLogger.info(f"{self.mongo_appname}:\n  {msg}")
+            m = "MetadataCacherThread disabled by client parameter, NOT LOOPING"
+            GeneFabLogger.info(f"{self.mongo_appname}:\n  {m}")
             return False
         else:
             for other in iterate_mongo_connections(self.mongo_client):
                 if other < self.mongo_appname:
-                    msg = (f"Found other instance {other}, " +
+                    m = (f"Found other instance {other}, " +
                         "NOT LOOPING current instance")
-                    GeneFabLogger.info(f"{self.mongo_appname}:\n  {msg}")
+                    GeneFabLogger.info(f"{self.mongo_appname}:\n  {m}")
                     return False
             else:
-                msg = "No other instances found, STARTING LOOP"
-                GeneFabLogger.info(f"{self.mongo_appname}:\n  {msg}")
+                m = "No other instances found, STARTING LOOP"
+                GeneFabLogger.info(f"{self.mongo_appname}:\n  {m}")
                 return True
  
-    def _ensure_cacher_thread(self, metadata_update_interval=1800, metadata_retry_delay=300, enabled=True):
+    def _ensure_metadata_cacher_thread(self, enabled=True, full_update_interval=21600, full_update_retry_delay=600, dataset_update_interval=60):
         """Start background cacher thread"""
-        if self._ok_to_loop_cacher_thread(enabled):
-            cacher_thread = CacherThread(
+        if self._ok_to_loop_metadata_cacher_thread(enabled):
+            metadata_cacher_thread = MetadataCacherThread(
                 genefab3_client=self,
-                metadata_update_interval=metadata_update_interval,
-                metadata_retry_delay=metadata_retry_delay,
+                full_update_interval=full_update_interval,
+                full_update_retry_delay=full_update_retry_delay,
+                dataset_update_interval=dataset_update_interval,
             )
-            cacher_thread.start()
-            return cacher_thread
+            metadata_cacher_thread.start()
+            return metadata_cacher_thread
         else:
             return SimpleNamespace(isAlive=lambda: False)
