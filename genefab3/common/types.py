@@ -40,7 +40,7 @@ class StringIterator():
 
 
 class Adapter():
-    """Base class for database adapters"""
+    """Base class for database adapters""" # TODO: documentation for `get_accessions` and `get_files_by_accession`
  
     def __init__(self):
         """Validate subclassed Adapter"""
