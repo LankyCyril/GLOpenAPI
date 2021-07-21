@@ -14,3 +14,4 @@ Data access API for GeneLab
 * numpy
 * pandas
 * natsort
+* filelock
