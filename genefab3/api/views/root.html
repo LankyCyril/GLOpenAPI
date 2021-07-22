@@ -9,6 +9,13 @@
         <style>
             * {font-size: 13pt; font-family: "Roboto", sans-serif; font-weight: 300}
             a {cursor: pointer; color: #C10; text-decoration: none}
+            a[target="_blank"] {white-space: nowrap}
+            a[target="_blank"]:after {
+                content: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAQElEQVR42qXKwQkAIAxDUUdxtO6/RBQkQZvSi8I/pL4BoGw/XPkh4XigPmsUgh0626AjRsgxHTkUThsG2T/sIlzdTsp52kSS1wAAAABJRU5ErkJggg==);
+                margin: 0 3px 0 2px; position: relative; top: -2pt;
+                filter: contrast(0) drop-shadow(1pt 1pt 0 #D10);
+                display: inline;
+            }
             a:hover {text-decoration: underline}
             b {font-weight: 500}
             strong {color: #00A; font-weight: 500}
@@ -35,6 +42,8 @@
             }
             code {font-family: "Oxygen Mono", monospace; font-size: 12pt; color: #44B !important; background-color: #EEE; white-space: nowrap}
             code b {font-family: "Oxygen Mono", monospace; font-size: 12pt; font-weight: 500; color: #44B}
+            li {margin-bottom: 3pt}
+            pre {font-family: "Oxygen Mono", monospace; font-size: 11pt;}
             #url tt {font-family: "Oxygen Mono", monospace; font-size: 13pt; background: transparent}
             #url tt.base_url, #url tt.pale {color: #AAA;}
             #url tt.plain, #url tt.view {color: #222;}
@@ -452,29 +461,77 @@ $(document).ready(function() {
         </div>
         <h2>API Syntax</h2>
         <div class='description' style='margin-bottom: 0; padding-bottom: 0'>
-            <p>This API provides the means to query the GeneLab database for annotation and data
-            associated with datasets, assays, and samples hosted by GeneLab,
-            and represents results as tables and/or JSON records.</p>
-            <p>Each queriable metadata entry represents a single sample from a single assay and dataset;
-            each entry contains nested fields under multiple categories.</p>
-            <p>The <code>"id"</code> category contains fields <code>"accession", "assay name", "sample name"</code>.</p>
-            <p>The <code>"file"</code> category contains fields <code>"filename", "datatype"</code> and
-            contains the information about the files associated with a given sample.</p>
-            <p>Finally, the categories <code>"investigation", "study", "assay"</code> are organized according to the
-            <a href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab model</a>,
-            and subsequently contain the following fields, each of which may contain further nested subfields:
+            <p>This API provides the means to query the
+            <a target='_blank' href='https://genelab-data.ndc.nasa.gov/genelab/projects'>GeneLab database</a>
+            for annotation and data associated with datasets, assays, and samples hosted by GeneLab,
+            and represents results in a number of <a href='#format'>formats</a>.</p>
             <ul>
-                <li>investigation.study</li>
-                <li>investigation.study assays</li>
-                <li>investigation.investigation</li>
-                <li>study.characteristics</li>
-                <li>study.factor value</li>
-                <li>study.parameter value</li>
-                <li>assay.characteristics</li>
-                <li>assay.factor value</li>
-                <li>assay.parameter value</li>
-            </ul></p>
-            <p>Request URLs are formed by combining an arbitrary number of queries, described below.</p>
+                <li>Each queriable metadata <b>entry</b> represents a single sample;</li>
+                <li>a sample belongs to an assay, which in turn belongs to a dataset.</li>
+                <li>Each <b>entry</b> contains nested fields under multiple categories, for example:</li>
+            </ul>
+            <pre style='margin-left: -60pt; margin-top: -5pt'>
+              id &#x21B4;
+                accession &rarr; GLDS-239
+                assay name &rarr; mhu2_fskn_transcription_profiling_RNA_Sequencing_(RNA-Seq)
+                sample name &rarr; Mmus_C57-6J_FSKN_FLT_1G_JC_Rep3_F12
+              study &#x21B4;
+                factor value &#x21B4;
+                  altered gravity &rarr; 1G by centrifugation
+                  diet &rarr; JAXA Chow
+                  spaceflight &rarr; Space Flight
+                  ...
+                characteristics &#x21B4;
+                  ...
+                parameter value &#x21B4;
+                  ...
+              assay &#x21B4;
+                parameter value &#x21B4;
+                  read depth &rarr; 67001231 {read}
+                  read length &rarr; 149 {base pair}
+                  ...
+                ...
+              file &#x21B4;
+                datatype &rarr; normalized counts
+                filename &rarr; GLDS-239_rna_seq_Normalized_Counts.csv
+            </pre>
+            <ul style='margin-top: -10pt'>
+                <li>The <code>"id"</code> category always contains fields <code>"accession"</code>,
+                    <code>"assay name"</code>, <code>"sample name"</code>.</li>
+                <li>The categories <code>"investigation"</code>, <code>"study"</code>, <code>"assay"</code> are
+                    organized according to the
+                    <a target='_blank' href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab model</a>,
+                    and subsequently <i>may</i> contain the following fields, each of which <i>may</i> contain further
+                    nested subfields:
+                    <pre style='margin-left: -145pt; margin-top: 6pt'>
+                      investigation &#x21B4;
+                        study &#x21B4;
+                          ...
+                        study assays &#x21B4;
+                          ...
+                        investigation &#x21B4;
+                          ...
+                      study &#x21B4;
+                        characteristics &#x21B4;
+                          ...
+                        factor value &#x21B4;
+                          ...
+                        parameter value &#x21B4;
+                          ...
+                      assay &#x21B4;
+                        characteristics &#x21B4;
+                          ...
+                        factor value &#x21B4;
+                          ...
+                        parameter value &#x21B4;
+                          ...
+                    </pre>
+                    </li>
+                <li style='margin-top: -14pt'>The <code>"file"</code> category contains fields <code>"filename"</code>, <code>"datatype"</code>
+                    and represents the information about the file(s) associated with a given sample.</li>
+            </ul>
+            <p>Names of nested fields can be joined with a period (<code>.</code>) to form queries.<br>
+            Request URLs are formed by combining an arbitrary number of queries, described below.</p>
         </div>
         <div id='selectors'>
             <div>
