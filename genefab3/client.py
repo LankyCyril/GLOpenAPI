@@ -116,13 +116,14 @@ class GeneFabClient():
                 GeneFabLogger.info(f"{self.mongo_appname}:\n  {m}")
                 return True
  
-    def _ensure_metadata_cacher_thread(self, enabled=True, full_update_interval=21600, full_update_retry_delay=600, dataset_update_interval=60):
+    def _ensure_metadata_cacher_thread(self, full_update_interval, full_update_retry_delay, dataset_init_interval, dataset_update_interval, enabled=True):
         """Start background cacher thread"""
         if self._ok_to_loop_metadata_cacher_thread(enabled):
             metadata_cacher_thread = MetadataCacherThread(
                 genefab3_client=self,
                 full_update_interval=full_update_interval,
                 full_update_retry_delay=full_update_retry_delay,
+                dataset_init_interval=dataset_init_interval,
                 dataset_update_interval=dataset_update_interval,
             )
             metadata_cacher_thread.start()

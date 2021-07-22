@@ -68,10 +68,15 @@ genefab3_client = GeneFabClient(
         ),
     ),
     metadata_cacher_params=dict(
-        enabled=True, # whether to spawn a persistent cacher daemon thread
-        full_update_interval=21600, # sec between full update cycles
-        full_update_retry_delay=600, # sec before retrying if server unreachable
-        dataset_update_interval=60, # sec between updating each dataset
+        enabled=True,
+        # seconds between full update cycles:
+        full_update_interval=21600,
+        # seconds before retrying full update cycle if server unreachable:
+        full_update_retry_delay=600,
+        # seconds between adding datasets that have not been previously cached:
+        dataset_init_interval=3,
+        # seconds between updating datasets that have (potentially stale) cache:
+        dataset_update_interval=60,
     ),
     flask_params=dict(
         app=flask_app,
