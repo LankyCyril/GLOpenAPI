@@ -8,15 +8,15 @@
         <link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Oxygen+Mono&family=Roboto:wght@300;500&display=swap'/>
         <style>
             * {font-size: 13pt; font-family: "Roboto", sans-serif; font-weight: 300}
-            a {cursor: pointer; color: #C10; text-decoration: none}
-            a[target="_blank"] {white-space: nowrap}
-            a[target="_blank"]:after {
+            a:not([name]) {cursor: pointer; color: #C10; text-decoration: none}
+            a[target="_blank"]:not([name]) {white-space: nowrap}
+            a[target="_blank"]:not([name]):after {
                 content: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAQElEQVR42qXKwQkAIAxDUUdxtO6/RBQkQZvSi8I/pL4BoGw/XPkh4XigPmsUgh0626AjRsgxHTkUThsG2T/sIlzdTsp52kSS1wAAAABJRU5ErkJggg==);
                 margin: 0 3px 0 2px; position: relative; top: -2pt;
                 filter: contrast(0) drop-shadow(1pt 1pt 0 #D10);
                 display: inline;
             }
-            a:hover {text-decoration: underline}
+            a:not([name]):hover {text-decoration: underline}
             b {font-weight: 500}
             strong {color: #00A; font-weight: 500}
             em {font-style: normal; color: black; font-family: "Oxygen Mono", monospace; font-size: 12pt}
@@ -26,7 +26,7 @@
             b.header {font-size: 24pt; font-weight: 500}
             h2 {font-size: 20pt; font-weight: 500; display: block; margin: 10pt 0}
             div.description {max-width: 640pt; padding-bottom: 7pt}
-            #url-builder {position: sticky; top: 0; background: #FFFFFFEE; z-index: 8}
+            #url-builder {position: sticky; top: 0pt; background: #FFFFFFEE; border-top: 4pt solid #FFFFFFEE; z-index: 8}
             #url-wrapper {display: inline-block}
             #url-description {
                 display: inline-block; background: #CDF; padding: 5pt;
@@ -41,9 +41,13 @@
                 word-break: break-all; word-wrap: break-word; overflow-y: auto;
             }
             code {font-family: "Oxygen Mono", monospace; font-size: 12pt; color: #44B !important; background-color: #EEE; white-space: nowrap}
-            code b {font-family: "Oxygen Mono", monospace; font-size: 12pt; font-weight: 500; color: #44B}
+            code b {font-family: "Oxygen Mono", monospace; font-size: 12pt; font-weight: bold; color: #44B}
+            a code, a code b {font-size: 10pt !important}
+            a:hover code, a:hover code b {color: #D10 !important}
             li {margin-bottom: 3pt}
+            ul ul {margin-top: 3pt}
             pre {font-family: "Oxygen Mono", monospace; font-size: 11pt;}
+            img.example {width: 480pt; margin-top: 5pt; margin-bottom: 10pt; margin-left: 1cm}
             #url tt {font-family: "Oxygen Mono", monospace; font-size: 13pt; background: transparent}
             #url tt.base_url, #url tt.pale {color: #AAA;}
             #url tt.plain, #url tt.view {color: #222;}
@@ -68,6 +72,13 @@
             a.del {color: #AAA; font-style: italic; margin-left: 3pt; text-decoration: none}
             .list-item:not(:first-child) em.key {visibility: hidden}
             .or-selects {display: inline-block}
+            table#formats-matrix {border-spacing: 0; border-collapse: collapse}
+            table#formats-matrix td {border: 1px solid #999; font-size: 10pt; padding: 5pt; min-width: 36pt}
+            table#formats-matrix td.y {color: green}
+            table#formats-matrix td.m {color: #890}
+            table#formats-matrix td.n {color: #D10}
+            table#formats-matrix tr.th td {font-weight: bold}
+            table#formats-matrix sup, .footnotes sup {font-size: 8pt !important}
             #footer {margin-top: 24pt; height: 2.5in; max-height: 2.5in; background: #DDD; color: #555}
             #footer table, #footer table * {border: 0; line-height: 1.6; font-size: 11pt}
             #footer table td {vertical-align: top; padding-top: .15in}
@@ -429,12 +440,12 @@ function prefill_example() {
     $("select#view").append(option).val("");
 }
 
-$(document).ready(function() {
-    toggle_builder();
-    refresh_dropdowns();
-    refresh_event_handlers();
-    prefill_example();
-});
+//$(document).ready(function() {
+//    toggle_builder();
+//    refresh_dropdowns();
+//    refresh_event_handlers();
+//    prefill_example();
+//});
 
 </script>
     <body>
@@ -449,22 +460,12 @@ $(document).ready(function() {
                 </td>
             </tr>
         </table>
-        <div id='url-builder' class='interactive' style='display:none'>
-            <div id='url-wrapper'>
-                <div id='url-description'>You are here:</div>
-                <div id='url'>$URL_ROOT</div>
-                <div id='url-follow'><a href=''>Follow generated URL</a></div>
-            </div>
-        </div>
-        <div id='noscript' style='display: inline-block; color: #D10; font-weight: bold; padding: 5pt; margin-bottom: 10pt; border: 1px solid #A10'>
-            Additional interactive features on this page require a browser with JavaScript support.<br>
-        </div>
-        <h2>API Syntax</h2>
+        <a name='syntax'><h2>API syntax</h2></a>
         <div class='description' style='margin-bottom: 0; padding-bottom: 0'>
             <p>This API provides the means to query the
             <a target='_blank' href='https://genelab-data.ndc.nasa.gov/genelab/projects'>GeneLab database</a>
             for annotation and data associated with datasets, assays, and samples hosted by GeneLab,
-            and represents results in a number of <a href='#format'>formats</a>.</p>
+            and represents results in a number of <a href='#formats'>formats</a>.</p>
             <ul>
                 <li>Each queriable metadata <b>entry</b> represents a single sample;</li>
                 <li>a sample belongs to an assay, which in turn belongs to a dataset.</li>
@@ -498,11 +499,9 @@ $(document).ready(function() {
             <ul style='margin-top: -10pt'>
                 <li>The <code>"id"</code> category always contains fields <code>"accession"</code>,
                     <code>"assay name"</code>, <code>"sample name"</code>.</li>
-                <li>The categories <code>"investigation"</code>, <code>"study"</code>, <code>"assay"</code> are
-                    organized according to the
-                    <a target='_blank' href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab model</a>,
-                    and subsequently <i>may</i> contain the following fields, each of which <i>may</i> contain further
-                    nested subfields:
+                <li>Categories <code>"investigation"</code>, <code>"study"</code>, <code>"assay"</code> are organized
+                    according to the <a target='_blank' href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab model</a>,
+                    and subsequently may contain the following fields, each of which may contain further nested subfields:
                     <pre style='margin-left: -145pt; margin-top: 6pt'>
                       investigation &#x21B4;
                         study &#x21B4;
@@ -527,15 +526,27 @@ $(document).ready(function() {
                           ...
                     </pre>
                     </li>
-                <li style='margin-top: -14pt'>The <code>"file"</code> category contains fields <code>"filename"</code>, <code>"datatype"</code>
-                    and represents the information about the file(s) associated with a given sample.</li>
+                <li style='margin-top: -14pt'>The <code>"file"</code> category contains fields <code>"filename"</code>,
+                    <code>"datatype"</code> and represents the information about the file(s) associated with a given sample.</li>
             </ul>
-            <p>Names of nested fields can be joined with a period (<code>.</code>) to form queries.<br>
-            Request URLs are formed by combining an arbitrary number of queries, described below.</p>
+            <p style='margin-bottom: 25pt'>Names of categories and nested fields can be joined with a period
+                (<code>.</code>) to form queries.<br>
+                Request URLs are formed by combining an arbitrary number of queries, described below.</p>
         </div>
+        <div id='url-builder' class='interactive' style='display:none'>
+            <div id='url-wrapper'>
+                <div id='url-description'>You are here:</div>
+                <div id='url'>$URL_ROOT</div>
+                <div id='url-follow'><a href=''>Follow generated URL</a></div>
+            </div>
+        </div>
+        <div id='noscript' style='display: inline-block; color: #D10; font-weight: bold; padding: 5pt; margin-bottom: 10pt; border: 1px solid #A10'>
+            Additional interactive features on this page require a browser with JavaScript support.<br>
+        </div>
+        <a name='components'><h2>URL and query components</h2></a>
         <div id='selectors'>
             <div>
-                <div><b>Choice of view level</b></div><br>
+                <div><a name='view'><b>View level</b></a></div><br>
                 <div class='interactive' style='display:none'>
                     <select id='view'>
                         <option value='' selected></option>
@@ -546,22 +557,64 @@ $(document).ready(function() {
                 </div>
                 <div class='description on-newline'>
                     <p>This part of the URL is required.</p>
-                    <p>The &quot;assays&quot; view generates overview tables;
-                    each column represents a property (such as a factor value), and
-                    each row represents one assay, followed by boolean values (True/False)
-                    denoting whether a property is associated with the assay.</p>
-                    <p>The &quot;samples&quot; view generates annotation (metadata) tables;
-                    each column represents a property (such as a factor value), and
-                    each row represents one sample, followed by its property values.</p>
-                    <p>The &quot;data&quot; view outputs data associated with sample(s);
-                    table data is returned in formats 'csv', 'tsv', 'json', 'browser' (see below);
-                    raw file data is returned if the requested format is 'raw' and a single file
-                    matches the rest of the query.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<a href="$URL_ROOT/samples"><code><b>/samples/</b></code></a>
+                    <ul>
+                        <li>
+                            The <b>&quot;assays&quot;</b> view generates overview tables;
+                            each column represents a property (such as a factor value), and
+                            each row represents one assay, followed by boolean values (True/False)
+                            denoting whether a property is associated with the assay.
+                            <ul>
+                                <li>The fields <code>id.accession</code> and <code>id.assay name</code> are always included;
+                                <li>There are two levels of column names:
+                                <ul>
+                                    <li>The bottom one is the target nested field</li>
+                                    <li>
+                                        The top one is the preceding nested fields, joined by a period, e.g.:<br>
+                                        <code>id &rarr; accession</code>, <code>study.characteristics &rarr; age</code>
+                                    </li>
+                                </ul>
+                                <li>
+                                    This tabular data can be represented in CSV, TSV, JSON, and interactive
+                                    <a href='#formats'>formats</a>.
+                                </li>
+                            </ul>
+                            <img class='example' src='/images/assays-example.png'>
+                        </li>
+                        <li>
+                            The <b>&quot;samples&quot;</b> view generates annotation (metadata) tables;
+                            each column represents a property (such as a factor value), and
+                            each row represents one sample, followed by its property values.
+                            <ul><li>The output format is identical to the "assays" view</li></ul>
+                            <img class='example' src='/images/samples-example.png'>
+                        </li>
+                        <li>
+                            The &quot;data&quot; view outputs data associated with sample(s).
+                            <ul>
+                                <li>
+                                    All tabular <a href='#formats'>formats</a> (CSV, TSV, JSON, browser) are supported
+                                    if the underlying data is a table, and contain three levels of column names,
+                                    from top to bottom:
+                                    <ul>
+                                        <li>Accession (e.g., <code>GLDS-1</code>)</li>
+                                        <li>Assay name (e.g., <code>E-GEOD-53196_GeneChip_assay</code>)</li>
+                                        <li>Sample name (e.g., <code>Dmel_OR_wo_FLT_uninfd_Rep1</code>)</li>
+                                    </ul>
+                                    Thus, the header corresponds to the leftmost three columns of the "samples" view.
+                                </li>
+                                <img class='example' style='margin-left: 0 !important' src='/images/data-example.png'>
+                                <li>
+                                    Otherwise, if a single non-tabular file matches the query, it can be returned raw
+                                    (see <a href='#formats'>formats</a> below).
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples'><code><b>/samples/</b></code></a>
+                    <i style='font-size: 9pt'>(we will build upon this below)</i>.
                 </div>
             </div>
             <div>
-                <div><b>Retrieval of entries from specific<strong>datasets and/or assays</strong>:</b></div><br>
+                <div><a name='ids'><b>Retrieval of entries from specific <strong>datasets and/or assays</strong></b></a></div><br>
                 <div class='interactive' style='display:none'>
                     <div id='meta-assay-list' class='list'>
                         <div class='meta-assay list-item'>
@@ -581,18 +634,20 @@ $(document).ready(function() {
                 <div class='description on-newline'>
                     <p>This part of the URL, as well as all following parts, can be specified any number of times
                     (including zero times).</p>
-                    <p>The search can be constrained to only the samples from
-                    specific datasets (<code>id.accession=ACCESSION</code>) and/or assays
-                    (<code>id.assay name=ASSAY</code>)</p>
-                    <p>As a shorthand, it is also possible to pass a mixed query, where accessions and assay names
-                    are separated by a forward slash, and multiple accessions / assay names are joined by a vertical pipe
-                    (<code>id=ACCESSION_1/ASSAY_1A|ACCESSION_2</code>)</p>
-                    <i>Example:</i>&nbsp;&nbsp;<a href="$URL_ROOT/samples/?id.accession=GLDS-38"><code>/samples/?<b>id.accession=GLDS-38</b></code></a><br>
-                    <i>Example:</i>&nbsp;&nbsp;<a href="$URL_ROOT/samples/?id=GLDS-38/proteomics|GLDS-276"><code>/samples/?<b>id=GLDS-38/proteomics|GLDS-276</b></code></a>
+                    <ul>
+                        <li>The search can be constrained to only the samples from
+                        specific datasets (<code>id.accession=ACCESSION</code>) and/or assays
+                        (<code>id.assay name=ASSAY</code>)</li>
+                        <li>As a shorthand, it is also possible to pass a mixed query, where accessions and assay names
+                        are separated by a forward slash, and multiple accessions / assay names are joined by a vertical pipe
+                        (<code>id=ACCESSION_1/ASSAY_1A|ACCESSION_2</code>)</li>
+                    </ul>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?id.accession=GLDS-38'><code>/samples/?<b>id.accession=GLDS-38</b></code></a><br>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?id=GLDS-38/proteomics|GLDS-276'><code>/samples/?<b>id=GLDS-38/proteomics|GLDS-276</b></code></a>
                 </div>
             </div>
             <div>
-                <div><b>Retrieval of entries with metadata <strong>categories</strong></b></div><br>
+                <div><a name='categories'><b>Retrieval of entries with metadata <strong>categories</strong></b></a></div><br>
                 <div class='interactive' style='display:none'>
                     <div id='meta-wildcard-list' class='list'>
                         <div class='meta-wildcard list-item'>
@@ -609,16 +664,19 @@ $(document).ready(function() {
                     </div>
                 </div>
                 <div class='description on-newline'>
-                    <p>Information on all values under a given <a href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab</a>
-                    category can be retrieved: querying directly by any of these categories will constrain the results
-                    to only the datasets, assays, and samples that have this category annotated.</p>
-                    <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
-                    the values of fields in the category will be reported in table columns.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<a href="$URL_ROOT/samples/?study.factor value"><code>/samples/?<b>study.factor value</b></code></a>
+                    <p>Information on all values under a given
+                    <a target='_blank' href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab</a> category can be retrieved:</p>
+                    <ul>
+                        <li>Querying directly by any of these <b>categories</b> (e.g., <code>assay.parameters</code>
+                        will constrain the results to only the datasets, assays, and samples that have this category annotated.</li>
+                        <li>Under view levels &quot;assays&quot; and &quot;samples&quot;,
+                        the values of fields in the category will be reported in table columns.</li>
+                    </ul>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor value'><code>/samples/?<b>study.factor value</b></code></a>
                 </div>
             </div>
             <div>
-                <div><b>Retrieval of entries with metadata <strong>fields</strong></b></div><br>
+                <div><a name='fields'><b>Retrieval of entries with metadata <strong>fields</strong></b></a></div><br>
                 <div class='interactive' style='display:none'>
                     <div id='meta-existence-list' class='list'>
                         <div class='meta-existence list-item'>
@@ -640,16 +698,18 @@ $(document).ready(function() {
                     </div>
                 </div>
                 <div class='description on-newline'>
-                    <p>Each ISA category contains multiple fields; querying by any such field
-                    will constrain the results to only the datasets, assays, and samples that
-                    have this field annotated.</p>
-                    <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
-                    the values of this field will be reported in table columns.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<a href="$URL_ROOT/samples/?study.factor value.spaceflight"><code>/samples/?<b>study.factor value.spaceflight</b></code></a>
+                    <p>Each ISA category contains multiple fields:</p>
+                    <ul>
+                        <li>Querying by any such <b>field</b> will constrain the results to only the datasets,
+                        assays, and samples that have this field annotated.</li>
+                        <li>Under view levels &quot;assays&quot; and &quot;samples&quot;,
+                        the values of this field will be reported in table columns.</li>
+                    </ul>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor value.spaceflight'><code>/samples/?<b>study.factor value.spaceflight</b></code></a>
                 </div>
             </div>
             <div>
-                <div><b>Retrieval of entries with metadata field <strong>values</strong></b></div><br>
+                <div><a name='fieldvalues'><b>Retrieval of entries with metadata field <strong>values</strong></b></a></div><br>
                 <div class='interactive' style='display:none'>
                     <div id='meta-equals-list' class='list'>
                         <div class='meta-equals list-item'>
@@ -674,15 +734,15 @@ $(document).ready(function() {
                 </div>
                 <div class='description on-newline'>
                     <p>The search can be constrained to only the samples that are
-                    annotated with a specific value of an ISA field.</p>
-                    <p>Under view levels &quot;assays&quot; and &quot;samples&quot;,
-                    the values of this field will be reported in table columns.</p>
-                    <i>Example:</i>&nbsp;&nbsp;<a href="$URL_ROOT/samples/?study.characteristics.genotype=WT"><code>/samples/?<b>study.characteristics.genotype=WT</b></code></a><br>
-                    <i>Example:</i>&nbsp;&nbsp;<a href="$URL_ROOT/samples/?study.characteristics.genotype=WT|TK6"><code>/samples/?<b>study.characteristics.genotype=WT|TK6</b></code></a>
+                    annotated with a specific <b>value</b> of an ISA field.</p>
+                    <ul><li>Under view levels &quot;assays&quot; and &quot;samples&quot;,
+                    the values of this field will be reported in table columns.</li></ul>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.characteristics.genotype=WT'><code>/samples/?<b>study.characteristics.genotype=WT</b></code></a><br>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.characteristics.genotype=WT|TK6'><code>/samples/?<b>study.characteristics.genotype=WT|TK6</b></code></a>
                 </div>
             </div>
             <div>
-                <div><b><strong>Files or data</strong> to retrieve:</b></div><br>
+                <div><a name='files'><b>Retrieval of <strong>files or data</strong></b></a></div><br>
                 <div class='interactive' style='display:none'>
                     <div id='meta-file-filename-pseudo-list' class='list'>
                         <div class='meta-file-filename-pseudo list-item'>
@@ -719,22 +779,23 @@ $(document).ready(function() {
                     </div>
                 </div>
                 <div class='description on-newline'>
-                    <p>For the resultant queried datasets, assays, and samples,
-                    there may be files associated. All files with recognized datatypes
-                    can be queried by passing <code>file.datatype</code>.</p>
-                    <p>The query can be constrained to files of particular datatypes
-                    by specifying these datatypes in the query (<code>file.datatype=pca</code>).</p>
-                    <p>Finally, the query can be constrained by specifying a full file name
-                    of interest or a regular expression pattern enclosed in forward slashes.</p>
+                    <p>For the resultant queried datasets, assays, and samples, there may be files associated.</b>
+                    <ul>
+                        <li>All files with recognized datatypes can be queried by passing <code>file.datatype</code>.</li>
+                        <li>The query can be constrained to files of particular datatypes
+                        by specifying these datatypes in the query (<code>file.datatype=pca</code>).</li>
+                        <li>Finally, the query can be constrained by specifying a full file name
+                        of interest or a regular expression pattern enclosed in forward slashes.</li>
+                    </ul>
                     <i>Examples:</i><br>
-                    <a href="$URL_ROOT/samples/?file.datatype"><code>/samples/?<b>file.datatype</b></code></a><br>
-                    <a href="$URL_ROOT/samples/?file.datatype=differential expression"><code>/samples/?<b>file.datatype=differential expression</b></code></a><br>
-                    <a href="$URL_ROOT/samples/?file.datatype=visualization table|pca"><code>/samples/?<b>file.datatype=visualization table|pca</b></code></a><br>
-                    <a href="$URL_ROOT/samples/?file.filename=/trimmed\.fastq\.gz$/"><code>/samples/?<b>file.filename=/trimmed\.fastq\.gz$/</b></code></a>
+                    <a target='_blank' href='$URL_ROOT/samples/?file.datatype'><code>/samples/?<b>file.datatype</b></code></a><br>
+                    <a target='_blank' href='$URL_ROOT/samples/?file.datatype=differential expression'><code>/samples/?<b>file.datatype=differential expression</b></code></a><br>
+                    <a target='_blank' href='$URL_ROOT/samples/?file.datatype=visualization table|pca'><code>/samples/?<b>file.datatype=visualization table|pca</b></code></a><br>
+                    <a target='_blank' href='$URL_ROOT/samples/?file.filename=/trimmed\.fastq\.gz$/'><code>/samples/?<b>file.filename=/trimmed\.fastq\.gz$/</b></code></a>
                 </div>
             </div>
             <div>
-                <div><b>Display in format:</b></div><br>
+                <div><a name='formats'><b>Display format</b></a></div><br>
                 <div class='interactive' style='display:none'>
                     <div id='meta-format-list' class='list'>
                         <div class='meta-format list-item'>
@@ -766,7 +827,156 @@ $(document).ready(function() {
                     </div>
                 </div>
                 <div class='description on-newline'>
-                    <p>Data returned for the query can be formatted in multiple ways.</p>
+                    <p>Data returned for the query can be formatted in multiple ways, depending on the output type.<br>
+                       Refer to the table below for a matrix of valid requested formats.</p>
+                    <p>Note that annotation columns only appear in the "assays" and "samples" views,
+                       while files are only sourced from for the "data" view.</p>
+                    <table id='formats-matrix'>
+                        <tr class='th' valign='top'>
+                            <td rowspan=2>View</td>
+                            <td rowspan=2>Number&nbsp;of<br>annotation&nbsp;columns<br>in&nbsp;output</td>
+                            <td rowspan=2>Number&nbsp;of&nbsp;files<br>data&nbsp;is<br>sourced&nbsp;from</td>
+                            <td rowspan=2>Resultant<br>output&nbsp;type</td>
+                            <td colspan=7>&amp;format=</td><td colspan=2>&amp;schema=</td>
+                        </tr>
+                        <tr class='th' valign='bottom'>
+                            <td>csv<sup>*</sup></td><td>tsv</td><td>json</td><td>browser</td><td>raw</td>
+                            <td>cls</td><td>gct</td><td>0<sup>*</sup></td><td>1</td>
+                        </tr>
+                        <tr>
+                            <td>/assays/</td><td>1</td><td></td><td>table</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td>
+                            <td class='n'>no</td><td class='y'>yes</td><td class='n'>no</td><td class='y'>yes</td>
+                            <td class='y'>yes</td>
+                        </tr>
+                        <tr>
+                            <td>/assays/</td><td>&gt;1</td><td></td><td>table</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td>
+                            <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><td class='y'>yes</td>
+                            <td class='y'>yes</td>
+                        </tr>
+                        <tr>
+                            <td>/samples/</td><td>1</td><td></td><td>table</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td>
+                            <td class='n'>no</td><td class='y'>yes</td><td class='n'>no</td><td class='y'>yes</td>
+                            <td class='y'>yes</td>
+                        </tr>
+                        <tr>
+                            <td>/samples/</td><td>&gt;1</td><td></td><td>table</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td>
+                            <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><td class='y'>yes</td>
+                            <td class='y'>yes</td>
+                        </tr>
+                        <tr valign='bottom'>
+                            <td>/data/</td><td></td><td>1</td><td>table</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td>
+                            <td class='y'>yes</td><td class='n'>no</td><td class='m'>maybe<sup>1</sup></td>
+                            <td class='y'>yes</td><td class='y'>yes</td>
+                        </tr>
+                        <tr valign='bottom'>
+                            <td>/data/</td><td></td><td>&gt;1</td><td>table</td>
+                            <td class='m'>maybe<sup>2</sup></td><td class='m'>maybe<sup>2</sup></td>
+                            <td class='m'>maybe<sup>2</sup></td><td class='m'>maybe<sup>2</sup></td>
+                            <td class='n'>no</td><td class='n'>no</td><td class='m'>maybe<sup>1,2</sup></td>
+                            <td class='m'>maybe<sup>2</sup></td><td class='m'>maybe<sup>2</sup></td>
+                        </tr>
+                        <tr>
+                            <td>/data/</td><td></td><td>1</td><td>other</td>
+                            <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><td class='n'>no</td>
+                            <td class='y'>yes</td><td class='n'>no</td><td class='n'>no</td><td class='n'>no</td>
+                            <td class='n'>no</td>
+                        </tr>
+                        <tr>
+                            <td>/data/</td><td></td><td>&gt;1</td><td>other</td>
+                            <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><td class='n'>no</td>
+                            <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><td class='n'>no</td>
+                            <td class='n'>no</td>
+                        </tr>
+                    </table>
+                    <span class='footnotes' style='font-size: 9pt'>
+                        <sup>*</sup> Default<br>
+                        <sup>1</sup> Only for transcription data<br>
+                        <sup>2</sup> Only for data that can be merged across assays (currently only transcription data)
+                    </span>
+                    <ul><li>Character-separated formats (<code>&amp;format=csv</code>, <code>&amp;format=tsv</code>):
+                        <ul>
+                            <li>Tabular results can be represented in comma-separated (CSV) or tab-separated (TSV) formats.</li>
+                            <li>Header lines (column names) are preceded with a hash sign (<code>&#x23;</code>):
+                                <ul>
+                                    <li>
+                                        Metadata headers (i.e., for views "assays" and "samples") contain two levels of column names:
+                                        <ul>
+                                            <li>The bottom one is the target nested field</li>
+                                            <li>
+                                                The top one is the preceding nested fields, joined by a period, e.g.:<br>
+                                                <code>id &rarr; accession</code>, <code>study.characteristics &rarr; age</code>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        Headers of tabular data (for view "data") contain three levels of column names,
+                                        from top to bottom:
+                                        <ul>
+                                            <li>Accession (e.g., <code>GLDS-1</code>)</li>
+                                            <li>Assay name (e.g., <code>E-GEOD-53196_GeneChip_assay</code>)</li>
+                                            <li>Sample name (e.g., <code>Dmel_OR_wo_FLT_uninfd_Rep1</code>)</li>
+                                        </ul>
+                                        Thus, the header corresponds to the leftmost three columns of the "samples" view.
+                                    </li>
+                                </ul>
+                            </li>
+                            <li>In all remaining lines,
+                                <ul>
+                                    <li>string values are always quoted in double quotes (<code>&quot;</code>),</li>
+                                    <li>numeric and boolean values are never quoted,</li>
+                                    <li>and missing values are always displayed as <code>NaN</code> (unquoted).</li>
+                                </ul>
+                            </li>
+                        </ul>
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&format=tsv'>
+                            <code>/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&<b>format=tsv</b></code></a><br>
+                    </li></ul>
+                    <ul><li>JSON format (<code>&amp;format=json</code>):
+                        <ul>
+                            <li>JSON-formatted output is derived from the tabular output in
+                                <a target='_blank' href='https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_json.html'>split orientation</a>,
+                                placing:
+                                <ul>
+                                    <li>column names under the "columns" key,</li>
+                                    <li>index names under the "index" key,</li>
+                                    <li>cell values under the "data" key,</li>
+                                    <li>and <b>additionally</b> providing the "meta" key with index names.</li>
+                                </ul>
+                            <li>String values are always quoted in double quotes (<code>&quot;</code>),</li>
+                            <li>numeric and boolean values are never quoted,</li>
+                            <li>and missing values are always displayed as <code>NaN</code> (unquoted).</li>
+                        </ul>
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor%20value.spaceflight&id=GLDS-15&format=json'>
+                            <code>/samples/?study.factor value.spaceflight&id=GLDS-15&<b>format=json</b></code></a><br>
+                    </li></ul>
+                    <ul><li>Browser (interactive) format (<code>&amp;format=browser</code>):
+                        <ul>
+                            <li>Tabular output can be displayed in interactive tables (this requires JavaScript support).</li>
+                            <li>Clicking on a bottom-level column name sorts the table by the values in the column;</li>
+                            <li>clicking on a file name prompts the download of said file;</li>
+                            <li>clicking on any other value subsets the query to that value.</li>
+                        </ul>
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor value.spaceflight&file.datatype&format=browser'>
+                            <code>/samples/?study.factor value.spaceflight&file.datatype&<b>format=browser</b></code></a><br>
+                    </li></ul>
+                    <ul><li>Raw format (<code>&amp;format=raw</code>):
+                        <ul>
+                            <li>Any <b>/data/</b> output (tabular or not) can be requested raw, i.e. exactly as it is stored in the
+                                <a target='_blank' href='https://genelab-data.ndc.nasa.gov/genelab/projects'>GeneLab database</a>.</li>
+                            <li>
+                                Such requests are possible if the query resolves to exactly one underlying file (e.g.
+                                if the request is for a specific file name, or for a single data type from a single assay, etc).</li>
+                        </ul>
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/data/?id=GLDS-4&file.filename=/.*normPCA.png$/&format=raw'>
+                            <code>/data/?id=GLDS-4&file.filename=/.*normPCA.png$/&<b>format=raw</b></code></a>
+                    </li></ul>
+
+
                     <p>If an annotation table is requested (as produced by views &quot;assays&quot;, &quot;samples&quot;)
                     formats <code>csv</code>, <code>tsv</code>, <code>json</code> are recommended for programmatic use,
                     and format <code>browser</code> for interactive inspection.<br>
@@ -783,13 +993,9 @@ $(document).ready(function() {
                     and instead exists as the only suitable format for requesting non-tabular data.
                     Note that currently it only resolves successfully if exactly one data file matches the query.</p>
                     <i>Examples:</i><br>
-                    <a href="$URL_ROOT/samples/?study.factor value.spaceflight&format=browser">
+                    <a target='_blank' href="$URL_ROOT/samples/?study.factor value.spaceflight&format=browser">
                         <code>/samples/?study.factor value.spaceflight&<b>format=browser</b></code></a><br>
-                    <a href="$URL_ROOT/samples/?study.factor value.spaceflight&format=json">
-                        <code>/samples/?study.factor value.spaceflight&<b>format=json</b></code></a><br>
-                    <a href="$URL_ROOT/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&format=tsv">
-                        <code>/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&<b>format=tsv</b></code></a><br>
-                    <a href="$URL_ROOT/data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&format=raw">
+                    <a target='_blank' href="$URL_ROOT/data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&format=raw">
                         <code>/data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&<b>format=raw</b></code></a>
                 </div>
             </div>
