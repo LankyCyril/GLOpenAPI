@@ -46,6 +46,7 @@
             a:hover code, a:hover code b {color: #D10 !important}
             li {margin-bottom: 3pt}
             ul ul {margin-top: 3pt}
+            ul#toc a {color: #44B !important}
             pre {font-family: "Oxygen Mono", monospace; font-size: 11pt;}
             img.example {width: 480pt; margin-top: 5pt; margin-bottom: 10pt; margin-left: 1cm}
             #url tt {font-family: "Oxygen Mono", monospace; font-size: 13pt; background: transparent}
@@ -440,12 +441,12 @@ function prefill_example() {
     $("select#view").append(option).val("");
 }
 
-//$(document).ready(function() {
-//    toggle_builder();
-//    refresh_dropdowns();
-//    refresh_event_handlers();
-//    prefill_example();
-//});
+$(document).ready(function() {
+    toggle_builder();
+    refresh_dropdowns();
+    refresh_event_handlers();
+    prefill_example();
+});
 
 </script>
     <body>
@@ -460,6 +461,30 @@ function prefill_example() {
                 </td>
             </tr>
         </table>
+        <h2>Table of contents</h2>
+        <ul id='toc'>
+            <li><a href='#syntax'>API syntax</a></li>
+            <li><a href='#components'>URL and query components</a><ul>
+                <li><a href='#view'>View level</a></li>
+                <li><a href='#ids'>Retrieval of entries from specific datasets and/or assays</a></li>
+                <li><a href='#categories'>Retrieval of entries with metadata categories</a></li>
+                <li><a href='#fields'>Retrieval of entries with metadata fields</a></li>
+                <li><a href='#fieldvalues'>Retrieval of entries with metadata field values</a></li>
+                <li><a href='#files'>Retrieval of files or data</a></li>
+                <li><a href='#formats'>Display formats</a><ul>
+                    <li>
+                        <a href='#csv'>csv</a> |
+                        <a href='#tsv'>tsv</a> |
+                        <a href='#json'>json</a> |
+                        <a href='#browser'>browser</a> |
+                        <a href='#raw'>raw</a> |
+                        <a href='#cls'>cls</a> |
+                        <a href='#gct'>gct</a>
+                    </li>
+                    <li><a href='#schema'>schema</a></li>
+                </ul></li>
+            </ul></li>
+        </ul>
         <a name='syntax'><h2>API syntax</h2></a>
         <div class='description' style='margin-bottom: 0; padding-bottom: 0'>
             <p>This API provides the means to query the
@@ -667,7 +692,7 @@ function prefill_example() {
                     <p>Information on all values under a given
                     <a target='_blank' href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab</a> category can be retrieved:</p>
                     <ul>
-                        <li>Querying directly by any of these <b>categories</b> (e.g., <code>assay.parameters</code>
+                        <li>Querying directly by any of these <b>categories</b> (e.g., <code>assay.parameters</code>)
                         will constrain the results to only the datasets, assays, and samples that have this category annotated.</li>
                         <li>Under view levels &quot;assays&quot; and &quot;samples&quot;,
                         the values of fields in the category will be reported in table columns.</li>
@@ -795,7 +820,7 @@ function prefill_example() {
                 </div>
             </div>
             <div>
-                <div><a name='formats'><b>Display format</b></a></div><br>
+                <div><a name='formats'><b>Display formats</b></a></div><br>
                 <div class='interactive' style='display:none'>
                     <div id='meta-format-list' class='list'>
                         <div class='meta-format list-item'>
@@ -895,16 +920,18 @@ function prefill_example() {
                     </table>
                     <span class='footnotes' style='font-size: 9pt'>
                         <sup>*</sup> Default<br>
-                        <sup>1</sup> Only for transcription data<br>
-                        <sup>2</sup> Only for data that can be merged across assays (currently only transcription data)
+                        <sup>1</sup> Only for transcription profiling data<br>
+                        <sup>2</sup> Only for data that can be merged across assays
+                            (currently only unnormalized counts RNA-seq data)
                     </span>
-                    <ul><li>Character-separated formats (<code>&amp;format=csv</code>, <code>&amp;format=tsv</code>):
+                    <ul><li><a name='csv'>Character-separated</a> <a name='tsv'>formats</a>
+                            (<code>&amp;format=csv</code>, <code>&amp;format=tsv</code>):
                         <ul>
                             <li>Tabular results can be represented in comma-separated (CSV) or tab-separated (TSV) formats.</li>
                             <li>Header lines (column names) are preceded with a hash sign (<code>&#x23;</code>):
                                 <ul>
                                     <li>
-                                        Metadata headers (i.e., for views "assays" and "samples") contain two levels of column names:
+                                        Annotation headers (i.e., for views "assays" and "samples") contain two levels of column names:
                                         <ul>
                                             <li>The bottom one is the target nested field</li>
                                             <li>
@@ -927,7 +954,7 @@ function prefill_example() {
                             </li>
                             <li>In all remaining lines,
                                 <ul>
-                                    <li>string values are always quoted in double quotes (<code>&quot;</code>),</li>
+                                    <li>string values are always quoted with double quotes (<code>&quot;value&quot;</code>),</li>
                                     <li>numeric and boolean values are never quoted,</li>
                                     <li>and missing values are always displayed as <code>NaN</code> (unquoted).</li>
                                 </ul>
@@ -936,7 +963,7 @@ function prefill_example() {
                         <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&format=tsv'>
                             <code>/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&<b>format=tsv</b></code></a><br>
                     </li></ul>
-                    <ul><li>JSON format (<code>&amp;format=json</code>):
+                    <ul><li><a name='json'>JSON format</a> (<code>&amp;format=json</code>):
                         <ul>
                             <li>JSON-formatted output is derived from the tabular output in
                                 <a target='_blank' href='https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_json.html'>split orientation</a>,
@@ -947,14 +974,14 @@ function prefill_example() {
                                     <li>cell values under the "data" key,</li>
                                     <li>and <b>additionally</b> providing the "meta" key with index names.</li>
                                 </ul>
-                            <li>String values are always quoted in double quotes (<code>&quot;</code>),</li>
+                            <li>String values are always quoted in double quotes (<code>&quot;value&quot;</code>),</li>
                             <li>numeric and boolean values are never quoted,</li>
                             <li>and missing values are always displayed as <code>NaN</code> (unquoted).</li>
                         </ul>
                         <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor%20value.spaceflight&id=GLDS-15&format=json'>
                             <code>/samples/?study.factor value.spaceflight&id=GLDS-15&<b>format=json</b></code></a><br>
                     </li></ul>
-                    <ul><li>Browser (interactive) format (<code>&amp;format=browser</code>):
+                    <ul><li><a name='browser'>Browser (interactive) format</a> (<code>&amp;format=browser</code>):
                         <ul>
                             <li>Tabular output can be displayed in interactive tables (this requires JavaScript support).</li>
                             <li>Clicking on a bottom-level column name sorts the table by the values in the column;</li>
@@ -964,7 +991,7 @@ function prefill_example() {
                         <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor value.spaceflight&file.datatype&format=browser'>
                             <code>/samples/?study.factor value.spaceflight&file.datatype&<b>format=browser</b></code></a><br>
                     </li></ul>
-                    <ul><li>Raw format (<code>&amp;format=raw</code>):
+                    <ul><li><a name='raw'>Raw format</a> (<code>&amp;format=raw</code>):
                         <ul>
                             <li>Any <b>/data/</b> output (tabular or not) can be requested raw, i.e. exactly as it is stored in the
                                 <a target='_blank' href='https://genelab-data.ndc.nasa.gov/genelab/projects'>GeneLab database</a>.</li>
@@ -975,32 +1002,46 @@ function prefill_example() {
                         <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/data/?id=GLDS-4&file.filename=/.*normPCA.png$/&format=raw'>
                             <code>/data/?id=GLDS-4&file.filename=/.*normPCA.png$/&<b>format=raw</b></code></a>
                     </li></ul>
-
-
-                    <p>If an annotation table is requested (as produced by views &quot;assays&quot;, &quot;samples&quot;)
-                    formats <code>csv</code>, <code>tsv</code>, <code>json</code> are recommended for programmatic use,
-                    and format <code>browser</code> for interactive inspection.<br>
-                    <code>schema=1</code> can be passed to output the schema of the tabular data instead.<br>
-                    In cases where exactly one annotation column is present (such as a factor value, a characteristic, etc)
-                    the <code>cls</code> format is also supported.</p>
-                    <p>If data is requested (view &quot;data&quot;) and is expected to be tabular
-                    (e.g., unnormalized counts, differential expression, etc),
-                    formats <code>csv</code>, <code>tsv</code>, <code>json</code> are recommended as well,
-                    and format <code>browser</code> is supported, but discouraged.
-                    For data types representable as GCT (RNA-Seq counts, microarray data),
-                    the <code>gct</code> format is also supported.</p>
-                    <p>The <code>raw</code> format is <i><u>not</u></i> supported for tabular data,
-                    and instead exists as the only suitable format for requesting non-tabular data.
-                    Note that currently it only resolves successfully if exactly one data file matches the query.</p>
-                    <i>Examples:</i><br>
-                    <a target='_blank' href="$URL_ROOT/samples/?study.factor value.spaceflight&format=browser">
-                        <code>/samples/?study.factor value.spaceflight&<b>format=browser</b></code></a><br>
-                    <a target='_blank' href="$URL_ROOT/data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&format=raw">
-                        <code>/data/?file.filename=/R1-FL-A1.*toTransc.*bam$/&id=GLDS-37&<b>format=raw</b></code></a>
+                    <ul><li><a name='cls'>CLS format</a> (<code>&amp;format=cls</code>):
+                        <ul>
+                            <li>Annotation output (from views "assays" and "samples") can be represented in the
+                                <a target='_blank' href='https://www.genepattern.org/file-formats-guide#CLS'>CLS</a> format
+                                if it contains exactly one non-<code>id</code> column
+                                (e.g., <code>study.factor value.genotype</code>).</li>
+                        </ul>
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor%20value.genotype&format=cls'>
+                            <code>/samples/?study.factor value.genotype&<b>format=cls</b></code></a><br>
+                    </li></ul>
+                    <ul><li><a name='gct'>GCT format</a> (<code>&amp;format=gct</code>):
+                        <ul>
+                            <li>Data output (from the "data" view) can be represented in the
+                                <a target='_blank' href='https://www.genepattern.org/file-formats-guide#GCT'>GCT</a> format
+                                if it contains transcriptomics data (i.e., microarrays or RNA-seq counts);</li>
+                            <li>in the output, the <code>id</code> information (accession, assay name, sample name)
+                                is joined with a forward slash&nbsp;(<code>/</code>).
+                        </ul>
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/data/?file.datatype=normalized%20counts&id=GLDS-38&format=gct'>
+                            <code>/data/?file.datatype=normalized counts&id=GLDS-38&<b>format=gct</b></code></a><br>
+                    </li></ul>
+                    <ul><li><a name='schema'>Schema</a> (<code>&amp;schema=1</code>):
+                        <ul>
+                            <li>Rather than retrieving the entire table, a description of tabular data can be requested.</li>
+                            <li>
+                                The output contains the same header as the full table, followed by a single row, where each cell
+                                contains a string of form <code>type[(minimum)..(maximum)|NaN]</code>.
+                                <ul>
+                                    <li>If <code>type</code> is "str", minima and maxima are omitted;</li>
+                                    <li>if the column does not have any missing values, <code>NaN</code> is omitted.</li>
+                                </ul>
+                            </li>
+                        </ul>
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/data/?id=GLDS-4&file.datatype=differential%20expression&format=browser&schema=1'>
+                            <code>/data/?id=GLDS-4&file.datatype=differential%20expression&format=browser&<b>schema=1</b></code></a><br>
+                    </li></ul>
                 </div>
             </div>
             <!--DEBUG <div>
-                <div><b>Debug:</b></div><br>
+                <div><b>Debug</b></div><br>
                 <div class='interactive' style='display:none'>
                     <div id='meta-debug-list' class='list'>
                         <div class='meta-debug list-item'>
@@ -1012,6 +1053,10 @@ function prefill_example() {
                             </select>
                         </div>
                     </div>
+                </div>
+                <div class='description on-newline'>
+                    <p>This option is only available in debug mode (development, testing, staging environments).<br>
+                       Add <code>&debug=1</code> to force the API to return its interpretation of the query.</p>
                 </div>
             </div> DEBUG-->
         </div>
