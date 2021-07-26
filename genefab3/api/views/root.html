@@ -11,10 +11,8 @@
             a:not([name]) {cursor: pointer; color: #C10; text-decoration: none}
             a[target="_blank"]:not([name]) {white-space: nowrap}
             a[target="_blank"]:not([name]):after {
-                content: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAQElEQVR42qXKwQkAIAxDUUdxtO6/RBQkQZvSi8I/pL4BoGw/XPkh4XigPmsUgh0626AjRsgxHTkUThsG2T/sIlzdTsp52kSS1wAAAABJRU5ErkJggg==);
-                margin: 0 3px 0 2px; position: relative; top: -2pt;
-                filter: contrast(0) drop-shadow(1pt 1pt 0 #D10);
-                display: inline;
+                content: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKAgMAAADwXCcuAAAADFBMVEX///8AAACSAADdEQB+qjB2AAAAJUlEQVQIHWNg4P/A8J/hA8MBZgOGAzxAbMDAcOAAECPB//8PAAAB+w6MxfUpBgAAACNhbFBoeNpjYACB/1AAZTNABBmgrP8MUBacgIvDFGJjwQ0FALj/It69h6uYAAAAAElFTkSuQmCC);
+                display: inline; margin: 0 2pt; position: relative; top: -.8pt;
             }
             a:not([name]):hover {text-decoration: underline}
             b {font-weight: 500}
@@ -80,6 +78,8 @@
             table#formats-matrix td.n {color: #D10}
             table#formats-matrix tr.th td {font-weight: bold}
             table#formats-matrix sup, .footnotes sup {font-size: 8pt !important}
+            #forkme {display: inline-block; padding: 3pt; margin-top: 8pt; border: 1px solid #AAA; background-color: #CDF; filter: saturate(50%)}
+            #forkme, #forkme * {font-size: 11pt !important}
             #footer {margin-top: 24pt; height: 2.5in; max-height: 2.5in; background: #DDD; color: #555}
             #footer table, #footer table * {border: 0; line-height: 1.6; font-size: 11pt}
             #footer table td {vertical-align: top; padding-top: .15in}
@@ -1078,6 +1078,10 @@ $(document).ready(function() {
                        Add <code>&debug=1</code> to force the API to return its interpretation of the query.</p>
                 </div>
             </div> DEBUG-->
+        </div>
+        <div id='forkme'>
+            API source code on GitHub: <a href='https://github.com/lankycyril/genefab3'>github.com/lankycyril/genefab3</a><br>
+            Kirill Grigorev | <a href='https://masonlab.net'>The Mason Lab</a> | <a href='https://med.cornell.edu'>Weill Cornell Medicine</a>
         </div>
         <div id='footer'>
             <table style='width: 95%'><tr>
