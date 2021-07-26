@@ -16,7 +16,7 @@
                 filter: contrast(0) drop-shadow(1pt 1pt 0 #D10);
                 display: inline;
             }
-            a:not([name]):hover {text-decoration: underline; cursor: pointer}
+            a:not([name]):hover {text-decoration: underline}
             b {font-weight: 500}
             strong {color: #00A; font-weight: 500}
             em {font-style: normal; color: black; font-family: "Oxygen Mono", monospace; font-size: 12pt}
@@ -324,30 +324,25 @@ function toggle_builder() {
     $(".interactive").show();
     $(".on-newline").css("display", "block");
     $("#noscript").hide();
-    $("#url-builder").css("position", "static");
-    var y_offset = document.getElementById("url-builder").offsetHeight;
-    setTimeout(
-        function () {
-            $("a").each(function () {
-                if ($(this).is("[href]")) {
-                    if ($(this).attr("href").substring(0, 1) === "#") {
-                        var target = $(this).attr("href").substring(1);
+    $("a").each(function () {
+        if ($(this).is("[href]")) {
+            if ($(this).attr("href").substring(0, 1) === "#") {
+                var target = $(this).attr("href").substring(1);
+                $(this).removeAttr("href");
+                $(this).click(function () {
+                    $("#url-builder").css("position", "static");
+                    setTimeout(function () {
                         var y_to = $("a[name='"+target+"']").offset().top;
-                        $(this).removeAttr("href");
-                        $(this).click(function () {
-                            $("#url-builder").css("position", "static");
-                            window.scrollTo(0, y_to +  - y_offset);
-                            setTimeout(function () {
-                                $("#url-builder").css("position", "sticky")
-                            }, 100);
-                        });
-                    }
-                }
-            })
-        },
-        100
-    )
-    $("#url-builder").css("position", "sticky");
+                        var urlbuilder = document.getElementById("url-builder");
+                        window.scrollTo(0, y_to - urlbuilder.offsetHeight);
+                        setTimeout(function () {
+                            $("#url-builder").css("position", "sticky")
+                        }, 100);
+                    }, 10);
+                });
+            }
+        }
+    })
 }
 
 function set_default_repr_of_remover_ors() {
