@@ -1,35 +1,47 @@
 from threading import Thread
 from genefab3.db.sql.response_cache import ResponseCache
+from time import sleep
 from genefab3.common.exceptions import GeneFabLogger
 from genefab3.db.mongo.index import ensure_info_index
-from genefab3.db.mongo.index import update_metadata_value_lookup
-from time import sleep
 from collections import OrderedDict
+from genefab3.db.mongo.index import update_metadata_value_lookup
 from genefab3.db.mongo.utils import iterate_mongo_connections
 from genefab3.db.mongo.types import ValueCheckedRecord
 from genefab3.isa.types import Dataset
 from genefab3.db.mongo.utils import run_mongo_action, harmonize_document
-from genefab3.db.mongo.status import drop_status, update_status
+from genefab3.db.mongo.status import update_status
 
 
-class CacherThread(Thread):
+class MetadataCacherThread(Thread):
     """Lives in background and keeps local metadata cache, metadata index, and response cache up to date"""
     CLIENT_ATTRIBUTES_TO_COPY = (
       "adapter", "mongo_collections", "locale", "sqlite_dbs", "units_formatter",
     )
  
-    def __init__(self, *, genefab3_client, metadata_update_interval, metadata_retry_delay):
+    def __init__(self, *, genefab3_client, full_update_interval, full_update_retry_delay, dataset_init_interval, dataset_update_interval):
         """Prepare background thread that iteratively watches for changes to datasets"""
         self.genefab3_client = genefab3_client
-        _id = genefab3_client.mongo_appname.replace("GeneFab3", "CacherThread")
-        self._id = _id
+        self._id = genefab3_client.mongo_appname.replace(
+            "GeneFab3", "MetadataCacherThread",
+        )
         for attr in self.CLIENT_ATTRIBUTES_TO_COPY:
             setattr(self, attr, getattr(genefab3_client, attr))
-        self.metadata_update_interval = metadata_update_interval
-        self.metadata_retry_delay = metadata_retry_delay
+        self.full_update_interval = full_update_interval
+        self.full_update_retry_delay = full_update_retry_delay
+        self.dataset_init_interval = dataset_init_interval
+        self.dataset_update_interval = dataset_update_interval
         self.response_cache = ResponseCache(self.sqlite_dbs)
         self.status_kwargs = dict(collection=self.mongo_collections.status)
         super().__init__()
+ 
+    def delay(self, timeout, desc=None):
+        """Sleep for `timeout` seconds, reporting via GeneFabLogger.info()"""
+        if desc:
+            msg = f"Sleeping for {timeout} seconds before {desc}"
+        else:
+            msg = f"Sleeping for {timeout} seconds"
+        GeneFabLogger.info(f"{self._id}:\n  {msg}")
+        sleep(timeout)
  
     def run(self):
         """Continuously run MongoDB and SQLite3 cachers"""
@@ -37,46 +49,54 @@ class CacherThread(Thread):
             ensure_info_index(self.mongo_collections, self.locale)
             accessions, success = self.recache_metadata()
             if success:
-                update_metadata_value_lookup(self.mongo_collections, self._id)
                 if accessions["updated"]:
                     self.response_cache.drop_all()
                 else:
                     for acc in accessions["failed"] | accessions["dropped"]:
                         self.response_cache.drop(acc)
                 self.response_cache.shrink()
-                delay = self.metadata_update_interval
+                self.delay(self.full_update_interval, "full metadata update")
             else:
-                delay = self.metadata_retry_delay
-            GeneFabLogger.info(f"{self._id}:\n  Sleeping for {delay} seconds")
-            sleep(delay)
+                msg = "retrying connection for metadata update"
+                self.delay(self.full_update_retry_delay, msg)
+ 
+    def get_accession_dispatcher(self):
+        """Return dict of sets of accessions; populates: 'cached', 'live'; prepares empty: 'fresh', 'updated', 'stale', 'dropped', 'failed'"""
+        GeneFabLogger.info(f"{self._id}:\n  Checking metadata cache")
+        collection = self.mongo_collections.metadata
+        return OrderedDict(
+            cached=set(collection.distinct("id.accession")),
+            live=set(self.adapter.get_accessions()), fresh=set(),
+            updated=set(), stale=set(), dropped=set(), failed=set(),
+        )
  
     def recache_metadata(self):
         """Instantiate each available dataset; if contents changed, dataset automatically updates db.metadata"""
-        GeneFabLogger.info(f"{self._id}:\n  Checking metadata cache")
         try:
-            collection = self.mongo_collections.metadata
-            accessions = OrderedDict(
-                cached=set(collection.distinct("id.accession")),
-                live=set(self.adapter.get_accessions()), fresh=set(),
-                updated=set(), stale=set(), dropped=set(), failed=set(),
-            )
+            accessions = self.get_accession_dispatcher()
         except Exception as e:
             GeneFabLogger.error(f"{self._id}:\n  {e!r}", exc_info=e)
             return None, False
-        def _iterate():
-            for a in accessions["cached"] - accessions["live"]:
-                yield (a, *self.drop_single_dataset_metadata(a))
-            for a in accessions["live"]:
-                has_cache = a in accessions["cached"]
-                yield (a, *self.recache_single_dataset_metadata(a, has_cache))
-        for accession, key, report, error in _iterate():
-            accessions[key].add(accession)
+        def _iterate_with_delay():
+            for acc in accessions["cached"] - accessions["live"]:
+                yield (acc, *self.drop_single_dataset_metadata(acc))
+            update_metadata_value_lookup(self.mongo_collections, self._id)
+            for acc in accessions["live"] - accessions["cached"]:
+                msg = f"retrieving metadata for new dataset {acc}"
+                self.delay(self.dataset_init_interval, msg)
+                yield (acc, *self.recache_single_dataset_metadata(acc, False))
+            update_metadata_value_lookup(self.mongo_collections, self._id)
+            for acc in accessions["live"] & accessions["cached"]:
+                msg = f"updating cached metadata for dataset {acc}"
+                self.delay(self.dataset_update_interval, msg)
+                yield (acc, *self.recache_single_dataset_metadata(acc, True))
+            update_metadata_value_lookup(self.mongo_collections, self._id)
+        for acc, key, report, error in _iterate_with_delay():
+            accessions[key].add(acc)
             _kws = dict(
-                **self.status_kwargs, status=key, accession=accession,
-                prefix=self._id, info=f"{accession} {report}", error=error,
+                **self.status_kwargs, status=key, accession=acc,
+                prefix=self._id, info=f"{acc} {report}", error=error,
             )
-            if key in {"dropped", "failed"}:
-                drop_status(**_kws)
             update_status(**_kws)
             mongo_client = self.genefab3_client.mongo_client
             n_apps = sum(1 for _ in iterate_mongo_connections(mongo_client))

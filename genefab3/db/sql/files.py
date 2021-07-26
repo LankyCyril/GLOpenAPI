@@ -178,7 +178,7 @@ class CachedTableFile(SQLiteTable):
                 except (OperationalError, PandasDatabaseError, ValueError) as e:
                     msg = "Failed to insert SQL chunk or chunk part"
                     _kw = dict(name=self.name, debug_info=repr(e))
-                    raise GeneFabDatabaseException(msg, name=self.name)
+                    raise GeneFabDatabaseException(msg, **_kw)
             execute(f"""INSERT INTO `{self.aux_table}`
                 (`table`,`timestamp`,`retrieved_at`) VALUES(?,?,?)""", [
                 self.table, self.timestamp, int(datetime.now().timestamp()),

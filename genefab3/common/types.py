@@ -17,6 +17,7 @@ class ExtNaN(float):
     def __eq__(self, other): return False
     def __lt__(self, other): return not isinstance(other, float)
     def __gt__(self, other): return False
+    def __hash__(self): return hash(float("nan"))
 NaN = ExtNaN()
 
 
@@ -40,7 +41,7 @@ class StringIterator():
 
 
 class Adapter():
-    """Base class for database adapters"""
+    """Base class for database adapters""" # TODO: documentation for `get_accessions` and `get_files_by_accession`
  
     def __init__(self):
         """Validate subclassed Adapter"""

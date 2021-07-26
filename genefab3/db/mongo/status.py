@@ -21,6 +21,11 @@ def drop_status(collection, prefix="Status update", accession=None, status=None,
 
 def update_status(collection, prefix="Status update", report_type=None, accession=None, assay_name=None, sample_name=None, status=None, info=None, warning=None, error=None, **kwargs):
     """Update status of dataset (and, optionally, assay/sample) in `collection`, log with logger"""
+    if status in {"dropped", "failed"}:
+        drop_status(
+            collection=collection, prefix=prefix, accession=accession,
+            status=status, info=info, warning=warning, error=error, **kwargs,
+        )
     query = {
         "status": status, "report type": report_type or (
             "dataset status" if sample_name is None else "parser message"

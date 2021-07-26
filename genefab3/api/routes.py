@@ -37,6 +37,13 @@ class DefaultRoutes(Routes):
             context=context,
         )
  
+    @Routes.register_endpoint("/images/<filename>")
+    def image(self, filename, context=None):
+        return views.static.get(
+            directory="images", filename=filename,
+            mode="rb", mimetype="image/png",
+        )
+ 
     @Routes.register_endpoint()
     def status(self, context=None):
         return views.status.get(
