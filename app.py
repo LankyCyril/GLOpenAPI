@@ -11,7 +11,7 @@ GiB = 1024**3
 # - Must be defined in the global scope, i.e. right here, even though all we are
 #   doing later is passing `flask_app` to `GeneFabClient` via `flask_params`.
 #   Defining it in the global scope is meant to accommodate the standard ways of
-#   setting up the server, e.g. through wsgi, because the loaders there rely on
+#   setting up the server and testing the app, because loaders usually rely on
 #   importing the app variable from this file.
 # - The name of the Flask app will be used in the header of the landing page.
 
@@ -54,29 +54,35 @@ genefab3_client = GeneFabClient(
     ),
     sqlite_params=dict( # the SQLite databases are LRU if capped by `maxsize`:
         blobs=dict(
-            # the blobs database stores up-to-date ISA data and is required:
-            db="./.genefab3.sqlite3/blobs.db", maxsize=None,
+            db="./.genefab3.sqlite3/blobs.db", maxsize=None, # required;
+                # stores up-to-date ISA data
         ),
         tables=dict(
-            # the tables database stores cacheable tabular data and is required:
-            db="./.genefab3.sqlite3/tables.db", maxsize=48*GiB,
+            db="./.genefab3.sqlite3/tables.db", maxsize=48*GiB, # required;
+                # stores cacheable tabular data
         ),
         response_cache=dict(
-            # the response_cache caches displayable results of user requests
-            # until the (meta)data changes; optional, pass `db=None` to disable:
             db="./.genefab3.sqlite3/response-cache.db", maxsize=24*GiB,
+                # optional, pass `db=None` to disable; caches displayable
+                # results of user requests until the (meta)data changes
         ),
     ),
     metadata_cacher_params=dict(
         enabled=True,
-        # seconds between full update cycles:
-        full_update_interval=21600,
-        # seconds before retrying full update cycle if server unreachable:
-        full_update_retry_delay=600,
-        # seconds between adding datasets that have not been previously cached:
-        dataset_init_interval=3,
-        # seconds between updating datasets that have (potentially stale) cache:
-        dataset_update_interval=60,
+        dataset_init_interval=3, # seconds between adding datasets that have not
+            # been previously cached
+        dataset_update_interval=60, # seconds between updating datasets that
+            # have (potentially stale) cache
+        full_update_interval=0, # seconds between full update cycles;
+            # each update cycle already takes at least
+            # `dataset_update_interval * n_datasets_in_local_database` seconds,
+            # and on average the app will only ping the backing cold storage
+            # approximately once every `dataset_update_interval` seconds;
+            # therefore, the value of `full_update_interval` can be as low as 0,
+            # but if you want the cacher to additionally sleep between these
+            # cycles, set this value to whatever you like
+        full_update_retry_delay=600, # seconds before retrying the full update
+            # cycle if the cold storage server was unreachable
     ),
     flask_params=dict(
         app=flask_app,
