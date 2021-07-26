@@ -23,7 +23,7 @@
             em.remover, em.remover-or {color: #D10; cursor: pointer; border-bottom: 1pt dashed #D10}
             label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
             select {margin: 1pt 0; min-width: 120pt; max-width: 120pt; overflow: hidden; text-overflow: ellipsis; white-space: nowrap}
-            b.header {font-size: 24pt; font-weight: 500}
+            b.header {font-size: 24pt; font-weight: 500; white-space: nowrap; margin: 0 16pt}
             h2 {font-size: 20pt; font-weight: 500; display: block; margin: 10pt 0}
             div.description {max-width: 640pt; padding-bottom: 7pt}
             #url-builder {position: sticky; top: 0pt; background: #FFFFFFEE; border-top: 4pt solid #FFFFFFEE; z-index: 8}
@@ -479,7 +479,7 @@ $(document).ready(function() {
                 <td style='width: 260pt'>
                     <img src='https://genelab-data.ndc.nasa.gov/genelab/img/nasa-genelab-logo.png' style='height: 50pt'>
                 </td>
-                <td><b class='header'>NASA GeneLab Data API</b></td>
+                <td><b class='header'>$APPNAME</b></td>
                 <td style='width: 126pt; text-align: right'>
                     <img src='https://genelab-data.ndc.nasa.gov/genelab/img/nasa_logo.png' style='height: 50pt'>
                 </td>
