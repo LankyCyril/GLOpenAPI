@@ -77,18 +77,18 @@
             table#formats-matrix td.m {color: #890}
             table#formats-matrix td.n {color: #D10}
             table#formats-matrix tr.th td {font-weight: bold}
+            table#formats-matrix tr.th-upper td {vertical-align: top}
+            table#formats-matrix tr.th-lower td {vertical-align: bottom}
             table#formats-matrix sup, .footnotes sup {font-size: 8pt !important}
-            #forkme {display: inline-block; padding: 3pt; margin-top: 8pt; border: 1px solid #AAA; background-color: #CDF; filter: saturate(50%)}
-            #forkme, #forkme * {font-size: 11pt !important}
-            #footer {margin-top: 24pt; height: 2.5in; max-height: 2.5in; background: #DDD; color: #555}
-            #footer table, #footer table * {border: 0; line-height: 1.6; font-size: 11pt}
-            #footer table td {vertical-align: top; padding-top: .15in}
-            #footer img {height: 2.2in; width: 2.2in; padding-left: .15in; padding-bottom: .15in}
-            #footer b.h3 {display: inline-block; transform: scale(1,1.25); margin-bottom: 4pt}
-            #subfooter {text-align: center; width: 95; color: #555; margin-top: 8pt; font-size: 9pt}
-            #footer a {color: #555; font-size: 11pt}
-            #subfooter a {color: #555; font-size: 9pt}
-            #footer a:hover, #subfooter a:hover {color: #D10; text-decoration: underline}
+            .footer {background: #DDD; color: #555; font-size: 11pt !important}
+            .footer table, .footer table * {border: 0; line-height: 1.6; font-size: 11pt}
+            .footer table td {vertical-align: top; padding-top: .15in}
+            .footer img {height: 2.2in; width: 2.2in; padding-left: .15in; padding-bottom: .15in}
+            .footer b.h3 {display: inline-block; transform: scale(1,1.25); margin-bottom: 4pt}
+            .footer a {color: #555; font-size: 11pt}
+            .subfooter {text-align: center; width: 95; color: #555; margin-top: 8pt; font-size: 9pt}
+            .subfooter a {color: #555; font-size: 9pt}
+            .footer a:hover, .subfooter a:hover {color: #D10; text-decoration: underline}
         </style>
     </head>
 <script src='$URL_ROOT/libs/js/jquery-3.6.0.slim.min.js'></script>
@@ -541,10 +541,11 @@ $(document).ready(function() {
                    filename &rarr; GLDS-239_rna_seq_Normalized_Counts.csv
             </pre>
             <ul style='margin-top: -10pt'>
-                <li>The <code>"id"</code> category always contains fields <code>"accession"</code>,
-                    <code>"assay name"</code>, <code>"sample name"</code>.</li>
-                <li>Categories <code>"investigation"</code>, <code>"study"</code>, <code>"assay"</code> are organized
-                    according to the <a target='_blank' href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab model</a>,
+                <li>The <code>&quot;id&quot;</code> category always contains fields <code>&quot;accession&quot;</code>,
+                    <code>&quot;assay name&quot;</code>, <code>&quot;sample name&quot;</code>.</li>
+                <li>Categories <code>&quot;investigation&quot;</code>, <code>&quot;study&quot;</code>,
+                    <code>&quot;assay&quot;</code> are organized according to the
+                    <a target='_blank' href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab model</a>,
                     and subsequently may contain the following fields, each of which may contain further nested subfields:
                     <pre style='margin-left: -145pt; margin-top: 6pt'>
                       investigation &#x21B4;
@@ -570,8 +571,9 @@ $(document).ready(function() {
                                             ...
                     </pre>
                     </li>
-                <li style='margin-top: -14pt'>The <code>"file"</code> category contains fields <code>"filename"</code>,
-                    <code>"datatype"</code> and represents the information about the file(s) associated with a given sample.</li>
+                <li style='margin-top: -14pt'>The <code>&quot;file&quot;</code> category contains fields
+                    <code>&quot;filename&quot;</code>, <code>&quot;datatype&quot;</code> and represents the information
+                    about the file(s) associated with a given sample.</li>
             </ul>
             <p style='margin-bottom: 25pt'>Names of categories and nested fields can be joined with a period
                 (<code>.</code>) to form queries.<br>
@@ -628,7 +630,7 @@ $(document).ready(function() {
                             The <b>&quot;samples&quot;</b> view generates annotation (metadata) tables;
                             each column represents a property (such as a factor value), and
                             each row represents one sample, followed by its property values.
-                            <ul><li>The output format is identical to the "assays" view</li></ul>
+                            <ul><li>The output format is identical to the &quot;assays&quot; view</li></ul>
                             <img class='example' src='/images/samples-example.png'>
                         </li>
                         <li>
@@ -643,7 +645,8 @@ $(document).ready(function() {
                                         <li>Assay name (e.g., <code>E-GEOD-53196_GeneChip_assay</code>)</li>
                                         <li>Sample name (e.g., <code>Dmel_OR_wo_FLT_uninfd_Rep1</code>)</li>
                                     </ul>
-                                    Thus, the header corresponds to the leftmost three columns of the "samples" view.
+                                    Thus, the header corresponds to the leftmost three columns (index)
+                                    of the &quot;samples&quot; view.
                                 </li>
                                 <img class='example' style='margin-left: 0 !important' src='/images/data-example.png'>
                                 <li>
@@ -793,7 +796,7 @@ $(document).ready(function() {
                             <input type='checkbox'>
                             <em class='key'>&amp;</em>
                             <em class='key included-key'>file.filename=</em>
-                            <input class='value-level level-0' value="/.*/" type="text"></input>
+                            <input class='value-level level-0' value='/.*/' type='text'></input>
                         </div>
                     </div>
                 </div>
@@ -873,17 +876,17 @@ $(document).ready(function() {
                 <div class='description on-newline'>
                     <p>Data returned for the query can be formatted in multiple ways, depending on the output type.<br>
                        Refer to the table below for a matrix of valid requested formats.</p>
-                    <p>Note that annotation columns only appear in the "assays" and "samples" views,
-                       while files are only sourced from for the "data" view.</p>
+                    <p>Note that annotation columns only appear in the &quot;assays&quot; and &quot;samples&quot; views,
+                       while files are only sourced from for the &quot;data&quot; view.</p>
                     <table id='formats-matrix'>
-                        <tr class='th' valign='top'>
-                            <td rowspan=2>View</td>
-                            <td rowspan=2>Number&nbsp;of<br>annotation&nbsp;columns<br>in&nbsp;output</td>
-                            <td rowspan=2>Number&nbsp;of&nbsp;files<br>data&nbsp;is<br>sourced&nbsp;from</td>
-                            <td rowspan=2>Resultant<br>output&nbsp;type</td>
+                        <tr class='th th-upper'>
+                            <td rowspan=2>View<br></td>
+                            <td rowspan=2>Number&nbsp;of<br>annotation&nbsp;columns<br>in&nbsp;output<br></td>
+                            <td rowspan=2>Number&nbsp;of&nbsp;files<br>data&nbsp;is<br>sourced&nbsp;from<br></td>
+                            <td rowspan=2>Resultant<br>output&nbsp;type<br><br></td>
                             <td colspan=7>&amp;format=</td><td colspan=2>&amp;schema=</td>
                         </tr>
-                        <tr class='th' valign='bottom'>
+                        <tr class='th th-lower'>
                             <td>csv<sup>*</sup></td><td>tsv</td><td>json</td><td>browser</td><td>raw</td>
                             <td>cls</td><td>gct</td><td>0<sup>*</sup></td><td>1</td>
                         </tr>
@@ -950,24 +953,28 @@ $(document).ready(function() {
                             <li>Header lines (column names) are preceded with a hash sign (<code>&#x23;</code>):
                                 <ul>
                                     <li>
-                                        Annotation headers (i.e., for views "assays" and "samples") contain two levels of column names:
+                                        Annotation headers (i.e., for views &quot;assays&quot; and &quot;samples&quot;)
+                                        contain two levels of column names:
                                         <ul>
                                             <li>The bottom one is the target nested field</li>
                                             <li>
-                                                The top one is the preceding nested fields, joined by a period, e.g.:<br>
-                                                <code>id &rarr; accession</code>, <code>study.characteristics &rarr; age</code>
+                                                The top one is the preceding nested fields, joined by a period,
+                                                e.g.:<br>
+                                                <code>id &rarr; accession</code>,
+                                                <code>study.characteristics &rarr; age</code>
                                             </li>
                                         </ul>
                                     </li>
                                     <li>
-                                        Headers of tabular data (for view "data") contain three levels of column names,
-                                        from top to bottom:
+                                        Headers of tabular data (for view &quot;data&quot;) contain three levels of
+                                        column names, from top to bottom:
                                         <ul>
                                             <li>Accession (e.g., <code>GLDS-1</code>)</li>
                                             <li>Assay name (e.g., <code>E-GEOD-53196_GeneChip_assay</code>)</li>
                                             <li>Sample name (e.g., <code>Dmel_OR_wo_FLT_uninfd_Rep1</code>)</li>
                                         </ul>
-                                        Thus, the header corresponds to the leftmost three columns of the "samples" view.
+                                        Thus, the header corresponds to the leftmost three columns (index)
+                                        of the &quot;samples&quot; view.
                                     </li>
                                 </ul>
                             </li>
@@ -988,10 +995,10 @@ $(document).ready(function() {
                                 <a target='_blank' href='https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_json.html'>split orientation</a>,
                                 placing:
                                 <ul>
-                                    <li>column names under the "columns" key,</li>
-                                    <li>index names under the "index" key,</li>
-                                    <li>cell values under the "data" key,</li>
-                                    <li>and <b>additionally</b> providing the "meta" key with index names.</li>
+                                    <li>column names under the &quot;columns&quot; key,</li>
+                                    <li>index names under the &quot;index&quot; key,</li>
+                                    <li>cell values under the &quot;data&quot; key,</li>
+                                    <li>and <b>additionally</b> providing the &quot;meta&quot; key with index names.</li>
                                 </ul>
                             <li>String values are always quoted in double quotes (<code>&quot;value&quot;</code>),</li>
                             <li>numeric and boolean values are never quoted,</li>
@@ -1023,7 +1030,7 @@ $(document).ready(function() {
                     </li></ul>
                     <ul><li><a name='cls'>CLS format</a> (<code>&amp;format=cls</code>):
                         <ul>
-                            <li>Annotation output (from views "assays" and "samples") can be represented in the
+                            <li>Annotation output (from views &quot;assays&quot; and &quot;samples&quot;) can be represented in the
                                 <a target='_blank' href='https://www.genepattern.org/file-formats-guide#CLS'>CLS</a> format
                                 if it contains exactly one non-<code>id</code> column
                                 (e.g., <code>study.factor value.genotype</code>).</li>
@@ -1033,7 +1040,7 @@ $(document).ready(function() {
                     </li></ul>
                     <ul><li><a name='gct'>GCT format</a> (<code>&amp;format=gct</code>):
                         <ul>
-                            <li>Data output (from the "data" view) can be represented in the
+                            <li>Data output (from the &quot;data&quot; view) can be represented in the
                                 <a target='_blank' href='https://www.genepattern.org/file-formats-guide#GCT'>GCT</a> format
                                 if it contains transcriptomics data (i.e., microarrays or RNA-seq counts);</li>
                             <li>in the output, the <code>id</code> information (accession, assay name, sample name)
@@ -1049,7 +1056,7 @@ $(document).ready(function() {
                                 The output contains the same header as the full table, followed by a single row, where each cell
                                 contains a string of form <code>type[(minimum)..(maximum)|NaN]</code>.
                                 <ul>
-                                    <li>If <code>type</code> is "str", minima and maxima are omitted;</li>
+                                    <li>If <code>type</code> is &quot;str&quot;, minima and maxima are omitted;</li>
                                     <li>if the column does not have any missing values, <code>NaN</code> is omitted.</li>
                                 </ul>
                             </li>
@@ -1079,11 +1086,14 @@ $(document).ready(function() {
                 </div>
             </div> DEBUG-->
         </div>
-        <div id='forkme'>
-            API source code on GitHub: <a href='https://github.com/lankycyril/genefab3'>github.com/lankycyril/genefab3</a><br>
-            Kirill Grigorev | <a href='https://masonlab.net'>The Mason Lab</a> | <a href='https://med.cornell.edu'>Weill Cornell Medicine</a>
+        <div class='footer' style='margin-top: 24pt; padding: 5pt'>
+            API source code on GitHub:
+            <a href='https://github.com/lankycyril/genefab3'>https://github.com/lankycyril/genefab3</a> &nbsp;|&nbsp;
+            Kirill Grigorev &nbsp;|&nbsp;
+            <a href='https://masonlab.net'>The Mason Lab</a> &nbsp;|&nbsp;
+            <a href='https://med.cornell.edu'>Weill Cornell Medicine</a>
         </div>
-        <div id='footer'>
+        <div class='footer' style='margin-top: 12pt; height: 2.5in; max-height: 2.5in'>
             <table style='width: 95%'><tr>
                 <td>
                     <img src='https://genelab.nasa.gov/sites/default/files/inline-images/GeneLab_patch.png'>
@@ -1107,7 +1117,7 @@ $(document).ready(function() {
                 </td>
             </tr></table>
         </div>
-        <div id='subfooter'>
+        <div class='subfooter'>
             <a href='https://www.nasa.gov/'>NASA</a> &nbsp;&nbsp;|&nbsp;&nbsp;
             <a href='http://odeo.hq.nasa.gov/nofear.html'>No Fear Act</a> &nbsp;&nbsp;|&nbsp;&nbsp;
             <a href='http://www.nasa.gov/FOIA'>FOIA</a> &nbsp;&nbsp;|&nbsp;&nbsp;
