@@ -613,10 +613,10 @@ $(document).ready(function() {
                                 <li>The fields <code>id.accession</code> and <code>id.assay name</code> are always included;
                                 <li>There are two levels of column names:
                                 <ul>
-                                    <li>The bottom one is the target nested field</li>
+                                    <li>The bottom one is the target nested field;</li>
                                     <li>
-                                        The top one is the preceding nested fields, joined by a period, e.g.:<br>
-                                        <code>id &rarr; accession</code>, <code>study.characteristics &rarr; age</code>
+                                        the top one is the preceding nested fields, joined by a period, e.g.:<br>
+                                        <code>id &rarr; accession</code>, <code>study.characteristics &rarr; age</code>.
                                     </li>
                                 </ul>
                                 <li>
@@ -630,7 +630,13 @@ $(document).ready(function() {
                             The <b>&quot;samples&quot;</b> view generates annotation (metadata) tables;
                             each column represents a property (such as a factor value), and
                             each row represents one sample, followed by its property values.
-                            <ul><li>The output format is identical to the &quot;assays&quot; view</li></ul>
+                            <ul>
+                                <li>The output format is analogous to the &quot;assays&quot; view.</li>
+                                <li>
+                                    This tabular data can be represented in CSV, TSV, JSON, and interactive
+                                    <a href='#formats'>formats</a>.
+                                </li>
+                            </ul>
                             <img class='example' src='/images/samples-example.png'>
                         </li>
                         <li>
@@ -641,12 +647,12 @@ $(document).ready(function() {
                                     if the underlying data is a table, and contain three levels of column names,
                                     from top to bottom:
                                     <ul>
-                                        <li>Accession (e.g., <code>GLDS-1</code>)</li>
-                                        <li>Assay name (e.g., <code>E-GEOD-53196_GeneChip_assay</code>)</li>
-                                        <li>Sample name (e.g., <code>Dmel_OR_wo_FLT_uninfd_Rep1</code>)</li>
+                                        <li>accession (e.g., <code>GLDS-1</code>);</li>
+                                        <li>assay name (e.g., <code>E-GEOD-53196_GeneChip_assay</code>);</li>
+                                        <li>sample name (e.g., <code>Dmel_OR_wo_FLT_uninfd_Rep1</code>).</li>
                                     </ul>
                                     Thus, the header corresponds to the leftmost three columns (index)
-                                    of the &quot;samples&quot; view.
+                                    of the &quot;samples&quot; view &ndash; the <code>&quot;id&quot;</code> fields.
                                 </li>
                                 <img class='example' style='margin-left: 0 !important' src='/images/data-example.png'>
                                 <li>
@@ -969,12 +975,12 @@ $(document).ready(function() {
                                         Headers of tabular data (for view &quot;data&quot;) contain three levels of
                                         column names, from top to bottom:
                                         <ul>
-                                            <li>Accession (e.g., <code>GLDS-1</code>)</li>
-                                            <li>Assay name (e.g., <code>E-GEOD-53196_GeneChip_assay</code>)</li>
-                                            <li>Sample name (e.g., <code>Dmel_OR_wo_FLT_uninfd_Rep1</code>)</li>
+                                            <li>accession (e.g., <code>GLDS-1</code>);</li>
+                                            <li>assay name (e.g., <code>E-GEOD-53196_GeneChip_assay</code>);</li>
+                                            <li>sample name (e.g., <code>Dmel_OR_wo_FLT_uninfd_Rep1</code>).</li>
                                         </ul>
                                         Thus, the header corresponds to the leftmost three columns (index)
-                                        of the &quot;samples&quot; view.
+                                        of the &quot;samples&quot; view &ndash; the <code>&quot;id&quot;</code> fields.
                                     </li>
                                 </ul>
                             </li>
@@ -1000,6 +1006,14 @@ $(document).ready(function() {
                                     <li>cell values under the &quot;data&quot; key,</li>
                                     <li>and <b>additionally</b> providing the &quot;meta&quot; key with index names.</li>
                                 </ul>
+                            <li>The following are treated as indices:<ul>
+                                <li>The leftmost two columns of the &quot;assays&quot; view
+                                (i.e., the <code>&quot;id&quot;</code> columns);</li>
+                                <li>The leftmost three columns of the &quot;samples&quot; view
+                                (i.e., the <code>&quot;id&quot;</code> columns);</li>
+                                <li>The leftmost column of the &quot;data&quot; view
+                                (e.g., ENSEMBL gene names).</li>
+                            </ul></li>
                             <li>String values are always quoted in double quotes (<code>&quot;value&quot;</code>),</li>
                             <li>numeric and boolean values are never quoted,</li>
                             <li>and missing values are always displayed as <code>NaN</code> (unquoted).</li>
