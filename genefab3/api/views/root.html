@@ -787,9 +787,15 @@ $(document).ready(function() {
                 </div>
                 <div class='description on-newline'>
                     <p>The search can be constrained to only the samples that are
-                    annotated with a specific <b>value</b> of an ISA field.</p>
-                    <ul><li>Under view levels &quot;assays&quot; and &quot;samples&quot;,
-                    the values of this field will be reported in table columns.</li></ul>
+                    annotated with specific <b>value(s)</b> of an ISA field.</p>
+                    <ul>
+                        <li>The logical AND of several conditions is achieved by passing them
+                            at the same&nbsp;time&nbsp;(<code>x=a&amp;y=b</code>).</li>
+                        <li>The logical OR for a <i>single</i> condition is achieved by passing
+                            the target values joined by a vertical&nbsp;pipe&nbsp;(<code>x=a|b</code>).</li>
+                        <li>Under view levels &quot;assays&quot; and &quot;samples&quot;,
+                            the values of target field(s) will be reported in table columns.</li>
+                    </ul>
                     <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.characteristics.genotype=WT'><code>/samples/?<b>study.characteristics.genotype=WT</b></code></a><br>
                     <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.characteristics.genotype=WT|TK6'><code>/samples/?<b>study.characteristics.genotype=WT|TK6</b></code></a>
                 </div>
