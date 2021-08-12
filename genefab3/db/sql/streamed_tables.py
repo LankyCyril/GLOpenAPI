@@ -6,6 +6,7 @@ from genefab3.common.types import StreamedDataTable, NaN
 from genefab3.common.exceptions import GeneFabFileException
 from collections import Counter, OrderedDict
 from collections.abc import Iterable
+from urllib.request import unquote
 from re import search, sub
 from genefab3.common.hacks import apply_hack, speed_up_data_schema
 
@@ -104,7 +105,7 @@ class StreamedDataTableWizard():
         """Constrain self.columns to specified columns, if any"""
         if context.data_columns:
             self.columns = [
-                self._column_passed2full(c) for c in context.data_columns
+                self._column_passed2full(unquote(c)) for c in context.data_columns
             ]
  
     def _sanitize_where(self, context):
@@ -122,7 +123,7 @@ class StreamedDataTableWizard():
                 msg = "Not a valid column in data comparison"
                 raise GeneFabFileException(msg, comparison=dc)
             else:
-                sanitized_name = "/".join(passed2full(match.group(2)))
+                sanitized_name = "/".join(passed2full(unquote(match.group(2))))
                 yield sub(r'(`)([^`]*)(`)', f"`{sanitized_name}`", dc, count=1)
  
     def _make_query_filter(self, context, limit, offset):

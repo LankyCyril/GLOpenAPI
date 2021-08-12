@@ -11,7 +11,7 @@ from zipfile import ZipFile
 from io import BytesIO, StringIO
 from os import path
 from logging import getLogger, CRITICAL
-from isatools.isatab import load_investigation
+from isatools.isatab import load_investigation, strip_comments
 from pandas.errors import ParserError as PandasParserError
 
 
@@ -314,7 +314,7 @@ class IsaFromZip():
         """Read TSV file, absorbing encoding errors, and allowing for duplicate column names"""
         safe_handle = StringIO(handle.read().decode(errors="replace"))
         raw_tab = read_csv(
-            safe_handle, sep="\t", comment="#", header=None, index_col=False,
+            strip_comments(safe_handle), sep="\t", header=None, index_col=False,
         )
         raw_tab.columns = raw_tab.iloc[0,:]
         raw_tab.columns.name = None

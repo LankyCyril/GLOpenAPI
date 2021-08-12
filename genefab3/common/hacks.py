@@ -1,4 +1,4 @@
-from functools import wraps, partial
+from functools import wraps
 from genefab3.common.types import NaN, StreamedDataTable
 from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabDatabaseException
