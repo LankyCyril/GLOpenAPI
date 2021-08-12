@@ -60,3 +60,16 @@ with [mod_wsgi](https://flask.palletsprojects.com/en/2.0.x/deploying/mod_wsgi/).
 Note that the name of the singleton instance of the app is called `flask_app`,
 therefore in the `.wsgi` file you will need something similar to the following
 line of code: `from app import flask_app as app`.
+
+
+## Usage
+
+Please refer to the description of the structure and the query syntax over at
+the [API landing page](https://visualization.genelab.nasa.gov/GLOpenAPI/); in
+JavaScript-capable browsers it also provides an interactive URL builder.
+
+Basic (and very naive) examples of using the API programmatically (e.g., in
+Python) are available in this repository under
+[./examples](https://github.com/LankyCyril/genefab3/tree/master/examples);
+for instance,
+[heatmap.ipynb](https://github.com/LankyCyril/genefab3/tree/master/examples/heatmap.ipynb).
