@@ -15,7 +15,7 @@ GiB = 1024**3
 #   importing the app variable from this file.
 # - The name of the Flask app will be used in the header of the landing page.
 
-flask_app = Flask("NASA GeneLab Data API")
+flask_app = Flask("NASA GeneLab Open API")
 
 
 # Initialize the genefab3 client.
