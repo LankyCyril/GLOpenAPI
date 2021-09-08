@@ -5,6 +5,10 @@ from genefab3.api import views
 class DefaultRoutes(Routes):
     """Defines standard endpoints"""
  
+    @Routes.register_endpoint("/version/")
+    def version(self, context=None):
+        return str(getattr(self.genefab3_client, "app_version", ""))
+ 
     @Routes.register_endpoint("/favicon.<imgtype>")
     def favicon(self, imgtype, context=None):
         return b''
@@ -33,6 +37,7 @@ class DefaultRoutes(Routes):
     @Routes.register_endpoint("/")
     def root(self, context):
         return views.root.get(
+            genefab3_client=self.genefab3_client,
             mongo_collections=self.genefab3_client.mongo_collections,
             context=context,
         )

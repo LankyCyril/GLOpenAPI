@@ -45,6 +45,7 @@ flask_app = Flask("NASA GeneLab Open API")
 #      - `flask_params` to `_configure_flask_app()`
 
 genefab3_client = GeneFabClient(
+    app_version="3.0.1",
     AdapterClass=GeneLabAdapter,
     RoutesClass=DefaultRoutes,
     mongo_params=dict(

@@ -14,8 +14,9 @@ from functools import partial
 class GeneFabClient():
     """Routes Response-generating methods, continuously caches metadata and responses"""
  
-    def __init__(self, *, AdapterClass, RoutesClass, mongo_params, sqlite_params, metadata_cacher_params, flask_params):
+    def __init__(self, *, AdapterClass, RoutesClass, mongo_params, sqlite_params, metadata_cacher_params, flask_params, app_version=""):
         """Initialize metadata cacher (with adapter), response cacher, routes"""
+        self.app_version = app_version
         try:
             self.flask_app = self._configure_flask_app(**flask_params)
             (self.mongo_client, self.mongo_collections, self.locale,

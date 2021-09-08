@@ -22,6 +22,7 @@
             label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
             select {margin: 1pt 0; min-width: 120pt; max-width: 120pt; overflow: hidden; text-overflow: ellipsis; white-space: nowrap}
             b.header {font-size: 24pt; font-weight: 500; white-space: nowrap; margin: 0 16pt}
+            small.version {font-size: 10pt; font-weight: 300; white-space: nowrap; margin-top: 0pt}
             h2 {font-size: 20pt; font-weight: 500; display: block; margin: 10pt 0}
             div.description {max-width: 640pt; padding-bottom: 7pt}
             #url-builder {position: sticky; top: 0pt; background: #FFFFFFEE; border-top: 4pt solid #FFFFFFEE; z-index: 8}
@@ -469,7 +470,7 @@ $(document).ready(function() {
 
 </script>
     <body>
-        <table style='border-left: 0; border-right: 0; border-top: 0; border-bottom: 1px solid black; margin-bottom: 24pt'>
+        <table style='border-left: 0; border-right: 0; border-top: 0; border-bottom: 1px solid black; margin-bottom: 16pt'>
             <tr valign='middle'>
                 <td style='width: 260pt'>
                     <img src='https://genelab-data.ndc.nasa.gov/genelab/img/nasa-genelab-logo.png' style='height: 50pt'>
@@ -480,6 +481,9 @@ $(document).ready(function() {
                 </td>
             </tr>
         </table>
+        <div class='description' style='margin-bottom: 16pt; padding-bottom: 0'>
+            API version $APP_VERSION
+        </div>
         <h2>Table of contents</h2>
         <ul id='toc'>
             <li><a href='#structure'>Structure</a></li>
