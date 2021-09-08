@@ -14,7 +14,7 @@ from functools import partial
 class GeneFabClient():
     """Routes Response-generating methods, continuously caches metadata and responses"""
  
-    def __init__(self, *, AdapterClass, RoutesClass, mongo_params, sqlite_params, metadata_cacher_params, flask_params, app_version=""):
+    def __init__(self, *, AdapterClass, RoutesClass, mongo_params, sqlite_params, metadata_cacher_params, flask_params, app_version="unknown"):
         """Initialize metadata cacher (with adapter), response cacher, routes"""
         self.app_version = app_version
         try:
