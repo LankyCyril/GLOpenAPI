@@ -46,9 +46,9 @@ def convert_legacy_metadata(self):
         if value is not None:
             msg = f"{prefix} setting {destination} to {value}"
             GeneFabLogger.info(msg)
-            #collection.update_one(
-            #    {"_id": entry["_id"]}, {"$set": {destination: value}},
-            #)
+            collection.update_one(
+                {"_id": entry["_id"]}, {"$set": {destination: value}},
+            )
 
 
 def convert_legacy_metadata_pre(recache_metadata, self):
