@@ -20,7 +20,7 @@ def apply_hack(hack):
     return outer
 
 
-def convert_legacy_metadata(recache_metadata, self):
+def convert_legacy_metadata(self):
     """Convert some legacy fields in MongoDB database from as-in-GeneLab to as-supposed-to-be-in-GeneLab """
     collection = self.mongo_collections.metadata
     source = "study.material type"
@@ -49,7 +49,19 @@ def convert_legacy_metadata(recache_metadata, self):
             #collection.update_one(
             #    {"_id": entry["_id"]}, {"$set": {destination: value}},
             #)
+
+
+def convert_legacy_metadata_pre(recache_metadata, self):
+    """Run convert_legacy_metadata() before recache_metadata()"""
+    convert_legacy_metadata(self)
     return recache_metadata(self)
+
+
+def convert_legacy_metadata_post(recache_single_dataset_metadata, self, accession, has_cache):
+    """Run convert_legacy_metadata() after recache_single_dataset_metadata()"""
+    result = recache_single_dataset_metadata(self, accession, has_cache)
+    convert_legacy_metadata(self)
+    return result
 
 
 def get_sub_df(obj, partname, partcols):
