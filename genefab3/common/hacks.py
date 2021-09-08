@@ -20,6 +20,38 @@ def apply_hack(hack):
     return outer
 
 
+def convert_legacy_metadata(recache_metadata, self):
+    """Convert some legacy fields in MongoDB database from as-in-GeneLab to as-supposed-to-be-in-GeneLab """
+    collection = self.mongo_collections.metadata
+    source = "study.material type"
+    destination = "study.characteristics.material type"
+    get_source_value = lambda e: e.get("study", {}).get("material type", None)
+    query = {source: {"$exists": True}, destination: {"$exists": False}}
+    for entry in collection.find(query):
+        prefix = f"apply_hack(convert_legacy_metadata) on {entry['id']!r}:\n "
+        value = get_source_value(entry)
+        if isinstance(value, (list, tuple)):
+            if len(value) == 1:
+                value = value[0]
+            else:
+                msg = f"{prefix} unexpected value of {source}: {value!r}"
+                GeneFabLogger.warning(msg)
+                value = None
+        if isinstance(value, str):
+            value = {"": value}
+        if not isinstance(value, dict):
+            msg = f"{prefix} unexpected value of {source}: {value!r}"
+            GeneFabLogger.warning(msg)
+            value = None
+        if value is not None:
+            msg = f"{prefix} setting {destination} to {value}"
+            GeneFabLogger.info(msg)
+            #collection.update_one(
+            #    {"_id": entry["_id"]}, {"$set": {destination: value}},
+            #)
+    return recache_metadata(self)
+
+
 def get_sub_df(obj, partname, partcols):
     """Retrieve only informative values from single part of table as pandas.DataFrame"""
     from genefab3.db.sql.streamed_tables import SQLiteIndexName

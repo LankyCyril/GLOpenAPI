@@ -4,6 +4,7 @@ from time import sleep
 from genefab3.common.exceptions import GeneFabLogger
 from genefab3.db.mongo.index import ensure_info_index
 from collections import OrderedDict
+from genefab3.common.hacks import apply_hack, convert_legacy_metadata
 from genefab3.db.mongo.index import update_metadata_value_lookup
 from genefab3.db.mongo.utils import iterate_mongo_connections
 from genefab3.db.mongo.types import ValueCheckedRecord
@@ -70,6 +71,7 @@ class MetadataCacherThread(Thread):
             updated=set(), stale=set(), dropped=set(), failed=set(),
         )
  
+    @apply_hack(convert_legacy_metadata)
     def recache_metadata(self):
         """Instantiate each available dataset; if contents changed, dataset automatically updates db.metadata"""
         try:
