@@ -9,6 +9,7 @@ from itertools import chain, count
 from base64 import b64encode
 from uuid import uuid3, uuid4
 from contextlib import contextmanager
+from genefab3.common.exceptions import GeneFabLogger
 from requests import get as request_get
 from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabConfigurationException
@@ -52,11 +53,14 @@ def pick_reachable_url(urls, name=None):
     def _pick():
         get_kws = dict(allow_redirects=True, stream=True)
         for url in urls:
+            GeneFabLogger.debug(f"Trying URL: {url}")
             try:
                 with request_get(url, **get_kws) as response:
                     if response.ok:
+                        GeneFabLogger.debug(f"Hit URL: {url}")
                         return url
             except (URLError, OSError):
+                GeneFabLogger.debug(f"Unreachable URL: {url}")
                 continue
         else:
             if name:
