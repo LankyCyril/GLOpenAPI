@@ -20,8 +20,8 @@ def apply_hack(hack):
     return outer
 
 
-def convert_legacy_metadata(self):
-    """Convert some legacy fields in MongoDB database from as-in-GeneLab to as-supposed-to-be-in-GeneLab """
+def convert_legacy_material_type(self, _name="convert_legacy_material_type"):
+    """Convert 'material type' legacy fields in MongoDB database from as-in-GeneLab to as-supposed-to-be-in-GeneLab """
     collection = self.mongo_collections.metadata
     updated_accessions = set()
     source = "study.material type"
@@ -29,34 +29,60 @@ def convert_legacy_metadata(self):
     get_source_value = lambda e: e.get("study", {}).get("material type", None)
     query = {source: {"$exists": True}, destination: {"$exists": False}}
     for entry in collection.find(query):
-        prefix = f"apply_hack(convert_legacy_metadata) on {entry['id']!r}:\n "
+        prefix = f"apply_hack({_name}) on {entry['id']!r}:\n "
         value = get_source_value(entry)
         if isinstance(value, (list, tuple)):
             if len(value) == 1:
                 value = value[0]
             else:
-                msg = f"{prefix} unexpected value of {source}: {value!r}"
+                msg = f"{prefix} unexpected value of '{source}': {value!r}"
                 GeneFabLogger.warning(msg)
                 value = None
         if isinstance(value, str):
             value = {"": value}
         if not isinstance(value, dict):
-            msg = f"{prefix} unexpected value of {source}: {value!r}"
+            msg = f"{prefix} unexpected value of '{source}': {value!r}"
             GeneFabLogger.warning(msg)
             value = None
         if value is not None:
-            msg = f"{prefix} setting {destination} to {value}"
-            GeneFabLogger.info(msg)
-            collection.update_one(
-                {"_id": entry["_id"]}, {"$set": {destination: value}},
-            )
+            if search(r'\s+$', value[""]):
+                msg = f"{prefix} removing empty '{source}' value"
+                collection.update_one(
+                    {"_id": entry["_id"]}, {"$unset": {source: True}},
+                )
+                GeneFabLogger.info(msg)
+            else:
+                msg = f"{prefix} setting '{destination}' to {value}"
+                GeneFabLogger.info(msg)
+                collection.update_one(
+                    {"_id": entry["_id"]}, {"$set": {destination: value}},
+                )
             updated_accessions.add(entry["id"]["accession"])
     return updated_accessions
 
 
+def remove_legacy_metadata_empty_values(self, _name="remove_legacy_metadata_empty_values"):
+    """Remove 'study.characteristics.material type' entries where the value is entirely made of space-like characters"""
+    collection = self.mongo_collections.metadata
+    updated_accessions = set()
+    destination = "study.characteristics.material type"
+    query = {f"{destination}.": {"$regex": '^\s+$'}}
+    for entry in collection.find(query):
+        prefix = f"apply_hack({_name}) on {entry['id']!r}:\n "
+        GeneFabLogger.info(f"{prefix}: removing empty '{destination}'")
+        collection.update_one(
+            {"_id": entry["_id"]}, {"$unset": {destination: True}},
+        )
+        updated_accessions.add(entry["id"]["accession"])
+    return updated_accessions
+
+
 def convert_legacy_metadata_pre(recache_metadata, self):
-    """Run convert_legacy_metadata() before recache_metadata()"""
-    updated_accessions = convert_legacy_metadata(self)
+    """Run legacy metadata converters before recache_metadata()"""
+    updated_accessions = (
+        convert_legacy_material_type(self) |
+        remove_legacy_metadata_empty_values(self)
+    )
     accessions, success = recache_metadata(self)
     accessions["updated"] |= updated_accessions
     accessions["fresh"] -= updated_accessions
@@ -64,12 +90,13 @@ def convert_legacy_metadata_pre(recache_metadata, self):
 
 
 def convert_legacy_metadata_post(recache_single_dataset_metadata, self, accession, has_cache):
-    """Run convert_legacy_metadata() after recache_single_dataset_metadata()"""
+    """Run legacy metadata converters after recache_single_dataset_metadata()"""
     collection = self.mongo_collections.metadata
     with collection.database.client.start_session() as session:
         with session.start_transaction():
             result = recache_single_dataset_metadata(self, accession, has_cache)
-            convert_legacy_metadata(self)
+            convert_legacy_material_type(self)
+            remove_legacy_metadata_empty_values(self)
     return result
 
 
