@@ -23,6 +23,7 @@ def apply_hack(hack):
 def convert_legacy_metadata(self):
     """Convert some legacy fields in MongoDB database from as-in-GeneLab to as-supposed-to-be-in-GeneLab """
     collection = self.mongo_collections.metadata
+    updated_accessions = set()
     source = "study.material type"
     destination = "study.characteristics.material type"
     get_source_value = lambda e: e.get("study", {}).get("material type", None)
@@ -49,12 +50,17 @@ def convert_legacy_metadata(self):
             collection.update_one(
                 {"_id": entry["_id"]}, {"$set": {destination: value}},
             )
+            updated_accessions.add(entry["id"]["accession"])
+    return updated_accessions
 
 
 def convert_legacy_metadata_pre(recache_metadata, self):
     """Run convert_legacy_metadata() before recache_metadata()"""
-    convert_legacy_metadata(self)
-    return recache_metadata(self)
+    updated_accessions = convert_legacy_metadata(self)
+    accessions, success = recache_metadata(self)
+    accessions["updated"] |= updated_accessions
+    accessions["fresh"] -= updated_accessions
+    return accessions, success
 
 
 def convert_legacy_metadata_post(recache_single_dataset_metadata, self, accession, has_cache):
