@@ -96,6 +96,7 @@
 <script>
 
 var url_root = "$URL_ROOT";
+var prefill_example = false;
 
 var metadata = {
     "wildcard": $METADATA_WILDCARDS,
@@ -420,7 +421,7 @@ function refresh_event_handlers() {
     $("input[type=text]").on("input", generate_url);
 }
 
-function prefill_example() {
+function do_prefill_example() {
     var initiator = $("#meta-wildcard-list .key-level.level-0")
     initiator.val("study");
     refresh_dropdown_section(initiator, "wildcard", 0);
@@ -465,7 +466,8 @@ $(document).ready(function() {
     toggle_builder();
     refresh_dropdowns();
     refresh_event_handlers();
-    prefill_example();
+    if (prefill_example)
+        do_prefill_example();
 });
 
 </script>
