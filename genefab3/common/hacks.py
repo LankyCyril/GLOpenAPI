@@ -65,8 +65,11 @@ def convert_legacy_metadata_pre(recache_metadata, self):
 
 def convert_legacy_metadata_post(recache_single_dataset_metadata, self, accession, has_cache):
     """Run convert_legacy_metadata() after recache_single_dataset_metadata()"""
-    result = recache_single_dataset_metadata(self, accession, has_cache)
-    convert_legacy_metadata(self)
+    collection = self.mongo_collections.metadata
+    with collection.database.client.start_session() as session:
+        with session.start_transaction():
+            result = recache_single_dataset_metadata(self, accession, has_cache)
+            convert_legacy_metadata(self)
     return result
 
 
