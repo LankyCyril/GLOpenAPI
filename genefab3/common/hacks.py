@@ -40,7 +40,7 @@ def convert_legacy_material_type(self, _name="convert_legacy_material_type"):
                 value = None
         if isinstance(value, str):
             value = {"": value}
-        if not isinstance(value, dict):
+        if (not isinstance(value, dict)) or ("" not in value):
             msg = f"{prefix} unexpected value of '{source}': {value!r}"
             GeneFabLogger.warning(msg)
             value = None
@@ -65,9 +65,18 @@ def remove_legacy_metadata_empty_values(self, _name="remove_legacy_metadata_empt
     """Remove 'study.characteristics.material type' entries where the value is entirely made of space-like characters"""
     collection = self.mongo_collections.metadata
     updated_accessions = set()
+    source = "study.material type"
+    source_query = {source: {"$elemMatch": {"": {"$exists": False}}}}
+    for entry in collection.find(source_query):
+        prefix = f"apply_hack({_name}) on {entry['id']!r}:\n "
+        GeneFabLogger.info(f"{prefix}: removing empty '{source}'")
+        collection.update_one(
+            {"_id": entry["_id"]}, {"$unset": {source: True}},
+        )
+        updated_accessions.add(entry["id"]["accession"])
     destination = "study.characteristics.material type"
-    query = {f"{destination}.": {"$regex": '^\s+$'}}
-    for entry in collection.find(query):
+    destination_query = {f"{destination}.": {"$regex": '^\s+$'}}
+    for entry in collection.find(destination_query):
         prefix = f"apply_hack({_name}) on {entry['id']!r}:\n "
         GeneFabLogger.info(f"{prefix}: removing empty '{destination}'")
         collection.update_one(
