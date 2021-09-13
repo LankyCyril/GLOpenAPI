@@ -58,7 +58,7 @@ def get_metadata_datatypes(mongo_collections): # TODO: should be cached at index
     return {e["k"]: True for e in cursor if "k" in e}
 
 
-def get(*, mongo_collections, context):
+def get(*, genefab3_client, mongo_collections, context):
     """Serve an interactive documentation page"""
     equals_json = get_metadata_equals_json(mongo_collections)
     existence_json = get_metadata_existence_json(equals_json)
@@ -69,6 +69,7 @@ def get(*, mongo_collections, context):
     dumps_sorted = lambda j: dumps(j, separators=(",", ":"), sort_keys=True)
     replacements = {
         "$APPNAME": context.app_name,
+        "$APP_VERSION": genefab3_client.app_version,
         "$URL_ROOT": context.url_root,
         "$METADATA_WILDCARDS": dumps_sorted(wildcards),
         "$METADATA_EXISTENCE": dumps_sorted(existence_json),

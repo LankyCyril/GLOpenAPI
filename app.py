@@ -4,8 +4,6 @@ from genefab3.client import GeneFabClient
 from genefab3_genelab_adapter import GeneLabAdapter
 from genefab3.api.routes import DefaultRoutes
 
-GiB = 1024**3
-
 
 # Initialize the Flask app.
 # - Must be defined in the global scope, i.e. right here, even though all we are
@@ -16,6 +14,8 @@ GiB = 1024**3
 # - The name of the Flask app will be used in the header of the landing page.
 
 flask_app = Flask("NASA GeneLab Open API")
+__version__ = "3.0.2"
+GiB = 1024**3
 
 
 # Initialize the genefab3 client.
@@ -45,6 +45,7 @@ flask_app = Flask("NASA GeneLab Open API")
 #      - `flask_params` to `_configure_flask_app()`
 
 genefab3_client = GeneFabClient(
+    app_version=__version__,
     AdapterClass=GeneLabAdapter,
     RoutesClass=DefaultRoutes,
     mongo_params=dict(
