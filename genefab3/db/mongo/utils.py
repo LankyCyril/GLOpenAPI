@@ -2,6 +2,7 @@ from functools import partial
 from bson.errors import InvalidDocument as InvalidDocumentError
 from collections.abc import ValuesView
 from genefab3.common.exceptions import GeneFabLogger, GeneFabDatabaseException
+from collections import OrderedDict
 from pymongo import ASCENDING
 
 
@@ -102,19 +103,39 @@ def run_mongo_action(action, collection, *, query=None, data=None, documents=Non
         )
 
 
+def get_preferred_sort_order(collection, context, id_fields):
+    """Compose an `OrderedDict` for "$sort" stage of aggregate pipeline based on order preference in index, context, request"""
+    pending_sort_by = {f"id.{f}" for f in id_fields}
+    def _yield_ordered():
+        index_information = collection.index_information()
+        if "id_compound" in index_information:
+            for id_f, *_ in index_information["id_compound"].get("key", []):
+                if id_f in context.sort_by:
+                    yield id_f
+                    if id_f in pending_sort_by:
+                        pending_sort_by.remove(id_f)
+                elif id_f in pending_sort_by:
+                    yield id_f
+                    pending_sort_by.remove(id_f)
+        yield from pending_sort_by
+    return OrderedDict((id_f, ASCENDING) for id_f in _yield_ordered())
+
+
 def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), postprocess=()):
     """Run .find() or .aggregate() based on query, projection"""
     full_projection = {**context.projection, **{"id."+f: 1 for f in id_fields}}
-    sort_by_too = ["id."+f for f in id_fields if "id."+f not in context.sort_by]
     pipeline = [
-        {"$sort": {f: ASCENDING for f in (*context.sort_by, *sort_by_too)}},
+        {"$sort": get_preferred_sort_order(collection, context, id_fields)},
       *({"$unwind": f"${f}"} for f in context.unwind),
         {"$match": context.query},
         {"$project": {**full_projection, "_id": False}},
         *postprocess,
     ]
     collation = {"locale": locale, "numericOrdering": True}
-    return collection.aggregate(pipeline, collation=collation)
+    return collection.aggregate(
+        pipeline, collation=collation,
+        allowDiskUse=True, # note: this is for worst-case, large, scenarios
+    )
 
 
 def aggregate_file_descriptors_by_context(collection, *, locale, context, tech_type_locator="investigation.study assays.study assay technology type"):

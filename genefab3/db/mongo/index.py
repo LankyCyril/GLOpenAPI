@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from genefab3.api.parser import KEYVALUE_PARSER_DISPATCHER
 from genefab3.common.exceptions import GeneFabLogger
 from pymongo import ASCENDING
@@ -6,7 +7,7 @@ from genefab3.db.mongo.utils import run_mongo_action
 
 
 METADATA_AUX_TEMPLATE = {
-    category: {f: "true" for f in parser.keywords["constrain_to"]}
+    category: OrderedDict((f, "true") for f in parser.keywords["constrain_to"])
     for category, parser in KEYVALUE_PARSER_DISPATCHER().items()
     if getattr(parser, "keywords", {}).get("constrain_to")
 }
@@ -18,8 +19,19 @@ def ensure_info_index(mongo_collections, locale):
         msgmask = "Generating index for metadata collection ('{}'), key 'id'"
         id_fields = METADATA_AUX_TEMPLATE["id"].keys()
         GeneFabLogger.info(msgmask.format(mongo_collections.metadata.name))
+        # create individual indices:
         mongo_collections.metadata.create_index(
-            name="id", keys=[(f"id.{f}", ASCENDING) for f in id_fields],
+            [("id", ASCENDING)], name="id",
+            collation={"locale": locale, "numericOrdering": True},
+        )
+        for f in id_fields:
+            mongo_collections.metadata.create_index(
+                [(f"id.{f}", ASCENDING)], name=f"id.{f}",
+                collation={"locale": locale, "numericOrdering": True},
+            )
+        # create compound index for good measure:
+        mongo_collections.metadata.create_index(
+            [(f"id.{f}", ASCENDING) for f in id_fields], name="id_compound",
             collation={"locale": locale, "numericOrdering": True},
         )
         msgmask = "Index generated for metadata collection ('{}'), key 'id'"
