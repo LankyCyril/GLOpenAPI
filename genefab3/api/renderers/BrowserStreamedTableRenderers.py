@@ -149,7 +149,8 @@ def html(obj, context, indent=None):
     """Force two-level columns in StreamedTable and render using SlickGrid"""
     passed_nlevels = {len(c) for c in getattr(obj, "columns", [[]])}
     if not passed_nlevels:
-        passed_nlevels = {len(c) for c in getattr(obj, "index_names", [[]])}
+        obj.move_index_boundary(to=0)
+        passed_nlevels = {len(c) for c in getattr(obj, "columns", [[]])}
     if passed_nlevels == {2}:
         return twolevel(obj, context, squash_preheader=False, indent=indent)
     elif passed_nlevels == {3}:
