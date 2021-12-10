@@ -55,13 +55,20 @@ class StreamedDataTableWizard():
         return self._columns
     @columns.setter
     def columns(self, passed_columns):
-        passed_last_level = [c[-1] for c in passed_columns]
-        own_last_level = [c[-1] for c in self._columns]
-        if set(passed_last_level) <= set(own_last_level):
-            self._columns = passed_columns
+        passed_last_level = {c[-1] for c in passed_columns}
+        own_last_level = {c[-1] for c in self._columns}
+        if self._index_name in passed_last_level:
+            passed_last_level.remove(self._index_name)
+            passed_columns_excluding_index = [
+                c for c in passed_columns if (tuple(c) != (self._index_name,))
+            ]
+        else:
+            passed_columns_excluding_index = passed_columns
+        if passed_last_level <= own_last_level:
+            self._columns = passed_columns_excluding_index
         else:
             msg = "Setting foreign column(s) to StreamedDataTableWizard"
-            foreign = sorted(set(passed_last_level) - set(own_last_level))
+            foreign = sorted(passed_last_level - own_last_level)
             raise GeneFabFileException(msg, columns=foreign)
  
     @property
@@ -77,7 +84,7 @@ class StreamedDataTableWizard():
         return {c[-1]: c for c in self.columns}
  
     def _column_passed2full(self, passed_name, ignore_missing=False):
-        """Match passed column name to full column name found in self.columns"""
+        """Match passed column name to either: full column name found in self.columns; or: index name (as-is)"""
         _raw_name_counts = Counter(c[-1] for c in self.columns)
         full_name = self._columns_slashed2full.get(
             passed_name, (
@@ -90,7 +97,9 @@ class StreamedDataTableWizard():
             return full_name
         else: # number of occurrences in _raw_name_counts
             if full_name == 0:
-                if ignore_missing:
+                if passed_name == self._index_name:
+                    return (passed_name,)
+                elif ignore_missing:
                     return None
                 else:
                     msg = "Requested column not in table"
@@ -105,7 +114,8 @@ class StreamedDataTableWizard():
         """Constrain self.columns to specified columns, if any"""
         if context.data_columns:
             self.columns = [
-                self._column_passed2full(unquote(c)) for c in context.data_columns
+                self._column_passed2full(unquote(c))
+                for c in context.data_columns
             ]
  
     def _sanitize_where(self, context):
@@ -204,10 +214,16 @@ class StreamedDataTableWizard_Single(StreamedDataTableWizard):
     @property
     def _inverse_column_dispatcher(self):
         """Make dictionary {table_part -> [col, col, col, ...]}"""
-        icd = OrderedDict({
-            # get index column from part containing first requested column:
-            self._column_dispatcher[self.columns[0][-1]]: [self._index_name],
-        })
+        if self.columns: # some columns requested; index will be auto-included
+            icd = OrderedDict({
+                # get index column from part containing first requested column:
+                self._column_dispatcher[self.columns[0][-1]]: [self._index_name],
+            })
+        else: # no columns requested (index likely was; is auto-included anyway)
+            icd = OrderedDict({
+                # only index is requested; get index column from first part:
+                self._column_dispatcher[self._index_name]: [self._index_name],
+            })
         for *_, rawcol in self.columns:
             icd.setdefault(self._column_dispatcher[rawcol], []).append(rawcol)
         return icd
@@ -218,13 +234,13 @@ class StreamedDataTableWizard_Single(StreamedDataTableWizard):
         _li, _tt = len(_icd), "\n  ".join(("", *_icd))
         msg = f"{self.name}; retrieving {_n} columns from {_li} table(s):{_tt}"
         join_statement = " NATURAL JOIN ".join(f"`{p}`" for p in _icd)
-        columns_as_slashed_columns = [
-            f"""`{self._column_dispatcher[rawcol]}`.`{rawcol}`
+        added_comma_separated_slashed_columns = "".join(
+            f""",`{self._column_dispatcher[rawcol]}`.`{rawcol}`
                 as `{self._columns_raw2slashed[rawcol]}`"""
             for *_, rawcol in self.columns
-        ]
+        )
         query = f"""
-            SELECT `{self._index_name}`,{','.join(columns_as_slashed_columns)}
+            SELECT `{self._index_name}`{added_comma_separated_slashed_columns}
             FROM {join_statement}"""
         return TempSelect(
             sqlite_db=self.sqlite_db, kind=kind, query=query, msg=msg, targets=[
