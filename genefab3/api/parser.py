@@ -17,7 +17,7 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
         constrain_to=["accession", "assay name", "sample name", "study name"],
     ),
     "investigation": partial(KeyValueParsers.kvp_generic,
-        category="investigation", fields_depth=2, dot_postfix=None,
+        category="investigation", fields_depth=3, dot_postfix=None,
         constrain_to=["investigation", "study", "study assays"],
     ),
     "study": partial(KeyValueParsers.kvp_generic,

@@ -106,16 +106,18 @@ class BranchTracerLevel(defaultdict):
             self[True] = True # create a non-descendable element
 
 
-def blackjack(e, max_level, head=(), marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple, join=".".join, cache=OrderedDict()):
+def blackjack(e, max_level, head=(), tack_on="comment", marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple, join=".".join, cache=OrderedDict()):
     """Quickly iterate flattened dictionary key-value pairs of known schema in pure Python, with LRU caching"""
     ck = marsh(e, 4), max_level, head
     if ck not in cache:
         if len(cache) >= 65536:
             cache.popitem(0)
         if isinstance(e, dict):
-            if len(head) <= max_level:
-                cache[ck] = sum((tuple(blackjack(v, max_level, head+(k,)))
-                    for k, v in e.items()), ())
+            if (len(head) <= max_level) or (head[-1] == tack_on):
+                cache[ck] = sum((
+                    tuple(blackjack(v, max_level, head+(k,), tack_on))
+                    for k, v in e.items()
+                ), ())
             else:
                 cache[ck] = ((join(head), e.get("", e)),)
         else:

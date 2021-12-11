@@ -38,7 +38,7 @@ def ensure_info_index(mongo_collections, locale):
         GeneFabLogger.info(msgmask.format(mongo_collections.metadata.name))
 
 
-def INPLACE_update_metadata_value_lookup_keys(index, mongo_collections, final_key_blacklist={"comment"}):
+def INPLACE_update_metadata_value_lookup_keys(index, mongo_collections, final_key_blacklist=set()):
     """Populate JSON with all possible metadata keys, also for documentation section 'meta-existence'"""
     for isa_category in index:
         for subkey in index[isa_category]:
