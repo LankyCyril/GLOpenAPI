@@ -22,6 +22,15 @@
             padding: 1pt 2pt !important; line-height: 1.05; font-size: 9pt;
             overflow: hidden; text-overflow: ellipsis;
             background: #D10; color: white;
+            cursor: pointer;
+        }
+        #sorting_reload {
+            margin: 0pt !important; display: inline-block; font-size: 9pt;
+            overflow: hidden; text-overflow: ellipsis;
+        }
+        #sorting_explain {
+            margin: 3pt 0pt !important; display: inline-block; font-size: 12pt;
+            overflow: hidden; text-overflow: ellipsis;
         }
         .fullpage{position: absolute; top: 25pt; left: 0; right: 0; bottom: 0}
         #grid {border: .25pt solid black}
@@ -85,7 +94,8 @@
         <a style="color:#D10" href="$DATAVIEW">data</a>.
     </div>
     <div id="sorting_popup" style="display: none">
-        CUSTOM SORTING<br>click to reset
+        <div id="sorting_reload" style="display: inline-block">CUSTOM SORT ORDER<br>&#8635;&nbsp;reload to reset</div>
+        <div id="sorting_explain" style="display: inline-block">[?]</div>
     </div>
     <div id="grid" class="fullpage">
         <div id="noscript">
@@ -252,6 +262,13 @@ grid.onSort.subscribe(function(e, args) {
     render_header_groups(
         $(g.getPreHeaderPanelLeft()), 0, options.frozenColumn+1,
     );
+    $("#sorting_popup").show();
+    $("#sorting_reload").click(function (e) {location.reload()});
+    $("#sorting_explain").click(function (e) {alert(
+        "Data was sorted manually in the browser; the order may be different to when requested via other formats.\n" +
+        "Static, non-interactive formats (CSV, TSV, JSON, CLS, GCT) always return data in the original order.\n" +
+        "Please rely on the original order if using these data for analyses, as it guarantees consistency."
+    )});
 });
 
 $(document).ready(function() {
