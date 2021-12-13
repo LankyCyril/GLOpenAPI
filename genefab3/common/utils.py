@@ -3,7 +3,7 @@ from datetime import datetime
 from copy import deepcopy
 from re import search, sub, compile
 from genefab3.common.exceptions import GeneFabParserException
-from functools import partial, reduce
+from functools import partial
 from urllib.request import quote
 from base64 import b64encode
 from uuid import uuid3, uuid4
@@ -12,8 +12,6 @@ from genefab3.common.exceptions import GeneFabLogger
 from requests import get as request_get
 from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabConfigurationException
-from operator import getitem
-from collections import defaultdict
 from threading import Thread
 
 
@@ -85,23 +83,6 @@ def iterate_terminal_leaf_elements(d, iter_leaves=iterate_terminal_leaves, isins
     for value in iter_leaves(d):
         if isinstance(value, str):
             yield from pattern.split(value)
-
-
-BranchTracer = lambda sep: BranchTracerLevel(partial(BranchTracer, sep), sep)
-BranchTracer.__doc__ = """Infinitely nestable and descendable defaultdict"""
-class BranchTracerLevel(defaultdict):
-    """Level of BranchTracer; creates nested levels by walking paths with sep"""
-    def __init__(self, factory, sep):
-        super().__init__(factory)
-        self.split = compile(sep).split
-    def descend(self, path, reduce=reduce, getitem=getitem):
-        """Move one level down for each key in `path`; return terminal level"""
-        return reduce(getitem, self.split(path), self)
-    def make_terminal(self, truthy=True):
-        """Prune descendants of current level, optionally marking self truthy"""
-        self.clear()
-        if truthy:
-            self[True] = True # create a non-descendable element
 
 
 def json_permissive_default(o):

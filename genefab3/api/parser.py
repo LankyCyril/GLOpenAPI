@@ -1,12 +1,14 @@
-from functools import lru_cache, partial
+from functools import lru_cache, partial, reduce
+from operator import getitem
+from collections import defaultdict
 from flask import request
 from urllib.request import quote, unquote
 from json import dumps
-from genefab3.common.utils import EmptyIterator, BranchTracer
+from genefab3.common.utils import EmptyIterator
 from genefab3.common.exceptions import is_debug, GeneFabParserException
 from genefab3.common.utils import make_safe_token, space_quote, is_regex
 from genefab3.common.exceptions import GeneFabConfigurationException
-from re import search
+from re import compile, search
 
 
 CONTEXT_ARGUMENTS = {"debug": "0", "format": None, "schema": "0"}
@@ -34,6 +36,23 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
     "column": partial(KeyValueParsers.kvp_column, category="column"),
     "c": partial(KeyValueParsers.kvp_column, category="column"),
 })
+
+
+BranchTracer = lambda sep: BranchTracerLevel(partial(BranchTracer, sep), sep)
+BranchTracer.__doc__ = """Infinitely nestable and descendable defaultdict"""
+class BranchTracerLevel(defaultdict):
+    """Level of BranchTracer; creates nested levels by walking paths with sep"""
+    def __init__(self, factory, sep):
+        super().__init__(factory)
+        self.split = compile(sep).split
+    def descend(self, path, reduce=reduce, getitem=getitem):
+        """Move one level down for each key in `path`; return terminal level"""
+        return reduce(getitem, self.split(path), self)
+    def make_terminal(self, truthy=True):
+        """Prune descendants of current level, optionally marking self truthy"""
+        self.clear()
+        if truthy:
+            self[True] = True # create a non-descendable element
 
 
 class Context():
