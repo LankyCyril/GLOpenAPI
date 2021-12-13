@@ -1,12 +1,14 @@
-from functools import lru_cache, partial
+from functools import lru_cache, partial, reduce
+from operator import getitem
+from collections import defaultdict
 from flask import request
 from urllib.request import quote, unquote
 from json import dumps
-from genefab3.common.utils import EmptyIterator, BranchTracer
+from genefab3.common.utils import EmptyIterator
 from genefab3.common.exceptions import is_debug, GeneFabParserException
 from genefab3.common.utils import make_safe_token, space_quote, is_regex
 from genefab3.common.exceptions import GeneFabConfigurationException
-from re import search
+from re import compile, search
 
 
 CONTEXT_ARGUMENTS = {"debug": "0", "format": None, "schema": "0"}
@@ -14,26 +16,43 @@ CONTEXT_ARGUMENTS = {"debug": "0", "format": None, "schema": "0"}
 KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
     "id": partial(KeyValueParsers.kvp_assay,
         category="id", fields_depth=1,
-        constrain_to={"accession", "assay name", "sample name", "study name"},
+        constrain_to=["accession", "assay name", "sample name", "study name"],
     ),
     "investigation": partial(KeyValueParsers.kvp_generic,
-        category="investigation", fields_depth=2, dot_postfix=None,
-        constrain_to={"investigation", "study", "study assays"},
+        category="investigation", fields_depth=3, dot_postfix=None,
+        constrain_to=["investigation", "study", "study assays"],
     ),
     "study": partial(KeyValueParsers.kvp_generic,
         category="study", fields_depth=2,
-        constrain_to={"characteristics", "factor value", "parameter value"},
+        constrain_to=["characteristics", "factor value", "parameter value"],
     ),
     "assay": partial(KeyValueParsers.kvp_generic,
         category="assay", fields_depth=2,
-        constrain_to={"characteristics", "factor value", "parameter value"},
+        constrain_to=["characteristics", "factor value", "parameter value"],
     ),
     "file": partial(KeyValueParsers.kvp_generic,
-        category="file", fields_depth=1, constrain_to={"datatype", "filename"},
+        category="file", fields_depth=1, constrain_to=["datatype", "filename"],
     ),
     "column": partial(KeyValueParsers.kvp_column, category="column"),
     "c": partial(KeyValueParsers.kvp_column, category="column"),
 })
+
+
+BranchTracer = lambda sep: BranchTracerLevel(partial(BranchTracer, sep), sep)
+BranchTracer.__doc__ = """Infinitely nestable and descendable defaultdict"""
+class BranchTracerLevel(defaultdict):
+    """Level of BranchTracer; creates nested levels by walking paths with sep"""
+    def __init__(self, factory, sep):
+        super().__init__(factory)
+        self.split = compile(sep).split
+    def descend(self, path, reduce=reduce, getitem=getitem):
+        """Move one level down for each key in `path`; return terminal level"""
+        return reduce(getitem, self.split(path), self)
+    def make_terminal(self, truthy=True):
+        """Prune descendants of current level, optionally marking self truthy"""
+        self.clear()
+        if truthy:
+            self[True] = True # create a non-descendable element
 
 
 class Context():
@@ -58,13 +77,20 @@ class Context():
         self.update_attributes()
         if not self.query["$and"]:
             self.query = {}
-        self.identity = quote(dumps(sort_keys=True, separators=(",", ":"), obj={
-            "?": self.view, "query": self.query, "sort_by": self.sort_by,
-            "unwind": sorted(self.unwind), "projection": self.projection,
-            "data_columns": self.data_columns,
-            "data_comparisons": self.data_comparisons,
-            "format": self.format, "schema": self.schema, "debug": self.debug,
-        }))
+        if self.full_path in {"/", "/?"}:
+            self.identity = "root"
+        else:
+            self.identity = quote(dumps(sort_keys=True, separators=(",", ":"),
+                obj={
+                    "?": self.view, "query": self.query,
+                    "sort_by": self.sort_by, "unwind": sorted(self.unwind),
+                    "projection": self.projection,
+                    "data_columns": self.data_columns,
+                    "data_comparisons": self.data_comparisons,
+                    "format": self.format, "schema": self.schema,
+                    "debug": self.debug,
+                }
+            ))
         if self.debug != "0" and (not is_debug()):
             raise GeneFabParserException("Setting 'debug' is not allowed")
  

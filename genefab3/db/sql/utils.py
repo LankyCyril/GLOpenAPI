@@ -158,7 +158,10 @@ class SQLTransactions():
             msg = "Data could not be retrieved"
             raise GeneFabDatabaseException(msg, debug_info=repr(e))
         finally:
-            connection.close()
+            try:
+                connection.close()
+            except UnboundLocalError:
+                pass
             def _clear_stale_locks():
                 for lockfilename in iglob(f"{self.cwd}/*.lock"):
                     clear_lock_if_stale(

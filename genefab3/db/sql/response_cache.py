@@ -117,6 +117,19 @@ class ResponseCache():
             WHERE `context_identity` == ?""", [context_identity])
  
     @bypass_if_disabled
+    def drop_by_context(self, *, identity, desc="response_cache/drop_by_context"):
+        with self.sqltransactions.exclusive(desc) as (_, execute):
+            try:
+                self._drop_by_context_identity(execute, identity)
+            except OperationalError as e:
+                msg = "ResponseCache():\n  could not drop responses for %s: %s"
+                _loge(msg, identity, repr(e))
+                raise
+            else:
+                msg = "ResponseCache():\n  dropped cached response(s) for %s"
+                _logi(msg, identity)
+ 
+    @bypass_if_disabled
     def drop(self, accession, desc="response_cache/drop"):
         """Drop responses for given accession"""
         with self.sqltransactions.exclusive(desc) as (_, execute):

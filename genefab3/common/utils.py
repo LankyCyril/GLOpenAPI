@@ -3,9 +3,8 @@ from datetime import datetime
 from copy import deepcopy
 from re import search, sub, compile
 from genefab3.common.exceptions import GeneFabParserException
-from functools import partial, reduce
+from functools import partial
 from urllib.request import quote
-from itertools import chain, count
 from base64 import b64encode
 from uuid import uuid3, uuid4
 from contextlib import contextmanager
@@ -13,9 +12,6 @@ from genefab3.common.exceptions import GeneFabLogger
 from requests import get as request_get
 from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabConfigurationException
-from operator import getitem
-from collections import defaultdict, OrderedDict
-from marshal import dumps as marsh
 from threading import Thread
 
 
@@ -87,45 +83,6 @@ def iterate_terminal_leaf_elements(d, iter_leaves=iterate_terminal_leaves, isins
     for value in iter_leaves(d):
         if isinstance(value, str):
             yield from pattern.split(value)
-
-
-BranchTracer = lambda sep: BranchTracerLevel(partial(BranchTracer, sep), sep)
-BranchTracer.__doc__ = """Infinitely nestable and descendable defaultdict"""
-class BranchTracerLevel(defaultdict):
-    """Level of BranchTracer; creates nested levels by walking paths with sep"""
-    def __init__(self, factory, sep):
-        super().__init__(factory)
-        self.split = compile(sep).split
-    def descend(self, path, reduce=reduce, getitem=getitem):
-        """Move one level down for each key in `path`; return terminal level"""
-        return reduce(getitem, self.split(path), self)
-    def make_terminal(self, truthy=True):
-        """Prune descendants of current level, optionally marking self truthy"""
-        self.clear()
-        if truthy:
-            self[True] = True # create a non-descendable element
-
-
-def blackjack(e, max_level, head=(), marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple, join=".".join, cache=OrderedDict()):
-    """Quickly iterate flattened dictionary key-value pairs of known schema in pure Python, with LRU caching"""
-    ck = marsh(e, 4), max_level, head
-    if ck not in cache:
-        if len(cache) >= 65536:
-            cache.popitem(0)
-        if isinstance(e, dict):
-            if len(head) <= max_level:
-                cache[ck] = sum((tuple(blackjack(v, max_level, head+(k,)))
-                    for k, v in e.items()), ())
-            else:
-                cache[ck] = ((join(head), e.get("", e)),)
-        else:
-            cache[ck] = ((join(head), e),)
-    yield from cache[ck]
-
-
-def KeyToPosition(*lists):
-    """Create an OrderedDict mapping `keys` to integers in range"""
-    return OrderedDict(zip(chain(*lists), count()))
 
 
 def json_permissive_default(o):

@@ -80,4 +80,7 @@ def get(*, genefab3_client, mongo_collections, context):
         " DEBUG-->": "" if is_debug() else "-->",
     }
     template_file = Path(__file__).parent / "root.html"
-    return StringIterator(lambda:_iter_html_chunks(template_file, replacements))
+    return StringIterator(
+        lambda: _iter_html_chunks(template_file, replacements),
+        cacheable=True,
+    )
