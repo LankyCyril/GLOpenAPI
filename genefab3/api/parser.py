@@ -77,13 +77,20 @@ class Context():
         self.update_attributes()
         if not self.query["$and"]:
             self.query = {}
-        self.identity = quote(dumps(sort_keys=True, separators=(",", ":"), obj={
-            "?": self.view, "query": self.query, "sort_by": self.sort_by,
-            "unwind": sorted(self.unwind), "projection": self.projection,
-            "data_columns": self.data_columns,
-            "data_comparisons": self.data_comparisons,
-            "format": self.format, "schema": self.schema, "debug": self.debug,
-        }))
+        if self.full_path in {"/", "/?"}:
+            self.identity = "root"
+        else:
+            self.identity = quote(dumps(sort_keys=True, separators=(",", ":"),
+                obj={
+                    "?": self.view, "query": self.query,
+                    "sort_by": self.sort_by, "unwind": sorted(self.unwind),
+                    "projection": self.projection,
+                    "data_columns": self.data_columns,
+                    "data_comparisons": self.data_comparisons,
+                    "format": self.format, "schema": self.schema,
+                    "debug": self.debug,
+                }
+            ))
         if self.debug != "0" and (not is_debug()):
             raise GeneFabParserException("Setting 'debug' is not allowed")
  

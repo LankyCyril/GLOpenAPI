@@ -38,8 +38,11 @@ class PhoenixIterator():
 class StringIterator():
     """Wraps functions that yield text"""
     default_format = "html"
-    def __init__(self, func): self.func = func
-    def __call__(self): return self.func()
+    def __init__(self, func, cacheable=False):
+        self.func, self.cacheable = func, cacheable
+        self.accessions = {None}
+    def __call__(self):
+        return self.func()
 
 
 class Adapter():

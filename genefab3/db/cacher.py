@@ -49,6 +49,7 @@ class MetadataCacherThread(Thread):
         """Continuously run MongoDB and SQLite3 cachers"""
         while True:
             ensure_info_index(self.mongo_collections, self.locale)
+            self.response_cache.drop_by_context(identity="root") # TODO move lower
             accessions, success = self.recache_metadata()
             if success:
                 if accessions["updated"]:

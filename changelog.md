@@ -10,6 +10,8 @@ Version 3.1.0 (2021-12-13)
         - `&investigation.study.comment.mission start&investigation.study.comment.mission end`
         - `&investigation.study.comment.space program=NASA|JAXA`
     - Add changelog at /changelog/
+- Various:
+    - Keep landing page cached between metadata update cycles
 
 
 Version 3.0.2 (2021-09-13)
