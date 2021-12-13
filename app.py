@@ -14,7 +14,7 @@ from genefab3.api.routes import DefaultRoutes
 # - The name of the Flask app will be used in the header of the landing page.
 
 flask_app = Flask("NASA GeneLab Open API")
-__version__ = "3.0.1"
+__version__ = "3.0.2"
 GiB = 1024**3
 
 
