@@ -3,7 +3,9 @@ from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
 from functools import wraps
 from flask import Response
-from genefab3.common.utils import blackjack, KeyToPosition
+from marshal import dumps as marsh
+from collections import OrderedDict
+from itertools import chain, count
 from genefab3.db.sql.utils import SQLTransactions, reraise_operational_error
 from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabLogger
@@ -184,6 +186,30 @@ class StreamedSchema(StreamedTable):
         yield _schema
 
 
+def _SAT_normalize_entry(e, max_level=2, head=(), add_on="comment", cache=OrderedDict(), join=".".join, marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple):
+    """Quickly iterate flattened dictionary key-value pairs of known schema in pure Python, with LRU caching"""
+    ck = marsh(e, 4), max_level, head
+    if ck not in cache:
+        if len(cache) >= 65536:
+            cache.popitem(0)
+        if isinstance(e, dict):
+            if (len(head) <= max_level) or (head[-1] == add_on):
+                cache[ck] = sum((
+                    tuple(_SAT_normalize_entry(v, max_level, head+(k,), add_on))
+                    for k, v in e.items()
+                ), ())
+            else:
+                cache[ck] = ((join(head), e.get("", e)),)
+        else:
+            cache[ck] = ((join(head), e),)
+    yield from cache[ck]
+
+
+def KeyToPosition(*lists):
+    """An OrderedDict mapping `keys` to integers in range"""
+    return OrderedDict(zip(chain(*lists), count()))
+
+
 class StreamedAnnotationTable(StreamedTable):
     """Table streamed from MongoDB cursor or cursor-like iterator"""
     _index_category = "id"
@@ -195,7 +221,7 @@ class StreamedAnnotationTable(StreamedTable):
         self._cursor, self._na_rep = PhoenixIterator(cursor), na_rep
         self.accessions, _key_pool, _nrows = set(), set(), 0
         for _nrows, entry in enumerate(self._cursor, 1):
-            for key, value in blackjack(entry, max_level=2):
+            for key, value in _SAT_normalize_entry(entry):
                 _key_pool.add(key)
                 if key == self._accession_key:
                     self.accessions.add(value)
@@ -258,7 +284,7 @@ class StreamedAnnotationTable(StreamedTable):
     def _iter_body_levels(self, cursor, dispatcher):
         for entry in cursor:
             level = [self._na_rep] * len(dispatcher)
-            for key, value in blackjack(entry, max_level=2):
+            for key, value in _SAT_normalize_entry(entry):
                 if key in dispatcher:
                     level[dispatcher[key]] = value
             yield level

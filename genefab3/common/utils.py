@@ -5,7 +5,6 @@ from re import search, sub, compile
 from genefab3.common.exceptions import GeneFabParserException
 from functools import partial, reduce
 from urllib.request import quote
-from itertools import chain, count
 from base64 import b64encode
 from uuid import uuid3, uuid4
 from contextlib import contextmanager
@@ -14,8 +13,7 @@ from requests import get as request_get
 from urllib.error import URLError
 from genefab3.common.exceptions import GeneFabConfigurationException
 from operator import getitem
-from collections import defaultdict, OrderedDict
-from marshal import dumps as marsh
+from collections import defaultdict
 from threading import Thread
 
 
@@ -104,30 +102,6 @@ class BranchTracerLevel(defaultdict):
         self.clear()
         if truthy:
             self[True] = True # create a non-descendable element
-
-
-def blackjack(e, max_level, head=(), tack_on="comment", marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple, join=".".join, cache=OrderedDict()):
-    """Quickly iterate flattened dictionary key-value pairs of known schema in pure Python, with LRU caching"""
-    ck = marsh(e, 4), max_level, head
-    if ck not in cache:
-        if len(cache) >= 65536:
-            cache.popitem(0)
-        if isinstance(e, dict):
-            if (len(head) <= max_level) or (head[-1] == tack_on):
-                cache[ck] = sum((
-                    tuple(blackjack(v, max_level, head+(k,), tack_on))
-                    for k, v in e.items()
-                ), ())
-            else:
-                cache[ck] = ((join(head), e.get("", e)),)
-        else:
-            cache[ck] = ((join(head), e),)
-    yield from cache[ck]
-
-
-def KeyToPosition(*lists):
-    """Create an OrderedDict mapping `keys` to integers in range"""
-    return OrderedDict(zip(chain(*lists), count()))
 
 
 def json_permissive_default(o):
