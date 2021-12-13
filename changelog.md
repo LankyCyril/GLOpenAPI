@@ -1,3 +1,17 @@
+Version 3.1.0 (2021-12-13)
+
+- Fixes:
+    - Sort metadata using multiple indices, preventing high RAM usage (and therefore errors on exceeding RAM limits)
+      when large tables are requested
+    - Allow to request data table index by its name as if it were a column (e.g., `&column.index`, `&column.TAIR`, etc)
+- Features:
+    - Allow to query comments (logged under "investigation.study.comment" in ISA-Tab), e.g.:
+        - `&investigation.study.comment`
+        - `&investigation.study.comment.mission start&investigation.study.comment.mission end`
+        - `&investigation.study.comment.space program=NASA|JAXA`
+    - Add changelog at /changelog/
+
+
 Version 3.0.2 (2021-09-13)
 
 - Fixes:
