@@ -1,5 +1,6 @@
 from functools import wraps
-from genefab3.common.types import NaN, StreamedDataTable
+from genefab3.common.types import NaN
+from genefab3.api.renderers.types import StreamedDataTable
 from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabDatabaseException
 from pandas import DataFrame

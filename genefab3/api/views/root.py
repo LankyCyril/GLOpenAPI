@@ -4,7 +4,7 @@ from pathlib import Path
 from json import dumps
 from genefab3.common.exceptions import is_debug
 from genefab3.api.renderers.BrowserStreamedTableRenderers import _iter_html_chunks
-from genefab3.common.types import StringIterator
+from genefab3.api.renderers.types import StreamedString
 
 
 def get_metadata_equals_json(mongo_collections):
@@ -80,7 +80,7 @@ def get(*, genefab3_client, mongo_collections, context):
         " DEBUG-->": "" if is_debug() else "-->",
     }
     template_file = Path(__file__).parent / "root.html"
-    return StringIterator(
+    return StreamedString(
         lambda: _iter_html_chunks(template_file, replacements),
         cacheable=True,
     )

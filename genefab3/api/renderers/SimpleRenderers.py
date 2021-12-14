@@ -1,6 +1,6 @@
 from json import dumps
 from collections.abc import Callable
-from genefab3.common.types import StringIterator
+from genefab3.api.renderers.types import StreamedString
 from genefab3.common.utils import json_permissive_default
 
 
@@ -16,7 +16,7 @@ def html(obj, context=None, indent=None):
     if isinstance(obj, bytes):
         content = obj.decode()
     elif isinstance(obj, Callable):
-        content = StringIterator(obj)
+        content = StreamedString(obj)
     else:
         content = obj
     return content, "text/html"
