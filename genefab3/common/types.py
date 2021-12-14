@@ -1,7 +1,6 @@
 from itertools import tee
 from collections.abc import Callable
 from genefab3.common.exceptions import GeneFabConfigurationException
-from flask import Response
 from marshal import dumps as marsh
 from collections import OrderedDict
 from itertools import chain, count
@@ -67,27 +66,6 @@ class Adapter():
             )
         else:
             return [ns for ns in names if ns == name]
-
-
-class ResponseContainer():
-    """Holds content (bytes, strings, streamer function, or Response), mimetype, and originating object"""
-    def update(self, content=None, mimetype=None, obj=None):
-        self.content, self.mimetype, self.obj = content, mimetype, obj
-    def __init__(self, content=None, mimetype=None, obj=None):
-        self.update(content, mimetype, obj)
-    @property
-    def empty(self):
-        return self.content is None
-    def make_response(self):
-        if isinstance(self.content, Response):
-            return self.content
-        elif isinstance(self.content, Callable):
-            return Response(self.content(), mimetype=self.mimetype)
-        elif self.content is not None:
-            return Response(self.content, mimetype=self.mimetype)
-        else:
-            msg = "Route returned no response"
-            raise GeneFabConfigurationException(msg)
 
 
 class StreamedTable():

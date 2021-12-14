@@ -11,7 +11,7 @@ from genefab3.db.sql.response_cache import ResponseCache
 from genefab3.common.utils import ExceptionPropagatingThread
 from functools import wraps
 from copy import deepcopy
-from genefab3.common.types import ResponseContainer
+from genefab3.api.types import ResponseContainer
 
 
 TYPE_RENDERERS = OrderedDict((
