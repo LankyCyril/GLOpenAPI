@@ -208,7 +208,7 @@ def _SAT_normalize_entry(e, max_level=2, head=(), add_on="comment", cache=Ordere
     yield from cache[ck]
 
 
-def KeyToPosition(*lists):
+def _SAT_KeyToPosition(*lists):
     """An OrderedDict mapping `keys` to integers in range"""
     return OrderedDict(zip(chain(*lists), count()))
 
@@ -238,10 +238,10 @@ class StreamedAnnotationTable(StreamedTable):
                 if key.startswith(category):
                     _key_order[category].add(key)
                     break
-        self._index_key_dispatcher = KeyToPosition(
+        self._index_key_dispatcher = _SAT_KeyToPosition(
             sorted(_key_order[self._index_category]),
         )
-        self._column_key_dispatcher = KeyToPosition(
+        self._column_key_dispatcher = _SAT_KeyToPosition(
             *(sorted(_key_order[p]) for p in _full_category_order[1:]),
         )
         self.n_index_levels = len(self._index_key_dispatcher)
@@ -251,8 +251,8 @@ class StreamedAnnotationTable(StreamedTable):
         """Like pandas methods reset_index() and set_index(), but by numeric position"""
         keys = iter([*self._index_key_dispatcher, *self._column_key_dispatcher])
         index_keys = (next(keys) for _ in range(to))
-        self._index_key_dispatcher = KeyToPosition(index_keys)
-        self._column_key_dispatcher = KeyToPosition(keys)
+        self._index_key_dispatcher = _SAT_KeyToPosition(index_keys)
+        self._column_key_dispatcher = _SAT_KeyToPosition(keys)
         self.shape = (self.shape[0], len(self._column_key_dispatcher))
         self.n_index_levels = len(self._index_key_dispatcher)
  
