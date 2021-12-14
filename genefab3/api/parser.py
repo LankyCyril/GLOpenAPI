@@ -41,8 +41,8 @@ EmptyIterator = lambda *a, **k: []
 is_regex = lambda v: search(r'^\/.*\/$', v)
 
 
-def make_safe_token(token, allow_regex=False):
-    """Quote special characters, ensure not a $-command. Note: SQL queries are sanitized in genefab3.db.sql.streamed_tables"""
+def make_safe_mongo_token(token, allow_regex=False):
+    """Quote special characters, ensure not a $-command."""
     quoted_token = space_quote(token)
     if allow_regex and ("$" not in sub(r'\$\/$', "", quoted_token)):
         return quoted_token
@@ -50,6 +50,22 @@ def make_safe_token(token, allow_regex=False):
         return quoted_token
     else:
         raise GeneFabParserException("Forbidden argument", field=quoted_token)
+
+
+def make_safe_sql_name(name, arg="arg"):
+    """Quote special characters; note: SQL injection prevention not necessary, as `name` must match existing column name"""
+    return space_quote(name)
+
+
+def make_safe_sql_value(value, arg="arg"):
+    """Quote special characters; currently, only allow numeric values""" # TODO: allow other values, while preventing injections
+    try:
+        float(value)
+    except ValueError:
+        msg = "Only comparisons to numbers are currently supported"
+        raise GeneFabParserException(msg, **{arg: value})
+    else:
+        return value
 
 
 BranchTracer = lambda sep: BranchTracerLevel(partial(BranchTracer, sep), sep)
@@ -110,7 +126,7 @@ class Context():
  
     def update(self, arg, values=("",), auto_reduce=True):
         """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections"""
-        category, *fields = map(make_safe_token, arg.split("."))
+        category, *fields = map(make_safe_mongo_token, arg.split("."))
         if arg in CONTEXT_ARGUMENTS:
             parser = EmptyIterator
         elif category in KEYVALUE_PARSER_DISPATCHER():
@@ -119,9 +135,10 @@ class Context():
             _kw = {arg: values}
             raise GeneFabParserException("Unrecognized argument", **_kw)
         def _it():
-            allow_regex = (arg=="file.filename")
-            _make_safe_token = partial(make_safe_token, allow_regex=allow_regex)
-            for value in map(_make_safe_token, values):
+            _make_safe_mongo_token = partial(
+                make_safe_mongo_token, allow_regex=(arg=="file.filename"),
+            )
+            for value in map(_make_safe_mongo_token, values):
                 yield from parser(arg=arg, fields=fields, value=value)
         n_iter, _en_it = None, enumerate(_it(), 1)
         for n_iter, (query, projection_keys, columns, comparisons) in _en_it:
@@ -163,7 +180,7 @@ class Context():
     def update_attributes(self):
         """Push remaining request arguments into self as attributes, set defaults"""
         for k, v in request.args.items():
-            safe_v = make_safe_token(v)
+            safe_v = make_safe_mongo_token(v)
             if k not in self.processed_args:
                 if not hasattr(self, k):
                     setattr(self, k, safe_v)
@@ -242,18 +259,14 @@ class KeyValueParsers():
             expr = f"{'.'.join(fields)}={value}" if value else ".".join(fields)
             unq_expr = unquote(expr)
         if not ({"<", "=", ">"} & set(unq_expr)):
-            yield None, (), [expr], ()
+            yield None, (), [make_safe_sql_name(expr)], ()
         else:
             match = search(r'^([^<>=]+)(<|<=|=|==|>=|>)([^<>=]*)$', unq_expr)
             if match:
-                name, op, value = match.groups()
-                try:
-                    float(value)
-                except ValueError:
-                    msg = "Only comparisons to numbers are currently supported"
-                    raise GeneFabParserException(msg, **{arg: value})
-                else:
-                    yield None, (), (), [f"`{space_quote(name)}` {op} {value}"]
+                name = make_safe_sql_name(match.group(1), arg=arg)
+                op = match.group(2)
+                value = make_safe_sql_value(match.group(3), arg=arg)
+                yield None, (), (), [f"`{name}` {op} {value}"]
             else:
                 msg = "Unparseable expression"
                 raise GeneFabParserException(msg, expression=expr)
