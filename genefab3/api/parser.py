@@ -1,14 +1,13 @@
 from functools import lru_cache, partial, reduce
+from re import search, sub, compile
+from genefab3.common.exceptions import GeneFabParserException, is_debug
 from operator import getitem
 from collections import defaultdict
 from flask import request
 from urllib.request import quote, unquote
 from json import dumps
-from genefab3.common.utils import EmptyIterator
-from genefab3.common.exceptions import is_debug, GeneFabParserException
-from genefab3.common.utils import make_safe_token, space_quote, is_regex
+from genefab3.common.utils import space_quote
 from genefab3.common.exceptions import GeneFabConfigurationException
-from re import compile, search
 
 
 CONTEXT_ARGUMENTS = {"debug": "0", "format": None, "schema": "0"}
@@ -36,6 +35,21 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
     "column": partial(KeyValueParsers.kvp_column, category="column"),
     "c": partial(KeyValueParsers.kvp_column, category="column"),
 })
+
+
+EmptyIterator = lambda *a, **k: []
+is_regex = lambda v: search(r'^\/.*\/$', v)
+
+
+def make_safe_token(token, allow_regex=False):
+    """Quote special characters, ensure not a $-command. Note: SQL queries are sanitized in genefab3.db.sql.streamed_tables"""
+    quoted_token = space_quote(token)
+    if allow_regex and ("$" not in sub(r'\$\/$', "", quoted_token)):
+        return quoted_token
+    elif "$" not in quoted_token:
+        return quoted_token
+    else:
+        raise GeneFabParserException("Forbidden argument", field=quoted_token)
 
 
 BranchTracer = lambda sep: BranchTracerLevel(partial(BranchTracer, sep), sep)
