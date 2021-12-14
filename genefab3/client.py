@@ -11,6 +11,7 @@ from genefab3.common.exceptions import GeneFabLogger, exception_catcher
 from genefab3.db.mongo.utils import iterate_mongo_connections
 from genefab3.db.mongo.cacher import MetadataCacherLoop
 from genefab3.api.renderer import CacheableRenderer
+from genefab3.api.parser import Context
 from threading import Thread
 
 
@@ -105,7 +106,8 @@ class GeneFabClient():
                 self.mongo_client.close()
         routes = RoutesClass(genefab3_client=self)
         renderer = CacheableRenderer(
-            flask_app=self.flask_app, sqlite_dbs=self.sqlite_dbs,
+            sqlite_dbs=self.sqlite_dbs,
+            get_context=lambda: Context(self.flask_app),
             cleanup=_cleanup_after_request,
         )
         for endpoint, method in routes.items():

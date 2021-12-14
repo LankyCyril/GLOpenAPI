@@ -10,7 +10,6 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.db.sql.response_cache import ResponseCache
 from genefab3.common.utils import ExceptionPropagatingThread
 from functools import wraps
-from genefab3.api.parser import Context
 from copy import deepcopy
 from genefab3.common.types import ResponseContainer
 
@@ -52,9 +51,10 @@ TYPE_RENDERERS = OrderedDict((
 class CacheableRenderer():
     """Renders objects returned by routes, and keeps them in LRU cache by `context.identity`"""
  
-    def __init__(self, *, flask_app, sqlite_dbs, cleanup):
+    def __init__(self, *, sqlite_dbs, get_context, cleanup):
         """Initialize object renderer and LRU cacher"""
-        self.flask_app, self.sqlite_dbs = flask_app, sqlite_dbs
+        self.sqlite_dbs = sqlite_dbs
+        self.get_context = get_context
         self.cleanup = cleanup
  
     def dispatch_renderer(self, obj, context, default_format, indent=None):
@@ -106,7 +106,7 @@ class CacheableRenderer():
         """Handle object returned from `method`, return either debug information or rendered object (optionally cached)"""
         @wraps(method)
         def wrapper(*args, **kwargs):
-            context = Context(self.flask_app)
+            context = self.get_context()
             try:
                 if context.debug == "1":
                     obj, context.format = deepcopy(context.__dict__), "json"
