@@ -1,3 +1,6 @@
+from genefab3.db.sql.response_cache import ResponseCache
+from functools import partial
+from genefab3.isa.types import Dataset
 from genefab3.common.exceptions import GeneFabConfigurationException, is_debug
 from flask_compress import Compress
 from genefab3.common.utils import timestamp36
@@ -6,9 +9,10 @@ from socket import create_connection, error as SocketError
 from types import SimpleNamespace
 from genefab3.common.exceptions import GeneFabLogger, exception_catcher
 from genefab3.db.mongo.utils import iterate_mongo_connections
-from genefab3.db.cacher import MetadataCacherThread
+from genefab3.db.mongo.cacher import MetadataCacherLoop
 from genefab3.api.renderer import CacheableRenderer
-from functools import partial
+from genefab3.api.parser import Context
+from threading import Thread
 
 
 class GeneFabClient():
@@ -27,7 +31,11 @@ class GeneFabClient():
             self.adapter = AdapterClass()
             self._init_error_handlers()
             self.routes = self._init_routes(RoutesClass)
-            self.metadata_cacher_thread = self._ensure_metadata_cacher_thread(
+            self.response_cache = ResponseCache(self.sqlite_dbs)
+            self.DatasetConstructor = partial(
+                Dataset, sqlite_dbs=self.sqlite_dbs,
+            )
+            self.cacher_loop_thread = self._ensure_cacher_loop_thread(
                 **metadata_cacher_params,
             )
         except TypeError as e:
@@ -93,41 +101,60 @@ class GeneFabClient():
  
     def _init_routes(self, RoutesClass):
         """Route Response-generating methods to Flask endpoints"""
+        def _cleanup_after_request():
+            if not self.cacher_loop_thread.isAlive():
+                self.mongo_client.close()
         routes = RoutesClass(genefab3_client=self)
-        renderer = CacheableRenderer(self)
+        renderer = CacheableRenderer(
+            sqlite_dbs=self.sqlite_dbs,
+            get_context=lambda: Context(self.flask_app),
+            cleanup=_cleanup_after_request,
+        )
         for endpoint, method in routes.items():
             self.flask_app.route(endpoint, methods=["GET"])(renderer(method))
         return routes
  
-    def _ok_to_loop_metadata_cacher_thread(self, enabled):
+    def _ok_to_loop_cacher_loop_thread(self, enabled):
         """Check if no other instances of genefab3 are talking to MongoDB database"""
         if not enabled:
-            m = "MetadataCacherThread disabled by client parameter, NOT LOOPING"
+            m = "MetadataCacherLoop disabled by client parameter, NOT LOOPING"
             GeneFabLogger.info(f"{self.mongo_appname}:\n  {m}")
             return False
         else:
             for other in iterate_mongo_connections(self.mongo_client):
                 if other < self.mongo_appname:
                     m = (f"Found other instance {other}, " +
-                        "NOT LOOPING current instance")
+                        "NOT LOOPING cachers in current instance")
                     GeneFabLogger.info(f"{self.mongo_appname}:\n  {m}")
                     return False
             else:
-                m = "No other instances found, STARTING LOOP"
+                m = "No other instances found, STARTING CACHER LOOP"
                 GeneFabLogger.info(f"{self.mongo_appname}:\n  {m}")
                 return True
  
-    def _ensure_metadata_cacher_thread(self, full_update_interval, full_update_retry_delay, dataset_init_interval, dataset_update_interval, enabled=True):
+    def _ensure_cacher_loop_thread(self, full_update_interval, full_update_retry_delay, dataset_init_interval, dataset_update_interval, enabled=True):
         """Start background cacher thread"""
-        if self._ok_to_loop_metadata_cacher_thread(enabled):
-            metadata_cacher_thread = MetadataCacherThread(
-                genefab3_client=self,
-                full_update_interval=full_update_interval,
-                full_update_retry_delay=full_update_retry_delay,
-                dataset_init_interval=dataset_init_interval,
-                dataset_update_interval=dataset_update_interval,
-            )
-            metadata_cacher_thread.start()
-            return metadata_cacher_thread
+        if self._ok_to_loop_cacher_loop_thread(enabled):
+            def _cacher_loop():
+                metadata_cacher_loop = MetadataCacherLoop(
+                    genefab3_client=self,
+                    full_update_interval=full_update_interval,
+                    full_update_retry_delay=full_update_retry_delay,
+                    dataset_init_interval=dataset_init_interval,
+                    dataset_update_interval=dataset_update_interval,
+                )
+                for accessions in metadata_cacher_loop():
+                    if accessions["updated"]:
+                        self.response_cache.drop_all()
+                    else:
+                        _fod_accs = accessions["failed"] | accessions["dropped"]
+                        for acc in _fod_accs:
+                            self.response_cache.drop_by_accession(acc)
+                        if _fod_accs:
+                            self.response_cache.drop_by_context(identity="root")
+                    self.response_cache.shrink()
+            cacher_loop_thread = Thread(target=_cacher_loop)
+            cacher_loop_thread.start()
+            return cacher_loop_thread
         else:
             return SimpleNamespace(isAlive=lambda: False)

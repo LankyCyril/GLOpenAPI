@@ -1,7 +1,7 @@
 from genefab3.common.exceptions import GeneFabLogger
 from genefab3.db.sql.utils import SQLTransactions
 from functools import wraps
-from genefab3.common.types import ResponseContainer
+from genefab3.api.types import ResponseContainer
 from flask import Response
 from collections.abc import Callable
 from zlib import compressobj, decompressobj, Z_FINISH, error as ZlibError
@@ -130,7 +130,7 @@ class ResponseCache():
                 _logi(msg, identity)
  
     @bypass_if_disabled
-    def drop(self, accession, desc="response_cache/drop"):
+    def drop_by_accession(self, accession, desc="response_cache/drop"):
         """Drop responses for given accession"""
         with self.sqltransactions.exclusive(desc) as (_, execute):
             try:

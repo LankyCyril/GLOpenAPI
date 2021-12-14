@@ -1,5 +1,6 @@
 from genefab3.common.exceptions import GeneFabLogger, GeneFabDatabaseException
 from genefab3.common.exceptions import GeneFabConfigurationException
+from functools import partial
 from os import path, access, W_OK, stat, remove, makedirs
 from datetime import datetime
 from filelock import Timeout as FileLockTimeoutError, FileLock
@@ -16,6 +17,17 @@ from time import sleep
 _logd = GeneFabLogger.debug
 _logw = GeneFabLogger.warning
 _loge = GeneFabLogger.error
+
+
+def validate_no_special_character(identifier, desc, c):
+    """Pass through `identifier` if contains no `c`, raise GeneFabConfigurationException otherwise"""
+    if (not isinstance(identifier, str)) or (c not in identifier):
+        return identifier
+    else:
+        msg = f"{repr(c)} in {desc} name"
+        raise GeneFabConfigurationException(msg, **{desc: identifier})
+validate_no_backtick = partial(validate_no_special_character, c="`")
+validate_no_doublequote = partial(validate_no_special_character, c='"')
 
 
 def apply_pragma(execute, pragma, value, sqlite_db):

@@ -30,7 +30,7 @@ GiB = 1024**3
 #         Each entry can have additional optional fields; for more details,
 #         see documentation in genefab3/common/types.py,
 #         or an implementation in genefab3_genelab_adapter/adapter.py.
-# - `RoutesClass` must be a subclass of `genefab3.common.types.Routes()`
+# - `RoutesClass` must be a subclass of `genefab3.api.types.Routes()`
 #      and associate endpoints with functions that may return objects of various
 #      types understood by `genefab3.api.renderer.CacheableRenderer()`.
 #      See implementation of `DefaultRoutes` in genefab3/api/routes.py,
@@ -40,8 +40,8 @@ GiB = 1024**3
 #      for possible argument names, see genefab3/client.py.
 #      - `mongo_params` is passed to `_get_mongo_db_connection()`;
 #      - `sqlite_params` to `_get_validated_sqlite_dbs()`;
-#      - `metadata_cacher_params` to `_ensure_metadata_cacher_thread()`
-#         - and then to `genefab3.db.cacher.MetadataCacherThread()`;
+#      - `metadata_cacher_params` to `_ensure_cacher_loop_thread()`
+#         - and then to `genefab3.db.mongo.cacher.MetadataCacherLoop()`;
 #      - `flask_params` to `_configure_flask_app()`
 
 genefab3_client = GeneFabClient(

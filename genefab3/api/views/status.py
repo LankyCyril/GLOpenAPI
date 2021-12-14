@@ -3,7 +3,7 @@ from datetime import datetime
 from genefab3.db.mongo.utils import iterate_mongo_connections
 from genefab3.common.utils import iterate_terminal_leaves
 from genefab3.common.exceptions import GeneFabParserException
-from genefab3.common.types import StreamedAnnotationTable
+from genefab3.api.renderers.types import StreamedAnnotationTable
 from itertools import chain
 
 

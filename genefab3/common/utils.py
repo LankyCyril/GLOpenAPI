@@ -1,8 +1,7 @@
 from numpy import generic as NumpyGenericType, base_repr
 from datetime import datetime
 from copy import deepcopy
-from re import search, sub, compile
-from genefab3.common.exceptions import GeneFabParserException
+from re import compile
 from functools import partial
 from urllib.request import quote
 from base64 import b64encode
@@ -17,26 +16,13 @@ from threading import Thread
 
 timestamp36 = lambda: base_repr(int(datetime.now().timestamp() * (10**6)), 36)
 as_is = lambda _:_
-EmptyIterator = lambda *a, **k: []
 
 copy_except = lambda d, *kk: {k: v for k, v in d.items() if k not in kk}
 deepcopy_except = lambda d, *kk: deepcopy({k: d[k] for k in d if k not in kk})
 deepcopy_keys = lambda d, *kk: deepcopy({k: d[k] for k in kk})
 
-is_regex = lambda v: search(r'^\/.*\/$', v)
 repr_quote = partial(quote, safe=" /'\",;:[{}]=")
 space_quote = partial(quote, safe=" /")
-
-
-def make_safe_token(token, allow_regex=False):
-    """Quote special characters, ensure not a $-command. Note: SQL queries are sanitized in genefab3.db.sql.streamed_tables"""
-    quoted_token = space_quote(token)
-    if allow_regex and ("$" not in sub(r'\$\/$', "", quoted_token)):
-        return quoted_token
-    elif "$" not in quoted_token:
-        return quoted_token
-    else:
-        raise GeneFabParserException("Forbidden argument", field=quoted_token)
 
 
 def random_unique_string(seed=""):
@@ -95,17 +81,6 @@ def json_permissive_default(o):
         return str(o)
     else:
         return str(type(o))
-
-
-def validate_no_special_character(identifier, desc, c):
-    """Pass through `identifier` if contains no `c`, raise GeneFabConfigurationException otherwise"""
-    if (not isinstance(identifier, str)) or (c not in identifier):
-        return identifier
-    else:
-        msg = f"{repr(c)} in {desc} name"
-        raise GeneFabConfigurationException(msg, **{desc: identifier})
-validate_no_backtick = partial(validate_no_special_character, c="`")
-validate_no_doublequote = partial(validate_no_special_character, c='"')
 
 
 class ExceptionPropagatingThread(Thread):

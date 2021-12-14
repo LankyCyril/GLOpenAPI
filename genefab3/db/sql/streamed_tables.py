@@ -1,8 +1,10 @@
-from genefab3.common.utils import random_unique_string, validate_no_backtick
+from genefab3.common.utils import random_unique_string
 from genefab3.db.sql.utils import SQLTransactions, reraise_operational_error
+from genefab3.db.sql.utils import validate_no_backtick
 from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabLogger, GeneFabDatabaseException
-from genefab3.common.types import StreamedDataTable, NaN
+from genefab3.common.types import NaN
+from genefab3.api.renderers.types import StreamedDataTable
 from genefab3.common.exceptions import GeneFabFileException
 from collections import Counter, OrderedDict
 from collections.abc import Iterable

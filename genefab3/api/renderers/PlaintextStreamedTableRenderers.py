@@ -5,7 +5,7 @@ from csv import writer as CSVWriter
 from re import sub
 from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.common.utils import as_is
-from genefab3.common.types import StreamedDataTable
+from genefab3.api.renderers.types import StreamedDataTable
 from genefab3.common.exceptions import GeneFabConfigurationException
 
 

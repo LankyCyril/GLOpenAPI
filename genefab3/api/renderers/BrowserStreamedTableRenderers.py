@@ -2,7 +2,7 @@ from genefab3.common.utils import space_quote, repr_quote
 from re import compile, escape
 from pathlib import Path
 from genefab3.common.exceptions import GeneFabLogger
-from genefab3.common.types import StreamedAnnotationTable
+from genefab3.api.renderers.types import StreamedAnnotationTable
 from genefab3.api.renderers.PlaintextStreamedTableRenderers import _iter_json_chunks
 from genefab3.common.exceptions import GeneFabConfigurationException
 

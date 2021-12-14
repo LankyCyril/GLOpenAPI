@@ -1,5 +1,5 @@
 from genefab3.db.sql.utils import SQLTransactions
-from genefab3.common.utils import validate_no_backtick, validate_no_doublequote
+from genefab3.db.sql.utils import validate_no_backtick, validate_no_doublequote
 from itertools import count
 from sqlite3 import OperationalError
 from genefab3.db.sql.streamed_tables import SQLiteIndexName

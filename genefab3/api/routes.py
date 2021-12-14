@@ -1,4 +1,4 @@
-from genefab3.common.types import Routes
+from genefab3.api.types import Routes
 from genefab3.api import views
 
 

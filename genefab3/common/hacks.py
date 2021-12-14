@@ -1,5 +1,6 @@
 from functools import wraps
-from genefab3.common.types import NaN, StreamedDataTable
+from genefab3.common.types import NaN
+from genefab3.api.renderers.types import StreamedDataTable
 from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabDatabaseException
 from pandas import DataFrame
@@ -262,7 +263,7 @@ def bypass_uncached_views(get, self, context, desc="hacks/bypass_uncached_views"
     is_static_lib = search(r'^libs\/', context.view)
     if is_image or is_favicon or is_static_lib:
         GeneFabLogger.info(f"{desc}: bypass caching of {context.view!r}")
-        from genefab3.common.types import ResponseContainer
+        from genefab3.api.types import ResponseContainer
         return ResponseContainer(content=None)
     else:
         return get(self, context)

@@ -1,19 +1,17 @@
 from collections import OrderedDict
 from flask import Response
-from genefab3.common.types import StreamedAnnotationTable, StreamedDataTable
-from genefab3.common.types import StreamedSchema
+from genefab3.api.renderers.types import StreamedAnnotationTable, StreamedSchema
+from genefab3.api.renderers.types import StreamedDataTable, StreamedString
 from genefab3.api.renderers import PlaintextStreamedTableRenderers
 from genefab3.api.renderers import BrowserStreamedTableRenderers
 from genefab3.api.renderers import SimpleRenderers
-from genefab3.common.types import StringIterator
 from genefab3.common.exceptions import GeneFabFormatException
 from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.db.sql.response_cache import ResponseCache
 from genefab3.common.utils import ExceptionPropagatingThread
 from functools import wraps
-from genefab3.api.parser import Context
 from copy import deepcopy
-from genefab3.common.types import ResponseContainer
+from genefab3.api.types import ResponseContainer
 
 
 TYPE_RENDERERS = OrderedDict((
@@ -40,7 +38,7 @@ TYPE_RENDERERS = OrderedDict((
         "json": PlaintextStreamedTableRenderers.json,
         "browser": BrowserStreamedTableRenderers.html,
     }),
-    ((StringIterator, str, bytes), {
+    ((StreamedString, str, bytes), {
         "raw": SimpleRenderers.raw,
         "html": SimpleRenderers.html,
     }),
@@ -53,9 +51,11 @@ TYPE_RENDERERS = OrderedDict((
 class CacheableRenderer():
     """Renders objects returned by routes, and keeps them in LRU cache by `context.identity`"""
  
-    def __init__(self, genefab3_client):
+    def __init__(self, *, sqlite_dbs, get_context, cleanup):
         """Initialize object renderer and LRU cacher"""
-        self.genefab3_client = genefab3_client
+        self.sqlite_dbs = sqlite_dbs
+        self.get_context = get_context
+        self.cleanup = cleanup
  
     def dispatch_renderer(self, obj, context, default_format, indent=None):
         """Render `obj` according to its type and passed kwargs: pass through content and mimetype"""
@@ -78,7 +78,7 @@ class CacheableRenderer():
  
     def _get_response_container_via_cache(self, context, method, args, kwargs):
         """Render object returned from `method`, put in LRU cache by `context.identity`"""
-        response_cache = ResponseCache(self.genefab3_client.sqlite_dbs)
+        response_cache = ResponseCache(self.sqlite_dbs)
         response_container = response_cache.get(context)
         if response_container.empty:
             def _call_and_cache():
@@ -106,7 +106,7 @@ class CacheableRenderer():
         """Handle object returned from `method`, return either debug information or rendered object (optionally cached)"""
         @wraps(method)
         def wrapper(*args, **kwargs):
-            context = Context(self.genefab3_client.flask_app)
+            context = self.get_context()
             try:
                 if context.debug == "1":
                     obj, context.format = deepcopy(context.__dict__), "json"
@@ -121,7 +121,6 @@ class CacheableRenderer():
                         context, method, args, kwargs,
                     )
             finally:
-                if not self.genefab3_client.metadata_cacher_thread.isAlive():
-                    self.genefab3_client.mongo_client.close()
+                self.cleanup()
             return response_container.make_response()
         return wrapper
