@@ -40,8 +40,8 @@ GiB = 1024**3
 #      for possible argument names, see genefab3/client.py.
 #      - `mongo_params` is passed to `_get_mongo_db_connection()`;
 #      - `sqlite_params` to `_get_validated_sqlite_dbs()`;
-#      - `metadata_cacher_params` to `_ensure_metadata_cacher_thread()`
-#         - and then to `genefab3.db.cacher.MetadataCacherThread()`;
+#      - `metadata_cacher_params` to `_ensure_cacher_loop_thread()`
+#         - and then to `genefab3.db.mongo.cacher.MetadataCacherLoop()`;
 #      - `flask_params` to `_configure_flask_app()`
 
 genefab3_client = GeneFabClient(

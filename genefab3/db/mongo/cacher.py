@@ -1,5 +1,3 @@
-from threading import Thread
-from genefab3.db.sql.response_cache import ResponseCache
 from time import sleep
 from genefab3.common.exceptions import GeneFabLogger
 from genefab3.db.mongo.index import ensure_info_index
@@ -9,22 +7,22 @@ from genefab3.common.hacks import convert_legacy_metadata_post
 from genefab3.db.mongo.index import update_metadata_value_lookup
 from genefab3.db.mongo.utils import iterate_mongo_connections
 from genefab3.db.mongo.types import ValueCheckedRecord
-from genefab3.isa.types import Dataset
 from genefab3.db.mongo.utils import run_mongo_action, harmonize_document
 from genefab3.db.mongo.status import update_status
 
 
-class MetadataCacherThread(Thread):
+class MetadataCacherLoop():
     """Lives in background and keeps local metadata cache, metadata index, and response cache up to date"""
     CLIENT_ATTRIBUTES_TO_COPY = (
-      "adapter", "mongo_collections", "locale", "sqlite_dbs", "units_formatter",
+        "adapter", "DatasetConstructor",
+        "mongo_collections", "locale", "units_formatter",
     )
  
     def __init__(self, *, genefab3_client, full_update_interval, full_update_retry_delay, dataset_init_interval, dataset_update_interval):
-        """Prepare background thread that iteratively watches for changes to datasets"""
+        """Prepare background loop that iteratively watches for changes to datasets"""
         self.genefab3_client = genefab3_client
         self._id = genefab3_client.mongo_appname.replace(
-            "GeneFab3", "MetadataCacherThread",
+            "GeneFab3", "MetadataCacherLoop",
         )
         for attr in self.CLIENT_ATTRIBUTES_TO_COPY:
             setattr(self, attr, getattr(genefab3_client, attr))
@@ -32,7 +30,6 @@ class MetadataCacherThread(Thread):
         self.full_update_retry_delay = full_update_retry_delay
         self.dataset_init_interval = dataset_init_interval
         self.dataset_update_interval = dataset_update_interval
-        self.response_cache = ResponseCache(self.sqlite_dbs)
         self.status_kwargs = dict(collection=self.mongo_collections.status)
         super().__init__()
  
@@ -45,23 +42,22 @@ class MetadataCacherThread(Thread):
         GeneFabLogger.info(f"{self._id}:\n  {msg}")
         sleep(timeout)
  
-    def run(self):
-        """Continuously run MongoDB and SQLite3 cachers"""
+    def __call__(self):
+        """Continuously run MongoDB metadata cacher, inform caller of updated/failed/dropped accessions"""
         while True:
             ensure_info_index(self.mongo_collections, self.locale)
-            self.response_cache.drop_by_context(identity="root") # TODO move lower
             accessions, success = self.recache_metadata()
             if success:
-                if accessions["updated"]:
-                    self.response_cache.drop_all()
-                else:
-                    for acc in accessions["failed"] | accessions["dropped"]:
-                        self.response_cache.drop(acc)
-                self.response_cache.shrink()
-                self.delay(self.full_update_interval, "full metadata update")
+                yield accessions
+                self.delay(
+                    self.full_update_interval,
+                    "full metadata update",
+                )
             else:
-                msg = "retrying connection for metadata update"
-                self.delay(self.full_update_retry_delay, msg)
+                self.delay(
+                    self.full_update_retry_delay,
+                    "retrying connection for metadata update",
+                )
  
     def get_accession_dispatcher(self):
         """Return dict of sets of accessions; populates: 'cached', 'live'; prepares empty: 'fresh', 'updated', 'stale', 'dropped', 'failed'"""
@@ -165,8 +161,8 @@ class MetadataCacherThread(Thread):
             )
             if files.changed or (not has_cache):
                 best_sample_name_matches=self.adapter.best_sample_name_matches
-                dataset = Dataset(
-                    accession, files.value, self.sqlite_dbs,
+                dataset = self.DatasetConstructor(
+                    accession=accession, files=files.value,
                     best_sample_name_matches=best_sample_name_matches,
                     status_kwargs=self.status_kwargs,
                 )
