@@ -4,5 +4,8 @@ sandbox
 data
 __pycache__
 test.py
+tests.py
 .sqlite3
 .flask-cache
+.genefab3.sqlite*
+examples/.ipynb_checkpoints

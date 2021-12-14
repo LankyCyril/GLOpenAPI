@@ -1,130 +1,91 @@
-from genefab3.config import COLLECTION_NAMES
-from flask import request
-from datetime import datetime
-from sys import exc_info
+from os import environ
+from logging import getLogger, DEBUG, INFO
+from sys import exc_info, stderr
 from traceback import format_tb
-from logging import Handler
+from functools import partial
+from json import dumps
+from flask import Response
 
 
-class GeneLabException(Exception):
-    def __init__(self, message="Error", accession_or_object=None, explicit_assay_name=None, **kwargs):
-        from genefab3.common.types import DatasetBaseClass, AssayBaseClass
-        args = [message]
-        if isinstance(accession_or_object, DatasetBaseClass):
-            accession, assay_name = accession_or_object.accession, None
-        elif isinstance(accession_or_object, AssayBaseClass):
-            accession = accession_or_object.dataset.accession
-            assay_name = accession_or_object.name
-        elif accession_or_object is None:
-            accession, assay_name = None, None
-        else:
-            accession, assay_name = str(accession_or_object), None
-        if explicit_assay_name is not None:
-            assay_name = explicit_assay_name
-        if accession is not None:
-            args.append(f'accession="{accession}"')
-        if assay_name is not None:
-            args.append(f'assay.name="{assay_name}"')
-        for k, v in kwargs.items():
-            args.append(f'{k}="{v}"')
-        super().__init__(*args)
+def is_debug(markers={"development", "staging", "stage", "debug", "debugging"}):
+    """Determine if app is running in debug mode"""
+    return environ.get("FLASK_ENV", None) in markers
+
+
+GeneFabLogger = getLogger("genefab3")
+if is_debug():
+    GeneFabLogger.setLevel(DEBUG)
+else:
+    GeneFabLogger.setLevel(INFO)
+
+
+class GeneFabException(Exception):
+    def __init__(self, message="Error", suggestion=None, **kwargs):
+        self.kwargs, self.suggestion = kwargs, suggestion
+        super().__init__(message, *(
+            f'{k}={repr(v)}' for k, v in kwargs.items() if k != "debug_info"
+        ))
     def __str__(self):
+        from genefab3.common.utils import repr_quote
         if len(self.args) == 0:
-            return "Error"
+            s =  "Error"
         elif len(self.args) == 1:
-            return self.args[0]
+            s = self.args[0]
         else:
-            return self.args[0] + ". Happened with: " + ", ".join(self.args[1:])
+            s = self.args[0] + ". Happened with: " + ", ".join(self.args[1:])
+        return repr_quote(s)
 
 
-class GeneLabParserException(GeneLabException): pass
-class GeneLabMetadataException(GeneLabException): pass
-class GeneLabDatabaseException(GeneLabException): pass
-class GeneLabJSONException(GeneLabException): pass
-class GeneLabISAException(GeneLabException): pass
-class GeneLabFileException(GeneLabException): pass
-class GeneLabDataManagerException(GeneLabException): pass
-class GeneLabFormatException(GeneLabException): pass
+class GeneFabConfigurationException(GeneFabException):
+    code, reason = 500, "GeneFab3 Configuration Error"
+class GeneFabDatabaseException(GeneFabException):
+    code, reason = 500, "GeneFab3 Database Error"
+class GeneFabDataManagerException(GeneFabException):
+    code, reason = 500, "Data Manager Internal Server Error"
+class GeneFabFileException(GeneFabException):
+    code, reason = 500, "Unresolvable Data Request"
+class GeneFabFormatException(GeneFabException):
+    code, reason = 400, "BAD REQUEST"
+class GeneFabISAException(GeneFabException):
+    code, reason = 500, "ISA Parser Error"
+class GeneFabParserException(GeneFabException):
+    code, reason = 400, "BAD REQUEST"
 
 
-HTTP_ERROR_MASK = """<html>
-    <head>
-        <style>
-            * {{font-size: 12pt; font-family: monospace}}
-        </style>
-    </head>
-    <body>
-        <b>HTTP error</b>: <mark>{} ({})</mark><br><br><b>{}</b>: {}
-    </body>
-</html>"""
-HTML_LIST_SEP = "<br>&middot;&nbsp;"
-HTTP_DEBUG_ERROR_MASK = "<h2>{}: {}</h2><pre>{}</pre><br><b>{}: {}</b>"
-
-
-def interpret_exc_info(ei):
-    exc_type, exc_value, exc_tb = ei
-    info = [
-        exc_type.__name__, str(exc_value),
-        "Traceback (most recent call last): \n" + "".join(format_tb(exc_tb)),
-    ]
-    return exc_type, exc_value, exc_tb, info
-
-
-def insert_log_entry(mongo_db, et=None, ev=None, stack=None, is_exception=False, cname=COLLECTION_NAMES.LOG, **kwargs):
-    try:
-        remote_addr, full_path = request.remote_addr, request.full_path
-    except RuntimeError:
-        remote_addr, full_path = None, None
-    getattr(mongo_db, cname).insert_one({
-        "is_exception": is_exception, "type": et, "value": ev, "stack": stack,
-        "remote_addr": remote_addr, "full_path": full_path,
-        "timestamp": int(datetime.now().timestamp()), **kwargs,
-    })
-
-
-def traceback_printer(e, mongo_db):
-    exc_type, exc_value, exc_tb, info = interpret_exc_info(exc_info())
-    insert_log_entry(
-        mongo_db, *info, is_exception=True,
-        args=getattr(e, "args", []),
-    )
-    error_message = HTTP_DEBUG_ERROR_MASK.format(
-        *info, exc_type.__name__, str(exc_value),
-    )
-    return error_message, 400
-
-
-def exception_catcher(e, mongo_db):
-    if isinstance(e, FileNotFoundError):
-        code, explanation = 404, "Not Found"
-    elif isinstance(e, NotImplementedError):
-        code, explanation = 501, "Not Implemented"
-    elif isinstance(e, GeneLabDataManagerException):
-        code, explanation = 500, "GeneLab Data Manager Internal Server Error"
-    elif isinstance(e, GeneLabDatabaseException):
-        code, explanation = 500, "GeneLab Database Error"
+def interpret_exception(e, debug=False):
+    from genefab3.common.utils import repr_quote, space_quote
+    exc_type, exc_value, exc_tb = exc_info()
+    if isinstance(e, NotImplementedError):
+        code, reason = 501, "Not Implemented"
     else:
-        code, explanation = 400, "Bad Request"
-    *_, info = interpret_exc_info(exc_info())
-    insert_log_entry(
-        mongo_db, *info, is_exception=True,
-        args=getattr(e, "args", []), code=code,
+        code = getattr(e, "code", 400)
+        reason = getattr(e, "reason", "BAD REQUEST")
+    kwargs = e.kwargs if isinstance(e, GeneFabException) else {}
+    info = dict(
+        code=code, reason=reason,
+        exception_type=exc_type.__name__, exception_value=str(exc_value),
+        args=[] if isinstance(e, GeneFabException) else [
+            repr_quote(repr(a)) for a in getattr(e, "args", [])
+        ],
+        kwargs={
+            space_quote(k): repr_quote(repr(kwargs[k]))
+            for k in kwargs if (debug or (k != "debug_info"))
+        },
     )
-    error_message = HTTP_ERROR_MASK.format(
-        code, explanation, type(e).__name__, (
-            (HTML_LIST_SEP.join(e.args) if hasattr(e, "args") else str(e))
-            or type(e).__name__
-        ),
-    )
-    return error_message, code
+    if isinstance(e, GeneFabException) and getattr(e, "suggestion", None):
+        info["suggestion"] = e.suggestion
+    return info, format_tb(exc_tb)
 
 
-class DBLogger(Handler):
-    def __init__(self, mongo_db):
-        self.mongo_db = mongo_db
-        super().__init__()
-    def emit(self, record):
-        insert_log_entry(
-            self.mongo_db, et=record.levelname, ev=record.getMessage(),
-            stack=record.stack_info, is_exception=False,
-        )
+def exception_catcher(e, debug=False):
+    from genefab3.common.utils import json_permissive_default
+    info, traceback_lines = interpret_exception(e, debug=debug)
+    tb_preface = "Traceback (most recent call last):\n"
+    traceback = "".join(traceback_lines)
+    print(tb_preface, traceback, repr(e), sep="", file=stderr)
+    dumps_permissive = partial(dumps, default=json_permissive_default)
+    if debug:
+        content = dumps_permissive(info, indent=4) + "\n\n" + traceback
+    else:
+        content = dumps_permissive(info, indent=4)
+    return Response(content, mimetype="application/json"), info["code"]
