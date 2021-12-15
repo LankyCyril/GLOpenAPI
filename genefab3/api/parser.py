@@ -39,17 +39,21 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
 
 EmptyIterator = lambda *a, **k: []
 is_regex = lambda v: search(r'^\/.*\/$', v)
+NonNaN = type("NonNaN", (object,), {})
 
 
 def make_safe_mongo_token(token, allow_regex=False):
     """Quote special characters, ensure not a $-command."""
-    quoted_token = space_quote(token)
-    if allow_regex and ("$" not in sub(r'\$\/$', "", quoted_token)):
-        return quoted_token
-    elif "$" not in quoted_token:
-        return quoted_token
+    if token is NonNaN:
+        return token
     else:
-        raise GeneFabParserException("Forbidden argument", field=quoted_token)
+        q_token = space_quote(token)
+        if allow_regex and ("$" not in sub(r'\$\/$', "", q_token)):
+            return q_token
+        elif "$" not in q_token:
+            return q_token
+        else:
+            raise GeneFabParserException("Forbidden argument", field=q_token)
 
 
 def make_safe_sql_name(name, arg="arg"):
@@ -124,42 +128,54 @@ class Context():
         if self.debug != "0" and (not is_debug()):
             raise GeneFabParserException("Setting 'debug' is not allowed")
  
-    def update(self, arg, values=("",), auto_reduce=True):
-        """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections"""
-        category, *fields = map(make_safe_mongo_token, arg.split("."))
+    def _choose_parser(self, arg, category, fields, values):
+        """Choose appropriate parser from KEYVALUE_PARSER_DISPATCHER based on `category`, or bypass if `arg` is one of simple CONTEXT_ARGUMENTS"""
         if arg in CONTEXT_ARGUMENTS:
-            parser = EmptyIterator
+            return EmptyIterator
         elif category in KEYVALUE_PARSER_DISPATCHER():
-            parser = KEYVALUE_PARSER_DISPATCHER()[category]
+            return KEYVALUE_PARSER_DISPATCHER()[category]
         else:
             _kw = {arg: values}
             raise GeneFabParserException("Unrecognized argument", **_kw)
-        def _it():
-            _make_safe_mongo_token = partial(
-                make_safe_mongo_token, allow_regex=(arg=="file.filename"),
+ 
+    def update(self, arg, values=("",), auto_reduce=True):
+        """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections"""
+        category, *fields = map(make_safe_mongo_token, arg.split("."))
+        if category == "":
+            return sum(
+                #self.update(shifted_arg, auto_reduce=auto_reduce)
+                self.update(shifted_arg, (NonNaN,), auto_reduce=auto_reduce)
+                for shifted_arg in values
             )
-            for value in map(_make_safe_mongo_token, values):
-                yield from parser(arg=arg, fields=fields, value=value)
-        n_iter, _en_it = None, enumerate(_it(), 1)
-        for n_iter, (query, projection_keys, columns, comparisons) in _en_it:
-            self.projection.update({k: True for k in projection_keys})
-            if query:
-                if "$and" not in self.query:
-                    self.query["$and"] = []
-                self.query["$and"].append(query)
-            if columns or comparisons:
-                if self.view == "data":
-                    _already_present = set(self.data_columns)
-                    for column in columns:
-                        if column not in _already_present:
-                            self.data_columns.extend(columns)
-                    self.data_comparisons.extend(comparisons)
-                else:
-                    msg = "Column queries are only valid for /data/"
-                    raise GeneFabParserException(msg)
-        if auto_reduce:
-            self.reduce_projection()
-        return n_iter
+        else:
+            parser = self._choose_parser(arg, category, fields, values)
+            def _it():
+                _kw = dict(arg=arg, fields=fields)
+                _make_safe_mongo_token = partial(
+                    make_safe_mongo_token, allow_regex=(arg=="file.filename"),
+                )
+                for value in map(_make_safe_mongo_token, values):
+                    yield from parser(value=value, **_kw)
+            n_iter, _en_it = None, enumerate(_it(), 1)
+            for n_iter, (query, projection_keys, cols, comparisons) in _en_it:
+                self.projection.update({k: True for k in projection_keys})
+                if query:
+                    if "$and" not in self.query:
+                        self.query["$and"] = []
+                    self.query["$and"].append(query)
+                if cols or comparisons:
+                    if self.view == "data":
+                        _already_present = set(self.data_columns)
+                        for col in cols:
+                            if col not in _already_present:
+                                self.data_columns.extend(cols) # TODO: recall, why not .append(col) here?
+                        self.data_comparisons.extend(comparisons)
+                    else:
+                        msg = "Column queries are only valid for /data/"
+                        raise GeneFabParserException(msg)
+            if auto_reduce:
+                self.reduce_projection()
+            return n_iter
  
     def update_special_fields(self):
         """Automatically adjust projection and unwind pipeline for special fields ('file')"""
@@ -230,24 +246,27 @@ class KeyValueParsers():
         else:
             _dot_postfix = KeyValueParsers._infer_postfix(dot_postfix, fields)
             lookup_key, projection_key = arg + _dot_postfix, arg
+            block_match = search(r'\.[^\.]+\.*$', lookup_key)
+        if (not block_match) or (block_match.group().count("|") == 0):
+            is_multikey, projection_keys = False, {projection_key}
+        else:
+            is_multikey, head = True, lookup_key[:block_match.start()]
+            targets = block_match.group().strip(".").split("|")
+            projection_keys = {f"{head}.{target}" for target in targets}
         if value: # metadata field must equal value or one of values
-            if is_regex(value):
+            if value is NonNaN: # not being NaN is same as existing
+                if is_multikey: # allow checking $exists for multiple fields
+                    _real_dot = "." if (block_match.group()[-1] == ".") else ""
+                    query = {"$or": [{k+_real_dot: {"$exists": True}}
+                        for k in projection_keys]}
+                else:
+                    query = {lookup_key : {"$exists": True}}
+            elif is_regex(value):
                 query = {lookup_key: {"$regex": unquote(value)[1:-1]}}
             else:
                 query = {lookup_key: {"$in": unquote(value).split("|")}}
-            projection_keys = {projection_key}
-        else: # metadata field or one of metadata fields must exist
-            block_match = search(r'\.[^\.]+\.*$', lookup_key)
-            if (not block_match) or (block_match.group().count("|") == 0):
-                query = {lookup_key: {"$exists": True}} # single field exists
-                projection_keys = {projection_key}
-            else: # either of the fields exists (OR condition)
-                head = lookup_key[:block_match.start()]
-                targets = block_match.group().strip(".").split("|")
-                projection_keys = {f"{head}.{target}" for target in targets}
-                _pfx = "." if (block_match.group()[-1] == ".") else ""
-                lookup_keys = {k+_pfx for k in projection_keys}
-                query = {"$or": [{k: {"$exists": True}} for k in lookup_keys]}
+        else: # metadata field(s) should be included in output regardless
+            query = None
         yield query, projection_keys, None, None
  
     def kvp_column(arg, category, fields, value):
