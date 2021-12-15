@@ -125,7 +125,7 @@ class Context():
                     "debug": self.debug,
                 }
             ))
-        if self.debug != "0" and (not is_debug()):
+        if (self.debug != "0") and (not is_debug()):
             raise GeneFabParserException("Setting 'debug' is not allowed")
  
     def _choose_parser(self, arg, category, fields, values):
@@ -141,9 +141,8 @@ class Context():
     def update(self, arg, values=("",), auto_reduce=True):
         """Interpret key-value pair; return False/None if not interpretable, else return True and update queries, projections"""
         category, *fields = map(make_safe_mongo_token, arg.split("."))
-        if category == "":
-            return sum(
-                #self.update(shifted_arg, auto_reduce=auto_reduce)
+        if category == "": # "=a.b.c&=d.e.f" => a.b.c is NonNaN; d.e.f is NonNaN
+            return sum( # sum of `n_iter` for each: a.b.c, d.e.f, ...
                 self.update(shifted_arg, (NonNaN,), auto_reduce=auto_reduce)
                 for shifted_arg in values
             )
@@ -160,15 +159,14 @@ class Context():
             for n_iter, (query, projection_keys, cols, comparisons) in _en_it:
                 self.projection.update({k: True for k in projection_keys})
                 if query:
-                    if "$and" not in self.query:
-                        self.query["$and"] = []
-                    self.query["$and"].append(query)
+                    self.query.setdefault("$and", list()).append(query)
                 if cols or comparisons:
                     if self.view == "data":
                         _already_present = set(self.data_columns)
                         for col in cols:
                             if col not in _already_present:
-                                self.data_columns.extend(cols) # TODO: recall, why not .append(col) here?
+                                # TODO: recall, why not .append(col) here?
+                                self.data_columns.extend(cols)
                         self.data_comparisons.extend(comparisons)
                     else:
                         msg = "Column queries are only valid for /data/"
