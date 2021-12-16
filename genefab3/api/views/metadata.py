@@ -38,9 +38,9 @@ def squash(cursor):
 def get(*, mongo_collections, locale, context, id_fields, condensed=False):
     """Select assays/samples based on annotation filters"""
     try:
-        cursor = aggregate_entries_by_context(
-            mongo_collections.metadata, locale=locale, context=context,
-            id_fields=id_fields,
+        cursor, full_projection = aggregate_entries_by_context(
+            mongo_collections.metadata, context=context, id_fields=id_fields,
+            locale=locale, return_full_projection=True,
         )
     except MongoOperationError as e:
         errmsg = getattr(e, "details", {}).get("errmsg", "").lower()
@@ -54,6 +54,7 @@ def get(*, mongo_collections, locale, context, id_fields, condensed=False):
     else:
         annotation = StreamedAnnotationTable(
             cursor=squash(cursor) if condensed else cursor,
+            full_projection=full_projection,
             na_rep=False if condensed else NaN,
         )
     if annotation.shape[0]:

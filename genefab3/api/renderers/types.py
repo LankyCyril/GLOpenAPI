@@ -118,15 +118,23 @@ class StreamedAnnotationTable(StreamedTable):
     _accession_key = "id.accession"
     _isa_categories = {"investigation", "study", "assay"}
  
-    def __init__(self, *, cursor, category_order=("investigation", "study", "assay", "file"), na_rep=NaN):
+    def __init__(self, *, cursor, na_rep=NaN, full_projection=None, category_order=("investigation", "study", "assay", "file")):
         """Infer index names and columns adhering to provided category order, retain forked aggregation cursors"""
         self._cursor, self._na_rep = PhoenixIterator(cursor), na_rep
-        self.accessions, _key_pool, _nrows = set(), set(), 0
+        self.accessions, _nrows = set(), 0
+        _key_pool, _key_lineages = set(), set()
         for _nrows, entry in enumerate(self._cursor, 1):
             for key, value in _SAT_normalize_entry(entry):
-                _key_pool.add(key)
                 if key == self._accession_key:
                     self.accessions.add(value)
+                if key not in _key_pool:
+                    _key_pool.add(key)
+                    while key:
+                        _key_lineages.add(key)
+                        key = ".".join(key.split(".")[:-1])
+        for key, truthy in full_projection.items():
+            if truthy and (key not in _key_lineages):
+                _key_pool.add(key)
         _full_category_order = [
             self._index_category,
             *(p for p in category_order if p != self._index_category), "",
@@ -194,14 +202,16 @@ class StreamedAnnotationTable(StreamedTable):
     @property
     def index(self):
         """Iterate index line by line, like in pandas"""
-        dispatcher = self._index_key_dispatcher
-        yield from self._iter_body_levels(self._cursor, dispatcher)
+        yield from self._iter_body_levels(
+            self._cursor, self._index_key_dispatcher,
+        )
  
     @property
     def values(self):
         """Iterate values line by line, like in pandas"""
-        dispatcher = self._column_key_dispatcher
-        yield from self._iter_body_levels(self._cursor, dispatcher)
+        yield from self._iter_body_levels(
+            self._cursor, self._column_key_dispatcher,
+        )
 
 
 class StreamedDataTable(StreamedTable):
