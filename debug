@@ -1,4 +1,4 @@
 #!/bin/bash
 set -eu
-FLASK_ENV=${1-development} FLASK_APP=app.py flask run --extra-files \
-    genefab3/api/renderers/dataframe.html:genefab3/api/views/root.html
+FLASK_ENV=${1-development} MODE=${2-normal} FLASK_APP=app.py flask run \
+--extra-files genefab3/api/renderers/dataframe.html:genefab3/api/views/root.html

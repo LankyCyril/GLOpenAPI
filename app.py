@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from os import environ
 from flask import Flask
 from genefab3.client import GeneFabClient
 from genefab3_genelab_adapter import GeneLabAdapter
@@ -16,6 +17,7 @@ from genefab3.api.routes import DefaultRoutes
 flask_app = Flask("NASA GeneLab Open API")
 __version__ = "3.1.0"
 GiB = 1024**3
+NOCACHE = (environ.get("MODE") == "nocache")
 
 
 # Initialize the genefab3 client.
@@ -63,13 +65,14 @@ genefab3_client = GeneFabClient(
                 # stores cacheable tabular data
         ),
         response_cache=dict(
-            db="./.genefab3.sqlite3/response-cache.db", maxsize=24*GiB,
+            db=(None if NOCACHE else "./.genefab3.sqlite3/response-cache.db"),
+            maxsize=24*GiB,
                 # optional, pass `db=None` to disable; caches displayable
                 # results of user requests until the (meta)data changes
         ),
     ),
     metadata_cacher_params=dict(
-        enabled=True,
+        enabled=(False if NOCACHE else True),
         dataset_init_interval=3, # seconds between adding datasets that have not
             # been previously cached
         dataset_update_interval=60, # seconds between updating datasets that
