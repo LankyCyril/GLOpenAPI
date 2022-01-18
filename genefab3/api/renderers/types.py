@@ -132,9 +132,10 @@ class StreamedAnnotationTable(StreamedTable):
                     while key:
                         _key_lineages.add(key)
                         key = ".".join(key.split(".")[:-1])
-        for key, truthy in full_projection.items():
-            if truthy and (key not in _key_lineages):
-                _key_pool.add(key)
+        if full_projection:
+            for key, truthy in full_projection.items():
+                if truthy and (key not in _key_lineages):
+                    _key_pool.add(key)
         _full_category_order = [
             self._index_category,
             *(p for p in category_order if p != self._index_category), "",
