@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8"/>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title></title>
+    <style>
+        * {font-family: Roboto; padding: 0; margin: 0}
+        body {margin: 10pt;}
+        tr {vertical-align: top}
+        td {white-space: pre-line; padding-right: 30pt;}
+        red {color: #D10}
+        green {color: #0A1}
+        a {color: #22B}
+        td:last-of-type:not(:first-of-type) {padding-bottom: 50pt}
+    </style>
+    </head>
+    <body>
+        <table><tr>
+        </tr><tr><td colspan=3><h4>Query non-NA columns</h4></td></tr><tr>
+        <td>
+            Before:
+            <green>(think colA&ne;NA &amp; colB&ne;NA)</green>
+            <a href="https://visualization.genelab.nasa.gov/GLOpenAPI/samples/?format=browser&study.factor%20value.altitude&study.factor%20value.time">
+            ?study.factor value.altitude
+            &study.factor value.time</a>
+        </td>
+        <td>
+            Same syntax after:
+            <red>(shows columns even if there's no data)</red>
+            <a href="http://127.0.0.1:5000/samples/?format=browser&study.factor%20value.altitude&study.factor%20value.time">
+            ?study.factor value.altitude
+            &study.factor value.time</a>
+        </td>
+        <td>
+            Equivalent syntax after:
+            <green>(think colA&ne;NA &amp; colB&ne;NA)</green>
+            <a href="http://127.0.0.1:5000/samples/?format=browser&=study.factor%20value.altitude&=study.factor%20value.time">
+            ?=study.factor value.altitude
+            &=study.factor value.time</a>
+        </td>
+        </tr><tr><td colspan=3><h4>Include columns with NAs while querying for others that are non-NA</h4></td></tr><tr>
+        <td>
+            Before:
+            <red>Impossible</red>
+        </td>
+        <td>
+            Same syntax after:
+            Not applicable
+        </td>
+        <td>
+            Correct syntax after:
+            <green>(think "any colA" &amp; colB&ne;NA)</green>
+            <a href="http://127.0.0.1:5000/samples/?format=browser&study.factor%20value.altitude&=study.factor%20value.time">
+            ?study.factor value.altitude
+            &=study.factor value.time</a>
+        </td>
+        </tr><tr><td colspan=3><h4>Include columns with NAs while querying for specific values in others</h4></td></tr><tr>
+        <td>
+            Before:
+            <red>Impossible</red>
+        </td>
+        <td>
+            Same syntax <b><i>before</i></b>:
+            <red>(subsets to non-NA in colA)</red>
+            <a href="https://visualization.genelab.nasa.gov/GLOpenAPI/samples/?format=browser&study.factor%20value.altitude&study.factor%20value.time=day%200">
+            ?study.factor value.altitude
+            &study.factor value.time=day 0</a>
+        </td>
+        <td>
+            Correct syntax after:
+            <green>(think "any colA" &amp; colB=X)</green>
+            <a href="http://127.0.0.1:5000/samples/?format=browser&study.factor%20value.altitude&study.factor%20value.time=day%200">
+            ?study.factor value.altitude
+            &study.factor value.time=day 0</a>
+        </td>
+        </tr><tr><td colspan=3><h4><green>Querying within one assay is unaffected by these changes</green></h4></td></tr><tr>
+        <td>
+            Before:
+            <green>(column values are defined for all samples)</green>
+            <a href="https://visualization.genelab.nasa.gov/GLOpenAPI/samples/?format=browser&id=GLDS-1&study.factor%20value.infection=uninfected&study.factor%20value.spaceflight">
+            &id=GLDS-1
+            &study.factor value.infection=uninfected
+            &study.factor value.spaceflight</a>
+        </td>
+        <td>
+            Same syntax after:
+            <green>(column values are defined for all samples)</green>
+            <a href="http://127.0.0.1:5000/samples/?format=browser&id=GLDS-1&study.factor%20value.infection=uninfected&study.factor%20value.spaceflight">
+            &id=GLDS-1
+            &study.factor value.infection=uninfected
+            &study.factor value.spaceflight</a>
+        </td>
+        <td>
+            Equivalent syntax after:
+            <green>(optional; adding the '=' symbol makes no difference)</green>
+            <a href="http://127.0.0.1:5000/samples/?format=browser&id=GLDS-1&study.factor%20value.infection=uninfected&=study.factor%20value.spaceflight">
+            &id=GLDS-1
+            &study.factor value.infection=uninfected
+            &=study.factor value.spaceflight</a>
+        </td>
+        </tr></table>
+    </body>
+</html>
