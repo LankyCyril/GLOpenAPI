@@ -283,7 +283,7 @@ class KeyValueParsers():
                 name = make_safe_sql_name(match.group(1), arg=arg)
                 op = match.group(2)
                 value = make_safe_sql_value(match.group(3), arg=arg)
-                yield None, (), (), [f"`{name}` {op} {value}"]
+                yield None, (), (name,), [f"`{name}` {op} {value}"]
             else:
                 msg = "Unparseable expression"
                 raise GeneFabParserException(msg, expression=expr)
