@@ -124,6 +124,8 @@ def get_preferred_sort_order(collection, context, id_fields):
 def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), postprocess=(), return_full_projection=False):
     """Run .find() or .aggregate() based on query, projection"""
     full_projection = {**context.projection, **{"id."+f: 1 for f in id_fields}}
+    if all(k.startswith("id.") for k in full_projection):
+        full_projection = {} # there's no metadata constraints provided by user
     pipeline = [
         {"$sort": get_preferred_sort_order(collection, context, id_fields)},
       *({"$unwind": f"${f}"} for f in context.unwind),
