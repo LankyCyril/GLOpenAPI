@@ -286,3 +286,16 @@ def ExecuteMany(partname, width):
     def mkinsert(pd_table, conn, keys, data_iter, name=partname):
         conn.executemany(f"INSERT INTO `{name}` VALUES({qmarks})", data_iter)
     return mkinsert
+
+
+class ForceShowAllDataColumns():
+    """Sentinel"""
+    pass
+
+
+class HackyBlackHoleList(list):
+    """Empty list that cannot be filled, but does not generate errors on attempts"""
+    def append(self, *a, **k): pass
+    def extend(self, *a, **k): pass
+    def __iadd__(self, *a, **k): return self
+    def __imul__(self, *a, **k): return self

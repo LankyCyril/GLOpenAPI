@@ -7,6 +7,7 @@ from flask import request
 from urllib.request import quote, unquote
 from json import dumps
 from genefab3.common.utils import space_quote
+from genefab3.common.hacks import ForceShowAllDataColumns, HackyBlackHoleList
 from genefab3.common.exceptions import GeneFabConfigurationException
 
 
@@ -164,7 +165,9 @@ class Context():
                     if self.view == "data":
                         _already_present = set(self.data_columns)
                         for col in cols:
-                            if col not in _already_present:
+                            if col is ForceShowAllDataColumns:
+                                self.data_columns = HackyBlackHoleList()
+                            elif col not in _already_present:
                                 # TODO: recall, why not .append(col) here?
                                 self.data_columns.extend(cols)
                         self.data_comparisons.extend(comparisons)
@@ -275,7 +278,9 @@ class KeyValueParsers():
         else:
             expr = f"{'.'.join(fields)}={value}" if value else ".".join(fields)
             unq_expr = unquote(expr)
-        if not ({"<", "=", ">"} & set(unq_expr)):
+        if unq_expr == "*":
+            yield None, (), [ForceShowAllDataColumns], ()
+        elif not ({"<", "=", ">"} & set(unq_expr)):
             yield None, (), [make_safe_sql_name(expr)], ()
         else:
             match = search(r'^([^<>=]+)(<|<=|=|==|>=|>)([^<>=]*)$', unq_expr)
@@ -283,7 +288,7 @@ class KeyValueParsers():
                 name = make_safe_sql_name(match.group(1), arg=arg)
                 op = match.group(2)
                 value = make_safe_sql_value(match.group(3), arg=arg)
-                yield None, (), (name,), [f"`{name}` {op} {value}"]
+                yield None, (), [name], [f"`{name}` {op} {value}"]
             else:
                 msg = "Unparseable expression"
                 raise GeneFabParserException(msg, expression=expr)
