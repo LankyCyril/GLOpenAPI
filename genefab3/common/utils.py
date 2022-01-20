@@ -71,6 +71,15 @@ def iterate_terminal_leaf_elements(d, iter_leaves=iterate_terminal_leaves, isins
             yield from pattern.split(value)
 
 
+def flatten_all_keys(d, *, sep=".", head=()):
+    """Recursively iterate nested dictionary `d`, yield flattened key sequences joined by `sep`"""
+    for k, _d in d.items():
+        if isinstance(_d, dict):
+            yield from flatten_all_keys(_d, head=(*head, k))
+        else:
+            yield sep.join((*head, k))
+
+
 def json_permissive_default(o):
     """Serialize numpy entries as native types, sets as informative strings, other unserializable entries as their type names"""
     if isinstance(o, NumpyGenericType):
