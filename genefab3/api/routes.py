@@ -31,16 +31,31 @@ class DefaultRoutes(Routes):
     def assays(self, context):
         return views.metadata.get(
             mongo_collections=self.genefab3_client.mongo_collections,
-            id_fields=["accession", "assay name"], condensed=1,
-            locale=self.genefab3_client.locale, context=context,
+            id_fields=["accession", "assay name"],
+            context=context, condensed=True,
+            locale=self.genefab3_client.locale,
         )
  
     @Routes.register_endpoint()
     def samples(self, context):
         return views.metadata.get(
             mongo_collections=self.genefab3_client.mongo_collections,
-            id_fields=["accession", "assay name", "sample name"], condensed=0,
-            locale=self.genefab3_client.locale, context=context,
+            id_fields=["accession", "assay name", "sample name"],
+            context=context, condensed=False,
+            locale=self.genefab3_client.locale,
+        )
+ 
+    @Routes.register_endpoint()
+    def metadata(self, context):
+        return self.samples(context)
+ 
+    @Routes.register_endpoint("/metadata-counts/")
+    def metadata_counts(self, context):
+        return views.metadata.get(
+            mongo_collections=self.genefab3_client.mongo_collections,
+            id_fields=["accession", "assay name", "sample name"],
+            context=context, condensed=False,
+            locale=self.genefab3_client.locale,
         )
  
     @Routes.register_endpoint()
