@@ -40,7 +40,7 @@ def get(*, mongo_collections, locale, context, id_fields, condensed=False):
     try:
         cursor, full_projection = aggregate_entries_by_context(
             mongo_collections.metadata, context=context, id_fields=id_fields,
-            locale=locale, return_full_projection=True,
+            locale=locale,
         )
     except MongoOperationError as e:
         errmsg = getattr(e, "details", {}).get("errmsg", "").lower()

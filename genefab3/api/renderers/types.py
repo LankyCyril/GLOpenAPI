@@ -118,7 +118,7 @@ class StreamedAnnotationTable(StreamedTable):
     _accession_key = "id.accession"
     _isa_categories = {"investigation", "study", "assay"}
  
-    def __init__(self, *, cursor, na_rep=NaN, full_projection=None, category_order=("investigation", "study", "assay", "file")):
+    def __init__(self, *, cursor, full_projection=None, na_rep=NaN, category_order=("investigation", "study", "assay", "file")):
         """Infer index names and columns adhering to provided category order, retain forked aggregation cursors"""
         self._cursor, self._na_rep = PhoenixIterator(cursor), na_rep
         self.accessions, _nrows = set(), 0

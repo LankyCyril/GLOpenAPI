@@ -121,7 +121,7 @@ def get_preferred_sort_order(collection, context, id_fields):
     return OrderedDict((id_f, ASCENDING) for id_f in _yield_ordered())
 
 
-def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), postprocess=(), return_full_projection=False):
+def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), postprocess=()):
     """Run .find() or .aggregate() based on query, projection"""
     full_projection = {**context.projection, **{"id."+f: 1 for f in id_fields}}
     if all(k.startswith("id.") for k in full_projection):
@@ -138,10 +138,7 @@ def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), p
         pipeline, collation=collation,
         allowDiskUse=True, # note: this is for worst-case, large, scenarios
     )
-    if return_full_projection:
-        return cursor, full_projection
-    else:
-        return cursor
+    return cursor, full_projection
 
 
 def aggregate_file_descriptors_by_context(collection, *, locale, context, tech_type_locator="investigation.study assays.study assay technology type"):
