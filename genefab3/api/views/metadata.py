@@ -38,8 +38,10 @@ def squash(cursor):
 def as_leaf_counts(cursor):
     """Aggregate and count metadata values""" # TODO: this is slow-ish, however, it's cached; but MongoDB native aggregation is WIP
     class MetadataValueCounts(dict): # TODO: genefab3.api.renderers.types
-        default_format = "json"
+        default_format, cacheable, accessions = "json", True, set() # TODO: play along with response_cache
         def add(self, keyseq, value):
+            if keyseq == ("id", "accession"):
+                self.accessions.add(value)
             leafpile = self
             for key in keyseq:
                 if isinstance(leafpile, dict):
