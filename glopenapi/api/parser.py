@@ -235,15 +235,15 @@ class KeyValueParsers():
     def kvp_generic(arg, category, fields, value, fields_depth=2, constrain_to=None, dot_postfix="auto"):
         """Interpret single key-value pair if it gives rise to database query"""
         if not fields:
-            msg = "Category requires a subfield to be specified"
-            raise GLOpenAPIParserException(msg, **{arg: value}, category=category)
+            m = "Category requires a subfield to be specified"
+            raise GLOpenAPIParserException(m, **{arg: value}, category=category)
         elif constrain_to and (fields[0] not in constrain_to):
-            msg = "Unrecognized field in argument"
-            raise GLOpenAPIParserException(msg, **{arg: value}, field=fields[0])
+            m = "Unrecognized field in argument"
+            raise GLOpenAPIParserException(m, **{arg: value}, field=fields[0])
         elif len(fields) > fields_depth:
-            msg = "Too many nested fields in argument"
+            m = "Too many nested fields in argument"
             _kw = {"max_dots": fields_depth}
-            raise GLOpenAPIParserException(msg, **{arg: value}, **_kw)
+            raise GLOpenAPIParserException(m, **{arg: value}, **_kw)
         else:
             _dot_postfix = KeyValueParsers._infer_postfix(dot_postfix, fields)
             lookup_key, projection_key = arg + _dot_postfix, arg

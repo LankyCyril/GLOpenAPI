@@ -72,8 +72,8 @@ def INPLACE_update_metadata_value_lookup_values(index, mongo_collections):
 
 def update_metadata_value_lookup(mongo_collections, cacher_id, keys=("investigation", "study", "assay")):
     """Collect existing keys and values for lookups"""
-    m = "{}:\n  reindexing metadata lookup records ('{}')"
-    GLOpenAPILogger.info(m.format(cacher_id, mongo_collections.metadata_aux.name))
+    mf = "{}:\n  reindexing metadata lookup records ('{}')".format
+    GLOpenAPILogger.info(mf(cacher_id, mongo_collections.metadata_aux.name))
     index = deepcopy_keys(METADATA_AUX_TEMPLATE, *keys)
     INPLACE_update_metadata_value_lookup_keys(index, mongo_collections)
     INPLACE_update_metadata_value_lookup_values(index, mongo_collections)
@@ -87,5 +87,5 @@ def update_metadata_value_lookup(mongo_collections, cacher_id, keys=("investigat
                         query={"isa_category": isa_category, "subkey": subkey},
                         data={"content": index[isa_category][subkey]},
                     )
-    m = "{}:\n  finished reindexing metadata lookup records ('{}')"
-    GLOpenAPILogger.info(m.format(cacher_id, mongo_collections.metadata_aux.name))
+    mf = "{}:\n  finished reindexing metadata lookup records ('{}')".format
+    GLOpenAPILogger.info(mf(cacher_id, mongo_collections.metadata_aux.name))

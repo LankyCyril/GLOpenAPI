@@ -230,7 +230,8 @@ def speed_up_data_schema(get, self, *, context, limit=None, offset=0):
             SQLiteIndexName,
             StreamedDataTableWizard_Single, StreamedDataTableWizard_OuterJoined,
         )
-        GLOpenAPILogger.info(f"apply_hack(speed_up_data_schema) for {self.name}")
+        msg = f"apply_hack(speed_up_data_schema) for {self.name}"
+        GLOpenAPILogger.info(msg)
         sub_dfs, sub_indices = OrderedDict(), {}
         sub_columns, index_name = [], []
         def _extend_parts(obj):

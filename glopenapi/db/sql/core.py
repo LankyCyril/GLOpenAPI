@@ -39,7 +39,9 @@ class SQLiteObject():
     def iterparts(cls, table, connection, *, must_exist=True, partname_mask="{table}://{i}"):
         """During an open connection, iterate all parts of `table` and their index and column names"""
         for i in count():
-            partname = table if i == 0 else partname_mask.format(table=table, i=i)
+            partname = (
+                table if (i == 0) else partname_mask.format(table=table, i=i)
+            )
             if must_exist:
                 query = f"SELECT * FROM `{partname}` LIMIT 0"
                 try:
@@ -177,8 +179,8 @@ class SQLiteBlob(SQLiteObject):
                 WHERE `identifier` == "{self.identifier}" """
             ret = execute(query).fetchall()
             if len(ret) == 0:
-                msg = "No data found"
-                raise GLOpenAPIDatabaseException(msg, identifier=self.identifier)
+                m = "No data found"
+                raise GLOpenAPIDatabaseException(m, identifier=self.identifier)
             elif (len(ret) == 1) and (len(ret[0]) == 1):
                 data = self.decompressor(ret[0][0])
             else:
@@ -186,8 +188,8 @@ class SQLiteBlob(SQLiteObject):
         if data is None:
             with self.sqltransactions.concurrent(desc) as (connection, _):
                 self.drop(connection=connection)
-                msg = "Entries conflict (will attempt to fix on next request)"
-                raise GLOpenAPIDatabaseException(msg, identifier=self.identifier)
+                m = "Entries conflict (will attempt to fix on next request)"
+                raise GLOpenAPIDatabaseException(m, identifier=self.identifier)
         else:
             return data
 

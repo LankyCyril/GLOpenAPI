@@ -228,9 +228,9 @@ class StudyEntries(list):
         if field not in json:
             json[field] = {}
         if subfield in json[field]:
-            msg = "Duplicate field[subfield]"
+            m = "Duplicate field[subfield]"
             _k = copy_except(status_kwargs, "collection")
-            raise GLOpenAPIISAException(msg, field=field, subfield=subfield, **_k)
+            raise GLOpenAPIISAException(m, field=field, subfield=subfield, **_k)
         else: # make {"Characteristics": {"Age": {"": "36"}}}
             json[field][subfield] = {"": value}
             qualifiable = json[field][subfield]

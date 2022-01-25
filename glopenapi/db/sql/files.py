@@ -173,8 +173,8 @@ class CachedTableFile(SQLiteTable):
                             **to_sql_kws, chunksize=chunksize,
                             method=ExecuteMany(partname, bounded.shape[1]),
                         )
-                        msg = "Extended table for CachedTableFile"
-                        GLOpenAPILogger.info(f"{msg}:\n  {self.name}, {partname}")
+                        m = "Extended table for CachedTableFile"
+                        GLOpenAPILogger.info(f"{m}:\n  {self.name}, {partname}")
                 except (OperationalError, PandasDatabaseError, ValueError) as e:
                     msg = "Failed to insert SQL chunk or chunk part"
                     _kw = dict(name=self.name, debug_info=repr(e))
