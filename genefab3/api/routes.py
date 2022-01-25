@@ -32,7 +32,7 @@ class DefaultRoutes(Routes):
         return views.metadata.get(
             mongo_collections=self.genefab3_client.mongo_collections,
             id_fields=["accession", "assay name"],
-            context=context, condensed=True,
+            context=context, condensed=True, unique_counts=False,
             locale=self.genefab3_client.locale,
         )
  
@@ -41,7 +41,7 @@ class DefaultRoutes(Routes):
         return views.metadata.get(
             mongo_collections=self.genefab3_client.mongo_collections,
             id_fields=["accession", "assay name", "sample name"],
-            context=context, condensed=False,
+            context=context, condensed=False, unique_counts=False,
             locale=self.genefab3_client.locale,
         )
  
@@ -54,7 +54,7 @@ class DefaultRoutes(Routes):
         return views.metadata.get(
             mongo_collections=self.genefab3_client.mongo_collections,
             id_fields=["accession", "assay name", "sample name"],
-            context=context, condensed=False,
+            context=context, condensed=False, unique_counts=True,
             locale=self.genefab3_client.locale,
         )
  
