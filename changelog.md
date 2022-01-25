@@ -1,3 +1,33 @@
+Version 4.0.0-alpha0 (2022-01-25)
+
+- Rename backend to GLOpenAPI
+- Features that could be considered breaking changes:
+    - Metadata:
+        - When querying metadata without providing a value (e.g., "&study.factor value.spaceflight&..."), include this
+          field in the output even if it contains NAs (in other words, show the column, but do not constrain by its contents)
+        - To constrain to non-NA values, use syntax "&=field"
+          (with a leading equals sign, e.g. "&=study.factor value.spaceflight&...")
+        - NOTE: the behavior of direct querying for a value (e.g. "&study.factor value.spaceflight=Ground Control")
+          is unaffected by these changes
+        - NOTE: the behavior of querying without providing a value (e.g., "&study.factor value.spaceflight&...")
+          should be unaffected when querying within single assays -- simply due to the fact that within an assay, all
+          fields are simultaneously either defined or not defined. However, take note that theoretically, any queries
+          without an equals sign may return fields with NAs.
+    - Data:
+        - Querying for a column value (e.g. "&column.Log2FC>2") constrains the output to the columns queried for.
+          The remaining columns can be included back by using the wildcard "&column.*"
+          (or its alias, "&c.*" -- see below)
+- Features:
+    - Provide endpoint /metadata/, which is an alias to /samples/
+    - If no metadata constraints are given in the query, return all fields (in /metadata/, /samples/, and /assays/)
+    - Provide endpoint /metadata-counts/, which returns a JSON of value counts for each queried nested field
+      (only format=json is valid)
+    - Provide a wildcard argument "&column.*" (and its alias, "&c.*") to force inclusion of all /data/ columns even
+      when a query would constrain the output to a column
+- Various:
+    - In debug mode, make it possible to launch the app with caches disabled (`./debug development nocache`)
+
+
 Version 3.1.0 (2021-12-13)
 
 - Fixes:
