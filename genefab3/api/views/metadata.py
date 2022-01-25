@@ -35,7 +35,7 @@ def squash(cursor):
         yield _booleanize(squashed_entry)
 
 
-def as_leaf_counts(cursor):
+def as_leaf_counts(cursor, only_atomic=True):
     """Aggregate and count metadata values""" # TODO: this is slow-ish, however, it's cached; but MongoDB native aggregation is WIP
     class MetadataValueCounts(dict): # TODO: genefab3.api.renderers.types
         default_format, cacheable, accessions = "json", True, set() # TODO: play along with response_cache
@@ -47,13 +47,14 @@ def as_leaf_counts(cursor):
                 if isinstance(leafpile, dict):
                     leafpile = leafpile.setdefault(key, {})
                 else:
-                    msg = "Sister branches of document have different lengths"
-                    raise ValueError(msg)
+                    msg = "Sister branches of document have conflicting lengths"
+                    raise GeneFabDatabaseException(msg)
             try:
                 leafpile[value] = leafpile.setdefault(value, 0) + 1
             except TypeError: # unhashable values nested in `value`
-                value = "<complex object>"
-                leafpile[value] = leafpile.setdefault(value, 0) + 1
+                if not only_atomic:
+                    value = "<complex object>"
+                    leafpile[value] = leafpile.setdefault(value, 0) + 1
     def _iterate_branches(entry, keyseq=(), _is=isinstance):
         if isinstance(entry, dict):
             if "" in entry:
@@ -62,7 +63,10 @@ def as_leaf_counts(cursor):
                 for key, value in entry.items():
                     yield from _iterate_branches(value, (*keyseq, str(key)))
         else:
-            yield keyseq, str(entry)
+            if isinstance(entry, str):
+                yield keyseq, entry
+            elif not only_atomic:
+                yield keyseq, str(entry)
     leafcounter = MetadataValueCounts()
     for entry in cursor:
         for keyseq, value in _iterate_branches(entry):
