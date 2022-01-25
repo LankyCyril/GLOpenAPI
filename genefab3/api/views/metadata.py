@@ -12,12 +12,12 @@ def squash(cursor):
     hashes, current_id, squashed_entry = set(), None, {}
     def _booleanize(entry):
         if isinstance(entry, dict):
-            for k, v in entry.items():
-                if k != "id":
-                    if isinstance(v, dict):
-                        _booleanize(v)
+            for key, value in entry.items():
+                if key != "id":
+                    if isinstance(value, dict):
+                        _booleanize(value)
                     else:
-                        entry[k] = True
+                        entry[key] = True
         return entry
     for entry in cursor:
         if entry["id"] != current_id:
@@ -33,6 +33,38 @@ def squash(cursor):
         squashed_entry.update(entry)
     if current_id is not None:
         yield _booleanize(squashed_entry)
+
+
+def as_leaf_counts(cursor):
+    """Aggregate and count metadata values""" # TODO: this is slow-ish, however, it's cached; but MongoDB native aggregation is WIP
+    class MetadataValueCounts(dict):
+        def add(self, keyseq, value):
+            leafpile = self
+            for key in keyseq:
+                if isinstance(leafpile, dict):
+                    leafpile = leafpile.setdefault(key, {})
+                else:
+                    msg = "Sister branches of document have different lengths"
+                    raise ValueError(msg)
+            try:
+                leafpile[value] = leafpile.setdefault(value, 0) + 1
+            except TypeError: # unhashable values nested in `value`
+                value = "<complex object>"
+                leafpile[value] = leafpile.setdefault(value, 0) + 1
+    def _iterate_branches(entry, keyseq=(), _is=isinstance):
+        if isinstance(entry, dict):
+            if "" in entry:
+                yield keyseq, str(entry[""])
+            else:
+                for key, value in entry.items():
+                    yield from _iterate_branches(value, (*keyseq, str(key)))
+        else:
+            yield keyseq, str(entry)
+    leafcounter = MetadataValueCounts()
+    for entry in cursor:
+        for keyseq, value in _iterate_branches(entry):
+            leafcounter.add(keyseq, value)
+    return leafcounter
 
 
 def get_raw(*, mongo_collections, locale, context, id_fields):
@@ -55,40 +87,6 @@ def get_raw(*, mongo_collections, locale, context, id_fields):
         return cursor, full_projection
 
 
-def get_metadata_value_counts(cursor):
-    """Aggregate and count metadata values""" # TODO: this is slow-ish, however, it's cached; but MongoDB native aggregation is WIP
-    _LENGTH_ERROR = "Sister branches of document have different lengths"
-    class _TerminalLeafCount(dict):
-        pass
-    class MetadataValueCounts(dict):
-        def add(self, keyseq, value):
-            leafpile = self
-            for key in keyseq:
-                if isinstance(leafpile, dict):
-                    leafpile = leafpile.setdefault(key, {})
-                else:
-                    raise ValueError(_LENGTH_ERROR)
-            try:
-                leafpile[value] = leafpile.setdefault(value, 0) + 1
-            except TypeError: # unhashable values nested in `value`
-                value = "<complex object>"
-                leafpile[value] = leafpile.setdefault(value, 0) + 1
-    def _iterate_branches(entry, keyseq=(), _is=isinstance):
-        if isinstance(entry, dict):
-            if "" in entry:
-                yield keyseq, entry[""]
-            else:
-                for key, value in entry.items():
-                    yield from _iterate_branches(value, (*keyseq, str(key)))
-        else:
-            yield keyseq, str(entry)
-    leafcounter = MetadataValueCounts()
-    for entry in cursor:
-        for keyseq, value in _iterate_branches(entry):
-            leafcounter.add(keyseq, value)
-    return leafcounter
-
-
 def get(*, mongo_collections, locale, context, id_fields, condensed=False, unique_counts=False):
     """Select assays/samples based on annotation filters; optionally count terminal leaf values"""
     cursor, full_projection = get_raw(
@@ -96,11 +94,11 @@ def get(*, mongo_collections, locale, context, id_fields, condensed=False, uniqu
         context=context, locale=locale,
     )
     if unique_counts:
-        return get_metadata_value_counts(cursor)
+        return as_leaf_counts(cursor)
     else:
         annotation = StreamedAnnotationTable(
             cursor=squash(cursor) if condensed else cursor,
-            full_projection=full_projection,
+            full_projection=full_projection, # TODO: exclude sample, study name from /assays/
             na_rep=False if condensed else NaN,
         )
         if annotation.shape[0]:
