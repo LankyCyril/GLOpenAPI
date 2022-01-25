@@ -3,6 +3,7 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.db.mongo.utils import aggregate_entries_by_context
 from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException
+from genefab3.api.renderers.types import AnnotationValueCounts
 from genefab3.api.renderers.types import StreamedAnnotationTable
 from genefab3.common.types import NaN
 
@@ -35,45 +36,6 @@ def squash(cursor):
         yield _booleanize(squashed_entry)
 
 
-def as_leaf_counts(cursor, only_atomic=True):
-    """Aggregate and count metadata values""" # TODO: this is slow-ish, however, it's cached; but MongoDB native aggregation is WIP
-    class MetadataValueCounts(dict): # TODO: genefab3.api.renderers.types
-        default_format, cacheable, accessions = "json", True, set() # TODO: play along with response_cache
-        def add(self, keyseq, value):
-            if keyseq == ("id", "accession"):
-                self.accessions.add(value)
-            leafpile = self
-            for key in keyseq:
-                if isinstance(leafpile, dict):
-                    leafpile = leafpile.setdefault(key, {})
-                else:
-                    msg = "Sister branches of document have conflicting lengths"
-                    raise GeneFabDatabaseException(msg)
-            try:
-                leafpile[value] = leafpile.setdefault(value, 0) + 1
-            except TypeError: # unhashable values nested in `value`
-                if not only_atomic:
-                    value = "<complex object>"
-                    leafpile[value] = leafpile.setdefault(value, 0) + 1
-    def _iterate_branches(entry, keyseq=(), _is=isinstance):
-        if isinstance(entry, dict):
-            if "" in entry:
-                yield keyseq, str(entry[""])
-            else:
-                for key, value in entry.items():
-                    yield from _iterate_branches(value, (*keyseq, str(key)))
-        else:
-            if isinstance(entry, str):
-                yield keyseq, entry
-            elif not only_atomic:
-                yield keyseq, str(entry)
-    leafcounter = MetadataValueCounts()
-    for entry in cursor:
-        for keyseq, value in _iterate_branches(entry):
-            leafcounter.add(keyseq, value)
-    return leafcounter
-
-
 def get_raw(*, mongo_collections, locale, context, id_fields):
     """Select assays/samples based on annotation filters; return raw MongoDB cursor and projection"""
     try:
@@ -101,7 +63,7 @@ def get(*, mongo_collections, locale, context, id_fields, condensed=False, uniqu
         context=context, locale=locale,
     )
     if unique_counts:
-        return as_leaf_counts(cursor)
+        return AnnotationValueCounts(cursor)
     else:
         annotation = StreamedAnnotationTable(
             cursor=squash(cursor) if condensed else cursor,

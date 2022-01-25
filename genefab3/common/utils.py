@@ -18,6 +18,7 @@ timestamp36 = lambda: base_repr(int(datetime.now().timestamp() * (10**6)), 36)
 as_is = lambda _:_
 
 copy_except = lambda d, *kk: {k: v for k, v in d.items() if k not in kk}
+items_except = lambda d, *kk: ((k, v) for k, v in d.items() if k not in kk)
 deepcopy_except = lambda d, *kk: deepcopy({k: d[k] for k in d if k not in kk})
 deepcopy_keys = lambda d, *kk: deepcopy({k: d[k] for k in kk})
 
@@ -58,7 +59,7 @@ def iterate_terminal_leaves(d, step_tracker=1, max_steps=256, isinstance=isinsta
         msg = "Document branch exceeds nestedness threshold"
         raise GeneFabConfigurationException(msg, max_steps=max_steps)
     elif isinstance(d, dict):
-        for i, branch in enumerate(d.values(), start=1):
+        for i, branch in enumerate(d.values(), start=1): # TODO need enumerate, or same level for immediate children?!
             yield from iterate_terminal_leaves(branch, step_tracker+i)
     else:
         yield d
@@ -69,6 +70,24 @@ def iterate_terminal_leaf_elements(d, iter_leaves=iterate_terminal_leaves, isins
     for value in iter_leaves(d):
         if isinstance(value, str):
             yield from pattern.split(value)
+
+
+def iterate_branches_and_leaves(d, keyseq=(), value_key="", only_atomic=True, step_tracker=1, max_steps=256, isinstance=isinstance, dict=dict, str=str):
+    if step_tracker >= max_steps:
+        msg = "Document branch exceeds nestedness threshold"
+        raise GeneFabConfigurationException(msg, max_steps=max_steps)
+    elif isinstance(d, dict):
+        if value_key in d:
+            yield keyseq, str(d[""])
+        for key, value in items_except(d, ""):
+            yield from iterate_branches_and_leaves(
+                value, (*keyseq, str(key)),
+                value_key, only_atomic, step_tracker+1,
+            )
+    elif isinstance(d, str):
+        yield keyseq, d
+    elif not only_atomic:
+        yield keyseq, str(d)
 
 
 def flatten_all_keys(d, *, sep=".", head=()):

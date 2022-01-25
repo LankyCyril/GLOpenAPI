@@ -5,7 +5,8 @@ from genefab3.common.types import ExtNaN, NaN, PhoenixIterator
 from genefab3.db.sql.utils import SQLTransactions, reraise_operational_error
 from sqlite3 import OperationalError
 from genefab3.common.exceptions import GeneFabConfigurationException
-from genefab3.common.exceptions import GeneFabLogger
+from genefab3.common.exceptions import GeneFabDatabaseException, GeneFabLogger
+from genefab3.common.utils import iterate_branches_and_leaves
 
 
 def _SAT_normalize_entry(e, max_level=2, head=(), add_on="comment", cache=OrderedDict(), join=".".join, marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple):
@@ -327,3 +328,32 @@ class StreamedDataTable(StreamedTable):
                             yield [self.na_rep if v is None else v for v in vv]
         except OperationalError as e:
             reraise_operational_error(self, e)
+
+
+class AnnotationValueCounts(dict):
+    default_format = "json"
+    cacheable = True
+ 
+    def __init__(self, cursor, *, only_atomic=True):
+        self.accessions = set()
+        self.only_atomic = only_atomic
+        for entry in cursor:
+            for keyseq, value in iterate_branches_and_leaves(entry):
+                self.add(keyseq, value)
+ 
+    def add(self, keyseq, value):
+        if keyseq == ("id", "accession"):
+            self.accessions.add(value)
+        leafpile = self
+        for key in keyseq:
+            if isinstance(leafpile, dict):
+                leafpile = leafpile.setdefault(key, {})
+            else:
+                msg = "Sister branches of document have conflicting lengths"
+                raise GeneFabDatabaseException(msg)
+        try:
+            leafpile[value] = leafpile.setdefault(value, 0) + 1
+        except TypeError: # unhashable values nested in `value`
+            if not self.only_atomic:
+                value = "<complex object>"
+                leafpile[value] = leafpile.setdefault(value, 0) + 1
