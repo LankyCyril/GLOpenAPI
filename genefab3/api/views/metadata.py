@@ -3,7 +3,7 @@ from genefab3.common.exceptions import GeneFabConfigurationException
 from genefab3.db.mongo.utils import aggregate_entries_by_context
 from pymongo.errors import OperationFailure as MongoOperationError
 from genefab3.common.exceptions import GeneFabDatabaseException
-from genefab3.api.renderers.types import AnnotationValueCounts
+from genefab3.api.renderers.types import StreamedAnnotationValueCounts
 from genefab3.api.renderers.types import StreamedAnnotationTable
 from genefab3.common.types import NaN
 
@@ -63,7 +63,7 @@ def get(*, mongo_collections, locale, context, id_fields, condensed=False, uniqu
         context=context, locale=locale,
     )
     if unique_counts:
-        return AnnotationValueCounts(cursor)
+        return StreamedAnnotationValueCounts(cursor)
     else:
         annotation = StreamedAnnotationTable(
             cursor=squash(cursor) if condensed else cursor,

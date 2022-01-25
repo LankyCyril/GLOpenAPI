@@ -330,7 +330,8 @@ class StreamedDataTable(StreamedTable):
             reraise_operational_error(self, e)
 
 
-class AnnotationValueCounts(dict):
+class StreamedAnnotationValueCounts(dict):
+    """Value counts JSON streamed from MongoDB cursor""" # TODO: not exactly clean, as extensive data transformation happens right here
     default_format = "json"
     cacheable = True
  
