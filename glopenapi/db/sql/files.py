@@ -90,6 +90,11 @@ class CachedTableFile(SQLiteTable):
         try:
             yield filename
         finally:
+            # Note: even with a `finally`, hot reboots / shutdowns may leave
+            # some tempfiles lingering. It does not break anything, as the
+            # target data will not be stored in the database, and therefore will
+            # be re-downloaded using a different raw tempfile;
+            # however, TODO: remove stale temp-*.raw files
             if path.isfile(filename):
                 remove(filename)
  
