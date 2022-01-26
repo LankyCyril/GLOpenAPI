@@ -336,11 +336,15 @@ class StreamedAnnotationValueCounts(dict):
     default_format = "json"
     cacheable = True
  
-    def __init__(self, cursor, *, only_atomic=True):
+    def __init__(self, cursor, *, only_primitive=True):
         self.accessions = set()
-        self.only_atomic = only_atomic
+        self.only_primitive = only_primitive
+        _kw = dict(
+            value_key="", only_primitive=only_primitive,
+            TargetKeyType=str, TargetValueType=str,
+        )
         for entry in cursor:
-            for keyseq, value in iterate_branches_and_leaves(entry):
+            for keyseq, value in iterate_branches_and_leaves(entry, **_kw):
                 self.add(keyseq, value)
  
     def add(self, keyseq, value):
@@ -356,6 +360,6 @@ class StreamedAnnotationValueCounts(dict):
         try:
             leafpile[value] = leafpile.setdefault(value, 0) + 1
         except TypeError: # unhashable values nested in `value`
-            if not self.only_atomic:
+            if not self.only_primitive:
                 value = "<complex object>"
                 leafpile[value] = leafpile.setdefault(value, 0) + 1
