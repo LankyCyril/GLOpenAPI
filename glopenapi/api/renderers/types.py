@@ -331,10 +331,22 @@ class StreamedDataTable(StreamedTable):
             reraise_operational_error(self, e)
 
 
+class _SAVC_SetCounter(dict):
+    """Ingests values by key, but represents only the counts of unique values per key"""
+    def __init__(self):
+        self.sets = {}
+    def add(self, k, v):
+        if v not in self.sets.setdefault(k, set()):
+            self[k] = self.setdefault(k, 0) + 1
+            self.sets[k].add(v)
+
+
 class StreamedAnnotationValueCounts(dict):
     """Value counts JSON streamed from MongoDB cursor""" # TODO: not exactly clean, as extensive data transformation happens right here
     default_format = "json"
     cacheable = True
+    idmissing_warnmsg = "MongoDB 'metadata' document missing id fields"
+    generic_errmsg = "Sister branches of document may have conflicting lengths"
  
     def __init__(self, cursor, *, only_primitive=True):
         self.accessions = set()
@@ -344,22 +356,44 @@ class StreamedAnnotationValueCounts(dict):
             TargetKeyType=str, TargetValueType=str,
         )
         for entry in cursor:
-            for keyseq, value in iterate_branches_and_leaves(entry, **_kw):
-                self.add(keyseq, value)
+            try:
+                accession = entry["id"]["accession"]
+                assay_name = entry["id"]["assay name"]
+                sample_name = entry["id"]["sample name"]
+            except (KeyError, TypeError, IndexError):
+                GLOpenAPILogger.warning(self.idmissing_warnmsg)
+            else:
+                self.accessions.add(accession)
+                for keyseq, value in iterate_branches_and_leaves(entry, **_kw):
+                    self.add(keyseq, value, accession, assay_name, sample_name)
  
-    def add(self, keyseq, value):
-        if keyseq == ("id", "accession"):
-            self.accessions.add(value)
+    def add(self, keyseq, value, accession, assay_name, sample_name):
+        # Note: this is relatively slow, but the result is LRU cached, which makes it fast in the generalized real use case
         leafpile = self
         for key in keyseq:
             if isinstance(leafpile, dict):
                 leafpile = leafpile.setdefault(key, {})
             else:
-                msg = "Sister branches of document have conflicting lengths"
-                raise GLOpenAPIDatabaseException(msg)
-        try:
-            leafpile[value] = leafpile.setdefault(value, 0) + 1
-        except TypeError: # unhashable values nested in `value`
-            if not self.only_primitive:
-                value = "<complex object>"
-                leafpile[value] = leafpile.setdefault(value, 0) + 1
+                _kw = dict(
+                    accession=accession, assay_name=assay_name,
+                    sample_name=sample_name, keys=keyseq,
+                )
+                raise GLOpenAPIDatabaseException(self.generic_errmsg, **_kw)
+        for v in (value, "<complex object>"):
+            try:
+                if value not in leafpile:
+                    leafpile[value] = _SAVC_SetCounter()
+                lv = leafpile[value]
+                if not isinstance(lv, _SAVC_SetCounter):
+                    _kw = dict(
+                        accession=accession, assay_name=assay_name,
+                        sample_name=sample_name, keys=keyseq,
+                    )
+                    raise GLOpenAPIDatabaseException(self.generic_errmsg, **_kw)
+                else:
+                    lv.add("accessions", accession)
+                    lv.add("assays", assay_name)
+                    lv.add("samples", sample_name)
+            except TypeError: # unhashable values nested in `value`
+                if self.only_primitive:
+                    break
