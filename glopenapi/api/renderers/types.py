@@ -331,12 +331,23 @@ class StreamedDataTable(StreamedTable):
             reraise_operational_error(self, e)
 
 
-class _SAVC_SetCounter(dict):
-    """Ingests values by key, but represents only the counts of unique values per key"""
+class _SAVC_PerKeyCounter(dict):
+    """Ingests values by key, but represents only the counts of values per key; either unique or all"""
     def __init__(self):
-        self.sets = {}
-    def add(self, k, v):
-        if v not in self.sets.setdefault(k, set()):
+        self.lists, self.sets = {}, {}
+    def _fail(self):
+        msg = "Same id level being counted as unique and non-unique"
+        raise GLOpenAPIConfigurationException(msg)
+    def count(self, k, v):
+        if k in self.sets:
+            self._fail()
+        else:
+            self.lists[k] = True
+            self[k] = self.setdefault(k, 0) + 1
+    def count_unique(self, k, v):
+        if k in self.lists:
+            self._fail()
+        elif v not in self.sets.setdefault(k, set()):
             self[k] = self.setdefault(k, 0) + 1
             self.sets[k].add(v)
 
@@ -382,18 +393,20 @@ class StreamedAnnotationValueCounts(dict):
         for v in (value, "<complex object>"):
             try:
                 if value not in leafpile:
-                    leafpile[value] = _SAVC_SetCounter()
+                    leafpile[value] = _SAVC_PerKeyCounter()
                 lv = leafpile[value]
-                if not isinstance(lv, _SAVC_SetCounter):
+                if not isinstance(lv, _SAVC_PerKeyCounter):
                     _kw = dict(
                         accession=accession, assay_name=assay_name,
                         sample_name=sample_name, keys=keyseq,
                     )
                     raise GLOpenAPIDatabaseException(self.generic_errmsg, **_kw)
                 else:
-                    lv.add("accessions", accession)
-                    lv.add("assays", assay_name)
-                    lv.add("samples", sample_name)
+                    lv.count_unique("accessions", accession)
+                    lv.count_unique("assays", assay_name)
+                    lv.count("samples", sample_name)
             except TypeError: # unhashable values nested in `value`
                 if self.only_primitive:
                     break
+            else:
+                break
