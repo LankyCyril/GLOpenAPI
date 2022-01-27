@@ -1,3 +1,41 @@
+Version 4.0.0-alpha0 (2022-01-27)
+
+- Rename backend to GLOpenAPI
+- Features that MAY BE CONSIDERED BREAKING CHANGES:
+    - Metadata:
+        - If no metadata constraints are given in the query, return all fields (in /metadata/, /samples/, and /assays/);
+          this is now consistent with the behavior of the /data/ endpoint (which has always returned all columns if no
+          constraints were given)
+        - When querying metadata without providing a value (e.g., "&study.factor value.spaceflight&..."), include this
+          field in the output even if it contains NAs (in other words, show the column, but do not constrain by its
+          contents)
+        - To constrain to non-NA values, use syntax "&=field"
+          (with a leading equals sign, e.g. "&=study.factor value.spaceflight&...")
+        - NOTE: the behavior of direct querying for a value (e.g. "&study.factor value.spaceflight=Ground Control")
+          is unaffected by these changes
+        - NOTE: the behavior of querying without providing a value (e.g., "&study.factor value.spaceflight&...")
+          should be unaffected when querying within single assays -- simply due to the fact that within an assay, all
+          fields are simultaneously either defined or not defined. However, take note that theoretically, any queries
+          without an equals sign may return fields with NAs.
+    - Data:
+        - Querying for a column value (e.g. "&column.Log2FC>2") constrains the output to the columns queried for.
+          The remaining columns can be included back by using the wildcard "&column.*"
+          (or its alias, "&c.*" -- see below)
+- Features:
+    - Metadata:
+        - Provide endpoint /metadata/, which is an alias to /samples/
+        - Provide endpoint /metadata-counts/, which returns a JSON of value counts for each queried nested field:
+            - each metadata value is represented by an object with three fields: "accessions", "assays", "samples" --
+              each of these fields contains the number of respective entires that nave this value;
+            - only the JSON format is valid (and is the default, so one may omit the "&format=json" argument entirely)
+    - Data:
+        - Provide a wildcard argument "&column.*" (and its alias, "&c.*") to force inclusion of all /data/ columns even
+          when a query would constrain the output to a column
+- Various:
+    - In debug mode, make it possible to launch the app with caches disabled (`./debug development nocache`)
+      (this is only possible on staging/development servers, not on the production server)
+
+
 Version 3.1.0 (2021-12-13)
 
 - Fixes:

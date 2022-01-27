@@ -1,25 +1,27 @@
 #!/usr/bin/env python
+from os import environ
 from flask import Flask
-from genefab3.client import GeneFabClient
-from genefab3_genelab_adapter import GeneLabAdapter
-from genefab3.api.routes import DefaultRoutes
+from glopenapi.client import GLOpenAPIClient
+from glopenapi_genelab_adapter import GeneLabAdapter
+from glopenapi.api.routes import DefaultRoutes
 
 
 # Initialize the Flask app.
 # - Must be defined in the global scope, i.e. right here, even though all we are
-#   doing later is passing `flask_app` to `GeneFabClient` via `flask_params`.
+#   doing later is passing `flask_app` to `GLOpenAPIClient` via `flask_params`.
 #   Defining it in the global scope is meant to accommodate the standard ways of
 #   setting up the server and testing the app, because loaders usually rely on
 #   importing the app variable from this file.
 # - The name of the Flask app will be used in the header of the landing page.
 
 flask_app = Flask("NASA GeneLab Open API")
-__version__ = "3.1.0"
+__version__ = "4.0.0-alpha0"
 GiB = 1024**3
+NOCACHE = (environ.get("MODE") == "nocache")
 
 
-# Initialize the genefab3 client.
-# - `AdapterClass` must be a subclass of `genefab3.common.types.Adapter()`
+# Initialize the glopenapi client.
+# - `AdapterClass` must be a subclass of `glopenapi.common.types.Adapter()`
 #      and provide the following methods:
 #      - `get_accessions()`: returns an iterable of accession names;
 #      - `get_files_by_accession(accession)`: returns a dictionary of the form
@@ -28,23 +30,23 @@ GiB = 1024**3
 #                 "urls": ["%URL1%", "%URL2%", ...], # first reachable is used
 #             }}
 #         Each entry can have additional optional fields; for more details,
-#         see documentation in genefab3/common/types.py,
-#         or an implementation in genefab3_genelab_adapter/adapter.py.
-# - `RoutesClass` must be a subclass of `genefab3.common.types.Routes()`
+#         see documentation in glopenapi/common/types.py,
+#         or an implementation in glopenapi_genelab_adapter/adapter.py.
+# - `RoutesClass` must be a subclass of `glopenapi.api.types.Routes()`
 #      and associate endpoints with functions that may return objects of various
-#      types understood by `genefab3.api.renderer.CacheableRenderer()`.
-#      See implementation of `DefaultRoutes` in genefab3/api/routes.py,
-#      and `TYPE_RENDERERS` in genefab3/api/renderer.py.
+#      types understood by `glopenapi.api.renderer.CacheableRenderer()`.
+#      See implementation of `DefaultRoutes` in glopenapi/api/routes.py,
+#      and `TYPE_RENDERERS` in glopenapi/api/renderer.py.
 # - `mongo_params`, `sqlite_params`, `metadata_cacher_params`, `flask_params`
-#      are passed as keyword arguments to methods of `GeneFabClient`;
-#      for possible argument names, see genefab3/client.py.
+#      are passed as keyword arguments to methods of `GLOpenAPIClient`;
+#      for possible argument names, see glopenapi/client.py.
 #      - `mongo_params` is passed to `_get_mongo_db_connection()`;
 #      - `sqlite_params` to `_get_validated_sqlite_dbs()`;
-#      - `metadata_cacher_params` to `_ensure_metadata_cacher_thread()`
-#         - and then to `genefab3.db.cacher.MetadataCacherThread()`;
+#      - `metadata_cacher_params` to `_ensure_cacher_loop_thread()`
+#         - and then to `glopenapi.db.mongo.cacher.MetadataCacherLoop()`;
 #      - `flask_params` to `_configure_flask_app()`
 
-genefab3_client = GeneFabClient(
+glopenapi_client = GLOpenAPIClient(
     app_version=__version__,
     AdapterClass=GeneLabAdapter,
     RoutesClass=DefaultRoutes,
@@ -63,13 +65,14 @@ genefab3_client = GeneFabClient(
                 # stores cacheable tabular data
         ),
         response_cache=dict(
-            db="./.genefab3.sqlite3/response-cache.db", maxsize=24*GiB,
+            db=(None if NOCACHE else "./.genefab3.sqlite3/response-cache.db"),
+            maxsize=24*GiB,
                 # optional, pass `db=None` to disable; caches displayable
                 # results of user requests until the (meta)data changes
         ),
     ),
     metadata_cacher_params=dict(
-        enabled=True,
+        enabled=(False if NOCACHE else True),
         dataset_init_interval=3, # seconds between adding datasets that have not
             # been previously cached
         dataset_update_interval=60, # seconds between updating datasets that
