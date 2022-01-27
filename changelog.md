@@ -1,10 +1,14 @@
-Version 4.0.0-alpha0 (2022-01-25)
+Version 4.0.0-alpha0 (2022-01-27)
 
 - Rename backend to GLOpenAPI
-- Features that could be considered breaking changes:
+- Features that MAY BE CONSIDERED BREAKING CHANGES:
     - Metadata:
+        - If no metadata constraints are given in the query, return all fields (in /metadata/, /samples/, and /assays/);
+          this is now consistent with the behavior of the /data/ endpoint (which has always returned all columns if no
+          constraints were given)
         - When querying metadata without providing a value (e.g., "&study.factor value.spaceflight&..."), include this
-          field in the output even if it contains NAs (in other words, show the column, but do not constrain by its contents)
+          field in the output even if it contains NAs (in other words, show the column, but do not constrain by its
+          contents)
         - To constrain to non-NA values, use syntax "&=field"
           (with a leading equals sign, e.g. "&=study.factor value.spaceflight&...")
         - NOTE: the behavior of direct querying for a value (e.g. "&study.factor value.spaceflight=Ground Control")
@@ -18,14 +22,18 @@ Version 4.0.0-alpha0 (2022-01-25)
           The remaining columns can be included back by using the wildcard "&column.*"
           (or its alias, "&c.*" -- see below)
 - Features:
-    - Provide endpoint /metadata/, which is an alias to /samples/
-    - If no metadata constraints are given in the query, return all fields (in /metadata/, /samples/, and /assays/)
-    - Provide endpoint /metadata-counts/, which returns a JSON of value counts for each queried nested field
-      (only format=json is valid)
-    - Provide a wildcard argument "&column.*" (and its alias, "&c.*") to force inclusion of all /data/ columns even
-      when a query would constrain the output to a column
+    - Metadata:
+        - Provide endpoint /metadata/, which is an alias to /samples/
+        - Provide endpoint /metadata-counts/, which returns a JSON of value counts for each queried nested field:
+            - each metadata value is represented by an object with three fields: "accessions", "assays", "samples" --
+              each of these fields contains the number of respective entires that nave this value;
+            - only the JSON format is valid (and is the default, so one may omit the "&format=json" argument entirely)
+    - Data:
+        - Provide a wildcard argument "&column.*" (and its alias, "&c.*") to force inclusion of all /data/ columns even
+          when a query would constrain the output to a column
 - Various:
     - In debug mode, make it possible to launch the app with caches disabled (`./debug development nocache`)
+      (this is only possible on staging/development servers, not on the production server)
 
 
 Version 3.1.0 (2021-12-13)
