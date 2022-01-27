@@ -357,7 +357,7 @@ class StreamedAnnotationValueCounts(dict):
     default_format = "json"
     cacheable = True
     idmissing_warnmsg = "MongoDB 'metadata' document missing id fields"
-    generic_errmsg = "Sister branches of document may have conflicting lengths"
+    generic_errmsg = "Sister branches of entry may have conflicting lengths"
  
     def __init__(self, cursor, *, only_primitive=True):
         self.accessions = set()
@@ -374,9 +374,9 @@ class StreamedAnnotationValueCounts(dict):
             except (KeyError, TypeError, IndexError):
                 GLOpenAPILogger.warning(self.idmissing_warnmsg)
             else:
-                self.accessions.add(accession)
                 for keyseq, value in iterate_branches_and_leaves(entry, **_kw):
                     self.add(keyseq, value, accession, assay_name, sample_name)
+                self.accessions.add(accession)
  
     def add(self, keyseq, value, accession, assay_name, sample_name):
         # Note: this is relatively slow, but the result is LRU cached, which makes it fast in the generalized real use case
@@ -385,28 +385,23 @@ class StreamedAnnotationValueCounts(dict):
             if isinstance(leafpile, dict):
                 leafpile = leafpile.setdefault(key, {})
             else:
-                _kw = dict(
-                    accession=accession, assay_name=assay_name,
-                    sample_name=sample_name, keys=keyseq,
+                raise GLOpenAPIDatabaseException(
+                    self.generic_errmsg, keyseq=keyseq, accession=accession,
+                    assay_name=assay_name, sample_name=sample_name,
                 )
-                raise GLOpenAPIDatabaseException(self.generic_errmsg, **_kw)
-        for v in (value, "<complex object>"):
-            try:
-                if value not in leafpile:
-                    leafpile[value] = _SAVC_PerKeyCounter()
-                lv = leafpile[value]
-                if not isinstance(lv, _SAVC_PerKeyCounter):
-                    _kw = dict(
-                        accession=accession, assay_name=assay_name,
-                        sample_name=sample_name, keys=keyseq,
-                    )
-                    raise GLOpenAPIDatabaseException(self.generic_errmsg, **_kw)
-                else:
-                    lv.count_unique("accessions", accession)
-                    lv.count_unique("assays", assay_name)
-                    lv.count("samples", sample_name)
-            except TypeError: # unhashable values nested in `value`
-                if self.only_primitive:
-                    break
+        try:
+            leaf = leafpile.setdefault(value, _SAVC_PerKeyCounter())
+        except TypeError: # unhashable values nested in `value`
+            if self.only_primitive:
+                return
             else:
-                break
+                leaf = leafpile.setdefault(str(value), _SAVC_PerKeyCounter())
+        if not isinstance(leaf, _SAVC_PerKeyCounter):
+            raise GLOpenAPIDatabaseException(
+                self.generic_errmsg, keyseq=keyseq, accession=accession,
+                assay_name=assay_name, sample_name=sample_name,
+            )
+        else:
+            leaf.count_unique("accessions", accession)
+            leaf.count_unique("assays", assay_name)
+            leaf.count("samples", sample_name)
