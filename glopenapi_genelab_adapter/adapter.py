@@ -186,8 +186,11 @@ class GeneLabAdapter(Adapter):
             for _, row in files.sort_values(by="timestamp").iterrows()
         }
  
+    # TODO: method for expanding legacy abbreviations HERE
+ 
     def best_sample_name_matches(self, name, names, return_positions=False):
         """Match ISA sample names to their variants in data files (R-like dot-separated, postfixed)"""
+        # TODO: match by expanding legacy abbreviations, if needed
         dotted = lru_cache(maxsize=None)(
             lambda s: sub(r'[._-]', ".", s) if isinstance(s, str) else None
         )
