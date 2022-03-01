@@ -112,6 +112,12 @@ def INPLACE_process_dataframe(dataframe, *, mongo_collections, descriptor, best_
             dataframe.columns, descriptor, all_sample_names,
             best_sample_name_matches,
         )
+        if dataframe.shape[1] != len(harmonized_column_order):
+            raise GLOpenAPIDatabaseException(
+                "Sample names in data file do not match those in the metadata",
+                filename=descriptor.get("file", {}).get("filename", ""),
+                sample_names=dataframe.columns.tolist(),
+            )
         if not (dataframe.columns == column_order).all():
             for column in column_order: # reorder columns in-place
                 dataframe[column] = dataframe.pop(column)
