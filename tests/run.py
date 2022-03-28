@@ -8,6 +8,7 @@ from json import dumps
 from pandas import read_csv
 from urllib.parse import quote
 from functools import partial
+from contextlib import contextmanager
 
 
 TERMWIDTH = get_terminal_size().columns
@@ -16,7 +17,7 @@ TESTS = type("Tests", (list,), dict(register=lambda s,c: s.append(c) or c))()
 ARG_RULES = {
     ("api_root",): {
         "help": "API root URL", "type": str, "nargs": "?",
-        "default": "http://127.0.0.1:5000/",
+        "default": "http://127.0.0.1:5000",
     },
     ("--list-tests", "--lt"): {
         "help": "List available test names", "action": "store_true",
@@ -104,7 +105,8 @@ class Test():
     def seed(self):
         pass
  
-    def get_object(self, view, query, reader):
+    @contextmanager
+    def go(self, view, query, reader=read_csv):
         full_query, reader_kwargs, post = {**query}, {}, lambda _:_
         if reader == read_csv:
             reader_kwargs.update(dict(low_memory=False, escapechar="#"))
@@ -118,13 +120,15 @@ class Test():
                 ])
             if query.get("format") == "tsv":
                 reader_kwargs["sep"] = "\t"
+        def _kv2str(k, v):
+            head = quote(k) if isinstance(k, str) else quote(".".join(k))
+            return head if (v == "") else f"{head}={quote(str(v))}"
         url = f"{self.args.api_root}/{view}/?" + "&".join(
-            quote(k) if (v == "") else f"{quote(k)}={quote(str(v))}"
-            for k, v in full_query.items()
+            _kv2str(k, v) for k, v in full_query.items()
         )
         if self.args.verbose:
             print(f"  < URL: {url}", file=stderr)
-        return post(reader(url, **reader_kwargs))
+        yield post(reader(url, **reader_kwargs))
 
 
 @TESTS.register
@@ -133,12 +137,24 @@ class InvestigationStudyComment(Test):
     multiple_datasets = False
  
     def run(self, datasets=None):
-        go = partial(self.get_object, reader=read_csv)
-        metadata = go("samples", {"investigation.study": ""})
-        self.datasets = set(metadata.index.get_level_values(0))
-        c1, c2 = "investigation.study", "comment.mission start"
-        if (c1, c2) not in metadata.columns:
-            return -1, f"'{c1}.{c2}' missing"
+        t0, b = "investigation.study", [
+            "comment.mission start", "comment.mission end",
+            "comment.space program", "study title",
+        ]
+        with self.go("samples", {t0: ""}) as metadata:
+            if (t0, b[0]) not in metadata.columns:
+                return -1, f"'{t0}.{b[0]}' missing"
+            if (t0, "study title.") in metadata.columns:
+                return -1, f"extra dot in '{t0}.study title.'"
+        with self.go("samples", {(t0, b[0]): "", (t0, b[1]): ""}) as metadata:
+            if (metadata.shape[0] == 0) or (metadata.shape[1] < 2):
+                return -1, f"direct query for '{t0}.{b[0]}/{t0}.{b[1]}' failed"
+        with self.go("samples", {(t0, b[2]): ""}) as metadata:
+            if (metadata.shape[1] > 1):
+                return -1, "querying for one 'comment' field retrieves many"
+        with self.go("samples", {(t0, b[3]): ""}) as metadata:
+            if any(c.startswith("comment") for _, c in set(metadata.columns)):
+                return -1, "querying for non-comment also retrieves comments"
         return 200
 
 
@@ -148,8 +164,9 @@ def main(args):
         for t in TESTS:
             _stmd = str(t.multiple_datasets)
             print(f"{t.__name__:32} {_stmd:20} {t.cross_dataset}")
+        return 0
     else:
-        results = {}
+        results, n_errors = {}, 0
         for Test in TESTS:
             if (not args.tests) or (Test.__name__ in args.tests):
                 print(f"Running {Test.__name__}...", file=stderr)
@@ -157,8 +174,9 @@ def main(args):
                 results[Test.__name__] = test.results
                 if test.n_errors and args.stop_on_error:
                     break
+                n_errors += test.n_errors
         print(dumps(results, sort_keys=True, indent=4))
-    return 0
+        return n_errors
 
 
 if __name__ == "__main__":
