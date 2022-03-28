@@ -3,12 +3,13 @@ from sys import stderr
 from os import get_terminal_size
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from random import shuffle
-from itertools import combinations_with_replacement
-from json import dumps
+from itertools import combinations_with_replacement, takewhile
+from json import dumps, loads
 from pandas import read_csv
 from urllib.parse import quote
 from functools import partial
 from contextlib import contextmanager
+from requests import get as rget
 
 
 TERMWIDTH = get_terminal_size().columns
@@ -133,7 +134,25 @@ class Test():
         )
         if self.args.verbose:
             print(f"  < URL: {url}", file=stderr)
-        yield post(reader(url, **reader_kwargs))
+        try:
+            yield post(reader(url, **reader_kwargs))
+        except Exception as e:
+            raise self.generate_error_description(url, e)
+ 
+    def generate_error_description(self, url, e_orig):
+        try:
+            with rget(url) as response:
+                ej = loads("\n".join(
+                    takewhile(lambda s: s != "", response.text.split("\n"))
+                ))
+        except Exception as e_current:
+            return IOError(f"{str(e_orig)} [c.o. {e_current!r}] [URL: {url}]")
+        else:
+            return IOError("".join((
+                    ej.get('exception_type', 'Exception'),
+                    f"({ej.get('exception_value', '')!r})",
+                    f" [c.o. {e_orig!r}] [URL: {url}]",
+            )))
 
 
 @TESTS.register
@@ -201,7 +220,7 @@ class DataColumns(Test):
             with self.go("data", query={**q, f"c.{index_col}": ""}) as data:
                 pass
         except Exception as e:
-            return -1, f"{desc} fails w/ {e!r}"
+            return -1, f"{desc} fails w/ {e}"
         else:
             if data.shape[1] != 0:
                 return -1, f"{desc} produces the wrong # of columns"
@@ -209,7 +228,7 @@ class DataColumns(Test):
             with self.go("data", query={**q, **column_queries}) as data:
                 pass
         except Exception as e:
-            return -1, f"retrieving data columns fails w/ {e!r}"
+            return -1, f"retrieving data columns fails w/ {e}"
         else:
             if (data.shape[1] != 3) or (data.index.names[0][2] != index_col):
                 return -1, "index column lost when retrieving other data cols"
