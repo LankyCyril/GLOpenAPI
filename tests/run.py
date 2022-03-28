@@ -107,7 +107,11 @@ class Test():
  
     @contextmanager
     def go(self, view, query, reader=read_csv):
-        full_query, reader_kwargs, post = {**query}, {}, lambda _:_
+        if isinstance(query, dict):
+            full_query = {**query}
+        else:
+            full_query = {k: "" for k in query}
+        reader_kwargs, post = {}, lambda _:_
         if reader == read_csv:
             reader_kwargs.update(dict(low_memory=False, escapechar="#"))
             if view == "data":
@@ -118,7 +122,7 @@ class Test():
                 post = lambda df: df.set_index([
                     c for c in df.columns.tolist() if c[0] == "id"
                 ])
-            if query.get("format") == "tsv":
+            if full_query.get("format") == "tsv":
                 reader_kwargs["sep"] = "\t"
         def _kv2str(k, v):
             head = quote(k) if isinstance(k, str) else quote(".".join(k))
@@ -141,20 +145,35 @@ class InvestigationStudyComment(Test):
             "comment.mission start", "comment.mission end",
             "comment.space program", "study title",
         ]
-        with self.go("samples", {t0: ""}) as metadata:
-            if (t0, b[0]) not in metadata.columns:
+        with self.go("samples", {t0}) as data:
+            if (t0, b[0]) not in data.columns:
                 return -1, f"'{t0}.{b[0]}' missing"
-            if (t0, "study title.") in metadata.columns:
+            if (t0, "study title.") in data.columns:
                 return -1, f"extra dot in '{t0}.study title.'"
-        with self.go("samples", {(t0, b[0]): "", (t0, b[1]): ""}) as metadata:
-            if (metadata.shape[0] == 0) or (metadata.shape[1] < 2):
+        with self.go("samples", {(t0, b[0]), (t0, b[1])}) as data:
+            if (data.shape[0] == 0) or (data.shape[1] < 2):
                 return -1, f"direct query for '{t0}.{b[0]}/{t0}.{b[1]}' failed"
-        with self.go("samples", {(t0, b[2]): ""}) as metadata:
-            if (metadata.shape[1] > 1):
+        with self.go("samples", {(t0, b[2])}) as data:
+            if (data.shape[1] > 1):
                 return -1, "querying for one 'comment' field retrieves many"
-        with self.go("samples", {(t0, b[3]): ""}) as metadata:
-            if any(c.startswith("comment") for _, c in set(metadata.columns)):
+        with self.go("samples", {(t0, b[3])}) as data:
+            if any(c.startswith("comment") for _, c in set(data.columns)):
                 return -1, "querying for non-comment also retrieves comments"
+        return 200
+
+
+@TESTS.register
+class LargeMetadata(Test):
+    cross_dataset = False
+    multiple_datasets = False
+ 
+    def run(self, datasets=None):
+        t0, b = "study", ["factor value", "parameter value", "characteristics"]
+        with self.go("samples", {(t0, b[0])}):
+            pass
+        with self.go("samples", {(t0, b[0]), (t0, b[1]), (t0, b[2])}) as data:
+            if (data.shape[0] == 0) or (data.shape[1] == 0):
+                return -1, "retrieving all 'study.*' returns nothing"
         return 200
 
 
@@ -166,17 +185,18 @@ def main(args):
             print(f"{t.__name__:32} {_stmd:20} {t.cross_dataset}")
         return 0
     else:
-        results, n_errors = {}, 0
+        results = {"n_errors": 0, "success": None, "tests": {}}
         for Test in TESTS:
             if (not args.tests) or (Test.__name__ in args.tests):
                 print(f"Running {Test.__name__}...", file=stderr)
                 test = Test(args)
-                results[Test.__name__] = test.results
+                results["tests"][Test.__name__] = test.results
                 if test.n_errors and args.stop_on_error:
                     break
-                n_errors += test.n_errors
+                results["n_errors"] += test.n_errors
+        results["success"] = (results["n_errors"] == 0)
         print(dumps(results, sort_keys=True, indent=4))
-        return n_errors
+        return results["n_errors"]
 
 
 if __name__ == "__main__":
