@@ -189,12 +189,30 @@ class DataColumns(Test):
  
     def run(self, datasets):
         q = {"file.datatype": "visualization table", "id": datasets}
-        with self.go(view="data", query={**q, "schema": 1}) as schema:
-            print(schema)
-            if schema.index.names[:2] != ("*", "*"):
+        with self.go("data", query={**q, "schema": 1}) as schema:
+            if schema.index.names[0][:2] != ("*", "*"):
                 return -1, "data index top level is not '*', '*'"
-            cols = [schema.index.names[2], *schema.columns.get_level_values(2)]
-            shuffle(cols)
+            index_col = schema.index.names[0][2]
+            columns = list(schema.columns.get_level_values(2))
+            shuffle(columns)
+            column_queries = {f"c.{c}": "" for c in [index_col, *columns[:3]]}
+        desc = "retrieving just the data index"
+        try:
+            with self.go("data", query={**q, f"c.{index_col}": ""}) as data:
+                pass
+        except Exception as e:
+            return -1, f"{desc} fails w/ {e!r}"
+        else:
+            if data.shape[1] != 0:
+                return -1, f"{desc} produces the wrong # of columns"
+        try:
+            with self.go("data", query={**q, **column_queries}) as data:
+                pass
+        except Exception as e:
+            return -1, f"retrieving data columns fails w/ {e!r}"
+        else:
+            if (data.shape[1] != 3) or (data.index.names[0][2] != index_col):
+                return -1, "index column lost when retrieving other data cols"
         return 200
 
 
