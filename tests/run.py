@@ -62,20 +62,21 @@ def preprocess_args(args):
 
 
 class Test():
-    cross_dataset = False
     multiple_datasets = False
+    cross_dataset = False
     target_datasets = "*"
  
     def __init__(self, args):
         self.args, self.results, self.n_errors = args, {}, 0
         self.seed()
         if self.multiple_datasets:
-            self.target_datasets = self.datasets & args.favorites
+            self.target_datasets = list(self.datasets & args.favorites)
+            self.target_datasets = self.target_datasets[:args.n_datasets]
             non_favorite_datasets = list(self.datasets - args.favorites)
             shuffle(non_favorite_datasets)
             for dataset in non_favorite_datasets:
                 if len(self.target_datasets) < args.n_datasets:
-                    self.target_datasets.add(dataset)
+                    self.target_datasets.append(dataset)
             if self.cross_dataset:
                 cwr = list(map(set, combinations_with_replacement(
                     self.target_datasets, args.max_combined,
@@ -106,7 +107,7 @@ class Test():
         pass
  
     @contextmanager
-    def go(self, view, query, reader=read_csv):
+    def go(self, view="samples", query=(), reader=read_csv):
         if isinstance(query, dict):
             full_query = {**query}
         else:
@@ -137,26 +138,26 @@ class Test():
 
 @TESTS.register
 class InvestigationStudyComment(Test):
-    cross_dataset = False
     multiple_datasets = False
+    cross_dataset = False
  
     def run(self, datasets=None):
         t0, b = "investigation.study", [
             "comment.mission start", "comment.mission end",
             "comment.space program", "study title",
         ]
-        with self.go("samples", {t0}) as data:
+        with self.go(query={t0}) as data:
             if (t0, b[0]) not in data.columns:
                 return -1, f"'{t0}.{b[0]}' missing"
             if (t0, "study title.") in data.columns:
                 return -1, f"extra dot in '{t0}.study title.'"
-        with self.go("samples", {(t0, b[0]), (t0, b[1])}) as data:
+        with self.go(query={(t0, b[0]), (t0, b[1])}) as data:
             if (data.shape[0] == 0) or (data.shape[1] < 2):
                 return -1, f"direct query for '{t0}.{b[0]}/{t0}.{b[1]}' failed"
-        with self.go("samples", {(t0, b[2])}) as data:
+        with self.go(query={(t0, b[2])}) as data:
             if (data.shape[1] > 1):
                 return -1, "querying for one 'comment' field retrieves many"
-        with self.go("samples", {(t0, b[3])}) as data:
+        with self.go(query={(t0, b[3])}) as data:
             if any(c.startswith("comment") for _, c in set(data.columns)):
                 return -1, "querying for non-comment also retrieves comments"
         return 200
@@ -164,16 +165,36 @@ class InvestigationStudyComment(Test):
 
 @TESTS.register
 class LargeMetadata(Test):
-    cross_dataset = False
     multiple_datasets = False
+    cross_dataset = False
  
     def run(self, datasets=None):
         t0, b = "study", ["factor value", "parameter value", "characteristics"]
-        with self.go("samples", {(t0, b[0])}):
+        with self.go(query={(t0, b[0])}):
             pass
-        with self.go("samples", {(t0, b[0]), (t0, b[1]), (t0, b[2])}) as data:
+        with self.go(query={(t0, b[0]), (t0, b[1]), (t0, b[2])}) as data:
             if (data.shape[0] == 0) or (data.shape[1] == 0):
                 return -1, "retrieving all 'study.*' returns nothing"
+        return 200
+
+
+@TESTS.register
+class DataColumns(Test):
+    multiple_datasets = True
+    cross_dataset = False
+ 
+    def seed(self):
+        with self.go(query={"file.datatype": "visualization table"}) as data:
+            self.datasets = set(data.index.get_level_values(0))
+ 
+    def run(self, datasets):
+        q = {"file.datatype": "visualization table", "id": datasets}
+        with self.go(view="data", query={**q, "schema": 1}) as schema:
+            print(schema)
+            if schema.index.names[:2] != ("*", "*"):
+                return -1, "data index top level is not '*', '*'"
+            cols = [schema.index.names[2], *schema.columns.get_level_values(2)]
+            shuffle(cols)
         return 200
 
 
