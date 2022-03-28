@@ -147,7 +147,7 @@ def aggregate_file_descriptors_by_context(collection, *, locale, context, tech_t
     """Return DataFrame of file descriptors that match user query"""
     context.projection["file"] = True
     context.update(tech_type_locator, auto_reduce=True)
-    return aggregate_entries_by_context(
+    cursor, _ = aggregate_entries_by_context(
         collection, locale=locale, context=context,
         id_fields=["accession", "assay name", "sample name"], postprocess=[
             {"$group": {
@@ -163,6 +163,7 @@ def aggregate_file_descriptors_by_context(collection, *, locale, context, tech_t
             {"$replaceRoot": {"newRoot": "$_id"}},
         ],
     )
+    return cursor
 
 
 def match_sample_names_to_file_descriptor(collection, descriptor):
