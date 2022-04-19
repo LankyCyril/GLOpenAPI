@@ -4,6 +4,7 @@ from os import get_terminal_size
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from random import shuffle
 from itertools import combinations_with_replacement, takewhile
+from itertools import combinations, permutations
 from json import dumps, loads
 from pandas import read_csv
 from urllib.parse import quote
@@ -233,6 +234,58 @@ class DataColumns(Test):
             if (data.shape[1] != 3) or (data.index.names[0][2] != index_col):
                 return -1, "index column lost when retrieving other data cols"
         return 200
+
+
+@TESTS.register
+class MetadataToVizColumn(Test):
+    multiple_datasets = True
+    cross_dataset = False
+ 
+    GROUP_PREFIXES = ["Group.Mean", "Group.Stdev"]
+    CONTRAST_PREFIXES = [
+        "Log2fc", "Updown_Log2fc", "P.value", "Adj.p.value", "Sig.05", "Sig.1",
+        "Log2_P.value", "Log2_Adj.p.value",
+    ]
+    n_cols = 3
+ 
+    def seed(self):
+        with self.go(query={"file.datatype": "visualization table"}) as data:
+            self.datasets = set(data.index.get_level_values(0))
+ 
+    def run(self, datasets):
+        data_q = {"file.datatype": "visualization table", "id": datasets}
+        meta_q = {"study.factor value": "", "id": datasets}
+        shuffle(self.GROUP_PREFIXES)
+        shuffle(self.CONTRAST_PREFIXES)
+        potential_data_columns = set()
+        with self.go("samples", query=meta_q) as metadata:
+            factor_permutations = {
+                " & ".join(p)
+                for _, row in metadata.drop_duplicates().iterrows()
+                for p in permutations(row, len(row))
+            }
+            for prefix in self.GROUP_PREFIXES[:3]:
+                for fp in factor_permutations:
+                    potential_data_columns.add(f"{prefix}_{fp}")
+            factor_combinations = {
+                f"({a})v({b})" for a, b in
+                combinations(factor_permutations, 2)
+            }
+            for prefix in self.CONTRAST_PREFIXES[:3]:
+                for fc in factor_combinations:
+                    potential_data_columns.add(f"{prefix}_{fc}")
+        with self.go("data", query={**data_q, "schema": 1}) as schema:
+            data_columns = list(
+                potential_data_columns & set(schema.columns.get_level_values(2))
+            )
+            shuffle(data_columns)
+            column_queries = {f"c.{c}": "" for c in data_columns[:self.n_cols]}
+        with self.go("data", query={**data_q, **column_queries}) as data:
+            if (data.shape[0] == 0) or (data.shape[1] != self.n_cols):
+                e = "; ".join(f"{c!r}" for c in column_queries)
+                return -1, f"metadata values and data columns do not match: {e}"
+            else:
+                return 200
 
 
 def main(args):
