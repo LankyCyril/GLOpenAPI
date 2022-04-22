@@ -312,7 +312,8 @@ class MetadataToVizColumn(Test):
         potential_data_columns = set()
         with self.go("samples", query=meta_q) as metadata:
             factor_permutations = {
-                " & ".join(p) for _, r in metadata.drop_duplicates().iterrows()
+                " & ".join(map(str, p))
+                for _, r in metadata.drop_duplicates().iterrows()
                 for p in permutations(r, len(r))
             }
             for prefix in self.GROUP_PREFIXES[:3]:
@@ -339,8 +340,7 @@ class MetadataToVizColumn(Test):
             if (data.shape[0] == 0) or (data.shape[1] != self.n_cols):
                 e = "; ".join(f"{c!r}" for c in column_queries)
                 return -1, f"metadata values and data columns do not match: {e}"
-            else:
-                return 200, None
+            return 200, None
 
 
 def main(args):
