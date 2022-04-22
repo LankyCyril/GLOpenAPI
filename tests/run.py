@@ -78,10 +78,10 @@ class Test():
     multiple_datasets = False
     cross_dataset = False
     target_datasets = "*"
-    target_api_version = (0, 0, 0)
+    min_api_version = (0, 0, 0)
  
     def __init__(self, args):
-        self.args, self.results, self.n_errors = args, {}, 0
+        self.args, self.results, self.n_errors, self.n_warnings = args, {}, 0, 0
         self.seed()
         if self.multiple_datasets:
             self.target_datasets = list(self.datasets & args.favorites)
@@ -100,22 +100,21 @@ class Test():
         for i, ds in enumerate(self.target_datasets, start=1):
             print(f"  Round {i} STARTED: using dataset(s) {ds}", file=stderr)
             try:
-                ret = self.run(ds)
+                status, error, *warnings = self.run(ds, args=args)
             except Exception as e:
-                status, error = -1, repr(e)
-            else:
-                if isinstance(ret, (list, tuple)):
-                    status, error = [*ret[:2], 200, False][:2]
-                else:
-                    status, error = ret, False
+                status, error, warnings = -1, repr(e), []
             key = ",".join(sorted(ds)) if isinstance(ds, set) else ds
-            _results = dict(status=status, error=error, success=(status==200))
+            _results = dict(
+                success=(status==200), status=status,
+                warnings=warnings, error=error,
+            )
             self.results[key] = _results
             print(f"  Round {i} RESULTS: {_results}", file=stderr)
             if status != 200:
                 self.n_errors += 1
                 if args.stop_on_error:
                     break
+            self.n_warnings += len(warnings)
  
     def seed(self):
         pass
@@ -123,9 +122,11 @@ class Test():
     @contextmanager
     def go(self, view="samples", query=(), reader=read_csv):
         if isinstance(query, dict):
-            full_query = {**query}
+            full_query = list(query.items())
+        elif isinstance(query, set):
+            full_query = [(k, "") for k in query]
         else:
-            full_query = {k: "" for k in query}
+            full_query = query[:]
         reader_kwargs, post = {}, lambda _:_
         if reader == read_csv:
             reader_kwargs.update(dict(low_memory=False, escapechar="#"))
@@ -137,13 +138,15 @@ class Test():
                 post = lambda df: df.set_index([
                     c for c in df.columns.tolist() if c[0] == "id"
                 ])
-            if full_query.get("format") == "tsv":
-                reader_kwargs["sep"] = "\t"
+            for k, v in full_query:
+                if (k == "format") and (v == "tsv"):
+                    reader_kwargs["sep"] = "\t"
+                    break
         def _kv2str(k, v):
             head = quote(k) if isinstance(k, str) else quote(".".join(k))
             return head if (v == "") else f"{head}={quote(str(v))}"
         url = f"{self.args.api_root}/{view}/?" + "&".join(
-            _kv2str(k, v) for k, v in full_query.items()
+            _kv2str(k, v) for k, v in full_query
         )
         if self.args.verbose:
             print(f"  < URL: {url}", file=stderr)
@@ -172,9 +175,9 @@ class Test():
 class InvestigationStudyComment(Test):
     multiple_datasets = False
     cross_dataset = False
-    target_api_version = (3, 1, 0)
+    min_api_version = (3, 1, 0)
  
-    def run(self, datasets=None):
+    def run(self, datasets=None, *, args=None):
         t0, b = "investigation.study", [
             "comment.mission start", "comment.mission end",
             "comment.space program", "study title",
@@ -193,36 +196,69 @@ class InvestigationStudyComment(Test):
         with self.go(query={(t0, b[3])}) as data:
             if any(c.startswith("comment") for _, c in set(data.columns)):
                 return -1, "querying for non-comment also retrieves comments"
-        return 200
+        return 200, None
 
 
 @TESTS.register
 class LargeMetadata(Test):
     multiple_datasets = False
     cross_dataset = False
-    target_api_version = (3, 1, 0)
+    min_api_version = (3, 1, 0)
  
-    def run(self, datasets=None):
+    def run(self, datasets=None, *, args=None):
         t0, b = "study", ["factor value", "parameter value", "characteristics"]
         with self.go(query={(t0, b[0])}):
             pass
         with self.go(query={(t0, b[0]), (t0, b[1]), (t0, b[2])}) as data:
             if (data.shape[0] == 0) or (data.shape[1] == 0):
                 return -1, "retrieving all 'study.*' returns nothing"
-        return 200
+        return 200, None
+
+
+@TESTS.register
+class MetadataCombinationsAnd(Test):
+    multiple_datasets = False
+    cross_dataset = False
+    min_api_version = (3, 1, 0)
+ 
+    def run(self, datasets=None, *, args=None):
+        with self.go("assays", query={"study.factor value"}) as assays:
+            n_factors = assays.sum(axis=1)
+            good_assays = assays[(n_factors>1) & (n_factors<=args.max_combined)]
+            potential_targets = [
+                [ids2, row[row==True]] for ids2, row in good_assays.iterrows()
+            ]
+            shuffle(potential_targets)
+            targets = potential_targets[:args.max_combinations]
+        if len(targets) == 0:
+            return -1, "no assays satisfying -m and -M criteria"
+        else:
+            for ids2, row in targets:
+                if args.target_api_version < (4,):
+                    query = {f"{k}.{v}" for k, v in row.index}
+                else:
+                    query = {f"={k}.{v}" for k, v in row.index}
+                with self.go("samples", query=query) as metadata:
+                    for ids3 in metadata.index.tolist():
+                        if ids2 == ids3[:2]:
+                            break
+                    else:
+                        msg = f"for {query}, expected {ids2} but not retrieved"
+                        return -1, msg
+            return 200, None
 
 
 @TESTS.register
 class DataColumns(Test):
     multiple_datasets = True
     cross_dataset = False
-    target_api_version = (3, 1, 0)
+    min_api_version = (3, 1, 0)
  
     def seed(self):
         with self.go(query={"file.datatype": "visualization table"}) as data:
             self.datasets = set(data.index.get_level_values(0))
  
-    def run(self, datasets):
+    def run(self, datasets, *, args=None):
         q = {"file.datatype": "visualization table", "id": datasets}
         with self.go("data", query={**q, "schema": 1}) as schema:
             if schema.index.names[0][:2] != ("*", "*"):
@@ -248,14 +284,14 @@ class DataColumns(Test):
         else:
             if (data.shape[1] != 3) or (data.index.names[0][2] != index_col):
                 return -1, "index column lost when retrieving other data cols"
-        return 200
+        return 200, None
 
 
 @TESTS.register
 class MetadataToVizColumn(Test):
     multiple_datasets = True
     cross_dataset = False
-    target_api_version = (3, 1, 0)
+    min_api_version = (3, 1, 0)
  
     GROUP_PREFIXES = ["Group.Mean", "Group.Stdev"]
     CONTRAST_PREFIXES = [
@@ -268,7 +304,7 @@ class MetadataToVizColumn(Test):
         with self.go(query={"file.datatype": "visualization table"}) as data:
             self.datasets = set(data.index.get_level_values(0))
  
-    def run(self, datasets):
+    def run(self, datasets, *, args=None):
         data_q = {"file.datatype": "visualization table", "id": datasets}
         meta_q = {"study.factor value": "", "id": datasets}
         shuffle(self.GROUP_PREFIXES)
@@ -276,16 +312,14 @@ class MetadataToVizColumn(Test):
         potential_data_columns = set()
         with self.go("samples", query=meta_q) as metadata:
             factor_permutations = {
-                " & ".join(p)
-                for _, row in metadata.drop_duplicates().iterrows()
-                for p in permutations(row, len(row))
+                " & ".join(p) for _, r in metadata.drop_duplicates().iterrows()
+                for p in permutations(r, len(r))
             }
             for prefix in self.GROUP_PREFIXES[:3]:
                 for fp in factor_permutations:
                     potential_data_columns.add(f"{prefix}_{fp}")
             factor_combinations = {
-                f"({a})v({b})" for a, b in
-                combinations(factor_permutations, 2)
+                f"({a})v({b})" for a, b in combinations(factor_permutations, 2)
             }
             for prefix in self.CONTRAST_PREFIXES[:3]:
                 for fc in factor_combinations:
@@ -294,6 +328,11 @@ class MetadataToVizColumn(Test):
             data_columns = list(
                 potential_data_columns & set(schema.columns.get_level_values(2))
             )
+            if len(data_columns) == 0:
+                return 200, False, (
+                    "No mapping from metadata to data columns; "
+                    "possibly pending factor value replacements"
+                )
             shuffle(data_columns)
             column_queries = {f"c.{c}": "" for c in data_columns[:self.n_cols]}
         with self.go("data", query={**data_q, **column_queries}) as data:
@@ -301,33 +340,34 @@ class MetadataToVizColumn(Test):
                 e = "; ".join(f"{c!r}" for c in column_queries)
                 return -1, f"metadata values and data columns do not match: {e}"
             else:
-                return 200
+                return 200, None
 
 
 def main(args):
     if args.list_tests:
         print(
             f"{'#name':32}", f"{'#multiple_datasets':19}",
-            f"{'#target_api_version':20}", "#cross_dataset",
+            f"{'#min_api_version':17}", "#cross_dataset",
         )
         for Test in TESTS:
             print(
                 f"{Test.__name__:32}", f"{str(Test.multiple_datasets):19}",
-                f"{'.'.join(map(str, Test.target_api_version)):20}",
+                f"{'.'.join(map(str, Test.min_api_version)):17}",
                 f"{Test.cross_dataset}",
             )
         return 0
     else:
-        results = {"n_errors": 0, "success": None, "tests": {}}
+        results = {"n_errors": 0, "n_warnings": 0, "success": None, "tests": {}}
         for Test in TESTS:
             if (not args.tests) or (Test.__name__ in args.tests):
-                if Test.target_api_version <= args.target_api_version:
+                if Test.min_api_version <= args.target_api_version:
                     print(f"Running {Test.__name__}...", file=stderr)
                     test = Test(args)
                     results["tests"][Test.__name__] = test.results
                     if test.n_errors and args.stop_on_error:
                         break
                     results["n_errors"] += test.n_errors
+                    results["n_warnings"] += test.n_warnings
                 else:
                     msg = f"Skipping {Test.__name__} (targets newer version)"
                     print(msg, file=stderr)
