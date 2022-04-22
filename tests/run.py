@@ -21,6 +21,10 @@ ARG_RULES = {
         "help": "API root URL", "type": str, "nargs": "?",
         "default": "http://127.0.0.1:5000",
     },
+    ("--target-api-version", "--tv"): {
+        "help": "Target API version", "default": "3.1.0",
+        "metavar": "V",
+    },
     ("--list-tests", "--lt"): {
         "help": "List available test names", "action": "store_true",
     },
@@ -55,6 +59,13 @@ ARG_RULES = {
 
 
 def preprocess_args(args):
+    try:
+        args.target_api_version = tuple(map(
+            int, args.target_api_version.split("."),
+        ))
+    except ValueError:
+        msg = f"Bad version string: {args.target_api_version}"
+        exit(print(msg, file=stderr) or 1)
     args.favorites = {
         f if f.startswith("GLDS-") else f"GLDS-{f}"
         for f in args.favorites.strip("'\"").split(",")
@@ -67,6 +78,7 @@ class Test():
     multiple_datasets = False
     cross_dataset = False
     target_datasets = "*"
+    target_api_version = (0, 0, 0)
  
     def __init__(self, args):
         self.args, self.results, self.n_errors = args, {}, 0
@@ -160,6 +172,7 @@ class Test():
 class InvestigationStudyComment(Test):
     multiple_datasets = False
     cross_dataset = False
+    target_api_version = (3, 1, 0)
  
     def run(self, datasets=None):
         t0, b = "investigation.study", [
@@ -187,6 +200,7 @@ class InvestigationStudyComment(Test):
 class LargeMetadata(Test):
     multiple_datasets = False
     cross_dataset = False
+    target_api_version = (3, 1, 0)
  
     def run(self, datasets=None):
         t0, b = "study", ["factor value", "parameter value", "characteristics"]
@@ -202,6 +216,7 @@ class LargeMetadata(Test):
 class DataColumns(Test):
     multiple_datasets = True
     cross_dataset = False
+    target_api_version = (3, 1, 0)
  
     def seed(self):
         with self.go(query={"file.datatype": "visualization table"}) as data:
@@ -240,6 +255,7 @@ class DataColumns(Test):
 class MetadataToVizColumn(Test):
     multiple_datasets = True
     cross_dataset = False
+    target_api_version = (3, 1, 0)
  
     GROUP_PREFIXES = ["Group.Mean", "Group.Stdev"]
     CONTRAST_PREFIXES = [
@@ -290,21 +306,31 @@ class MetadataToVizColumn(Test):
 
 def main(args):
     if args.list_tests:
-        print(f"{'#name':32} {'#multiple_datasets':20} #cross_dataset")
-        for t in TESTS:
-            _stmd = str(t.multiple_datasets)
-            print(f"{t.__name__:32} {_stmd:20} {t.cross_dataset}")
+        print(
+            f"{'#name':32}", f"{'#multiple_datasets':19}",
+            f"{'#target_api_version':20}", "#cross_dataset",
+        )
+        for Test in TESTS:
+            print(
+                f"{Test.__name__:32}", f"{str(Test.multiple_datasets):19}",
+                f"{'.'.join(map(str, Test.target_api_version)):20}",
+                f"{Test.cross_dataset}",
+            )
         return 0
     else:
         results = {"n_errors": 0, "success": None, "tests": {}}
         for Test in TESTS:
             if (not args.tests) or (Test.__name__ in args.tests):
-                print(f"Running {Test.__name__}...", file=stderr)
-                test = Test(args)
-                results["tests"][Test.__name__] = test.results
-                if test.n_errors and args.stop_on_error:
-                    break
-                results["n_errors"] += test.n_errors
+                if Test.target_api_version <= args.target_api_version:
+                    print(f"Running {Test.__name__}...", file=stderr)
+                    test = Test(args)
+                    results["tests"][Test.__name__] = test.results
+                    if test.n_errors and args.stop_on_error:
+                        break
+                    results["n_errors"] += test.n_errors
+                else:
+                    msg = f"Skipping {Test.__name__} (targets newer version)"
+                    print(msg, file=stderr)
         results["success"] = (results["n_errors"] == 0)
         print(dumps(results, sort_keys=True, indent=4))
         return results["n_errors"]
