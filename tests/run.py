@@ -260,6 +260,11 @@ class DataColumns(Test):
  
     def run(self, datasets, *, args=None):
         q = {"file.datatype": "visualization table", "id": datasets}
+        with self.go("samples", query=q) as metadata:
+            assays = list(set(metadata.index.get_level_values(1)))
+            if len(assays) > 1:
+                shuffle(assays)
+                q["id"] = q["id"] + "/" + assays[0]
         with self.go("data", query={**q, "schema": 1}) as schema:
             if schema.index.names[0][:2] != ("*", "*"):
                 return -1, "data index top level is not '*', '*'"
