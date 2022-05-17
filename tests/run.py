@@ -22,7 +22,7 @@ ARG_RULES = {
         "default": "http://127.0.0.1:5000",
     },
     ("--target-api-version", "--tv"): {
-        "help": "Target API version", "default": "3.1.0",
+        "help": "Target API version", "default": "4.0.0",
         "metavar": "V",
     },
     ("--list-tests", "--lt"): {
