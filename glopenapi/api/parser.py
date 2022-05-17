@@ -281,7 +281,7 @@ class KeyValueParsers():
         if unq_expr == "*":
             yield None, (), [ForceShowAllDataColumns], ()
         elif not ({"<", "=", ">"} & set(unq_expr)):
-            yield None, (), [make_safe_sql_name(expr)], ()
+            yield None, (), [make_safe_sql_name(unq_expr)], ()
         else:
             match = search(r'^([^<>=]+)(<|<=|=|==|>=|>)([^<>=]*)$', unq_expr)
             if match:
