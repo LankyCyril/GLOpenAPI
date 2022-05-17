@@ -16,8 +16,15 @@ from glopenapi.api.routes import DefaultRoutes
 
 flask_app = Flask("NASA GeneLab Open API")
 __version__ = "4.0.0-alpha0"
-GiB = 1024**3
+
+
+# If MODE is 'nocache' (e.g., `export MODE=nocache` in wrapper, or running in
+# debug mode as FLASK_ENV=development MODE=nocache FLASK_APP=app.py flask run),
+# will disable the continuous MetadataCacherLoop as well as the response_cache
+# SQLite3 database file (see below):
+
 NOCACHE = (environ.get("MODE") == "nocache")
+GiB = 1024**3
 
 
 # Initialize the glopenapi client.
@@ -55,7 +62,7 @@ glopenapi_client = GLOpenAPIClient(
         units_formatter="{value} {{{unit}}}".format, # `f(value, unit) -> str`
         client_params={}, # any other `pymongo.MongoClient()` parameters
     ),
-    sqlite_params=dict( # the SQLite databases are LRU if capped by `maxsize`:
+    sqlite_params=dict( # the SQLite3 databases are LRU if capped by `maxsize`:
         blobs=dict(
             db="./.genefab3.sqlite3/blobs.db", maxsize=None, # required;
                 # stores up-to-date ISA data
