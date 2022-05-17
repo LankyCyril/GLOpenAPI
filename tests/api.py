@@ -253,7 +253,7 @@ class MetadataCombinationsAnd(Test):
                 if args.target_api_version < (4,):
                     query = {f"{k}.{v}" for k, v in row.index}
                 else:
-                    query = {f"={k}.{v}" for k, v in row.index}
+                    query = [("", f"{k}.{v}") for k, v in row.index]
                 with self.go("samples", query=query) as metadata:
                     for ids3 in metadata.index.tolist():
                         if ids2 == ids3[:2]:
