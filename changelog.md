@@ -1,3 +1,17 @@
+Version 4.0.0-alpha2 (2022-05-17)
+
+- Features (internal):
+    - Script for testing the API: tests/api.py
+- Fixes:
+    - Fix double-escaping of /data/ column names that lead to lookup errors
+
+
+Version 4.0.0-alpha1 (2022-03-28)
+
+- Hotfix: resolve data file names correctly (fixes wrong return in one of the
+  internal functions, see commit 72a5996)
+
+
 Version 4.0.0-alpha0 (2022-01-27)
 
 - Rename backend to GLOpenAPI
