@@ -55,6 +55,10 @@ ARG_RULES = {
         "help": "Print additional information to stderr",
         "action": "store_true",
     },
+    ("--ansi-color", "-c"): {
+        "help": "Color results in progress with ANSI colors",
+        "action": "store_true",
+    },
 }
 
 
@@ -72,6 +76,15 @@ def preprocess_args(args):
     }
     args.tests = set(args.tests.strip("'\"").split(",")) if args.tests else []
     return args
+
+
+def colorify(results):
+    if results.get("error"):
+        return f"\x1b[91m{results!r}\x1b[0m"
+    elif results.get("warnings"):
+        return f"\x1b[93m{results!r}\x1b[0m"
+    else:
+        return f"\x1b[92m{results!r}\x1b[0m"
 
 
 class Test():
@@ -109,7 +122,10 @@ class Test():
                 warnings=warnings, error=error,
             )
             self.results[key] = _results
-            print(f"  Round {i} RESULTS: {_results}", file=stderr)
+            if args.ansi_color:
+                print(f"  Round {i} RESULTS: {colorify(_results)}", file=stderr)
+            else:
+                print(f"  Round {i} RESULTS: {_results!r}", file=stderr)
             if status != 200:
                 self.n_errors += 1
                 if args.stop_on_error:
