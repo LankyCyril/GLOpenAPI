@@ -239,7 +239,7 @@ class MetadataCombinationsAnd(Test):
  
     def run(self, datasets=None, *, args=None):
         with self.go("assays", query={"study.factor value"}) as assays:
-            n_factors = assays.sum(axis=1)
+            n_factors = assays.loc[:,(assays.dtypes==bool)].sum(axis=1)
             good_assays = assays[(n_factors>1) & (n_factors<=args.max_combined)]
             potential_targets = [
                 [ids2, row[row==True]] for ids2, row in good_assays.iterrows()
