@@ -31,7 +31,7 @@ class GLOpenAPIClient():
             self.sqlite_dbs = self._get_validated_sqlite_dbs(**sqlite_params)
             self.adapter = AdapterClass()
             self._init_error_handlers()
-            self.routes = self._init_routes(RoutesClass)
+            self.renderer, self.routes = self._init_routes(RoutesClass)
             self.response_cache = ResponseCache(self.sqlite_dbs)
             self.DatasetConstructor = partial(
                 Dataset, sqlite_dbs=self.sqlite_dbs,
@@ -113,7 +113,7 @@ class GLOpenAPIClient():
         )
         for endpoint, method in routes.items():
             self.flask_app.route(endpoint, methods=["GET"])(renderer(method))
-        return routes
+        return renderer, routes
  
     def _ok_to_loop_cacher_loop_thread(self, enabled):
         """Check if no other instances of GLOpenAPI are talking to MongoDB database"""
@@ -136,6 +136,17 @@ class GLOpenAPIClient():
     def _ensure_cacher_loop_thread(self, full_update_interval, full_update_retry_delay, dataset_init_interval, dataset_update_interval, enabled=True):
         """Start background cacher thread"""
         if self._ok_to_loop_cacher_loop_thread(enabled):
+            # Note that cached responses get dropped *after* each cacher cycle;
+            # technically, this means that cached responses at any given moment
+            # may lag behind the real data by as much as the duration of one
+            # update cycle. This is also true for specifically pre-cached
+            # responses e.g. glopenapi.common.hacks.precache_metadata_counts().
+            # The assumption throughout this API is that most of the time, no
+            # changes happen between the update cycles (the underlying data repo
+            # is mostly static), thus for the majority of the time, both MongoDB
+            # and `response_cache` are accurate, except for the infrequent cases
+            # when they are outdated by a time delta of a single update cycle,
+            # while remaining *consistent* among themselves.
             def _cacher_loop():
                 metadata_cacher_loop = MetadataCacherLoop(
                     glopenapi_client=self,

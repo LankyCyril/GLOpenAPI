@@ -4,6 +4,7 @@ from glopenapi.db.mongo.index import ensure_info_index
 from collections import OrderedDict
 from glopenapi.common.hacks import apply_hack, convert_legacy_metadata_pre
 from glopenapi.common.hacks import convert_legacy_metadata_post
+from glopenapi.common.hacks import precache_metadata_counts
 from glopenapi.db.mongo.index import update_metadata_value_lookup
 from glopenapi.db.mongo.utils import iterate_mongo_connections
 from glopenapi.db.mongo.types import ValueCheckedRecord
@@ -69,6 +70,7 @@ class MetadataCacherLoop():
             updated=set(), stale=set(), dropped=set(), failed=set(),
         )
  
+    @apply_hack(precache_metadata_counts)
     @apply_hack(convert_legacy_metadata_pre)
     def recache_metadata(self):
         """Instantiate each available dataset; if contents changed, dataset automatically updates db.metadata"""

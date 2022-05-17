@@ -115,7 +115,14 @@ class Context():
         if self.full_path in {"/", "/?"}:
             self.identity = "root"
         else:
-            self.identity = quote(dumps(sort_keys=True, separators=(",", ":"),
+            self.identity = self._make_identity()
+        if (self.debug != "0") and (not is_debug()):
+            raise GLOpenAPIParserException("Setting 'debug' is not allowed")
+ 
+    def _make_identity(self):
+        """Serialize fields of Context"""
+        return quote(
+            dumps(
                 obj={
                     "?": self.view, "query": self.query,
                     "sort_by": self.sort_by, "unwind": sorted(self.unwind),
@@ -124,10 +131,11 @@ class Context():
                     "data_comparisons": self.data_comparisons,
                     "format": self.format, "schema": self.schema,
                     "debug": self.debug,
-                }
-            ))
-        if (self.debug != "0") and (not is_debug()):
-            raise GLOpenAPIParserException("Setting 'debug' is not allowed")
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
  
     def _choose_parser(self, arg, category, fields, values):
         """Choose appropriate parser from KEYVALUE_PARSER_DISPATCHER based on `category`, or bypass if `arg` is one of simple CONTEXT_ARGUMENTS"""

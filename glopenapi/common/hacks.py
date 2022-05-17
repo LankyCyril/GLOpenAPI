@@ -1,4 +1,5 @@
 from functools import wraps
+from types import SimpleNamespace
 from glopenapi.common.types import NaN
 from glopenapi.api.renderers.types import StreamedDataTable
 from sqlite3 import OperationalError
@@ -71,7 +72,7 @@ def remove_legacy_metadata_empty_values(self, _name="remove_legacy_metadata_empt
     source_query = {source: {"$elemMatch": {"": {"$exists": False}}}}
     for entry in collection.find(source_query):
         prefix = f"apply_hack({_name}) on {entry['id']!r}:\n "
-        GLOpenAPILogger.info(f"{prefix}: removing empty '{source}'")
+        GLOpenAPILogger.info(f"{prefix} removing empty '{source}'")
         collection.update_one(
             {"_id": entry["_id"]}, {"$unset": {source: True}},
         )
@@ -80,12 +81,50 @@ def remove_legacy_metadata_empty_values(self, _name="remove_legacy_metadata_empt
     destination_query = {f"{destination}.": {"$regex": '^\s+$'}}
     for entry in collection.find(destination_query):
         prefix = f"apply_hack({_name}) on {entry['id']!r}:\n "
-        GLOpenAPILogger.info(f"{prefix}: removing empty '{destination}'")
+        GLOpenAPILogger.info(f"{prefix} removing empty '{destination}'")
         collection.update_one(
             {"_id": entry["_id"]}, {"$unset": {destination: True}},
         )
         updated_accessions.add(entry["id"]["accession"])
     return updated_accessions
+
+
+def precache_metadata_counts(recache_metadata, self):
+    """Precache the rather large /metadata-counts/ JSON before users start asking for it"""
+    from glopenapi.api import views
+    from glopenapi.api.parser import Context
+    for fmt in None, "json":
+        prefix = "apply_hack(precache_metadata_counts):\n "
+        GLOpenAPILogger.info(f"{prefix} rendering + storing with format={fmt}")
+        context = SimpleNamespace(
+            view="metadata-counts", query={}, unwind=set(),
+            projection={"id.accession": True, "id.assay name": True},
+            data_columns=[], data_comparisons=[], schema="0", debug="0",
+            sort_by=["id.accession", "id.assay name"], format=fmt,
+        )
+        context.identity = Context._make_identity(context)
+        self.glopenapi_client.renderer._get_response_container_via_cache(
+            context=context,
+            method=views.metadata.get,
+            args=(),
+            kwargs=dict(
+                mongo_collections=self.glopenapi_client.mongo_collections,
+                id_fields=["accession", "assay name", "sample name"],
+                condensed=False, unique_counts=True,
+                locale=self.glopenapi_client.locale,
+            ),
+        )
+    # Note that `recache_metadata` happens *after* we precache the counts JSON;
+    # while yes, technically, this makes the cached counts lag by one cycle, but
+    # 1) that is true for all cached responses (!!),
+    # 2) if any accessions are dropped/updated/failed, the /metadata-counts/
+    #    response would immediately be invalidated and deleted from the cache,
+    #    and
+    # 3) if no accessions are dropped/updated/failed after `recache_metadata`,
+    #    the /metadata-counts/ will remain in the cache and be valid.
+    # See note in glopenapi.client.GLOpenAPIClient._ensure_cacher_loop_thread()
+    # for details and rationalization of this approach in general.
+    return recache_metadata(self)
 
 
 def convert_legacy_metadata_pre(recache_metadata, self):
