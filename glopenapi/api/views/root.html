@@ -21,6 +21,7 @@
             em.remover, em.remover-or {color: #D10; cursor: pointer; border-bottom: 1pt dashed #D10}
             label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
             select {margin: 1pt 0; min-width: 120pt; max-width: 120pt; overflow: hidden; text-overflow: ellipsis; white-space: nowrap}
+            select.shortvalue {min-width: 30pt !important; max-width: 30pt !important}
             b.header {font-size: 24pt; font-weight: 500; white-space: nowrap; margin: 0 16pt}
             small.version {font-size: 10pt; font-weight: 300; white-space: nowrap; margin-top: 0pt}
             h2 {font-size: 20pt; font-weight: 500; display: block; margin: 10pt 0}
@@ -291,7 +292,12 @@ function generate_url() {
                     var this_val = $(this).val().toString();
                     if (this_val[0] === "/")
                         url = url.replace(/\.+$/g, "");
-                    url += escape($(this).val()) + ".";
+                    if ($(this).hasClass("level-noescape"))
+                        url += $(this).val();
+                    else
+                        url += escape($(this).val());
+                    if (!$(this).hasClass("level-nodot"))
+                        url += ".";
                 });
                 var keyunion_level_dropdowns = $(this).find(".keyunion-level");
                 if (keyunion_level_dropdowns.length > 0) {
@@ -742,6 +748,10 @@ $(document).ready(function() {
                         <div class='meta-existence list-item'>
                             <input type='checkbox'>
                             <em class='remover'>&amp;</em>
+                            <select class='key-level level-nodot level-noescape shortvalue'>
+                                <option value='' selected></option>
+                                <option value='='>=</option>
+                            </select>
                             <select class='key-level level-0'></select>
                             <em>.</em>
                             <select class='key-level level-1'></select>
