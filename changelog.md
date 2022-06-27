@@ -1,3 +1,20 @@
+Version 4.0.1-alpha0 (2022-06-27)
+
+- Fixes:
+    - Exclude nested qualifiers (such as 'term source ref' and 'term accession
+      number') from the results returned by the /metadata-counts/ endpoint
+- Improvements:
+    - Support the 'leading equals' syntax in the interactive builder on the
+      landing page
+
+
+Version 4.0.0-alpha3 (2022-06-08)
+
+- Features (internal):
+    - Pre-cache the result of the /metadata-counts/ endpoint after each metadata
+      update cycle
+
+
 Version 4.0.0-alpha2 (2022-05-17)
 
 - Features (internal):

@@ -21,6 +21,7 @@
             em.remover, em.remover-or {color: #D10; cursor: pointer; border-bottom: 1pt dashed #D10}
             label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
             select {margin: 1pt 0; min-width: 120pt; max-width: 120pt; overflow: hidden; text-overflow: ellipsis; white-space: nowrap}
+            select.shortvalue {min-width: 30pt !important; max-width: 30pt !important}
             b.header {font-size: 24pt; font-weight: 500; white-space: nowrap; margin: 0 16pt}
             small.version {font-size: 10pt; font-weight: 300; white-space: nowrap; margin-top: 0pt}
             h2 {font-size: 20pt; font-weight: 500; display: block; margin: 10pt 0}
@@ -242,7 +243,7 @@ function decorate_url(url) {
         "</tt><tt class='pale'>/</tt>"
     );
     var tail = strip_special(a.prop("search"));
-    var level = 0, sep = "?";
+    var level = 0, sep = "?", at_alphanumeric_start = true;
     while (tail) {
         var match = /[\.\|\&\=]/.exec(tail);
         if (match === null) {
@@ -257,16 +258,19 @@ function decorate_url(url) {
             decorated += "<tt class='plain'>" + sep + "</tt>";
         else
             decorated += "<tt class='sep'>" + sep + "</tt>";
-        decorated += (
-            "<tt class='part-level-" + level + "'>" +
-            desaturate_escaped_spaces(part) + "</tt>"
-        );
+        if (part.length > 0) {
+            at_alphanumeric_start = false;
+            decorated += (
+                "<tt class='part-level-" + level + "'>" +
+                desaturate_escaped_spaces(part) + "</tt>"
+            );
+        }
         if (match !== null)
             sep = match[0];
         if (sep === "&")
             level = 0;
         else if (sep === "=")
-            level = 3;
+            level = at_alphanumeric_start? 0 : 3;
         else if ((sep !== "|") && (level < 4))
             level += 1;
     }
@@ -291,7 +295,12 @@ function generate_url() {
                     var this_val = $(this).val().toString();
                     if (this_val[0] === "/")
                         url = url.replace(/\.+$/g, "");
-                    url += escape($(this).val()) + ".";
+                    if ($(this).hasClass("level-noescape"))
+                        url += $(this).val();
+                    else
+                        url += escape($(this).val());
+                    if (!$(this).hasClass("level-nodot"))
+                        url += ".";
                 });
                 var keyunion_level_dropdowns = $(this).find(".keyunion-level");
                 if (keyunion_level_dropdowns.length > 0) {
@@ -742,6 +751,10 @@ $(document).ready(function() {
                         <div class='meta-existence list-item'>
                             <input type='checkbox'>
                             <em class='remover'>&amp;</em>
+                            <select class='key-level level-nodot level-noescape shortvalue'>
+                                <option value=''></option>
+                                <option value='=' selected>=</option>
+                            </select>
                             <select class='key-level level-0'></select>
                             <em>.</em>
                             <select class='key-level level-1'></select>
@@ -758,14 +771,26 @@ $(document).ready(function() {
                     </div>
                 </div>
                 <div class='description on-newline'>
-                    <p>Each ISA category contains multiple fields:</p>
+                    <p>Each ISA category contains multiple <b>fields</b>:</p>
                     <ul>
-                        <li>Querying by any such <b>field</b> will constrain the results to only the datasets,
-                        assays, and samples that have this field annotated.</li>
+                        <li>The logical AND (inclusion of several fields) is achieved by passing them
+                            at the same&nbsp;time&nbsp;(<code>=x.a.b&amp;=y.c.d</code>).</li>
+                        <li>The logical OR of several fields within a <i>single</i> category is achieved by passing
+                            the target fields joined by a vertical&nbsp;pipe&nbsp;(<code>=x.a.b|d</code>).</li>
                         <li>Under view levels &quot;assays&quot; and &quot;samples&quot;,
-                        the values of this field will be reported in table columns.</li>
+                            the values of any such field will be reported in table columns.</li>
+                        <li>The leading &quot;=&quot;&nbsp;(<code>=x.a.b</code>) effectively queries for existing values
+                            of the field(s), i.e. constrains the results to to only the datasets, assays, and samples
+                            that have this field annotated (with non-<i>NaN</i> values).</li>
+                        <li>Without the leading &quot;=&quot;&nbsp;(<code>x.a.b</code>), the columns may contain
+                            <i>NaN</i> values (i.e., this constrains to the columns, but not to values within
+                            columns).</li>
                     </ul>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?=study.factor value.spaceflight'><code>/samples/?<b>=study.factor value.spaceflight</b></code></a>
                     <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor value.spaceflight'><code>/samples/?<b>study.factor value.spaceflight</b></code></a>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?=study.factor value.radiation dose|absorbed radiation dose'><code>/samples/?<b>=study.factor value.radiation dose|absorbed radiation dose</b></code></a>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor value.radiation dose|absorbed radiation dose'><code>/samples/?<b>study.factor value.radiation dose|absorbed radiation dose</b></code></a>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor value.radiation dose|absorbed radiation dose&=assay.factor value.radiation type'><code>/samples/?<b>study.factor value.radiation dose|absorbed radiation dose&=assay.factor value.radiation type</b></code></a>
                 </div>
             </div>
             <div>

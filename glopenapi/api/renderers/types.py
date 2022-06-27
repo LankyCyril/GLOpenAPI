@@ -363,8 +363,9 @@ class StreamedAnnotationValueCounts(dict):
         self.accessions = set()
         self.only_primitive = only_primitive
         _kw = dict(
-            value_key="", only_primitive=only_primitive,
+            value_key="", descend_past_value_key=False,
             TargetKeyType=str, TargetValueType=str,
+            only_primitive=only_primitive,
         )
         for entry in cursor:
             try:
