@@ -74,7 +74,7 @@ def iterate_terminal_leaf_elements(d, iter_leaves=iterate_terminal_leaves, isins
             yield from pattern.split(value)
 
 
-def iterate_branches_and_leaves(d, keyseq=(), value_key="", only_primitive=True, step_tracker=1, max_steps=256, TargetKeyType=str, TargetValueType=str, isinstance=isinstance, dict=dict, PrimitiveTypes=PrimitiveTypes):
+def iterate_branches_and_leaves(d, keyseq=(), value_key="", descend_past_value_key=False, step_tracker=1, max_steps=256, TargetKeyType=str, TargetValueType=str, isinstance=isinstance, dict=dict, PrimitiveTypes=PrimitiveTypes, only_primitive=True):
     """Iterate (keyseq, terminal_value) of nested document; converts keys and values to TargetKeyType/TargetValueType"""
     if step_tracker >= max_steps:
         msg = "Document branch exceeds nestedness threshold"
@@ -82,11 +82,17 @@ def iterate_branches_and_leaves(d, keyseq=(), value_key="", only_primitive=True,
     elif isinstance(d, dict):
         if value_key in d:
             yield keyseq, TargetValueType(d[""])
-        for key, value in items_except(d, ""):
-            yield from iterate_branches_and_leaves(
-                value, (*keyseq, TargetKeyType(key)),
-                value_key, only_primitive, step_tracker+1,
-            )
+        if descend_past_value_key or (value_key not in d):
+            for key, value in items_except(d, ""):
+                yield from iterate_branches_and_leaves(
+                    value, (*keyseq, TargetKeyType(key)), value_key,
+                    descend_past_value_key=descend_past_value_key,
+                    step_tracker=step_tracker+1, max_steps=max_steps,
+                    TargetKeyType=TargetKeyType,
+                    TargetValueType=TargetValueType,
+                    PrimitiveTypes=PrimitiveTypes,
+                    only_primitive=only_primitive,
+                )
     elif (not only_primitive) or isinstance(d, PrimitiveTypes):
         yield keyseq, TargetValueType(d)
 
