@@ -332,32 +332,31 @@ class StreamedDataTable(StreamedTable):
 
 
 class _SAVC_PerKeyCounter(dict):
-    """Ingests values by key, but represents only the counts of values per key; either unique or all"""
+    """Ingests accession/assay_name/sample_name triples, counts occurrences"""
     def __init__(self):
-        self.lists, self.sets = {}, {}
+        self.accessions, self.assays, self.samples = set(), set(), set()
+        self[""] = dict(accessions=0, assays=0, samples=0)
     def _fail(self):
         msg = "Same id level being counted as unique and non-unique"
         raise GLOpenAPIConfigurationException(msg)
-    def count(self, k, v):
-        if k in self.sets:
-            self._fail()
-        else:
-            self.lists[k] = True
-            self[k] = self.setdefault(k, 0) + 1
-    def count_unique(self, k, v):
-        if k in self.lists:
-            self._fail()
-        elif v not in self.sets.setdefault(k, set()):
-            self[k] = self.setdefault(k, 0) + 1
-            self.sets[k].add(v)
+    def count(self, accession, assay_name, sample_name):
+        if accession not in self.accessions:
+            self.accessions.add(accession)
+            self[""]["accessions"] += 1
+        if (accession, assay_name) not in self.assays:
+            self.assays.add((accession, assay_name))
+            self[""]["assays"] += 1
+        if (accession, assay_name, sample_name) not in self.samples:
+            self.samples.add((accession, assay_name, sample_name))
+            self[""]["samples"] += 1
 
 
 class StreamedAnnotationValueCounts(dict):
     """Value counts JSON streamed from MongoDB cursor""" # TODO: not exactly clean, as extensive data transformation happens right here
     default_format = "json"
     cacheable = True
-    idmissing_warnmsg = "MongoDB 'metadata' document missing id fields"
-    generic_errmsg = "Sister branches of entry may have conflicting lengths"
+    IDMISSING_WARNMSG = "MongoDB 'metadata' document missing id fields"
+    GENERIC_ERRMSG = "Sister branches of entry may have conflicting lengths"
  
     def __init__(self, cursor, *, only_primitive=True):
         self.accessions = set()
@@ -373,7 +372,7 @@ class StreamedAnnotationValueCounts(dict):
                 assay_name = entry["id"]["assay name"]
                 sample_name = entry["id"]["sample name"]
             except (KeyError, TypeError, IndexError):
-                GLOpenAPILogger.warning(self.idmissing_warnmsg)
+                GLOpenAPILogger.warning(self.IDMISSING_WARNMSG)
             else:
                 for keyseq, value in iterate_branches_and_leaves(entry, **_kw):
                     self.add(keyseq, value, accession, assay_name, sample_name)
@@ -381,28 +380,25 @@ class StreamedAnnotationValueCounts(dict):
  
     def add(self, keyseq, value, accession, assay_name, sample_name):
         # Note: this is relatively slow, but the result is LRU cached, which makes it fast in the generalized real use case
-        leafpile = self
-        for key in keyseq:
-            if isinstance(leafpile, dict):
-                leafpile = leafpile.setdefault(key, {})
+        leaf = self
+        for node in (*keyseq, value):
+            if isinstance(leaf, dict):
+                try:
+                    leaf = leaf.setdefault(node, _SAVC_PerKeyCounter())
+                except TypeError: # unhashable values nested in `node`
+                    if self.only_primitive:
+                        return
+                    else:
+                        leaf = leaf.setdefault(str(node), _SAVC_PerKeyCounter())
             else:
                 raise GLOpenAPIDatabaseException(
-                    self.generic_errmsg, keyseq=keyseq, accession=accession,
+                    self.GENERIC_ERRMSG, keyseq=keyseq, accession=accession,
                     assay_name=assay_name, sample_name=sample_name,
                 )
-        try:
-            leaf = leafpile.setdefault(value, _SAVC_PerKeyCounter())
-        except TypeError: # unhashable values nested in `value`
-            if self.only_primitive:
-                return
-            else:
-                leaf = leafpile.setdefault(str(value), _SAVC_PerKeyCounter())
-        if not isinstance(leaf, _SAVC_PerKeyCounter):
-            raise GLOpenAPIDatabaseException(
-                self.generic_errmsg, keyseq=keyseq, accession=accession,
-                assay_name=assay_name, sample_name=sample_name,
-            )
-        else:
-            leaf.count_unique("accessions", accession)
-            leaf.count_unique("assays", assay_name)
-            leaf.count("samples", sample_name)
+            try:
+                leaf.count(accession, assay_name, sample_name)
+            except TypeError: # one of the identifiers is unhashable
+                raise GLOpenAPIDatabaseException(
+                    self.GENERIC_ERRMSG, keyseq=keyseq, accession=accession,
+                    assay_name=assay_name, sample_name=sample_name,
+                )
