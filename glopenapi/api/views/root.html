@@ -335,25 +335,10 @@ function toggle_builder() {
     $(".interactive").show();
     $(".on-newline").css("display", "block");
     $("#noscript").hide();
-    $("a").each(function () {
-        if ($(this).is("[href]")) {
-            if ($(this).attr("href").substring(0, 1) === "#") {
-                var target = $(this).attr("href").substring(1);
-                $(this).removeAttr("href");
-                $(this).click(function () {
-                    $("#url-builder").css("position", "static");
-                    setTimeout(function () {
-                        var y_to = $("a[name='"+target+"']").offset().top;
-                        var urlbuilder = document.getElementById("url-builder");
-                        window.scrollTo(0, y_to - urlbuilder.offsetHeight);
-                        setTimeout(function () {
-                            $("#url-builder").css("position", "sticky")
-                        }, 100);
-                    }, 10);
-                });
-            }
-        }
-    })
+    var offset = document.getElementById("url-builder").offsetHeight;
+    $("a[name]:not(.beforebuilder)").each(function () {
+        $(this).css("scroll-margin-top", offset);
+    });
 }
 
 function set_default_repr_of_remover_ors() {
@@ -520,7 +505,7 @@ $(document).ready(function() {
                 </ul></li>
             </ul></li>
         </ul>
-        <a name='structure'><h2>Structure</h2></a>
+        <a name='structure' class='beforebuilder'><h2>Structure</h2></a>
         <div class='description' style='margin-bottom: 0; padding-bottom: 0'>
             <p>This API provides the means to query the
             <a target='_blank' href='https://genelab-data.ndc.nasa.gov/genelab/projects'>GeneLab database</a>
