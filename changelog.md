@@ -1,3 +1,17 @@
+Version 4.0.2-alpha0 (2022-07-26)
+
+- Improvements:
+    - /metadata-counts/ JSONs now list the number of accessions, assays, and
+      samples at each level; each next level is available under the "children"
+      key. For example:
+        json["study"]["children"]["factor value"]["#samples"] -> 16941
+        json["study"]["children"]["factor value"]["children"]["age"]["#samples"] -> 812
+    - Landing page anchors dodge the URL builder thanks to CSS property
+      'scroll-margin-top' (i.e., when you click on a table of contents link,
+      or follow/copy-paste that link, the page scrolls so that the heading of
+      the section ends up just under the builder).
+
+
 Version 4.0.1-alpha0 (2022-06-27)
 
 - Fixes:
