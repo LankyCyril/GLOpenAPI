@@ -335,25 +335,25 @@ class _SAVC_PerKeyCounter(dict):
     """Ingests accession/assay_name/sample_name triples, counts occurrences"""
     def __init__(self):
         self.accessions, self.assays, self.samples = set(), set(), set()
-        for key in "accessions", "assays", "samples":
+        for key in "#accessions", "#assays", "#samples":
             self[key] = 0
     def _fail(self):
         msg = "Same id level being counted as unique and non-unique"
         raise GLOpenAPIConfigurationException(msg)
     def setdefault(self, key, value):
-        if ">" not in self:
-            self[">"] = {}
-        return self[">"].setdefault(key, value)
+        if "children" not in self:
+            self["children"] = {}
+        return self["children"].setdefault(key, value)
     def count(self, accession, assay_name, sample_name):
         if accession not in self.accessions:
             self.accessions.add(accession)
-            self["accessions"] += 1
+            self["#accessions"] += 1
         if (accession, assay_name) not in self.assays:
             self.assays.add((accession, assay_name))
-            self["assays"] += 1
+            self["#assays"] += 1
         if (accession, assay_name, sample_name) not in self.samples:
             self.samples.add((accession, assay_name, sample_name))
-            self["samples"] += 1
+            self["#samples"] += 1
 
 
 class StreamedAnnotationValueCounts(dict):
