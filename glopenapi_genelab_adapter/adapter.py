@@ -106,7 +106,7 @@ class GeneLabAdapter(Adapter):
                 GENELAB_ROOT=genelab_root,
                 COLD_SEARCH_MASK=(
                     genelab_root +
-                    "/genelab/data/search/?term=GLDS&type=cgene&size={}"
+                    "/genelab/data/search?term=GLDS&type=cgene&size={}"
                 ),
                 COLD_GLDS_MASK=genelab_root + "/genelab/data/study/data/{}/",
                 COLD_FILELISTINGS_MASK=(
