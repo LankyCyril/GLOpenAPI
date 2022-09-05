@@ -1,6 +1,7 @@
 from requests import get as request_get
 from glopenapi.common.exceptions import GLOpenAPILogger
 from urllib.error import URLError
+from json.decoder import JSONDecodeError
 from glopenapi.common.exceptions import GLOpenAPIDataManagerException
 from pandas import Timestamp, json_normalize
 from glopenapi.common.types import Adapter
@@ -83,6 +84,8 @@ def read_json(url):
             return response.json()
     except (URLError, OSError):
         raise GLOpenAPIDataManagerException("Not found", url=url)
+    except JSONDecodeError:
+        raise GLOpenAPIDataManagerException("Malformed data returned", url=url)
 
 
 def as_timestamp(dataframe, column, default=-1):
