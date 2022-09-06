@@ -114,6 +114,8 @@ class Context():
             self.query = {}
         if self.full_path in {"/", "/?"}:
             self.identity = "root"
+        elif self.view == "root.js":
+            self.identity = "root.js"
         else:
             self.identity = self._make_identity()
         if (self.debug != "0") and (not is_debug()):

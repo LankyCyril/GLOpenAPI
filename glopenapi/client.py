@@ -173,7 +173,7 @@ class GLOpenAPIClient():
                         for acc in _fod_accs:
                             self.response_cache.drop_by_accession(acc)
                         if _fod_accs:
-                            self.response_cache.drop_by_context(identity="root")
+                            self.response_cache.drop_by_context(identity="root.js")
                     self.response_cache.shrink()
             cacher_loop_thread = Thread(target=_cacher_loop)
             cacher_loop_thread.start()

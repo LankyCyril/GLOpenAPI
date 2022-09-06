@@ -87,7 +87,7 @@ def get(*, glopenapi_client, mongo_collections, context):
             "$METADATA_DATATYPES": dumps_sorted(metadata_datatypes),
         }
         template_file = Path(__file__).parent / "root.js"
-        default_format = "raw"
+        default_format = "raw" # TODO: format should be javascript
     else:
         _kw = dict(view=context.view)
         raise GLOpenAPIConfigurationException("Unconfigured view", **_kw)
