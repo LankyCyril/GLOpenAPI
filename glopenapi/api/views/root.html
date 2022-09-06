@@ -11,18 +11,18 @@
     <script src='$URL_ROOT/libs/js/jquery-3.6.0.slim.min.js'></script>
     <script src='$URL_ROOT/root.js'></script>
     <body>
-        <table style='border-left: 0; border-right: 0; border-top: 0; border-bottom: 1px solid black; margin-bottom: 16pt'>
+        <table id='i0ade8efeba2d'>
             <tr valign='middle'>
-                <td style='width: 260pt'>
-                    <img src='https://genelab-data.ndc.nasa.gov/genelab/assets/img/GeneLabLogo.png' style='height: 50pt'>
+                <td id='i06b7561e6186'>
+                    <img src='https://genelab-data.ndc.nasa.gov/genelab/assets/img/GeneLabLogo.png' id='icc47c41d2ef6'>
                 </td>
                 <td><b class='header'>$APPNAME</b></td>
-                <td style='width: 126pt; text-align: right'>
-                    <img src='https://genelab-data.ndc.nasa.gov/genelab/assets/img/nasa_logo.png' style='height: 50pt'>
+                <td id='id2bf7a9b934f'>
+                    <img src='https://genelab-data.ndc.nasa.gov/genelab/assets/img/nasa_logo.png' id='ibad63f47ded7'>
                 </td>
             </tr>
         </table>
-        <div class='description' style='margin-bottom: 16pt; padding-bottom: 0'>
+        <div class='description' id='i2625ecfc0c2b'>
             API version $APP_VERSION
             (<a href="$URL_ROOT/changelog">changelog</a>)
         </div>
@@ -51,7 +51,7 @@
             </ul></li>
         </ul>
         <a name='structure' class='beforebuilder'><h2>Structure</h2></a>
-        <div class='description' style='margin-bottom: 0; padding-bottom: 0'>
+        <div class='description' id='i49ebfdb880a6'>
             <p>This API provides the means to query the
             <a target='_blank' href='https://genelab-data.ndc.nasa.gov/genelab/projects'>GeneLab database</a>
             for annotation and data associated with datasets, assays, and samples hosted by GeneLab,
@@ -61,7 +61,7 @@
                 <li>a sample belongs to an assay, which in turn belongs to a dataset.</li>
                 <li>Each <b>entry</b> contains nested fields under multiple categories, for example:</li>
             </ul>
-            <pre style='margin-left: -60pt; margin-top: -5pt'>
+            <pre id='ice9422903e26'>
               id &#x21B4;
                  accession &rarr; GLDS-239
                  assay name &rarr; mhu2_fskn_transcription_profiling_RNA_Sequencing_(RNA-Seq)
@@ -86,14 +86,14 @@
                    datatype &rarr; normalized counts
                    filename &rarr; GLDS-239_rna_seq_Normalized_Counts.csv
             </pre>
-            <ul style='margin-top: -10pt'>
+            <ul id=iae483a5f5f5c'>
                 <li>The <code>&quot;id&quot;</code> category always contains fields <code>&quot;accession&quot;</code>,
                     <code>&quot;assay name&quot;</code>, <code>&quot;sample name&quot;</code>.</li>
                 <li>Categories <code>&quot;investigation&quot;</code>, <code>&quot;study&quot;</code>,
                     <code>&quot;assay&quot;</code> are organized according to the
                     <a target='_blank' href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab model</a>,
                     and subsequently may contain the following fields, each of which may contain further nested subfields:
-                    <pre style='margin-left: -145pt; margin-top: 6pt'>
+                    <pre id='if9fb561e2ec8'>
                       investigation &#x21B4;
                                     study &#x21B4;
                                           ...
@@ -117,29 +117,29 @@
                                             ...
                     </pre>
                     </li>
-                <li style='margin-top: -14pt'>The <code>&quot;file&quot;</code> category contains fields
+                <li id='ib40b74c60ecf'>The <code>&quot;file&quot;</code> category contains fields
                     <code>&quot;filename&quot;</code>, <code>&quot;datatype&quot;</code> and represents the information
                     about the file(s) associated with a given sample.</li>
             </ul>
-            <p style='margin-bottom: 25pt'>Names of categories and nested fields can be joined with a period
+            <p id='i94c463b92a8b'>Names of categories and nested fields can be joined with a period
                 (<code>.</code>) to form queries.<br>
                 Request URLs are formed by combining an arbitrary number of queries, described below.</p>
         </div>
-        <div id='url-builder' class='interactive' style='display:none'>
+        <div id='url-builder' class='interactive' id='i9b85c9d5d64a'>
             <div id='url-wrapper'>
                 <div id='url-description'>You are here:</div>
                 <div id='url'>$URL_ROOT</div>
                 <div id='url-follow'><a href=''>Follow generated URL</a></div>
             </div>
         </div>
-        <div id='noscript' style='display: inline-block; color: #D10; font-weight: bold; padding: 5pt; margin-bottom: 10pt; border: 1px solid #A10'>
+        <div id='noscript'>
             Additional interactive features on this page require a browser with JavaScript support.<br>
         </div>
         <a name='components'><h2>URL and query components</h2></a>
         <div id='selectors'>
             <div>
                 <div><a name='view'><b>View level</b></a></div><br>
-                <div class='interactive' style='display:none'>
+                <div class='interactive' id='ib15a60802981'>
                     <select id='view'>
                         <option value='' selected></option>
                         <option value='assays'>/assays/</option>
@@ -200,7 +200,7 @@
                                     Thus, the header corresponds to the leftmost three columns (index)
                                     of the &quot;samples&quot; view &ndash; the <code>&quot;id&quot;</code> fields.
                                 </li>
-                                <img class='example' style='margin-left: 0 !important' src='$URL_ROOT/images/data-example.png'>
+                                <img class='example' id='i67c645a4ec71' src='$URL_ROOT/images/data-example.png'>
                                 <li>
                                     Otherwise, if a single non-tabular file matches the query, it can be returned raw
                                     (see <a href='#formats'>formats</a> below).
@@ -209,12 +209,12 @@
                         </li>
                     </ul>
                     <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples'><code><b>/samples/</b></code></a>
-                    <i style='font-size: 9pt'>(we will build upon this below)</i>.
+                    <i id='i343455d76a96'>(we will build upon this below)</i>.
                 </div>
             </div>
             <div>
                 <div><a name='ids'><b>Retrieval of entries from specific <strong>datasets and/or assays</strong></b></a></div><br>
-                <div class='interactive' style='display:none'>
+                <div class='interactive' id='i237c45030082'>
                     <div id='meta-assay-list' class='list'>
                         <div class='meta-assay list-item'>
                             <input type='checkbox'>
@@ -247,7 +247,7 @@
             </div>
             <div>
                 <div><a name='categories'><b>Retrieval of entries with metadata <strong>categories</strong></b></a></div><br>
-                <div class='interactive' style='display:none'>
+                <div class='interactive' id='if1d6e5a183d9'>
                     <div id='meta-wildcard-list' class='list'>
                         <div class='meta-wildcard list-item'>
                             <input type='checkbox'>
@@ -276,7 +276,7 @@
             </div>
             <div>
                 <div><a name='fields'><b>Retrieval of entries with metadata <strong>fields</strong></b></a></div><br>
-                <div class='interactive' style='display:none'>
+                <div class='interactive' id='i373e00cc29ad'>
                     <div id='meta-existence-list' class='list'>
                         <div class='meta-existence list-item'>
                             <input type='checkbox'>
@@ -325,7 +325,7 @@
             </div>
             <div>
                 <div><a name='fieldvalues'><b>Retrieval of entries with metadata field <strong>values</strong></b></a></div><br>
-                <div class='interactive' style='display:none'>
+                <div class='interactive' id='ifbb818b33e58'>
                     <div id='meta-equals-list' class='list'>
                         <div class='meta-equals list-item'>
                             <input type='checkbox'>
@@ -364,7 +364,7 @@
             </div>
             <div>
                 <div><a name='files'><b>Retrieval of <strong>files or data</strong></b></a></div><br>
-                <div class='interactive' style='display:none'>
+                <div class='interactive' id='ie8ec0972a32d'>
                     <div id='meta-file-filename-pseudo-list' class='list'>
                         <div class='meta-file-filename-pseudo list-item'>
                             <input type='checkbox'>
@@ -374,19 +374,19 @@
                         </div>
                     </div>
                 </div>
-                <div class='interactive on-newline' style='display: none; margin-top: 0'>
+                <div class='interactive on-newline' id='i2c78064b9ee8'>
                     <div id='meta-file-datatype-pseudo-list' class='list'>
                         <div class='meta-file-datatype-pseudo list-item'>
                             <input type='checkbox'>
                             <em class='key'>&amp;</em>
                             <em class='key included-key'>file.datatype</em>
-                            <select class='key-level level-0' style='visibility: hidden'>
+                            <select class='key-level level-0' id='i24af8594e8e8'>
                                 <option value='' selected></option>
                             </select>
                         </div>
                     </div>
                 </div>
-                <div class='interactive on-newline' style='display: none; margin-top: 0'>
+                <div class='interactive on-newline' id='if28fc5f8a006'>
                     <div id='meta-file-datatype-list' class='list'>
                         <div class='meta-file-datatype list-item'>
                             <input type='checkbox'>
@@ -417,7 +417,7 @@
             </div>
             <div>
                 <div><a name='formats'><b>Display formats</b></a></div><br>
-                <div class='interactive' style='display:none'>
+                <div class='interactive' id='i07e10716c55d'>
                     <div id='meta-format-list' class='list'>
                         <div class='meta-format list-item'>
                             <input type='checkbox' checked disabled>
@@ -435,7 +435,7 @@
                         </div>
                     </div>
                 </div>
-                <div class='interactive on-newline' style='display: none; margin-top: 0'>
+                <div class='interactive on-newline' id='i948470d65a41'>
                     <div id='meta-schema-list' class='list'>
                         <div class='meta-schema list-item'>
                             <input type='checkbox'>
@@ -514,7 +514,7 @@
                             <td class='n'>no</td>
                         </tr>
                     </table>
-                    <span class='footnotes' style='font-size: 9pt'>
+                    <span class='footnotes' id='icb8d418b8bc0'>
                         <sup>*</sup> Default<br>
                         <sup>1</sup> Only for transcription profiling data<br>
                         <sup>2</sup> Only for data that can be merged across assays
@@ -650,7 +650,7 @@
             </div>
             <!--DEBUG <div>
                 <div><b>Debug</b></div><br>
-                <div class='interactive' style='display:none'>
+                <div class='interactive' id='i3b6325314f89'>
                     <div id='meta-debug-list' class='list'>
                         <div class='meta-debug list-item'>
                             <input type='checkbox'>
@@ -668,15 +668,15 @@
                 </div>
             </div> DEBUG-->
         </div>
-        <div class='footer' style='margin-top: 24pt; padding: 5pt'>
+        <div class='footer' id='ic934326f20ae'>
             API source code on GitHub:
             <a href='https://github.com/lankycyril/glopenapi'>https://github.com/lankycyril/glopenapi</a> &nbsp;|&nbsp;
             Kirill Grigorev &nbsp;|&nbsp;
             <a href='https://masonlab.net'>The Mason Lab</a> &nbsp;|&nbsp;
             <a href='https://med.cornell.edu'>Weill Cornell Medicine</a>
         </div>
-        <div class='footer' style='margin-top: 12pt; height: 2.5in; max-height: 2.5in'>
-            <table style='width: 95%'><tr>
+        <div class='footer' id='i39941d39a72c'>
+            <table id='ic7b0e1d034f0'><tr>
                 <td>
                     <img src='https://genelab.nasa.gov/sites/default/files/inline-images/GeneLab_patch.png'>
                 </td>
