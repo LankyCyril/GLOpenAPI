@@ -225,6 +225,7 @@ def get(*, mongo_collections, locale, context, sqlite_dbs, adapter):
     """Return data corresponding to search parameters; merged if multiple underlying files are same type and joinable"""
     descriptors = PhoenixIterator(aggregate_file_descriptors_by_context(
         mongo_collections.metadata, locale=locale, context=context,
+        unique_urls=True,
     ))
     n_descriptors = 0
     for n_descriptors, d in enumerate(descriptors, 1):

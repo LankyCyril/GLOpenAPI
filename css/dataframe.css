@@ -1,0 +1,67 @@
+html, body {margin: 0; padding: 0; background: #FFF; overflow: auto}
+body {font-size: 10pt; font-family: "Oxygen Mono", monospace}
+#preface {
+    position: absolute; top: 0; left: 0; right: 0;
+    min-height: 22pt; max-height: 22pt; height: 22pt;
+    background: #CDF; padding: 2pt !important;
+    line-height: 1.1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#sorting_popup {
+    position: absolute; top: 0; right: 0;
+    margin: 2pt !important; max-height: 18pt; height: 18pt;
+    padding: 1pt 2pt !important; line-height: 1.05; font-size: 9pt;
+    overflow: hidden; text-overflow: ellipsis;
+    background: #D10; color: white;
+    cursor: pointer;
+}
+#sorting_reload {
+    margin: 0pt !important; display: inline-block; font-size: 9pt;
+    overflow: hidden; text-overflow: ellipsis;
+}
+#sorting_explain {
+    margin: 3pt 0pt !important; display: inline-block; font-size: 12pt;
+    overflow: hidden; text-overflow: ellipsis;
+}
+.fullpage{position: absolute; top: 25pt; left: 0; right: 0; bottom: 0}
+#grid {border: .25pt solid black}
+#info {
+    margin: 10pt auto; min-width: 3in; max-width: 50%;
+    max-height: 90%; overflow: auto;
+    padding: 2pt; background: #CDF; border: 1pt solid black;
+}
+#info tt {background: #EEE; border: 1px solid gray; padding: 1pt}
+#noscript {padding: 2pt !important}
+.crosshair {
+    position: fixed; top: 0; left: 0; z-index: 2;
+    margin-top: -3px; margin-left: -2px;
+    background: transparent; pointer-events: none;
+    border-top: 1px dotted #000; border-left: 1px dotted #000;
+    display: none;
+}
+#crosshair-h {width: 100%}
+#crosshair-v {height: 100%}
+.slick-header-column {
+    background: #DDD; font-weight: 600;
+    border: .5pt solid black !important;
+}
+.slick-cell {
+    line-height: 1.65; background: #FFFFFF99; border: .25pt solid black;
+}
+.slick-cell.frozen {font-weight: 600}
+.slick-row.odd {background: #E8E8E8}
+a {text-decoration: none; color: black; cursor: pointer}
+a:hover {text-decoration: underline; color: blue}
+a.filter:hover:after {
+    content: " \229e"; display: inline-block; white-space: pre;
+    text-decoration: none; color: #D10;
+}
+a.file:hover:after {
+    content: " \21e9"; display: inline-block; white-space: pre;
+    text-decoration: none; color: #D10; font-weight: 600;
+}
+
+
+.i3e090f718adf {color: #D10}
+.i60bea29a6ec6 {display: none}
+.ibcb37068d9d0 {display: inline-block}

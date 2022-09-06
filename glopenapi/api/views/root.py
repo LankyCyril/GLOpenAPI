@@ -2,7 +2,7 @@ from collections import defaultdict
 from natsort import natsorted
 from pathlib import Path
 from json import dumps
-from glopenapi.common.exceptions import is_debug
+from glopenapi.common.exceptions import is_debug, GLOpenAPIConfigurationException
 from glopenapi.api.renderers.BrowserStreamedTableRenderers import _iter_html_chunks
 from glopenapi.api.renderers.types import StreamedString
 
@@ -60,27 +60,38 @@ def get_metadata_datatypes(mongo_collections): # TODO: should be cached at index
 
 def get(*, glopenapi_client, mongo_collections, context):
     """Serve an interactive documentation page"""
-    equals_json = get_metadata_equals_json(mongo_collections)
-    existence_json = get_metadata_existence_json(equals_json)
-    wildcards = get_metadata_wildcards(existence_json)
-    metadata_assays = get_metadata_assays(mongo_collections)
-    metadata_datatypes = get_metadata_datatypes(mongo_collections)
-    dumps_as_is = lambda j: dumps(j, separators=(",", ":"))
-    dumps_sorted = lambda j: dumps(j, separators=(",", ":"), sort_keys=True)
     replacements = {
         "$APPNAME": context.app_name,
         "$APP_VERSION": glopenapi_client.app_version,
         "$URL_ROOT": context.url_root,
-        "$METADATA_WILDCARDS": dumps_sorted(wildcards),
-        "$METADATA_EXISTENCE": dumps_sorted(existence_json),
-        "$METADATA_EQUALS": dumps_sorted(equals_json),
-        "$METADATA_ASSAYS": dumps_as_is(metadata_assays),
-        "$METADATA_DATATYPES": dumps_sorted(metadata_datatypes),
         "<!--DEBUG ": "" if is_debug() else "<!--",
         " DEBUG-->": "" if is_debug() else "-->",
     }
-    template_file = Path(__file__).parent / "root.html"
+    if context.view == "":
+        template_file = Path(__file__).parent / "root.html"
+        default_format = "html"
+    elif context.view == "root.js":
+        equals_json = get_metadata_equals_json(mongo_collections)
+        existence_json = get_metadata_existence_json(equals_json)
+        wildcards = get_metadata_wildcards(existence_json)
+        metadata_assays = get_metadata_assays(mongo_collections)
+        metadata_datatypes = get_metadata_datatypes(mongo_collections)
+        dumps_as_is = lambda j: dumps(j, separators=(",", ":"))
+        dumps_sorted = lambda j: dumps(j, separators=(",", ":"), sort_keys=True)
+        replacements = {
+            **replacements,
+            "$METADATA_WILDCARDS": dumps_sorted(wildcards),
+            "$METADATA_EXISTENCE": dumps_sorted(existence_json),
+            "$METADATA_EQUALS": dumps_sorted(equals_json),
+            "$METADATA_ASSAYS": dumps_as_is(metadata_assays),
+            "$METADATA_DATATYPES": dumps_sorted(metadata_datatypes),
+        }
+        template_file = Path(__file__).parent / "root.js"
+        default_format = "raw" # TODO: format should be javascript
+    else:
+        _kw = dict(view=context.view)
+        raise GLOpenAPIConfigurationException("Unconfigured view", **_kw)
     return StreamedString(
         lambda: _iter_html_chunks(template_file, replacements),
-        cacheable=True,
+        default_format=default_format, cacheable=True,
     )

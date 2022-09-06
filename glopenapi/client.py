@@ -51,6 +51,16 @@ class GLOpenAPIClient():
         def apply_headers(response):
             response.headers["X-Frame-Options"] = "SAMEORIGIN"
             response.headers["X-XSS-Protection"] = "1; mode=block"
+            response.headers["Content-Security-Policy"] = "; ".join([
+                "default-src 'self' fonts.gstatic.com",
+                "style-src-attr 'self' 'unsafe-inline'",
+                "frame-ancestors 'self'",
+                "form-action 'self'",
+                "style-src 'self' fonts.googleapis.com",
+                "connect-src 'self'",
+                "img-src 'self' data: genelab.nasa.gov genelab-data.ndc.nasa.gov",
+                "script-src 'self'",
+            ])
             return response
         return app
  
@@ -163,7 +173,7 @@ class GLOpenAPIClient():
                         for acc in _fod_accs:
                             self.response_cache.drop_by_accession(acc)
                         if _fod_accs:
-                            self.response_cache.drop_by_context(identity="root")
+                            self.response_cache.drop_by_context(identity="root.js")
                     self.response_cache.shrink()
             cacher_loop_thread = Thread(target=_cacher_loop)
             cacher_loop_thread.start()

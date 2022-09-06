@@ -122,6 +122,20 @@ def get_preferred_sort_order(collection, context, id_fields):
     return OrderedDict((id_f, ASCENDING) for id_f in _yield_ordered())
 
 
+def skip_same_file_urls_in_aggregation(cursor):
+    """Iterate over `cursor`, only yield entries where `entry["file"]["urls"] is new"""
+    urltuples = set()
+    for entry in cursor:
+        file_urls = entry.get("file", {}).get("urls", "")
+        if isinstance(file_urls, (tuple, list)):
+            urltuple = tuple(sorted(file_urls))
+        else:
+            urltuple = (file_urls,)
+        if urltuple not in urltuples:
+            urltuples.add(urltuple)
+            yield entry
+
+
 def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), postprocess=()):
     """Run .find() or .aggregate() based on query, projection"""
     full_projection = {**context.projection, **{"id."+f: 1 for f in id_fields}}
@@ -143,7 +157,7 @@ def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), p
     return cursor, full_projection
 
 
-def aggregate_file_descriptors_by_context(collection, *, locale, context, tech_type_locator="investigation.study assays.study assay technology type"):
+def aggregate_file_descriptors_by_context(collection, *, locale, context, unique_urls=False, tech_type_locator="investigation.study assays.study assay technology type"):
     """Return DataFrame of file descriptors that match user query"""
     context.projection["file"] = True
     context.update(tech_type_locator, auto_reduce=True)
@@ -163,7 +177,7 @@ def aggregate_file_descriptors_by_context(collection, *, locale, context, tech_t
             {"$replaceRoot": {"newRoot": "$_id"}},
         ],
     )
-    return cursor
+    return skip_same_file_urls_in_aggregation(cursor) if unique_urls else cursor
 
 
 def match_sample_names_to_file_descriptor(collection, descriptor):

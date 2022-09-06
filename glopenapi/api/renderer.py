@@ -26,6 +26,7 @@ TYPE_RENDERERS = OrderedDict((
         "csv": PlaintextStreamedTableRenderers.csv,
         "tsv": PlaintextStreamedTableRenderers.tsv,
         "json": PlaintextStreamedTableRenderers.json,
+        "javascript": BrowserStreamedTableRenderers.javascript,
         "browser": BrowserStreamedTableRenderers.html,
     }),
     (StreamedDataTable, {
@@ -33,12 +34,14 @@ TYPE_RENDERERS = OrderedDict((
         "csv": PlaintextStreamedTableRenderers.csv,
         "tsv": PlaintextStreamedTableRenderers.tsv,
         "json": PlaintextStreamedTableRenderers.json,
+        "javascript": BrowserStreamedTableRenderers.javascript,
         "browser": BrowserStreamedTableRenderers.html,
     }),
     (StreamedSchema, {
         "csv": PlaintextStreamedTableRenderers.csv,
         "tsv": PlaintextStreamedTableRenderers.tsv,
         "json": PlaintextStreamedTableRenderers.json,
+        "javascript": BrowserStreamedTableRenderers.javascript,
         "browser": BrowserStreamedTableRenderers.html,
     }),
     (StreamedAnnotationValueCounts, {
