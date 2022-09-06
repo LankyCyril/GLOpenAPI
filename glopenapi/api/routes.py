@@ -13,13 +13,6 @@ class DefaultRoutes(Routes):
             context=context,
         )
  
-    @Routes.register_endpoint("/images/<filename>")
-    def image(self, filename, context=None):
-        return views.static.get(
-            directory="images", filename=filename,
-            mode="rb", mimetype="image/png",
-        )
- 
     @Routes.register_endpoint()
     def status(self, context=None):
         return views.status.get(
@@ -71,22 +64,43 @@ class DefaultRoutes(Routes):
     def favicon(self, imgtype, context=None):
         return b''
  
-    @Routes.register_endpoint("/libs/js/<filename>")
+    @Routes.register_endpoint("/js/<filename>")
     def js(self, filename, context=None):
+        return views.static.get(
+            directory="js", filename=filename,
+            mode="rt", mimetype="application/javascript",
+        )
+ 
+    @Routes.register_endpoint("/css/<filename>")
+    def css(self, filename, context=None):
+        return views.static.get(
+            directory="css", filename=filename,
+            mode="rt", mimetype="text/css",
+        )
+ 
+    @Routes.register_endpoint("/images/<filename>")
+    def images(self, filename, context=None):
+        return views.static.get(
+            directory="images", filename=filename,
+            mode="rb", mimetype="image/png",
+        )
+ 
+    @Routes.register_endpoint("/libs/js/<filename>")
+    def libs_js(self, filename, context=None):
         return views.static.get(
             directory="libs/js", filename=filename,
             mode="rt", mimetype="application/javascript",
         )
  
     @Routes.register_endpoint("/libs/css/<filename>")
-    def css(self, filename, context=None):
+    def libs_css(self, filename, context=None):
         return views.static.get(
             directory="libs/css", filename=filename,
             mode="rt", mimetype="text/css",
         )
  
     @Routes.register_endpoint("/libs/css/images/<filename>")
-    def css_image(self, filename, context=None):
+    def libs_css_images(self, filename, context=None):
         return views.static.get(
             directory="libs/css/images", filename=filename,
             mode="rb", mimetype="image/gif",
