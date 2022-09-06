@@ -45,7 +45,6 @@ body {font-size: 10pt; font-family: "Oxygen Mono", monospace}
     background: #DDD; font-weight: 600;
     border: .5pt solid black !important;
 }
-$SQUASH_PREHEADER
 .slick-cell {
     line-height: 1.65; background: #FFFFFF99; border: .25pt solid black;
 }

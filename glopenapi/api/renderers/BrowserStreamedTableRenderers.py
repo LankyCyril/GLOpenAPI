@@ -84,6 +84,7 @@ def get_view_dependent_links(obj, context):
 
 def _iter_html_chunks(template_file, replacements):
     """Return list of lines of HTML template and subsitute variables with generated data"""
+    # TODO: this is becoming generic and needs to be moved elsewhere and renamed
     pattern = compile(r'|'.join(map(escape, replacements.keys())))
     with open(template_file) as template:
         for line in template:
@@ -102,16 +103,14 @@ def _iter_html_chunks(template_file, replacements):
 
 
 SQUASHED_PREHEADER_CSS = """
-    .slick-preheader-panel .slick-header-column {font-size:9pt;line-height:.8}
-    .slick-preheader-panel .slick-column-name {position: relative;top:-1pt}
+    <link rel='stylesheet' href='$URL_ROOT/css/dataframe-squash.css'/>
 """
 
 
 def twolevel(obj, context, squash_preheader=False, frozen=0, indent=None):
     """Display StreamedTable with two-level columns using SlickGrid"""
-    GLOpenAPILogger.info("HTML: converting StreamedTable to interactive table")
+    GLOpenAPILogger.info("JS: converting StreamedTable to interactive table")
     obj.move_index_boundary(to=0)
-    title_postfix = repr_quote(f"{context.view} {context.complete_kwargs}")
     def content():
         is_annotation_table = isinstance(obj, StreamedAnnotationTable)
         if is_annotation_table and (context.view != "status"):
@@ -124,38 +123,64 @@ def twolevel(obj, context, squash_preheader=False, frozen=0, indent=None):
         else:
             columns, preheader_css = obj.columns, ""
         replacements = {
-            "$APPNAME": f"{context.app_name}: {title_postfix}",
-            "$URL_ROOT": context.url_root,
             "$SQUASH_PREHEADER": preheader_css,
-            "$CSVLINK": build_url(context, drop={"format"}) + "format=csv",
-            "$TSVLINK": build_url(context, drop={"format"}) + "format=tsv",
-            "$JSONLINK": build_url(context, drop={"format"}) + "format=json",
             "$VIEWDEPENDENTLINKS": get_view_dependent_links(obj, context),
-            "$ASSAYSVIEW": build_url(context, "assays"),
-            "$SAMPLESVIEW": build_url(context, "samples"),
-            "$DATAVIEW": build_url(context, "data"),
             "$COLUMNDATA": _iter_json_chunks(data=columns, length=obj.shape[1]),
             "$ROWDATA": _iter_json_chunks(data=obj.values, length=obj.shape[0]),
             "$CONTEXTURL": build_url(context),
             "$FORMATTERS": "\n".join(formatters),
             "$FROZENCOLUMN": "undefined" if frozen is None else str(frozen),
         }
-        template_file = Path(__file__).parent / "dataframe.html"
+        template_file = Path(__file__).parent / "dataframe.js"
         yield from _iter_html_chunks(template_file, replacements)
-    return content, "text/html"
+    return content, "application/javascript"
+
+
+def _get_passed_nlevels(obj):
+    set_of_passed_nlevels = {len(c) for c in getattr(obj, "columns", [[]])}
+    if not set_of_passed_nlevels:
+        obj.move_index_boundary(to=0)
+        set_of_passed_nlevels = {len(c) for c in getattr(obj, "columns", [[]])}
+    if set_of_passed_nlevels == {2}:
+        return 2
+    elif set_of_passed_nlevels == {3}:
+        return 3
+    else:
+        msg = "Data cannot be represented as an interactive table"
+        _kw = dict(type=type(obj).__name__, nlevels=set_of_passed_nlevels)
+        raise GLOpenAPIConfigurationException(msg, **_kw)
+
+
+def javascript(obj, context, indent=None):
+    """Force two-level columns in StreamedTable and provide objects to be used in SlickGrid"""
+    # TODO: use AJAX or something like that
+    return twolevel(
+        obj, context, indent=indent,
+        squash_preheader=(_get_passed_nlevels(obj)==3),
+    )
 
 
 def html(obj, context, indent=None):
-    """Force two-level columns in StreamedTable and render using SlickGrid"""
-    passed_nlevels = {len(c) for c in getattr(obj, "columns", [[]])}
-    if not passed_nlevels:
-        obj.move_index_boundary(to=0)
-        passed_nlevels = {len(c) for c in getattr(obj, "columns", [[]])}
-    if passed_nlevels == {2}:
-        return twolevel(obj, context, squash_preheader=False, indent=indent)
-    elif passed_nlevels == {3}:
-        return twolevel(obj, context, squash_preheader=True, indent=indent)
-    else:
-        msg = "Data cannot be represented as an interactive table"
-        _kw = dict(type=type(obj).__name__, nlevels=passed_nlevels)
-        raise GLOpenAPIConfigurationException(msg, **_kw)
+    """Substitute output of `javascript` and render using SlickGrid"""
+    # TODO: we're evaluating `obj` twice, once for `html` and once for `javascript`, there's no reason
+    def content():
+        title_postfix = repr_quote(f"{context.view} {context.complete_kwargs}")
+        replacements = {
+            "$APPNAME": f"{context.app_name}: {title_postfix}",
+            "$URL_ROOT": context.url_root,
+            "$CSVLINK": build_url(context, drop={"format"}) + "format=csv",
+            "$TSVLINK": build_url(context, drop={"format"}) + "format=tsv",
+            "$JSONLINK": build_url(context, drop={"format"}) + "format=json",
+            "$ASSAYSVIEW": build_url(context, "assays"),
+            "$SAMPLESVIEW": build_url(context, "samples"),
+            "$DATAVIEW": build_url(context, "data"),
+            "$SQUASH_PREHEADER": (
+                SQUASHED_PREHEADER_CSS if (_get_passed_nlevels(obj)==3) else ""
+            ),
+            "$JAVASCRIPT_PATH": (
+                build_url(context, drop={"format"}) + "format=javascript",
+            ),
+        }
+        template_file = Path(__file__).parent / "dataframe.html"
+        yield from _iter_html_chunks(template_file, replacements)
+    return content, "text/html"
