@@ -13,6 +13,17 @@ class DefaultRoutes(Routes):
             context=context,
         )
  
+    @Routes.register_endpoint("/root.js")
+    def root_js(self, context):
+        # TODO/DRY: this is not very clean; similar logic should be applied to
+        # javascript generated for &format=browser; therefore, these logics
+        # should be unified
+        return views.root.get(
+            glopenapi_client=self.glopenapi_client,
+            mongo_collections=self.glopenapi_client.mongo_collections,
+            context=context,
+        )
+ 
     @Routes.register_endpoint()
     def status(self, context=None):
         return views.status.get(
@@ -63,13 +74,6 @@ class DefaultRoutes(Routes):
     @Routes.register_endpoint("/favicon.<imgtype>")
     def favicon(self, imgtype, context=None):
         return b''
- 
-    @Routes.register_endpoint("/js/<filename>")
-    def js(self, filename, context=None):
-        return views.static.get(
-            directory="js", filename=filename,
-            mode="rt", mimetype="application/javascript",
-        )
  
     @Routes.register_endpoint("/css/<filename>")
     def css(self, filename, context=None):

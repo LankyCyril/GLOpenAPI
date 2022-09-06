@@ -16,9 +16,11 @@ def html(obj, context=None, indent=None):
     if isinstance(obj, bytes):
         content = obj.decode()
     elif isinstance(obj, Callable):
-        content = StreamedString(obj)
+        content = StreamedString(obj, default_format="html")
     else:
         content = obj
+    # TODO: check how this is used and whether it can/should be merged with
+    # glopenapi.api.renderers.types.StreamedString
     return content, "text/html"
 
 
