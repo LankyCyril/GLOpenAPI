@@ -85,10 +85,9 @@ table#formats-matrix sup, .footnotes sup {font-size: 8pt !important}
 
 #noscript {display: inline-block; color: #D10; font-weight: bold; padding: 5pt; margin-bottom: 10pt; border: 1px solid #A10}
 
-/* TODO: all of the below is pretty horrible and serves as a quick solution
-   to move away from inlined CSS. Needs to be refactored!
-   Also note that all of class='interactive' appear to have display:none;
-   seems like all of class='on-newline' have margin-top:0; */
+/* TODO: this is just a quick solution for de-inlining CSS. Needs to be refactored!
+   Note that all of class='interactive' have display:none;
+   Most of class='on-newline' have margin-top:0; */
 #i0ade8efeba2d {border-left: 0; border-right: 0; border-top: 0; border-bottom: 1px solid black; margin-bottom: 16pt}
 #i06b7561e6186 {width: 260pt}
 #icc47c41d2ef6 {height: 50pt}
