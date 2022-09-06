@@ -36,9 +36,9 @@ def _SAT_KeyToPosition(*lists):
 
 class StreamedString():
     """Wraps functions that yield text"""
-    default_format = "html"
-    def __init__(self, func, cacheable=False):
+    def __init__(self, func, cacheable=False, default_format="html"):
         self.func, self.cacheable = func, cacheable
+        self.default_format = default_format
         self.accessions = {None}
     def __call__(self):
         return self.func()

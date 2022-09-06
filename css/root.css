@@ -1,0 +1,122 @@
+* {font-size: 13pt; font-family: "Roboto", sans-serif; font-weight: 300}
+a:not([name]) {cursor: pointer; color: #C10; text-decoration: none}
+a[target="_blank"]:not([name]) {white-space: nowrap}
+a[target="_blank"]:not([name]):after {
+    content: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKAgMAAADwXCcuAAAADFBMVEX///8AAACSAADdEQB+qjB2AAAAJUlEQVQIHWNg4P/A8J/hA8MBZgOGAzxAbMDAcOAAECPB//8PAAAB+w6MxfUpBgAAACNhbFBoeNpjYACB/1AAZTNABBmgrP8MUBacgIvDFGJjwQ0FALj/It69h6uYAAAAAElFTkSuQmCC);
+    display: inline; margin: 0 2pt; position: relative; top: -.8pt;
+}
+a:not([name]):hover {text-decoration: underline}
+b {font-weight: 500}
+strong {color: #00A; font-weight: 500}
+em {font-style: normal; color: black; font-family: "Oxygen Mono", monospace; font-size: 12pt}
+em.remover, em.remover-or {color: #D10; cursor: pointer; border-bottom: 1pt dashed #D10}
+label span {border: 1px solid #BBB; display: inline-block; padding: 1.4pt 1pt; margin: 1pt 3pt; min-width: 100pt}
+select {margin: 1pt 0; min-width: 120pt; max-width: 120pt; overflow: hidden; text-overflow: ellipsis; white-space: nowrap}
+select.shortvalue {min-width: 30pt !important; max-width: 30pt !important}
+b.header {font-size: 24pt; font-weight: 500; white-space: nowrap; margin: 0 16pt}
+small.version {font-size: 10pt; font-weight: 300; white-space: nowrap; margin-top: 0pt}
+h2 {font-size: 20pt; font-weight: 500; display: block; margin: 10pt 0}
+div.description {max-width: 640pt; padding-bottom: 7pt}
+#url-builder {position: sticky; top: 0pt; background: #FFFFFFEE; border-top: 4pt solid #FFFFFFEE; z-index: 8}
+#url-wrapper {display: inline-block}
+#url-description {
+    display: inline-block; background: #CDF; padding: 5pt;
+    border-width: 1pt 1pt 0 1pt;
+    border-style: solid; border-color: #AAA;
+}
+#url {
+    font-size: 13pt; font-family: "Oxygen Mono", monospace; color: #000;
+    padding: 5pt; border: 1px solid #AAA;
+    height: 100pt; min-height: 100pt; max-height: 50vh;
+    width: 480pt; min-width: 480pt; max-width: 90vw; resize: horizontal;
+    word-break: break-all; word-wrap: break-word; overflow-y: auto;
+}
+code {font-family: "Oxygen Mono", monospace; font-size: 12pt; color: #44B !important; background-color: #EEE; white-space: nowrap}
+code b {font-family: "Oxygen Mono", monospace; font-size: 12pt; font-weight: bold; color: #44B}
+a code, a code b {font-size: 10pt !important}
+a:hover code, a:hover code b {color: #D10 !important}
+li {margin-bottom: 3pt}
+ul ul {margin-top: 3pt}
+ul#toc a {color: #44B !important}
+pre {font-family: "Oxygen Mono", monospace; font-size: 11pt;}
+img.example {width: 480pt; margin-top: 5pt; margin-bottom: 10pt; margin-left: 1cm}
+#url tt {font-family: "Oxygen Mono", monospace; font-size: 13pt; background: transparent}
+#url tt.base_url, #url tt.pale {color: #AAA;}
+#url tt.plain, #url tt.view {color: #222;}
+#url tt.sep {color: #D10;}
+#url tt.part-level-0 {color: #00C; border: 1px solid #00C4; background: #AAA1}
+#url tt.part-level-1 {color: #08A; border: 1px solid #08A4; background: #AAA1}
+#url tt.part-level-2 {color: #084; border: 1px solid #0844; background: #AAA1}
+#url tt.part-level-3, #url tt.part-level-4 {color: #000; border: 1px solid #CDF2; background: #CDF2}
+#url tt.desaturated {font-size: 8pt; opacity: .7;}
+#url-follow {
+    display: inline-block; float: right; background: #DDD; padding: 5pt;
+    border-width: 0 1pt 1pt 1pt;
+    border-style: solid; border-color: #AAA;
+}
+#url-follow a {color: black; text-decoration: none}
+#selectors {padding-top: 20pt}
+#selectors > div {margin-bottom: 12pt; border-left: 3pt solid #DDD; padding-left: 5pt}
+#selectors > div > div {display: inline-block; vertical-align: top}
+#selectors > div > div ~ div {margin-left: 12pt; margin-top: 3pt}
+#selectors > div > div ~ div input {position: relative; top: 1pt}
+a.add, a.or {color: #777; font-style: italic; border-bottom: 1pt dashed #CCC; text-decoration: none}
+a.del {color: #AAA; font-style: italic; margin-left: 3pt; text-decoration: none}
+.list-item:not(:first-child) em.key {visibility: hidden}
+.or-selects {display: inline-block}
+table#formats-matrix {border-spacing: 0; border-collapse: collapse}
+table#formats-matrix td {border: 1px solid #999; font-size: 10pt; padding: 5pt; min-width: 36pt}
+table#formats-matrix td.y {color: green}
+table#formats-matrix td.m {color: #890}
+table#formats-matrix td.n {color: #D10}
+table#formats-matrix tr.th td {font-weight: bold}
+table#formats-matrix tr.th-upper td {vertical-align: top}
+table#formats-matrix tr.th-lower td {vertical-align: bottom}
+table#formats-matrix sup, .footnotes sup {font-size: 8pt !important}
+.footer {background: #DDD; color: #555; font-size: 11pt !important}
+.footer table, .footer table * {border: 0; line-height: 1.6; font-size: 11pt}
+.footer table td {vertical-align: top; padding-top: .15in}
+.footer img {height: 2.2in; width: 2.2in; padding-left: .15in; padding-bottom: .15in}
+.footer b.h3 {display: inline-block; transform: scale(1,1.25); margin-bottom: 4pt}
+.footer a {color: #555; font-size: 11pt}
+.subfooter {text-align: center; width: 95; color: #555; margin-top: 8pt; font-size: 9pt}
+.subfooter a {color: #555; font-size: 9pt}
+.footer a:hover, .subfooter a:hover {color: #D10; text-decoration: underline}
+
+#noscript {display: inline-block; color: #D10; font-weight: bold; padding: 5pt; margin-bottom: 10pt; border: 1px solid #A10}
+
+/* TODO: all of the below is pretty horrible and serves as a quick solution
+   to move away from inlined CSS. Needs to be refactored!
+   Also note that all of class='interactive' appear to have display:none;
+   seems like all of class='on-newline' have margin-top:0; */
+#i0ade8efeba2d {border-left: 0; border-right: 0; border-top: 0; border-bottom: 1px solid black; margin-bottom: 16pt}
+#i06b7561e6186 {width: 260pt}
+#icc47c41d2ef6 {height: 50pt}
+#id2bf7a9b934f {width: 126pt; text-align: right}
+#ibad63f47ded7 {height: 50pt}
+#i2625ecfc0c2b {margin-bottom: 16pt; padding-bottom: 0}
+#i49ebfdb880a6 {margin-bottom: 0; padding-bottom: 0}
+#ice9422903e26 {margin-left: -60pt; margin-top: -5pt}
+#iae483a5f5f5c {margin-top: -10pt}
+#if9fb561e2ec8 {margin-left: -145pt; margin-top: 6pt}
+#ib40b74c60ecf {margin-top: -14pt}
+#i94c463b92a8b {margin-bottom: 25pt}
+#i9b85c9d5d64a {display:none}
+#ib15a60802981 {display:none}
+#i67c645a4ec71 {margin-left: 0 !important}
+#i343455d76a96 {font-size: 9pt}
+#i237c45030082 {display:none}
+#if1d6e5a183d9 {display:none}
+#i373e00cc29ad {display:none}
+#ifbb818b33e58 {display:none}
+#ie8ec0972a32d {display:none}
+#i2c78064b9ee8 {display: none; margin-top: 0}
+#i24af8594e8e8 {visibility: hidden}
+#if28fc5f8a006 {display: none; margin-top: 0}
+#i07e10716c55d {display:none}
+#i948470d65a41 {display: none; margin-top: 0}
+#icb8d418b8bc0 {font-size: 9pt}
+#i3b6325314f89 {display:none}
+#ic934326f20ae {margin-top: 24pt; padding: 5pt}
+#i39941d39a72c {margin-top: 12pt; height: 2.5in; max-height: 2.5in}
+#ic7b0e1d034f0 {width: 95%}

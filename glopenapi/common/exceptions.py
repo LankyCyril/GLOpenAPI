@@ -50,6 +50,8 @@ class GLOpenAPIISAException(GLOpenAPIException):
     code, reason = 500, "ISA Parser Error"
 class GLOpenAPIParserException(GLOpenAPIException):
     code, reason = 400, "BAD REQUEST"
+class GLOpenAPIDisabledException(GLOpenAPIException):
+    code, reason = 404, "Temporarily disabled"
 
 
 def interpret_exception(e, debug=False):

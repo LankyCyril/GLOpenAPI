@@ -13,11 +13,15 @@ class DefaultRoutes(Routes):
             context=context,
         )
  
-    @Routes.register_endpoint("/images/<filename>")
-    def image(self, filename, context=None):
-        return views.static.get(
-            directory="images", filename=filename,
-            mode="rb", mimetype="image/png",
+    @Routes.register_endpoint("/root.js")
+    def root_js(self, context):
+        # TODO/DRY: this is not very clean; similar logic should be applied to
+        # javascript generated for &format=browser; therefore, these logics
+        # should be unified
+        return views.root.get(
+            glopenapi_client=self.glopenapi_client,
+            mongo_collections=self.glopenapi_client.mongo_collections,
+            context=context,
         )
  
     @Routes.register_endpoint()
@@ -71,22 +75,36 @@ class DefaultRoutes(Routes):
     def favicon(self, imgtype, context=None):
         return b''
  
+    @Routes.register_endpoint("/css/<filename>")
+    def css(self, filename, context=None):
+        return views.static.get(
+            directory="css", filename=filename,
+            mode="rt", mimetype="text/css",
+        )
+ 
+    @Routes.register_endpoint("/images/<filename>")
+    def images(self, filename, context=None):
+        return views.static.get(
+            directory="images", filename=filename,
+            mode="rb", mimetype="image/png",
+        )
+ 
     @Routes.register_endpoint("/libs/js/<filename>")
-    def js(self, filename, context=None):
+    def libs_js(self, filename, context=None):
         return views.static.get(
             directory="libs/js", filename=filename,
             mode="rt", mimetype="application/javascript",
         )
  
     @Routes.register_endpoint("/libs/css/<filename>")
-    def css(self, filename, context=None):
+    def libs_css(self, filename, context=None):
         return views.static.get(
             directory="libs/css", filename=filename,
             mode="rt", mimetype="text/css",
         )
  
     @Routes.register_endpoint("/libs/css/images/<filename>")
-    def css_image(self, filename, context=None):
+    def libs_css_images(self, filename, context=None):
         return views.static.get(
             directory="libs/css/images", filename=filename,
             mode="rb", mimetype="image/gif",
