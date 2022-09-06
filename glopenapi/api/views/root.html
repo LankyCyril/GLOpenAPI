@@ -41,7 +41,7 @@
                         <a href='#csv'>csv</a> |
                         <a href='#tsv'>tsv</a> |
                         <a href='#json'>json</a> |
-                        <a href='#browser'>browser</a> |
+                        <!--<a href='#browser'>browser</a> |-->
                         <a href='#raw'>raw</a> |
                         <a href='#cls'>cls</a> |
                         <a href='#gct'>gct</a>
@@ -189,7 +189,7 @@
                             The &quot;data&quot; view outputs data associated with sample(s).
                             <ul>
                                 <li>
-                                    All tabular <a href='#formats'>formats</a> (CSV, TSV, JSON, browser) are supported
+                                    All tabular <a href='#formats'>formats</a> (CSV, TSV, JSON<!--, browser-->) are supported
                                     if the underlying data is a table, and contain three levels of column names,
                                     from top to bottom:
                                     <ul>
@@ -424,8 +424,8 @@
                             <em class='key'>&amp;</em>
                             <em class='key included-key'>format=</em>
                             <select class='value-level level-0'>
-                                <option value='browser' selected>browser</option>
-                                <option value='tsv'>tsv</option>
+                                <!--<option value='browser' selected>browser</option>-->
+                                <option value='tsv' selected>tsv</option>
                                 <option value='csv'>csv</option>
                                 <option value='json'>json</option>
                                 <option value='cls'>cls</option>
@@ -458,58 +458,58 @@
                             <td rowspan=2>Number&nbsp;of<br>annotation&nbsp;columns<br>in&nbsp;output<br></td>
                             <td rowspan=2>Number&nbsp;of&nbsp;files<br>data&nbsp;is<br>sourced&nbsp;from<br></td>
                             <td rowspan=2>Resultant<br>output&nbsp;type<br><br></td>
-                            <td colspan=7>&amp;format=</td><td colspan=2>&amp;schema=</td>
+                            <!--<td colspan=7>--><td colspan=6>&amp;format=</td><td colspan=2>&amp;schema=</td>
                         </tr>
                         <tr class='th th-lower'>
-                            <td>csv<sup>*</sup></td><td>tsv</td><td>json</td><td>browser</td><td>raw</td>
+                            <td>csv<sup>*</sup></td><td>tsv</td><td>json</td><!--<td>browser</td>--><td>raw</td>
                             <td>cls</td><td>gct</td><td>0<sup>*</sup></td><td>1</td>
                         </tr>
                         <tr>
                             <td>/assays/</td><td>1</td><td></td><td>table</td>
-                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><!--<td class='y'>yes</td>-->
                             <td class='n'>no</td><td class='y'>yes</td><td class='n'>no</td><td class='y'>yes</td>
                             <td class='y'>yes</td>
                         </tr>
                         <tr>
                             <td>/assays/</td><td>&gt;1</td><td></td><td>table</td>
-                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><!--<td class='y'>yes</td>-->
                             <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><td class='y'>yes</td>
                             <td class='y'>yes</td>
                         </tr>
                         <tr>
                             <td>/samples/</td><td>1</td><td></td><td>table</td>
-                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><!--<td class='y'>yes</td>-->
                             <td class='n'>no</td><td class='y'>yes</td><td class='n'>no</td><td class='y'>yes</td>
                             <td class='y'>yes</td>
                         </tr>
                         <tr>
                             <td>/samples/</td><td>&gt;1</td><td></td><td>table</td>
-                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><!--<td class='y'>yes</td>-->
                             <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><td class='y'>yes</td>
                             <td class='y'>yes</td>
                         </tr>
                         <tr valign='bottom'>
                             <td>/data/</td><td></td><td>1</td><td>table</td>
-                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><!--<td class='y'>yes</td>-->
                             <td class='y'>yes</td><td class='n'>no</td><td class='m'>maybe<sup>1</sup></td>
                             <td class='y'>yes</td><td class='y'>yes</td>
                         </tr>
                         <tr valign='bottom'>
                             <td>/data/</td><td></td><td>&gt;1</td><td>table</td>
                             <td class='m'>maybe<sup>2</sup></td><td class='m'>maybe<sup>2</sup></td>
-                            <td class='m'>maybe<sup>2</sup></td><td class='m'>maybe<sup>2</sup></td>
+                            <td class='m'>maybe<sup>2</sup></td><!--<td class='m'>maybe<sup>2</sup></td>-->
                             <td class='n'>no</td><td class='n'>no</td><td class='m'>maybe<sup>1,2</sup></td>
                             <td class='m'>maybe<sup>2</sup></td><td class='m'>maybe<sup>2</sup></td>
                         </tr>
                         <tr>
                             <td>/data/</td><td></td><td>1</td><td>other</td>
-                            <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><td class='n'>no</td>
+                            <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><!--<td class='n'>no</td>-->
                             <td class='y'>yes</td><td class='n'>no</td><td class='n'>no</td><td class='n'>no</td>
                             <td class='n'>no</td>
                         </tr>
                         <tr>
                             <td>/data/</td><td></td><td>&gt;1</td><td>other</td>
-                            <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><td class='n'>no</td>
+                            <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><!--<td class='n'>no</td>-->
                             <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><td class='n'>no</td>
                             <td class='n'>no</td>
                         </tr>
@@ -589,7 +589,7 @@
                         <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor%20value.spaceflight&id=GLDS-15&format=json'>
                             <code>/samples/?study.factor value.spaceflight&id=GLDS-15&<b>format=json</b></code></a><br>
                     </li></ul>
-                    <ul><li><a name='browser'>Browser (interactive) format</a> (<code>&amp;format=browser</code>):
+                    <!--<ul><li><a name='browser'>Browser (interactive) format</a> (<code>&amp;format=browser</code>):
                         <ul>
                             <li>Tabular output can be displayed in interactive tables (this requires JavaScript support).</li>
                             <li>Clicking on a bottom-level column name sorts the table by the values in the column;</li>
@@ -598,7 +598,7 @@
                         </ul>
                         <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor value.spaceflight&file.datatype&format=browser'>
                             <code>/samples/?study.factor value.spaceflight&file.datatype&<b>format=browser</b></code></a><br>
-                    </li></ul>
+                    </li></ul>-->
                     <ul><li><a name='raw'>Raw format</a> (<code>&amp;format=raw</code>):
                         <ul>
                             <li>Any <b>/data/</b> output (tabular or not) can be requested raw, i.e. exactly as it is stored in the
@@ -643,8 +643,10 @@
                                 </ul>
                             </li>
                         </ul>
-                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/data/?id=GLDS-4&file.datatype=differential%20expression&format=browser&schema=1'>
-                            <code>/data/?id=GLDS-4&file.datatype=differential%20expression&format=browser&<b>schema=1</b></code></a><br>
+                        <!--<i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/data/?id=GLDS-4&file.datatype=differential%20expression&format=browser&schema=1'>
+                            <code>/data/?id=GLDS-4&file.datatype=differential%20expression&format=browser&<b>schema=1</b></code></a><br>-->
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/data/?id=GLDS-4&file.datatype=differential%20expression&format=tsv&schema=1'>
+                            <code>/data/?id=GLDS-4&file.datatype=differential%20expression&format=tsv&<b>schema=1</b></code></a><br>
                     </li></ul>
                 </div>
             </div>

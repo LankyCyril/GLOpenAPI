@@ -5,6 +5,7 @@ from glopenapi.common.exceptions import GLOpenAPILogger
 from glopenapi.api.renderers.types import StreamedAnnotationTable
 from glopenapi.api.renderers.PlaintextStreamedTableRenderers import _iter_json_chunks
 from glopenapi.common.exceptions import GLOpenAPIConfigurationException
+from glopenapi.common.exceptions import GLOpenAPIDisabledException
 
 
 def build_url(context, target_view=None, drop=set()):
@@ -163,6 +164,9 @@ def javascript(obj, context, indent=None):
 def html(obj, context, indent=None):
     """Substitute output of `javascript` and render using SlickGrid"""
     # TODO: we're evaluating `obj` twice, once for `html` and once for `javascript`, there's no reason
+    raise GLOpenAPIDisabledException(
+        "Interactive format temporarily disabled", format=context.format,
+    )
     def content():
         title_postfix = repr_quote(f"{context.view} {context.complete_kwargs}")
         replacements = {
