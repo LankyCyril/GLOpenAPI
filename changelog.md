@@ -1,3 +1,8 @@
+Version 4.0.4-alpha0 (2022-09-13)
+
+- Hotfix: serve `root.js` with correct mimetype (application/javascript)
+
+
 Version 4.0.3-alpha0 (2022-09-06)
 
 - Fixes (internal):
