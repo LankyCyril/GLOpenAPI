@@ -49,6 +49,7 @@ TYPE_RENDERERS = OrderedDict((
     }),
     ((StreamedString, str, bytes), {
         "raw": SimpleRenderers.raw,
+        "javascript": SimpleRenderers.javascript,
         "html": SimpleRenderers.html,
     }),
     ((list, dict), {
