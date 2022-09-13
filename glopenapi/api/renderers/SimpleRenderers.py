@@ -11,6 +11,14 @@ def raw(obj, context=None, indent=None):
     return content, mimetype
 
 
+def javascript(obj, context=None, indent=None):
+    """Display javascript"""
+    content = StreamedString(obj, default_format="javascript")
+    # TODO: merge with libs_js in routes and/or
+    # glopenapi.api.renderers.types.StreamedString
+    return content, "application/javascript"
+
+
 def html(obj, context=None, indent=None):
     """Display HTML code"""
     if isinstance(obj, bytes):
