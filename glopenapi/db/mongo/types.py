@@ -1,4 +1,4 @@
-from hashlib import md5
+from hashlib import sha1
 from json import dumps
 from base64 import encodebytes
 from zlib import compress
@@ -10,7 +10,7 @@ from glopenapi.db.mongo.utils import run_mongo_action
 def funcdump(f):
     """One-way encoder of functions; only used for identity checks; code is never executed"""
     code = f.__code__
-    return {"vars": code.co_varnames, "hash": md5(code.co_code).hexdigest()}
+    return {"vars": code.co_varnames, "hash": sha1(code.co_code).hexdigest()}
 
 
 class ValueCheckedRecord():

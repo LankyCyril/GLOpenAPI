@@ -3,10 +3,11 @@ from glopenapi.common.exceptions import GLOpenAPILogger
 from urllib.error import URLError
 from json.decoder import JSONDecodeError
 from glopenapi.common.exceptions import GLOpenAPIDataManagerException
-from pandas import json_normalize
+from pandas import Timestamp, json_normalize
 from glopenapi.common.types import Adapter
 from glopenapi.common.utils import pick_reachable_url
 from types import SimpleNamespace
+from urllib.parse import quote
 from re import search, sub
 from glopenapi.common.exceptions import GLOpenAPIConfigurationException
 from warnings import catch_warnings, filterwarnings
@@ -87,6 +88,19 @@ def read_json(url):
         raise GLOpenAPIDataManagerException("Malformed data returned", url=url)
 
 
+def as_timestamp(dataframe, column, default=-1):
+    """Convert dataframe[column] to Unix timestamp, filling in `default` where not available"""
+    if column not in dataframe:
+        return default
+    else:
+        def safe_timestamp(value):
+            try:
+                return int(Timestamp(value).timestamp())
+            except ValueError:
+                return default
+        return dataframe[column].apply(safe_timestamp)
+
+
 class GeneLabAdapter(Adapter):
  
     def __init__(self, root_urls=["https://genelab-data.ndc.nasa.gov"]):
@@ -97,10 +111,7 @@ class GeneLabAdapter(Adapter):
                     genelab_root +
                     "/genelab/data/search?term=GLDS&type=cgene&size={}"
                 ),
-                FILES_MASK=genelab_root+"/genelab/data/glds/files/{}",
-            )
-            self._legacy_constants = SimpleNamespace(
-                COLD_GLDS_MASK=genelab_root+"/genelab/data/study/data/{}/",
+                COLD_GLDS_MASK=genelab_root + "/genelab/data/study/data/{}/",
                 COLD_FILELISTINGS_MASK=(
                     genelab_root + "/genelab/data/study/filelistings/{}"
                 ),
@@ -118,15 +129,15 @@ class GeneLabAdapter(Adapter):
         except (KeyError, TypeError):
             raise GLOpenAPIDataManagerException("Malformed GeneLab search JSON")
  
-    def _format_file_entry(self, row, accession):
+    def _format_file_entry(self, row):
         """Format filelisting dataframe row to include URLs, timestamp, datatype, rules"""
         filename = row["file_name"]
-        version_info = (
-            "?version={}".format(row["version"]) if "version" in row else ""
-        )
+        version_info = "?version={}".format(row["version"])
         entry = {
             "urls": [
-                (self.constants.GENELAB_ROOT + row["remote_url"] +
+                (self.constants.GENELAB_ROOT + self.constants.SHORT_MEDIA_PATH +
+                    quote(filename) + version_info),
+                (self.constants.GENELAB_ROOT + quote(row["remote_url"]) +
                     version_info),
             ],
             "timestamp": row["timestamp"],
@@ -142,36 +153,39 @@ class GeneLabAdapter(Adapter):
             raise GLOpenAPIConfigurationException(msg, **_kw)
         return entry
  
-    def get_files_by_accession(self, accession, default_timestamp=-1):
+    def get_files_by_accession(self, accession):
         """Get dictionary of files for dataset available through genelab.nasa.gov/genelabAPIs"""
-        _id = sub(r'GLDS-', "", accession)
         try:
-            url = self.constants.FILES_MASK.format(_id)
-            files_json = read_json(url)
-            assert files_json["hits"] == 1
-            filelisting_json = files_json["studies"][accession]["study_files"]
-            assert isinstance(filelisting_json, list)
-        except (AssertionError, KeyError, TypeError):
+            url = self.constants.COLD_GLDS_MASK.format(accession)
+            glds_json = read_json(url)
+            assert len(glds_json) == 1
+            _id = glds_json[0]["_id"]
+        except (AssertionError, IndexError, KeyError, TypeError):
             raise GLOpenAPIDataManagerException(
-                "Malformed 'files' JSON", accession=accession, _id=_id,
-                url=url, object_type=type(files_json).__name__,
+                "Malformed GLDS JSON", accession=accession,
+                url=url, object_type=type(glds_json).__name__,
+                length=getattr(glds_json, "__len__", lambda: None)(),
+                target="[0]['_id']",
+            )
+        try:
+            url = self.constants.COLD_FILELISTINGS_MASK.format(_id)
+            filelisting_json = read_json(url)
+            assert isinstance(filelisting_json, list)
+        except AssertionError:
+            raise GLOpenAPIDataManagerException(
+                "Malformed 'filelistings' JSON", accession=accession, _id=_id,
+                url=url, object_type=type(filelisting_json).__name__,
                 expected_type="list",
             )
         else:
             files = json_normalize(filelisting_json)
         with catch_warnings():
             filterwarnings("ignore", category=UnknownTimezoneWarning)
-            files["date_created"] = files["date_created"].astype(int)
-            if "date_modified" in files:
-                files["date_modified"] = (
-                    files["date_modified"].fillna(default_timestamp).astype(int)
-                )
-            else:
-                GLOpenAPILogger.warning(f"No 'date_modified' fields: {url}")
-                files["date_modified"] = files["date_created"].copy()
+            files["date_created"] = as_timestamp(files, "date_created")
+            files["date_modified"] = as_timestamp(files, "date_modified")
         files["timestamp"] = files[["date_created", "date_modified"]].max(axis=1)
         return {
-            row["file_name"]: self._format_file_entry(row, accession)
+            row["file_name"]: self._format_file_entry(row)
             for _, row in files.sort_values(by="timestamp").iterrows()
         }
  

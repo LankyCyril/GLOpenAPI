@@ -1,3 +1,12 @@
+Version 4.0.5-alpha0 (2023-02-06)
+
+- Reverted:
+    - Revert to using the /filelistings/ endpoint
+- Fixes:
+    - Use sha1 instead of md5 for FIPS compliance
+    - Update logo in header on landing page, use OSDR style (logo only on left)
+
+
 Version 4.0.4-alpha0 (2022-09-13)
 
 - Hotfix: serve `root.js` with correct mimetype (application/javascript)

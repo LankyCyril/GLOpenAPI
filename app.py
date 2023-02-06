@@ -15,7 +15,7 @@ from glopenapi.api.routes import DefaultRoutes
 # - The name of the Flask app will be used in the header of the landing page.
 
 flask_app = Flask("NASA GeneLab Open API")
-__version__ = "4.0.4-alpha0"
+__version__ = "4.0.5-alpha0"
 
 
 # If MODE is 'nocache' (e.g., `export MODE=nocache` in wrapper, or running in
