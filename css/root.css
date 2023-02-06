@@ -89,7 +89,9 @@ table#formats-matrix sup, .footnotes sup {font-size: 8pt !important}
    Note that all of class='interactive' have display:none;
    Most of class='on-newline' have margin-top:0; */
 #i0ade8efeba2d {border-left: 0; border-right: 0; border-top: 0; border-bottom: 1px solid black; margin-bottom: 16pt}
-#i06b7561e6186 {width: 260pt}
+#i06b7561e6186 {width: 60pt; padding-top: 5pt}
+#i06b7561e6187 {width: 260pt}
+#i06b7561e6187 span {margin-left: -11pt; font-size: .9em; font-weight: 600; color: #a19278; font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif,"Apple Color Emoji","Segoe UI Emoji",Segoe UI Symbol,"Noto Color Emoji"}
 #icc47c41d2ef6 {height: 50pt}
 #id2bf7a9b934f {width: 126pt; text-align: right}
 #ibad63f47ded7 {height: 50pt}

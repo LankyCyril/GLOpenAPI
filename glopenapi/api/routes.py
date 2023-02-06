@@ -78,15 +78,14 @@ class DefaultRoutes(Routes):
     @Routes.register_endpoint("/css/<filename>")
     def css(self, filename, context=None):
         return views.static.get(
-            directory="css", filename=filename,
-            mode="rt", mimetype="text/css",
+            directory="css", filename=filename, mode="rt", mimetype="text/css",
         )
  
     @Routes.register_endpoint("/images/<filename>")
     def images(self, filename, context=None):
         return views.static.get(
-            directory="images", filename=filename,
-            mode="rb", mimetype="image/png",
+            directory="images", filename=filename, mode="rb",
+            mimetype="image/"+(filename.endswith("png") and "png" or "svg+xml"),
         )
  
     @Routes.register_endpoint("/libs/js/<filename>")
