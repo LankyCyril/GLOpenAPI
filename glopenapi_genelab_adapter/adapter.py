@@ -9,8 +9,6 @@ from glopenapi.common.utils import pick_reachable_url
 from types import SimpleNamespace
 from re import search, sub
 from glopenapi.common.exceptions import GLOpenAPIConfigurationException
-from warnings import catch_warnings, filterwarnings
-from dateutil.parser import UnknownTimezoneWarning
 from functools import lru_cache
 
 
@@ -89,46 +87,40 @@ def read_json(url):
 
 class GeneLabAdapter(Adapter):
  
-    def __init__(self, root_urls=["https://genelab-data.ndc.nasa.gov"]):
-        with pick_reachable_url(root_urls) as genelab_root:
+    def __init__(self, root_urls=["https://osdr.nasa.gov", "https://genelab-data.ndc.nasa.gov"]):
+        with pick_reachable_url(root_urls) as root:
             self.constants = SimpleNamespace(
-                GENELAB_ROOT=genelab_root,
-                COLD_SEARCH_MASK=(
-                    genelab_root +
-                    "/genelab/data/search?term=GLDS&type=cgene&size={}"
-                ),
-                FILES_MASK=genelab_root+"/genelab/data/glds/files/{}",
+                GENELAB_ROOT=root,
+                SEARCH_MASK=root+"/genelab/data/search?type=cgene&size={}",
+                FILES_MASK=root+"/genelab/data/glds/files/{}?all_files=True",
             )
             self._legacy_constants = SimpleNamespace(
-                COLD_GLDS_MASK=genelab_root+"/genelab/data/study/data/{}/",
-                COLD_FILELISTINGS_MASK=(
-                    genelab_root + "/genelab/data/study/filelistings/{}"
-                ),
-                SHORT_MEDIA_PATH="/genelab/static/media/dataset/",
+                GLDS_MASK=root+"/genelab/data/study/data/{}/",
+                FILELISTINGS_MASK=root+"/genelab/data/study/filelistings/{}",
+                SHORT_MEDIA_PATH=root+"/genelab/static/media/dataset/",
             )
         super().__init__()
  
     def get_accessions(self):
         """Return list of dataset accessions available through genelab.nasa.gov/genelabAPIs"""
         try:
-            n_datasets_url = self.constants.COLD_SEARCH_MASK.format(0)
+            n_datasets_url = self.constants.SEARCH_MASK.format(0)
             n_datasets = read_json(n_datasets_url)["hits"]["total"]
-            datasets_url = self.constants.COLD_SEARCH_MASK.format(n_datasets)
-            return {e["_id"] for e in read_json(datasets_url)["hits"]["hits"]}
+            datasets_url = self.constants.SEARCH_MASK.format(n_datasets)
+            return {
+                entry["_source"]["Accession"]
+                for entry in read_json(datasets_url)["hits"]["hits"]
+            }
         except (KeyError, TypeError):
             raise GLOpenAPIDataManagerException("Malformed GeneLab search JSON")
  
     def _format_file_entry(self, row, accession):
         """Format filelisting dataframe row to include URLs, timestamp, datatype, rules"""
-        filename = row["file_name"]
-        version_info = (
-            "?version={}".format(row["version"]) if "version" in row else ""
-        )
-        entry = {
-            "urls": [
-                (self.constants.GENELAB_ROOT + row["remote_url"] +
-                    version_info),
-            ],
+        filename, entry = row["file_name"], {
+            "urls": [(
+                self.constants.GENELAB_ROOT + row["remote_url"] +
+                (f"?version={row['version']}" if "version" in row else "")
+            )],
             "timestamp": row["timestamp"],
         }
         matched_patterns = set()
@@ -140,40 +132,40 @@ class GeneLabAdapter(Adapter):
             msg = "File name matches more than one predefined pattern"
             _kw = dict(filename=filename, debug_info=sorted(matched_patterns))
             raise GLOpenAPIConfigurationException(msg, **_kw)
-        return entry
+        return filename, entry
  
-    def get_files_by_accession(self, accession, default_timestamp=-1):
+    def get_files_by_accession(self, accession):
         """Get dictionary of files for dataset available through genelab.nasa.gov/genelabAPIs"""
-        _id = sub(r'GLDS-', "", accession)
-        try:
-            url = self.constants.FILES_MASK.format(_id)
-            files_json = read_json(url)
-            assert files_json["hits"] == 1
-            filelisting_json = files_json["studies"][accession]["study_files"]
-            assert isinstance(filelisting_json, list)
-        except (AssertionError, KeyError, TypeError):
-            raise GLOpenAPIDataManagerException(
-                "Malformed 'files' JSON", accession=accession, _id=_id,
-                url=url, object_type=type(files_json).__name__,
-                expected_type="list",
-            )
+        _id_match = search(r'[0-9]+', accession)
+        if not _id_match:
+            GLOpenAPILogger.warning(f"Not a numeric accession: {accession}")
+            return {}
         else:
-            files = json_normalize(filelisting_json)
-        with catch_warnings():
-            filterwarnings("ignore", category=UnknownTimezoneWarning)
-            files["date_created"] = files["date_created"].astype(int)
-            if "date_modified" in files:
-                files["date_modified"] = (
-                    files["date_modified"].fillna(default_timestamp).astype(int)
+            _id = _id_match.group()
+            try:
+                url = self.constants.FILES_MASK.format(_id)
+                files_json = read_json(url)
+                assert files_json["hits"] == 1
+                study_files = files_json["studies"][accession]["study_files"]
+                assert isinstance(study_files, list)
+            except (AssertionError, KeyError, TypeError):
+                raise GLOpenAPIDataManagerException(
+                    "Malformed 'files' JSON", accession=accession, _id=_id,
+                    url=url, object_type=type(files_json).__name__,
+                    expected_type="list",
                 )
             else:
+                files = json_normalize(study_files)
+            if "date_modified" not in files:
                 GLOpenAPILogger.warning(f"No 'date_modified' fields: {url}")
-                files["date_modified"] = files["date_created"].copy()
-        files["timestamp"] = files[["date_created", "date_modified"]].max(axis=1)
-        return {
-            row["file_name"]: self._format_file_entry(row, accession)
-            for _, row in files.sort_values(by="timestamp").iterrows()
-        }
+                files["date_modified"] = float("nan")
+            files["timestamp"] = (
+                files[["date_created", "date_modified"]].max(axis=1).astype(int)
+            )
+            return dict((
+                self._format_file_entry(row, accession)
+                for _, row in files.sort_values(by="timestamp").iterrows()
+            ))
  
     def best_sample_name_matches(self, name, names, return_positions=False):
         """Match ISA sample names to their variants in data files (R-like dot-separated, postfixed)"""
