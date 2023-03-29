@@ -1,3 +1,28 @@
+Version 4.0.5-alpha0 (2023-02-06)
+
+- Reverted:
+    - Revert to using the /filelistings/ endpoint
+- Fixes:
+    - Use sha1 instead of md5 for FIPS compliance
+    - Update logo in header on landing page, use OSDR style (logo only on left)
+
+
+Version 4.0.4-alpha0 (2022-09-13)
+
+- Hotfix: serve `root.js` with correct mimetype (application/javascript)
+
+
+Version 4.0.3-alpha0 (2022-09-06)
+
+- Fixes (internal):
+    - Use new NASA API endpoints
+    - Enforce new Content Security Policy rules;
+      factor out inline JavaScript and CSS
+- Regression:
+    - Temporarily disable '&format=browser'; usage of SlickGrid currently
+      violates the Content Security Policy
+
+
 Version 4.0.2-alpha0 (2022-07-26)
 
 - Improvements:
@@ -9,7 +34,7 @@ Version 4.0.2-alpha0 (2022-07-26)
     - Landing page anchors dodge the URL builder thanks to CSS property
       'scroll-margin-top' (i.e., when you click on a table of contents link,
       or follow/copy-paste that link, the page scrolls so that the heading of
-      the section ends up just under the builder).
+      the section ends up just under the builder)
 
 
 Version 4.0.1-alpha0 (2022-06-27)

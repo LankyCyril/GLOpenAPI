@@ -6,7 +6,7 @@ from os import path, access, W_OK, stat, remove, makedirs
 from datetime import datetime
 from filelock import Timeout as FileLockTimeoutError, FileLock
 from glob import iglob
-from hashlib import md5
+from hashlib import sha1
 from contextlib import contextmanager, closing
 from glopenapi.common.utils import timestamp36
 from sqlite3 import connect, OperationalError
@@ -140,7 +140,7 @@ class SQLTransactions():
             if identifier is None:
                 self._lockfilename = path.join(cwd, f"{name}.lock")
             else:
-                id_hash = md5(identifier.encode()).hexdigest()
+                id_hash = sha1(identifier.encode()).hexdigest()
                 self._lockfilename = path.join(cwd, f"{name}.{id_hash}.lock")
             clear_lock_if_stale(
                 self._lockfilename, raise_errors=True,
