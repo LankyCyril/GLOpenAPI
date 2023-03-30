@@ -172,9 +172,9 @@ def get_sub_df(obj, partname, partcols):
                 if isinstance(c, SQLiteIndexName):
                     index_name = str(c)
                 data[c] = [_min, _max, _nan]
-        except OperationalError as e:
+        except OperationalError as exc:
             msg = "Data could not be retrieved"
-            _kw = dict(table=obj.name, debug_info=repr(e))
+            _kw = dict(table=obj.name, debug_info=repr(exc))
             raise GLOpenAPIDatabaseException(msg, **_kw)
     dataframe = DataFrame(data)
     if index_name is not None:

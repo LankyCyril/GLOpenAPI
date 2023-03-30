@@ -101,8 +101,8 @@ class ResponseCache():
                         execute("""INSERT INTO `accessions_used`
                             (accession, context_identity) VALUES (?, ?)""", [
                             accession, context.identity])
-                except (OperationalError, ZlibError, TypeError) as e:
-                    msg = f"{context.identity}, {e!r}"
+                except (OperationalError, ZlibError, TypeError) as exc:
+                    msg = f"{context.identity}, {exc!r}"
                     _loge(f"ResponseCache(), could not store:\n  {msg}")
                     raise
                 else:
@@ -121,9 +121,9 @@ class ResponseCache():
         with self.sqltransactions.exclusive(desc) as (_, execute):
             try:
                 self._drop_by_context_identity(execute, identity)
-            except OperationalError as e:
+            except OperationalError as exc:
                 msg = "ResponseCache():\n  could not drop responses for %s: %s"
-                _loge(msg, identity, repr(e))
+                _loge(msg, identity, repr(exc))
                 raise
             else:
                 msg = "ResponseCache():\n  dropped cached response(s) for %s"
@@ -139,9 +139,9 @@ class ResponseCache():
                 identity_entries = execute(query, [accession]).fetchall()
                 for context_identity, *_ in identity_entries:
                     self._drop_by_context_identity(execute, context_identity)
-            except OperationalError as e:
+            except OperationalError as exc:
                 msg = "ResponseCache():\n  could not drop responses for %s: %s"
-                _loge(msg, accession, repr(e))
+                _loge(msg, accession, repr(exc))
                 raise
             else:
                 msg = "ResponseCache():\n  dropped %s cached response(s) for %s"
@@ -154,8 +154,8 @@ class ResponseCache():
             try:
                 execute("DELETE FROM `accessions_used`")
                 execute("DELETE FROM `response_cache`")
-            except OperationalError as e:
-                _loge(f"ResponseCache().drop_all():\n  failed with {e!r}")
+            except OperationalError as exc:
+                _loge(f"ResponseCache().drop_all():\n  failed with {exc!r}")
                 raise
             else:
                 _logi("ResponseCache():\n  dropped all cached Flask responses")
@@ -193,13 +193,13 @@ class ResponseCache():
         except EOFError:
             _logi(f"ResponseCache(), nothing yet for:\n  {context.identity}")
             return ResponseContainer(content=None)
-        except OperationalError as e:
+        except OperationalError as exc:
             msg = "could not retrieve, staging replacement"
-            _logw(f"ResponseCache() {msg}:\n  {context.identity}, {e!r}")
+            _logw(f"ResponseCache() {msg}:\n  {context.identity}, {exc!r}")
             return ResponseContainer(content=None)
-        except ZlibError as e:
+        except ZlibError as exc:
             msg = "could not decompress, staging replacement"
-            _logw(f"ResponseCache() {msg}:\n  {context.identity}, {e!r}")
+            _logw(f"ResponseCache() {msg}:\n  {context.identity}, {exc!r}")
             return ResponseContainer(content=None)
         else:
             _logi(f"ResponseCache(), retrieving:\n  {context.identity}")
@@ -226,9 +226,9 @@ class ResponseCache():
                         msg = f"ResponseCache.shrink():\n  dropping {cid}"
                         GLOpenAPILogger.info(msg)
                         self._drop_by_context_identity(execute, cid)
-                    except OperationalError as e:
-                        msg= f"Rolling back shrinkage due to {e!r}"
-                        GLOpenAPILogger.error(msg, exc_info=e)
+                    except OperationalError as exc:
+                        msg= f"Rolling back shrinkage due to {exc!r}"
+                        GLOpenAPILogger.error(msg, exc_info=exc)
                         connection.rollback() # explicit, to be able to continue
                         break
                     else:

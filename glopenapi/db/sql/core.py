@@ -63,8 +63,8 @@ class SQLiteObject():
         for partname, *_ in list(_iterparts):
             try:
                 connection.execute(f"DROP TABLE IF EXISTS `{partname}`")
-            except Exception as e:
-                GLOpenAPILogger.error(f"Could not drop {partname}", exc_info=e)
+            except Exception as exc:
+                GLOpenAPILogger.error(f"Could not drop {partname}", exc_info=exc)
                 raise
             else:
                 GLOpenAPILogger.info(f"Dropped {partname} (if it existed)")
@@ -158,9 +158,9 @@ class SQLiteBlob(SQLiteObject):
         try:
             connection.execute(f"""DELETE FROM `{self.table}`
                 WHERE `identifier` == "{identifier}" """)
-        except Exception as e:
+        except Exception as exc:
             msg = f"Could not delete from {self.table}: {identifier}"
-            GLOpenAPILogger.error(msg, exc_info=e)
+            GLOpenAPILogger.error(msg, exc_info=exc)
             raise
         else:
             GLOpenAPILogger.info(f"Deleted from {self.table}: {identifier}")
@@ -228,9 +228,9 @@ class SQLiteTable(SQLiteObject):
         try:
             connection.execute(f"""DELETE FROM `{self.aux_table}`
                 WHERE `table` == "{table}" """)
-        except Exception as e:
+        except Exception as exc:
             msg = f"Could not delete from {self.aux_table}: {table}"
-            GLOpenAPILogger.error(msg, exc_info=e)
+            GLOpenAPILogger.error(msg, exc_info=exc)
             raise
         else:
             GLOpenAPILogger.info(f"Deleted from {self.aux_table}: {table}")
@@ -276,9 +276,9 @@ class SQLiteTable(SQLiteObject):
                     try:
                         GLOpenAPILogger.info(f"{desc} purging: {table}")
                         self.drop(connection=connection, other=table)
-                    except OperationalError as e:
-                        msg= f"Rolling back shrinkage due to {e!r}"
-                        GLOpenAPILogger.error(msg, exc_info=e)
+                    except OperationalError as exc:
+                        msg= f"Rolling back shrinkage due to {exc!r}"
+                        GLOpenAPILogger.error(msg, exc_info=exc)
                         connection.rollback() # explicit, to be able to continue
                         break
                     else:

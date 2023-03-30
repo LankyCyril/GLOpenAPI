@@ -23,8 +23,8 @@ class PhoenixIterator():
         self.it, _it = tee(self.it)
         return _it
     def __next__(self):
-        for e in self:
-            return e
+        for entry in self:
+            return entry
 
 
 class Adapter():

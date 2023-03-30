@@ -124,8 +124,8 @@ class ExceptionPropagatingThread(Thread):
         self.exception = None
         try:
             super(ExceptionPropagatingThread, self).run()
-        except Exception as e:
-            self.exception = e
+        except Exception as exc:
+            self.exception = exc
             raise
     def join(self):
         super(ExceptionPropagatingThread, self).join()

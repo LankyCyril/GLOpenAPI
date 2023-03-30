@@ -43,15 +43,15 @@ def get_raw(*, mongo_collections, locale, context, id_fields):
             mongo_collections.metadata, context=context, id_fields=id_fields,
             locale=locale,
         )
-    except MongoOperationError as e:
-        errmsg = getattr(e, "details", {}).get("errmsg", "").lower()
+    except MongoOperationError as exc:
+        errmsg = getattr(exc, "details", {}).get("errmsg", "").lower()
         has_index = ("id" in mongo_collections.metadata.index_information())
         index_reason = ("index" in errmsg)
         if index_reason and (not has_index):
             msg = "Metadata is not indexed yet; this is a temporary error"
         else:
             msg = "Could not retrieve sorted metadata"
-        raise GLOpenAPIDatabaseException(msg, locale=locale, reason=str(e))
+        raise GLOpenAPIDatabaseException(msg, locale=locale, reason=str(exc))
     else:
         return cursor, full_projection
 

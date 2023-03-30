@@ -10,22 +10,22 @@ from glopenapi.common.exceptions import GLOpenAPILogger
 from glopenapi.common.utils import iterate_branches_and_leaves
 
 
-def _SAT_normalize_entry(e, max_level=2, head=(), add_on="comment", cache=OrderedDict(), join=".".join, marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple):
+def _SAT_normalize_entry(entry, max_level=2, head=(), add_on="comment", cache=OrderedDict(), join=".".join, marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple):
     """Quickly iterate flattened dictionary key-value pairs of known schema in pure Python, with LRU caching"""
-    ck = marsh(e, 4), max_level, head
+    ck = marsh(entry, 4), max_level, head
     if ck not in cache:
         if len(cache) >= 65536:
             cache.popitem(0)
-        if isinstance(e, dict):
+        if isinstance(entry, dict):
             if (len(head) <= max_level) or (head[-1] == add_on):
                 cache[ck] = sum((
                     tuple(_SAT_normalize_entry(v, max_level, head+(k,), add_on))
-                    for k, v in e.items()
+                    for k, v in entry.items()
                 ), ())
             else:
-                cache[ck] = ((join(head), e.get("", e)),)
+                cache[ck] = ((join(head), entry.get("", entry)),)
         else:
-            cache[ck] = ((join(head), e),)
+            cache[ck] = ((join(head), entry),)
     yield from cache[ck]
 
 
@@ -243,8 +243,8 @@ class StreamedDataTable(StreamedTable):
                 _count_query = f"SELECT count(*) FROM ({self.query})"
                 _nrows = (execute(_count_query).fetchone() or [0])[0]
                 self.shape = (_nrows, len(self._columns))
-            except OperationalError as e:
-                reraise_operational_error(self, e)
+            except OperationalError as exc:
+                reraise_operational_error(self, exc)
         self.accessions = {c[0] for c in self._columns}
         self.n_index_levels = 1
         self.datatypes, self.gct_validity_set = set(), set()
@@ -297,8 +297,8 @@ class StreamedDataTable(StreamedTable):
                         _na_tup = (self.na_rep,)
                         for value, *_ in execute(index_query):
                             yield _na_tup if value is None else (value,)
-                except OperationalError as e:
-                    reraise_operational_error(self, e)
+                except OperationalError as exc:
+                    reraise_operational_error(self, exc)
         else:
             yield from ([] for _ in range(self.shape[0]))
  
@@ -327,8 +327,8 @@ class StreamedDataTable(StreamedTable):
                     with self.sqltransactions.concurrent(desc) as (_, execute):
                         for vv in execute(self.query):
                             yield [self.na_rep if v is None else v for v in vv]
-        except OperationalError as e:
-            reraise_operational_error(self, e)
+        except OperationalError as exc:
+            reraise_operational_error(self, exc)
 
 
 class _SAVC_PerKeyCounter(dict):

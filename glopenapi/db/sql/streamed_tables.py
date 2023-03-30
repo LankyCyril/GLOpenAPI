@@ -28,8 +28,8 @@ class TempSelect():
                 GLOpenAPILogger.info(msg)
             try:
                 execute(f"CREATE {self.kind} `{self.name}` as {query}")
-            except OperationalError as e:
-                reraise_operational_error(self, e)
+            except OperationalError as exc:
+                reraise_operational_error(self, exc)
             else:
                 query_repr = repr(query.lstrip()[:200] + "...")
                 msg = f"Created temporary SQLite {self.kind}"
@@ -39,9 +39,9 @@ class TempSelect():
         with self.sqltransactions.exclusive(desc) as (_, execute):
             try:
                 execute(f"DROP {self.kind} `{self.name}`")
-            except OperationalError as e:
+            except OperationalError as exc:
                 msg = f"Failed to drop temporary {self.kind} {self.name}"
-                GLOpenAPILogger.error(msg, exc_info=e)
+                GLOpenAPILogger.error(msg, exc_info=exc)
             else:
                 msg = f"Dropped temporary SQLite {self.kind} {self.name}"
                 GLOpenAPILogger.info(msg)

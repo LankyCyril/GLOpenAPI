@@ -39,9 +39,9 @@ class GLOpenAPIClient():
             self.cacher_loop_thread = self._ensure_cacher_loop_thread(
                 **metadata_cacher_params,
             )
-        except TypeError as e:
+        except TypeError as exc:
             msg = "Exception occurred during GLOpenAPIClient() initialization"
-            raise GLOpenAPIConfigurationException(msg, debug_info=repr(e))
+            raise GLOpenAPIConfigurationException(msg, debug_info=repr(exc))
  
     def _configure_flask_app(self, *, app, compress_params=None):
         """Modify Flask application, enable compression"""
@@ -75,9 +75,9 @@ class GLOpenAPIClient():
             host_and_port = (mongo_client.HOST, mongo_client.PORT)
             with create_connection(host_and_port, timeout=test_timeout):
                 pass
-        except SocketError as e:
+        except SocketError as exc:
             msg = "Could not connect to internal MongoDB instance"
-            raise GLOpenAPIConfigurationException(msg, error=type(e).__name__)
+            raise GLOpenAPIConfigurationException(msg, error=type(exc).__name__)
         parsed_cnames = {
             kind: (collection_names or {}).get(kind) or kind
             for kind in ("metadata", "metadata_aux", "records", "status")
