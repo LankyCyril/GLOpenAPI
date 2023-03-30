@@ -38,9 +38,9 @@ class CachedBinaryFile(SQLiteBlob):
             try:
                 with request_get(url) as response:
                     data = response.content
-            except (URLError, OSError) as e:
+            except (URLError, OSError) as exc:
                 msg = f"{self.name}; tried URL and failed:\n  {url}"
-                GLOpenAPILogger.warning(msg, exc_info=e)
+                GLOpenAPILogger.warning(msg, exc_info=exc)
             else:
                 msg = f"{self.name}; successfully fetched blob:\n  {url}"
                 GLOpenAPILogger.info(msg)
@@ -109,9 +109,9 @@ class CachedTableFile(SQLiteTable):
                         msg = f"{self.name}:\n  streaming to {tempfile}"
                         GLOpenAPILogger.debug(msg)
                         copyfileobj(response.raw, handle)
-                except (URLError, OSError) as e:
+                except (URLError, OSError) as exc:
                     msg = f"{self.name}; tried URL and failed:\n  {url}"
-                    GLOpenAPILogger.warning(msg, exc_info=e)
+                    GLOpenAPILogger.warning(msg, exc_info=exc)
                 else:
                     msg = f"{self.name}; successfully fetched data:\n  {url}"
                     GLOpenAPILogger.info(msg)
@@ -180,9 +180,9 @@ class CachedTableFile(SQLiteTable):
                         )
                         m = "Extended table for CachedTableFile"
                         GLOpenAPILogger.info(f"{m}:\n  {self.name}, {partname}")
-                except (OperationalError, PandasDatabaseError, ValueError) as e:
+                except (OperationalError, PandasDatabaseError, ValueError) as exc:
                     msg = "Failed to insert SQL chunk or chunk part"
-                    _kw = dict(name=self.name, debug_info=repr(e))
+                    _kw = dict(name=self.name, debug_info=repr(exc))
                     raise GLOpenAPIDatabaseException(msg, **_kw)
             execute(f"""INSERT INTO `{self.aux_table}`
                 (`table`,`timestamp`,`retrieved_at`) VALUES(?,?,?)""", [

@@ -54,37 +54,37 @@ class GLOpenAPIDisabledException(GLOpenAPIException):
     code, reason = 404, "Temporarily disabled"
 
 
-def interpret_exception(e, debug=False):
+def interpret_exception(exc, debug=False):
     from glopenapi.common.utils import repr_quote, space_quote
     exc_type, exc_value, exc_tb = exc_info()
-    if isinstance(e, NotImplementedError):
+    if isinstance(exc, NotImplementedError):
         code, reason = 501, "Not Implemented"
     else:
-        code = getattr(e, "code", 400)
-        reason = getattr(e, "reason", "BAD REQUEST")
-    kwargs = e.kwargs if isinstance(e, GLOpenAPIException) else {}
+        code = getattr(exc, "code", 400)
+        reason = getattr(exc, "reason", "BAD REQUEST")
+    kwargs = exc.kwargs if isinstance(exc, GLOpenAPIException) else {}
     info = dict(
         code=code, reason=reason,
         exception_type=exc_type.__name__, exception_value=str(exc_value),
-        args=[] if isinstance(e, GLOpenAPIException) else [
-            repr_quote(repr(a)) for a in getattr(e, "args", [])
+        args=[] if isinstance(exc, GLOpenAPIException) else [
+            repr_quote(repr(a)) for a in getattr(exc, "args", [])
         ],
         kwargs={
             space_quote(k): repr_quote(repr(kwargs[k]))
             for k in kwargs if (debug or (k != "debug_info"))
         },
     )
-    if isinstance(e, GLOpenAPIException) and getattr(e, "suggestion", None):
-        info["suggestion"] = e.suggestion
+    if isinstance(exc, GLOpenAPIException) and getattr(exc, "suggestion", None):
+        info["suggestion"] = exc.suggestion
     return info, format_tb(exc_tb)
 
 
-def exception_catcher(e, debug=False):
+def exception_catcher(exc, debug=False):
     from glopenapi.common.utils import json_permissive_default
-    info, traceback_lines = interpret_exception(e, debug=debug)
+    info, traceback_lines = interpret_exception(exc, debug=debug)
     tb_preface = "Traceback (most recent call last):\n"
     traceback = "".join(traceback_lines)
-    print(tb_preface, traceback, repr(e), sep="", file=stderr)
+    print(tb_preface, traceback, repr(exc), sep="", file=stderr)
     dumps_permissive = partial(dumps, default=json_permissive_default)
     if debug:
         content = dumps_permissive(info, indent=4) + "\n\n" + traceback

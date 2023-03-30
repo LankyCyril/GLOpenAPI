@@ -36,9 +36,9 @@ def apply_pragma(execute, pragma, value, sqlite_db):
     try:
         execute(f"PRAGMA {pragma} = {value}")
         status = (execute(f"PRAGMA {pragma}").fetchone() or [None])[0]
-    except (OSError, FileNotFoundError, OperationalError) as e:
+    except (OSError, FileNotFoundError, OperationalError) as exc:
         msg = f"Database {sqlite_db!r} may not be writable"
-        _logw(msg, exc_info=e)
+        _logw(msg, exc_info=exc)
     else:
         if str(status) != str(value):
             msg = f"Could not set {pragma} = {value} for database {sqlite_db!r}"
@@ -59,12 +59,12 @@ def clear_lock_if_stale(lockfilename, max_filelock_age_seconds=7200, raise_error
         lockfile_ctime = datetime.fromtimestamp(stat(lockfilename).st_ctime)
     except FileNotFoundError:
         lockfile_ctime = datetime.now()
-    except Exception as e:
+    except Exception as exc:
         msg = f"{lockfilename} is inaccessible"
         if raise_errors:
-            raise GLOpenAPIConfigurationException(msg, debug_info=repr(e))
+            raise GLOpenAPIConfigurationException(msg, debug_info=repr(exc))
         else:
-            _loge(msg, exc_info=e)
+            _loge(msg, exc_info=exc)
             return
     else:
         if not access(lockfilename, W_OK):
@@ -81,12 +81,12 @@ def clear_lock_if_stale(lockfilename, max_filelock_age_seconds=7200, raise_error
                 remove(lockfilename)
         except FileNotFoundError:
             pass
-        except Exception as e:
+        except Exception as exc:
             msg = f"{lockfilename} is inaccessible"
             if raise_errors:
-                raise GLOpenAPIConfigurationException(msg, debug_info=repr(e))
+                raise GLOpenAPIConfigurationException(msg, debug_info=repr(exc))
             else:
-                _loge(msg, exc_info=e)
+                _loge(msg, exc_info=exc)
 
 
 def fds_exceed(filename, maxcount):
@@ -159,17 +159,17 @@ class SQLTransactions():
                 execute("BEGIN")
                 try:
                     yield connection, execute
-                except Exception as e:
+                except Exception as exc:
                     connection.rollback()
                     msg = f"{prelude}: transaction failed, rolling back"
-                    _logw(msg, exc_info=e)
+                    _logw(msg, exc_info=exc)
                     raise
                 else:
                     _logd(f"{prelude}: committing transaction")
                     connection.commit()
-        except (OSError, FileNotFoundError, OperationalError) as e:
+        except (OSError, FileNotFoundError, OperationalError) as exc:
             msg = "Data could not be retrieved"
-            raise GLOpenAPIDatabaseException(msg, debug_info=repr(e))
+            raise GLOpenAPIDatabaseException(msg, debug_info=repr(exc))
         finally:
             try:
                 connection.close()
@@ -232,16 +232,16 @@ class SQLTransactions():
                 _logd(f"{prelude}: releasing write lock")
 
 
-def reraise_operational_error(obj, e):
+def reraise_operational_error(obj, exc):
     """If OperationalError is due to too many columns in request, tell user; otherwise, raise generic error"""
-    if "too many columns" in str(e).lower():
+    if "too many columns" in str(exc).lower():
         msg = "Too many columns requested"
         sug = "Limit request to fewer than 2000 columns"
         raise GLOpenAPIDatabaseException(msg, suggestion=sug)
     else:
         msg = "Data could not be retrieved"
         try:
-            debug_info = [repr(e), obj.query]
+            debug_info = [repr(exc), obj.query]
         except AttributeError:
-            debug_info = repr(e)
+            debug_info = repr(exc)
         raise GLOpenAPIDatabaseException(msg, debug_info=debug_info)

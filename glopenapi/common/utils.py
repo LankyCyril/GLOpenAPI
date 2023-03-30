@@ -49,9 +49,10 @@ def pick_reachable_url(urls, name=None):
                 continue
         else:
             if name:
-                raise URLError(f"No URLs are reachable for {name}: {urls}")
+                msg = f"No URLs are reachable for {name}: {urls}"
             else:
-                raise URLError(f"No URLs are reachable: {urls}")
+                msg = f"No URLs are reachable: {urls}"
+            raise GLOpenAPIConfigurationException(msg)
     yield _pick()
 
 
@@ -124,8 +125,8 @@ class ExceptionPropagatingThread(Thread):
         self.exception = None
         try:
             super(ExceptionPropagatingThread, self).run()
-        except Exception as e:
-            self.exception = e
+        except Exception as exc:
+            self.exception = exc
             raise
     def join(self):
         super(ExceptionPropagatingThread, self).join()
