@@ -19,7 +19,7 @@ from threading import Thread
 class GLOpenAPIClient():
     """Routes Response-generating methods, continuously caches metadata and responses"""
  
-    def __init__(self, *, AdapterClass, RoutesClass, mongo_params, sqlite_params, metadata_cacher_params, flask_params, app_version="unknown"):
+    def __init__(self, *, adapter, RoutesClass, mongo_params, sqlite_params, metadata_cacher_params, flask_params, app_version="unknown"):
         """Initialize metadata cacher (with adapter), response cacher, routes"""
         self.app_version = app_version
         try:
@@ -29,7 +29,7 @@ class GLOpenAPIClient():
                 self._get_mongo_db_connection(**mongo_params)
             )
             self.sqlite_dbs = self._get_validated_sqlite_dbs(**sqlite_params)
-            self.adapter = AdapterClass()
+            self.adapter = adapter
             self._init_error_handlers()
             self.renderer, self.routes = self._init_routes(RoutesClass)
             self.response_cache = ResponseCache(self.sqlite_dbs)
