@@ -2,6 +2,7 @@ from numpy import generic as NumpyGenericType, base_repr
 from datetime import datetime
 from copy import deepcopy
 from re import compile
+from typing.re import Pattern as SRE_Pattern
 from functools import partial
 from urllib.request import quote
 from base64 import b64encode
@@ -113,6 +114,8 @@ def json_permissive_default(o):
         return o.item()
     elif isinstance(o, set):
         return f"<set>{list(o)}"
+    elif isinstance(o, SRE_Pattern):
+        return f"<SRE>{o!r}"
     elif isinstance(o, bytes):
         return str(o)
     else:

@@ -1,12 +1,12 @@
 from functools import lru_cache, partial, reduce
-from re import search, sub, compile
+from re import search, sub, compile, IGNORECASE
 from glopenapi.common.exceptions import GLOpenAPIParserException, is_debug
 from operator import getitem
 from collections import defaultdict
 from flask import request
 from urllib.request import quote, unquote
 from json import dumps
-from glopenapi.common.utils import space_quote
+from glopenapi.common.utils import space_quote, json_permissive_default
 from glopenapi.common.hacks import ForceShowAllDataColumns, HackyBlackHoleList
 from glopenapi.common.exceptions import GLOpenAPIConfigurationException
 
@@ -41,6 +41,9 @@ KEYVALUE_PARSER_DISPATCHER = lru_cache(maxsize=1)(lambda: {
 EmptyIterator = lambda *a, **k: []
 is_regex = lambda v: search(r'^\/.*\/$', v)
 NonNaN = type("NonNaN", (object,), {})
+
+# TODO: regexes cannot utilize indices and can lead to degraded performance
+re_I = lambda expression: compile(expression, flags=IGNORECASE)
 
 
 def make_safe_mongo_token(token, allow_regex=False):
@@ -136,6 +139,7 @@ class Context():
                 },
                 sort_keys=True,
                 separators=(",", ":"),
+                default=json_permissive_default,
             )
         )
  
@@ -273,9 +277,9 @@ class KeyValueParsers():
                 else:
                     query = {lookup_key : {"$exists": True}}
             elif is_regex(value):
-                query = {lookup_key: {"$regex": unquote(value)[1:-1]}}
+                query = {lookup_key: {"$regex": re_I(unquote(value)[1:-1])}}
             else:
-                query = {lookup_key: {"$in": unquote(value).split("|")}}
+                query = {lookup_key: {"$regex": re_I("^("+unquote(value)+")$")}}
         else: # metadata field(s) should be included in output regardless
             query = None
         yield query, projection_keys, None, None
