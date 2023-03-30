@@ -30,8 +30,8 @@ class ValueCheckedRecord():
             try:
                 dumped = dumps(value, sort_keys=True, default=funcdump)
                 self.base64value = compress(encodebytes(dumped.encode()))
-            except TypeError as e:
-                msg, _erep = "ValueCheckedRecord(): TypeError", repr(e)
+            except TypeError as exc:
+                msg, _erep = "ValueCheckedRecord(): TypeError", repr(exc)
                 _kw = dict(identifier=identifier, value=value, debug_info=_erep)
                 raise GLOpenAPIConfigurationException(msg, **_kw)
             else:

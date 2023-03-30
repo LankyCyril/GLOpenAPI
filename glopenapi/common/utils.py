@@ -2,6 +2,7 @@ from numpy import generic as NumpyGenericType, base_repr
 from datetime import datetime
 from copy import deepcopy
 from re import compile
+from typing.re import Pattern as SRE_Pattern
 from functools import partial
 from urllib.request import quote
 from base64 import b64encode
@@ -49,9 +50,10 @@ def pick_reachable_url(urls, name=None):
                 continue
         else:
             if name:
-                raise URLError(f"No URLs are reachable for {name}: {urls}")
+                msg = f"No URLs are reachable for {name}: {urls}"
             else:
-                raise URLError(f"No URLs are reachable: {urls}")
+                msg = f"No URLs are reachable: {urls}"
+            raise GLOpenAPIConfigurationException(msg)
     yield _pick()
 
 
@@ -112,6 +114,8 @@ def json_permissive_default(o):
         return o.item()
     elif isinstance(o, set):
         return f"<set>{list(o)}"
+    elif isinstance(o, SRE_Pattern):
+        return f"<SRE>{o!r}"
     elif isinstance(o, bytes):
         return str(o)
     else:
@@ -124,8 +128,8 @@ class ExceptionPropagatingThread(Thread):
         self.exception = None
         try:
             super(ExceptionPropagatingThread, self).run()
-        except Exception as e:
-            self.exception = e
+        except Exception as exc:
+            self.exception = exc
             raise
     def join(self):
         super(ExceptionPropagatingThread, self).join()

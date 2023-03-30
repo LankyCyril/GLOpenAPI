@@ -1,6 +1,6 @@
 from time import sleep
 from glopenapi.common.exceptions import GLOpenAPILogger
-from glopenapi.db.mongo.index import ensure_info_index
+from glopenapi.db.mongo.index import ensure_indices
 from collections import OrderedDict
 from glopenapi.common.hacks import apply_hack, convert_legacy_metadata_pre
 from glopenapi.common.hacks import convert_legacy_metadata_post
@@ -46,7 +46,7 @@ class MetadataCacherLoop():
     def __call__(self):
         """Continuously run MongoDB metadata cacher, inform caller of updated/failed/dropped accessions"""
         while True:
-            ensure_info_index(self.mongo_collections, self.locale)
+            ensure_indices(self.mongo_collections, self.locale)
             accessions, success = self.recache_metadata()
             if success:
                 yield accessions
@@ -76,8 +76,8 @@ class MetadataCacherLoop():
         """Instantiate each available dataset; if contents changed, dataset automatically updates db.metadata"""
         try:
             accessions = self.get_accession_dispatcher()
-        except Exception as e:
-            GLOpenAPILogger.error(f"{self._id}:\n  {e!r}", exc_info=e)
+        except Exception as exc:
+            GLOpenAPILogger.error(f"{self._id}:\n  {exc!r}", exc_info=exc)
             return None, False
         def _iterate_with_delay():
             for acc in accessions["cached"] - accessions["live"]:
@@ -145,10 +145,10 @@ class MetadataCacherLoop():
                             **self.status_kwargs, status="warning",
                             warning="No samples", accession=dataset.accession,
                         )
-                except Exception as e:
-                    msg = f"{self._id} @ {dataset.accession} samples:\n  {e!r}"
-                    GLOpenAPILogger.error(msg, exc_info=e)
-                    return e
+                except Exception as exc:
+                    m = f"{self._id} @ {dataset.accession} samples:\n  {exc!r}"
+                    GLOpenAPILogger.error(m, exc_info=exc)
+                    return exc
                 else:
                     return None
  
@@ -170,22 +170,22 @@ class MetadataCacherLoop():
                 )
             else:
                 dataset = None
-        except Exception as e:
-            msg = f"{self._id} @ {accession}:\n  {e!r}"
+        except Exception as exc:
+            msg = f"{self._id} @ {accession}:\n  {exc!r}"
             if has_cache:
                 status = "stale"
-                report = f"failed to retrieve ({repr(e)}), kept stale"
-                GLOpenAPILogger.warning(msg, exc_info=e)
+                report = f"failed to retrieve ({exc!r}), kept stale"
+                GLOpenAPILogger.warning(msg, exc_info=exc)
             else:
-                status, report = "failed", f"failed to retrieve ({repr(e)})"
-                GLOpenAPILogger.error(msg, exc_info=e)
-            return status, report, e
+                status, report = "failed", f"failed to retrieve ({exc!r})"
+                GLOpenAPILogger.error(msg, exc_info=exc)
+            return status, report, exc
         if dataset is not None: # files have changed OR needs to be re-inserted
             self.drop_single_dataset_metadata(accession)
-            e = self.recache_single_dataset_samples(dataset)
-            if e is not None:
+            exc = self.recache_single_dataset_samples(dataset)
+            if exc is not None:
                 self.drop_single_dataset_metadata(accession)
-                return "failed", f"failed to parse ({repr(e)})", e
+                return "failed", f"failed to parse ({exc!r})", exc
             else:
                 return "updated", "updated", None
         else: # files have not changed

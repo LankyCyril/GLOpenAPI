@@ -13,7 +13,7 @@ from glopenapi.common.exceptions import GLOpenAPIConfigurationException
 from glopenapi.db.sql.response_cache import ResponseCache
 from glopenapi.common.utils import ExceptionPropagatingThread
 from functools import wraps
-from copy import deepcopy
+from copy import copy
 from glopenapi.api.types import ResponseContainer
 
 
@@ -119,7 +119,7 @@ class CacheableRenderer():
             context = self.get_context()
             try:
                 if context.debug == "1":
-                    obj, context.format = deepcopy(context.__dict__), "json"
+                    obj, context.format = copy(context.__dict__), "json"
                     content, mimetype = self.dispatch_renderer(
                         obj, context=context, indent=4, default_format="json",
                     )

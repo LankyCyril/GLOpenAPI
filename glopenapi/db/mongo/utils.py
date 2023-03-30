@@ -10,8 +10,8 @@ from pymongo import ASCENDING
 def iterate_mongo_connections(mongo_client):
     query = {"$currentOp": {"allUsers": True, "idleConnections": True}}
     projection = {"$project": {"appName": True}}
-    for e in mongo_client.admin.aggregate([query, projection]):
-        connected_app_name = e.get("appName", "")
+    for entry in mongo_client.admin.aggregate([query, projection]):
+        connected_app_name = entry.get("appName", "")
         if connected_app_name.startswith("GLOpenAPI"):
             yield connected_app_name
 
@@ -19,16 +19,18 @@ def iterate_mongo_connections(mongo_client):
 isempty = lambda v: (v != v) or (v == "") or (v is None)
 
 
-def is_unit_formattable(e, unit_key):
-    """Check if entry `e` contains keys "" and unit_key and that `e[unit_key]` is not empty"""
-    return ("" in e) and (unit_key in e) and (not isempty(e[unit_key]))
+def is_unit_formattable(entry, unit_key):
+    """Check if entry `entry` contains keys "" and unit_key and that `entry[unit_key]` is not empty"""
+    return (
+        ("" in entry) and (unit_key in entry) and (not isempty(entry[unit_key]))
+    )
 
 
-def format_units(e, unit_key, units_formatter):
-    """Replace `e[""]` with value with formatted `e[unit_key]`, discard `e[unit_key]`"""
+def format_units(entry, unit_key, units_formatter):
+    """Replace `entry[""]` with value with formatted `entry[unit_key]`, discard `entry[unit_key]`"""
     return {
-        k: units_formatter(value=v, unit=e[unit_key]) if k == "" else v
-        for k, v in e.items() if k != unit_key
+        k: units_formatter(value=v, unit=entry[unit_key]) if k == "" else v
+        for k, v in entry.items() if k != unit_key
     }
 
 

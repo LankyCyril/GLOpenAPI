@@ -15,7 +15,7 @@ from glopenapi.api.routes import DefaultRoutes
 # - The name of the Flask app will be used in the header of the landing page.
 
 flask_app = Flask("NASA GeneLab Open API")
-__version__ = "4.0.5-alpha0"
+__version__ = "4.0.6-alpha0"
 
 
 # If MODE is 'nocache' (e.g., `export MODE=nocache` in wrapper, or running in
@@ -27,8 +27,18 @@ NOCACHE = (environ.get("MODE") == "nocache")
 GiB = 1024**3
 
 
+# By default, GLOpenAPI will try to read data from osdr.nasa.gov; this can
+# be changed by setting the environment variable GENELAB_ROOT, e.g.
+# GENELAB_ROOT=my.awesome.site FLASK_APP=app.py flask run:
+
+if "GENELAB_ROOT" in environ:
+    GENELAB_ROOT = [environ["GENELAB_ROOT"]]
+else:
+    GENELAB_ROOT = "https://osdr.nasa.gov", "https://genelab-data.ndc.nasa.gov"
+
+
 # Initialize the glopenapi client.
-# - `AdapterClass` must be a subclass of `glopenapi.common.types.Adapter()`
+# - `adapter` must be of subclass of `glopenapi.common.types.Adapter()`
 #      and provide the following methods:
 #      - `get_accessions()`: returns an iterable of accession names;
 #      - `get_files_by_accession(accession)`: returns a dictionary of the form
@@ -55,7 +65,7 @@ GiB = 1024**3
 
 glopenapi_client = GLOpenAPIClient(
     app_version=__version__,
-    AdapterClass=GeneLabAdapter,
+    adapter=GeneLabAdapter(root_urls=GENELAB_ROOT),
     RoutesClass=DefaultRoutes,
     mongo_params=dict(
         db_name="genefab3", locale="en_US",
@@ -63,23 +73,20 @@ glopenapi_client = GLOpenAPIClient(
         client_params={}, # any other `pymongo.MongoClient()` parameters
     ),
     sqlite_params=dict( # the SQLite3 databases are LRU if capped by `maxsize`:
-        blobs=dict(
-            db="./.genefab3.sqlite3/blobs.db", maxsize=None, # required;
-                # stores up-to-date ISA data
+        blobs=dict( # stores up-to-date ISA data; required:
+            db="./.genefab3.sqlite3/blobs.db", maxsize=None,
         ),
-        tables=dict(
-            db="./.genefab3.sqlite3/tables.db", maxsize=48*GiB, # required;
-                # stores cacheable tabular data
+        tables=dict( # stores cacheable tabular data; required:
+            db="./.genefab3.sqlite3/tables.db", maxsize=48*GiB,
         ),
-        response_cache=dict(
+        response_cache=dict( # optional! pass `db=None` to disable;
+            # caches results of user requests until the (meta)data changes:
             db=(None if NOCACHE else "./.genefab3.sqlite3/response-cache.db"),
             maxsize=24*GiB,
-                # optional, pass `db=None` to disable; caches displayable
-                # results of user requests until the (meta)data changes
         ),
     ),
     metadata_cacher_params=dict(
-        enabled=(False if NOCACHE else True),
+        enabled=(not NOCACHE),
         dataset_init_interval=3, # seconds between adding datasets that have not
             # been previously cached
         dataset_update_interval=60, # seconds between updating datasets that
@@ -87,7 +94,7 @@ glopenapi_client = GLOpenAPIClient(
         full_update_interval=0, # seconds between full update cycles;
             # each update cycle already takes at least
             # `dataset_update_interval * n_datasets_in_local_database` seconds,
-            # and on average the app will only ping the backing cold storage
+            # and so on average the app will only ping the backing cold storage
             # approximately once every `dataset_update_interval` seconds;
             # therefore, the value of `full_update_interval` can be as low as 0,
             # but if you want the cacher to additionally sleep between these

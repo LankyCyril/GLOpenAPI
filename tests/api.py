@@ -114,8 +114,8 @@ class Test():
             print(f"  Round {i} STARTED: using dataset(s) {ds}", file=stderr)
             try:
                 status, error, *warnings = self.run(ds, args=args)
-            except Exception as e:
-                status, error, warnings = -1, repr(e), []
+            except Exception as exc:
+                status, error, warnings = -1, repr(exc), []
             key = ",".join(sorted(ds)) if isinstance(ds, set) else ds
             _results = dict(
                 success=(status==200), status=status,
@@ -168,8 +168,8 @@ class Test():
             print(f"  < URL: {url}", file=stderr)
         try:
             yield post(reader(url, **reader_kwargs))
-        except Exception as e:
-            raise self.generate_error_description(url, e)
+        except Exception as exc:
+            raise self.generate_error_description(url, exc)
  
     def generate_error_description(self, url, e_orig):
         try:
@@ -292,16 +292,16 @@ class DataColumns(Test):
         try:
             with self.go("data", query={**q, f"c.{index_col}": ""}) as data:
                 pass
-        except Exception as e:
-            return -1, f"{desc} fails w/ {e}"
+        except Exception as exc:
+            return -1, f"{desc} fails w/ {exc}"
         else:
             if data.shape[1] != 0:
                 return -1, f"{desc} produces the wrong # of columns"
         try:
             with self.go("data", query={**q, **column_queries}) as data:
                 pass
-        except Exception as e:
-            return -1, f"retrieving data columns fails w/ {e}"
+        except Exception as exc:
+            return -1, f"retrieving data columns fails w/ {exc}"
         else:
             if (data.shape[1] != 3) or (data.index.names[0][2] != index_col):
                 return -1, "index column lost when retrieving other data cols"

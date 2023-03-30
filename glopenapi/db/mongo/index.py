@@ -13,29 +13,58 @@ METADATA_AUX_TEMPLATE = {
 }
 
 
-def ensure_info_index(mongo_collections, locale):
+def make_index(collection, field, subfields, collation, sorting, index_information):
+    msgmask = "Generating index for metadata collection ('{}'), key '{}'"
+    GLOpenAPILogger.info(msgmask.format(collection.name, field))
+    def _remake_index(spec, name):
+        if name in index_information:
+            msg = f"Updating parameters to {collection.name} index {name}"
+            GLOpenAPILogger.info(msg)
+            collection.drop_index(name)
+        collection.create_index(spec, name=name, collation=collation)
+    # create top-level index:
+    _remake_index([(field, sorting)], field)
+    # create individual indices:
+    for subfield in (subfields or ()):
+        _remake_index(
+            [(f"{field}.{subfield}", sorting)], f"{field}.{subfield}",
+        )
+    # create compound index for good measure:
+    if subfields:
+        _remake_index(
+            [(f"{field}.{subfield}", sorting) for subfield in subfields],
+            f"{field}_compound",
+        )
+    msgmask = "Index generated for metadata collection ('{}'), key '{}'"
+    GLOpenAPILogger.info(msgmask.format(collection.name, field))
+
+
+def ensure_indices(mongo_collections, locale):
     """Index `id.*` for sorting"""
-    if "id" not in mongo_collections.metadata.index_information():
-        msgmask = "Generating index for metadata collection ('{}'), key 'id'"
-        id_fields = METADATA_AUX_TEMPLATE["id"].keys()
-        GLOpenAPILogger.info(msgmask.format(mongo_collections.metadata.name))
-        # create individual indices:
-        mongo_collections.metadata.create_index(
-            [("id", ASCENDING)], name="id",
-            collation={"locale": locale, "numericOrdering": True},
-        )
-        for f in id_fields:
-            mongo_collections.metadata.create_index(
-                [(f"id.{f}", ASCENDING)], name=f"id.{f}",
-                collation={"locale": locale, "numericOrdering": True},
+    def _index_ok(index_information, field, collation, sorting):
+        if field not in index_information:
+            return False
+        if sorting == "text":
+            if "textIndexVersion" not in index_information[field]:
+                return False
+        if sorting != "text":
+            existing_collation = index_information[field]["collation"]
+            for k, v in collation.items():
+                if existing_collation[k] != v:
+                    return False
+        return True
+    id_collation = dict(locale=locale, numericOrdering=True, strength=2)
+    fieldsets = [
+        ("id", METADATA_AUX_TEMPLATE["id"].keys(), id_collation, ASCENDING),
+        ("$**", None, {"locale": "simple"}, "text"),
+    ]
+    index_information = mongo_collections.metadata.index_information()
+    for field, subfields, collation, sorting in fieldsets:
+        if not _index_ok(index_information, field, collation, sorting):
+            make_index(
+                mongo_collections.metadata, field, subfields,
+                collation, sorting, index_information,
             )
-        # create compound index for good measure:
-        mongo_collections.metadata.create_index(
-            [(f"id.{f}", ASCENDING) for f in id_fields], name="id_compound",
-            collation={"locale": locale, "numericOrdering": True},
-        )
-        msgmask = "Index generated for metadata collection ('{}'), key 'id'"
-        GLOpenAPILogger.info(msgmask.format(mongo_collections.metadata.name))
 
 
 def INPLACE_update_metadata_value_lookup_keys(index, mongo_collections, final_key_blacklist=set()):

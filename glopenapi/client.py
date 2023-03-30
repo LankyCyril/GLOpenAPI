@@ -19,7 +19,7 @@ from threading import Thread
 class GLOpenAPIClient():
     """Routes Response-generating methods, continuously caches metadata and responses"""
  
-    def __init__(self, *, AdapterClass, RoutesClass, mongo_params, sqlite_params, metadata_cacher_params, flask_params, app_version="unknown"):
+    def __init__(self, *, adapter, RoutesClass, mongo_params, sqlite_params, metadata_cacher_params, flask_params, app_version="unknown"):
         """Initialize metadata cacher (with adapter), response cacher, routes"""
         self.app_version = app_version
         try:
@@ -29,7 +29,7 @@ class GLOpenAPIClient():
                 self._get_mongo_db_connection(**mongo_params)
             )
             self.sqlite_dbs = self._get_validated_sqlite_dbs(**sqlite_params)
-            self.adapter = AdapterClass()
+            self.adapter = adapter
             self._init_error_handlers()
             self.renderer, self.routes = self._init_routes(RoutesClass)
             self.response_cache = ResponseCache(self.sqlite_dbs)
@@ -39,9 +39,9 @@ class GLOpenAPIClient():
             self.cacher_loop_thread = self._ensure_cacher_loop_thread(
                 **metadata_cacher_params,
             )
-        except TypeError as e:
+        except TypeError as exc:
             msg = "Exception occurred during GLOpenAPIClient() initialization"
-            raise GLOpenAPIConfigurationException(msg, debug_info=repr(e))
+            raise GLOpenAPIConfigurationException(msg, debug_info=repr(exc))
  
     def _configure_flask_app(self, *, app, compress_params=None):
         """Modify Flask application, enable compression"""
@@ -75,9 +75,9 @@ class GLOpenAPIClient():
             host_and_port = (mongo_client.HOST, mongo_client.PORT)
             with create_connection(host_and_port, timeout=test_timeout):
                 pass
-        except SocketError as e:
+        except SocketError as exc:
             msg = "Could not connect to internal MongoDB instance"
-            raise GLOpenAPIConfigurationException(msg, error=type(e).__name__)
+            raise GLOpenAPIConfigurationException(msg, error=type(exc).__name__)
         parsed_cnames = {
             kind: (collection_names or {}).get(kind) or kind
             for kind in ("metadata", "metadata_aux", "records", "status")

@@ -1,3 +1,17 @@
+Version 4.0.6-alpha0 (2023-03-30)
+
+- Features:
+    - Case-insensitive search for metadata values (e.g.,
+      "&study.factor value.spaceflight=ground Control|vivarIuM ConTrOL")
+    - In debug/staging mode, the GENELAB_ROOT environment variable can be set
+      to a different core NASA API endpoint (e.g. internal staging)
+    - Support OSD accession IDs, simply by way of not assuming that they should
+      start with anything particular. Any /(\S+)-(\d+)/ identifier is valid.
+- Features, internal, staged for testing:
+    - Make use of the new (to be rolled out) /files/ endpoint structure
+      (request "all_files=True"; parse "date_created" and "date_modified")
+
+
 Version 4.0.5-alpha0 (2023-02-06)
 
 - Reverted:

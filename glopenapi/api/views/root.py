@@ -55,7 +55,7 @@ def get_metadata_datatypes(mongo_collections): # TODO: should be cached at index
         {"$unwind": "$file"},
         {"$project": {"k": "$file.datatype", "_id": False}},
     ])
-    return {e["k"]: True for e in cursor if "k" in e}
+    return {entry["k"]: True for entry in cursor if "k" in entry}
 
 
 def get(*, glopenapi_client, mongo_collections, context):

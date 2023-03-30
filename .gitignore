@@ -9,3 +9,4 @@ tests.py
 .flask-cache
 .genefab3.sqlite*
 examples/.ipynb_checkpoints
+tests/aux.py
