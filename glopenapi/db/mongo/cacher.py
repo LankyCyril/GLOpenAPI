@@ -1,6 +1,6 @@
 from time import sleep
 from glopenapi.common.exceptions import GLOpenAPILogger
-from glopenapi.db.mongo.index import ensure_info_index
+from glopenapi.db.mongo.index import ensure_indices
 from collections import OrderedDict
 from glopenapi.common.hacks import apply_hack, convert_legacy_metadata_pre
 from glopenapi.common.hacks import convert_legacy_metadata_post
@@ -46,7 +46,7 @@ class MetadataCacherLoop():
     def __call__(self):
         """Continuously run MongoDB metadata cacher, inform caller of updated/failed/dropped accessions"""
         while True:
-            ensure_info_index(self.mongo_collections, self.locale)
+            ensure_indices(self.mongo_collections, self.locale)
             accessions, success = self.recache_metadata()
             if success:
                 yield accessions
