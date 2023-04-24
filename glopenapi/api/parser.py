@@ -1,5 +1,5 @@
 from functools import lru_cache, partial, reduce
-from re import search, sub, compile, IGNORECASE
+from re import search, sub, compile, escape, IGNORECASE
 from glopenapi.common.exceptions import GLOpenAPIParserException, is_debug
 from operator import getitem
 from collections import defaultdict
@@ -43,7 +43,12 @@ is_regex = lambda v: search(r'^\/.*\/$', v)
 NonNaN = type("NonNaN", (object,), {})
 
 # TODO: regexes cannot utilize indices and can lead to degraded performance
-re_I = lambda expression: compile(expression, flags=IGNORECASE)
+# TODO: unified method instead of the two separate re_I and re_unquote
+# TODO: make regex syntax optional
+re_I = lambda expr: compile(expr, flags=IGNORECASE)
+re_unquote = lambda expr: (
+    "^(" + "|".join((escape(v) for v in unquote(expr).split("|"))) + ")"
+)
 
 
 def make_safe_mongo_token(token, allow_regex=False):
@@ -279,7 +284,7 @@ class KeyValueParsers():
             elif is_regex(value):
                 query = {lookup_key: {"$regex": re_I(unquote(value)[1:-1])}}
             else:
-                query = {lookup_key: {"$regex": re_I("^("+unquote(value)+")$")}}
+                query = {lookup_key: {"$regex": re_unquote(value)}}
         else: # metadata field(s) should be included in output regardless
             query = None
         yield query, projection_keys, None, None
