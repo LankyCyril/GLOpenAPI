@@ -1,6 +1,7 @@
 from requests import get as request_get
 from glopenapi.common.exceptions import GLOpenAPILogger
 from urllib.error import URLError
+from json import dumps
 from json.decoder import JSONDecodeError
 from glopenapi.common.exceptions import GLOpenAPIDataManagerException
 from pandas import json_normalize
@@ -103,6 +104,7 @@ class GeneLabAdapter(Adapter):
  
     def get_accessions(self):
         """Return list of dataset accessions available through genelab.nasa.gov/genelabAPIs"""
+        # return ["OSD-42", "OSD-4", "OSD-168", "OSD-48"] # hehe
         try:
             n_datasets_url = self.constants.SEARCH_MASK.format(0)
             n_datasets = read_json(n_datasets_url)["hits"]["total"]
@@ -128,6 +130,11 @@ class GeneLabAdapter(Adapter):
             if search(pattern, filename):
                 entry.update(metadata)
                 matched_patterns.add(pattern)
+                GLOpenAPILogger.debug(
+                    f"File pattern match: accession={accession}, " +
+                    f"urls={entry['urls']}, filename={filename}, " +
+                    f"pattern={pattern}, metadata={metadata}"
+                )
         if len(matched_patterns) > 1:
             msg = "File name matches more than one predefined pattern"
             _kw = dict(filename=filename, debug_info=sorted(matched_patterns))
@@ -162,10 +169,14 @@ class GeneLabAdapter(Adapter):
             files["timestamp"] = (
                 files[["date_created", "date_modified"]].max(axis=1).astype(int)
             )
-            return dict((
+            files_entries = dict((
                 self._format_file_entry(row, accession)
                 for _, row in files.sort_values(by="timestamp").iterrows()
             ))
+            files_entries_repr = dumps(files_entries, indent=4)
+            msg = f"Files ({accession}) (url={url}): {files_entries_repr}"
+            GLOpenAPILogger.debug(msg)
+            return files_entries
  
     def best_sample_name_matches(self, name, names, return_positions=False):
         """Match ISA sample names to their variants in data files (R-like dot-separated, postfixed)"""
