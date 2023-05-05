@@ -1,3 +1,11 @@
+Version 4.0.7-alpha0 (2023-04-24)
+
+- Fixes (internal):
+    - Implicit metadata value regex matches start-to-END
+- Internal:
+    - Exhaustive debugging messages when enumerating files by accession
+
+
 Version 4.0.6-alpha0 (2023-03-30)
 
 - Features:
