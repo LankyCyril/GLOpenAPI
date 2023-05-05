@@ -1,3 +1,10 @@
+Version 4.0.8-alpha0 (2023-05-05)
+
+- Internal:
+    - Drop response_cache.db if it was created with an app version older than
+      specified by parameter `min_app_version`
+
+
 Version 4.0.7-alpha0 (2023-04-24)
 
 - Fixes (internal):

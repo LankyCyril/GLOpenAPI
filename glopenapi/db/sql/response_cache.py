@@ -1,3 +1,4 @@
+from re import split, sub
 from glopenapi.common.exceptions import GLOpenAPILogger
 from glopenapi.db.sql.utils import SQLTransactions
 from functools import wraps
@@ -10,6 +11,7 @@ from datetime import datetime
 from threading import Thread
 from glopenapi.common.hacks import apply_hack, bypass_uncached_views
 from os import path
+from contextlib import contextmanager
 
 
 RESPONSE_CACHE_SCHEMAS = (
@@ -20,8 +22,12 @@ RESPONSE_CACHE_SCHEMAS = (
     ("accessions_used", """(
         `context_identity` TEXT, `accession` TEXT
     )"""),
+    ("meta", """(
+        `key` TEXT, `value` TEXT
+    )"""),
 )
 
+splver = lambda v: tuple(int(p) if p.isdigit() else p for p in split('[-.]', v))
 _logi, _logw = GLOpenAPILogger.info, GLOpenAPILogger.warning
 _loge = GLOpenAPILogger.error
 
@@ -32,6 +38,8 @@ class ResponseCache():
     def __init__(self, sqlite_dbs):
         self.sqlite_db = sqlite_dbs.response_cache["db"]
         self.maxdbsize = sqlite_dbs.response_cache["maxsize"] or float("inf")
+        self.app_version = sqlite_dbs.response_cache["app_version"]
+        self.min_app_version = sqlite_dbs.response_cache.get("min_app_version")
         if self.sqlite_db is None:
             msg = "LRU SQL cache DISABLED by client parameter"
             _logw(f"ResponseCache():\n  {msg}")
@@ -41,6 +49,21 @@ class ResponseCache():
             with self.sqltransactions.concurrent(desc) as (_, execute):
                 for table, schema in RESPONSE_CACHE_SCHEMAS:
                     execute(f"CREATE TABLE IF NOT EXISTS `{table}` {schema}")
+                if self.min_app_version:
+                    query = "SELECT `value` FROM `meta` WHERE `key` = 'version'"
+                    version_in_db, = execute(query).fetchone() or ["0"]
+                    if splver(version_in_db) < splver(self.min_app_version):
+                        _logw((lambda s: sub(r'\s+', " ", s).strip())(f"""
+                            DROPPING response_cache because the app version
+                            in the database ({version_in_db}) is older than the
+                            minimum target app version ({self.min_app_version})
+                        """))
+                        self.drop_all(execute=execute)
+                    execute("DELETE FROM `meta` WHERE `key` = 'version'")
+                    execute(
+                        "INSERT INTO meta (key, value) VALUES ('version', ?)",
+                        [self.app_version],
+                    )
  
     bypass_if_disabled = lambda f: wraps(f)(lambda self, *args, **kwargs:
         ResponseContainer(content=None) if self.sqlite_db is None
@@ -148,9 +171,15 @@ class ResponseCache():
                 _logi(msg, len(identity_entries), accession)
  
     @bypass_if_disabled
-    def drop_all(self, desc="response_cache/drop_all"):
+    def drop_all(self, desc="response_cache/drop_all", execute=None):
         """Drop all cached responses"""
-        with self.sqltransactions.exclusive(desc) as (_, execute):
+        if execute is None:
+            sqlcontext = self.sqltransactions.exclusive(desc)
+        else:
+            def _sqlcontext():
+                yield None, execute
+            sqlcontext = contextmanager(_sqlcontext)()
+        with sqlcontext as (_, execute):
             try:
                 execute("DELETE FROM `accessions_used`")
                 execute("DELETE FROM `response_cache`")

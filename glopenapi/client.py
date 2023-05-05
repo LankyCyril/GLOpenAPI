@@ -19,7 +19,7 @@ from threading import Thread
 class GLOpenAPIClient():
     """Routes Response-generating methods, continuously caches metadata and responses"""
  
-    def __init__(self, *, adapter, RoutesClass, mongo_params, sqlite_params, metadata_cacher_params, flask_params, app_version="unknown"):
+    def __init__(self, *, adapter, RoutesClass, mongo_params, sqlite_params, metadata_cacher_params, flask_params, app_version="0"):
         """Initialize metadata cacher (with adapter), response cacher, routes"""
         self.app_version = app_version
         try:
@@ -95,7 +95,9 @@ class GLOpenAPIClient():
     def _get_validated_sqlite_dbs(self, *, blobs, tables, response_cache):
         """Check target SQLite3 files are specified correctly, convert to namespace for dot-syntax lookup"""
         sqlite_dbs = SimpleNamespace(
-            blobs=blobs, tables=tables, response_cache=response_cache,
+            blobs={**blobs, "app_version": self.app_version},
+            tables={**tables, "app_version": self.app_version},
+            response_cache={**response_cache, "app_version": self.app_version},
         )
         if len({v.get("db") for v in sqlite_dbs.__dict__.values()}) != 3:
             msg = "SQL databases must all be distinct to avoid name conflicts"
