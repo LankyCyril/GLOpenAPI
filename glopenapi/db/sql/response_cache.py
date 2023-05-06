@@ -45,25 +45,34 @@ class ResponseCache():
             _logw(f"ResponseCache():\n  {msg}")
         else:
             self.sqltransactions = SQLTransactions(self.sqlite_db)
-            desc = "response_cache/ensure_schema"
+            desc = "response_cache/__init__/ensure_schema"
             with self.sqltransactions.concurrent(desc) as (_, execute):
                 for table, schema in RESPONSE_CACHE_SCHEMAS:
                     execute(f"CREATE TABLE IF NOT EXISTS `{table}` {schema}")
-                if self.min_app_version:
-                    query = "SELECT `value` FROM `meta` WHERE `key` = 'version'"
+            if self.min_app_version:
+                query = "SELECT `value` FROM `meta` WHERE `key` = 'version'"
+                desc = "response_cache/__init__/check_min_app_version"
+                # first only check in a non-blocking manner:
+                with self.sqltransactions.concurrent(desc) as (_, execute):
                     version_in_db, = execute(query).fetchone() or ["0"]
-                    if splver(version_in_db) < splver(self.min_app_version):
-                        _logw((lambda s: sub(r'\s+', " ", s).strip())(f"""
-                            DROPPING response_cache because the app version
-                            in the database ({version_in_db}) is older than the
-                            minimum target app version ({self.min_app_version})
-                        """))
-                        self.drop_all(execute=execute)
-                    execute("DELETE FROM `meta` WHERE `key` = 'version'")
-                    execute(
-                        "INSERT INTO meta (key, value) VALUES ('version', ?)",
-                        [self.app_version],
-                    )
+                if splver(version_in_db) < splver(self.min_app_version):
+                    # now request blocking, check again once aquired and update:
+                    desc = "response_cache/__init__/act_on_min_app_version"
+                    with self.sqltransactions.exclusive(desc) as (_, execute):
+                        version_in_db, = execute(query).fetchone() or ["0"]
+                        if splver(version_in_db) < splver(self.min_app_version):
+                            _logw((lambda s: sub(r'\s+', " ", s).strip())(f"""
+                                DROPPING response_cache because the app version
+                                in the database ({version_in_db}) is older than
+                                the minimum target app version
+                                ({self.min_app_version})
+                            """))
+                            self.drop_all(execute=execute)
+            desc = "response_cache/__init__/app_version"
+            with self.sqltransactions.concurrent(desc) as (_, execute):
+                execute("DELETE FROM `meta` WHERE `key` = 'version'")
+                execute("""INSERT INTO meta (key, value)
+                    VALUES ('version', ?)""", [self.app_version])
  
     bypass_if_disabled = lambda f: wraps(f)(lambda self, *args, **kwargs:
         ResponseContainer(content=None) if self.sqlite_db is None
