@@ -1,3 +1,9 @@
+Version 4.0.8-alpha1 (2023-05-22)
+
+- Hotfix: in "all_files=True", look for "date_updated" (rather than
+  "date_modified")
+
+
 Version 4.0.8-alpha0 (2023-05-05)
 
 - Internal:

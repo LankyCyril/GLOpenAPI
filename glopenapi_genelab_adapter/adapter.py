@@ -163,11 +163,11 @@ class GeneLabAdapter(Adapter):
                 )
             else:
                 files = json_normalize(study_files)
-            if "date_modified" not in files:
-                GLOpenAPILogger.warning(f"No 'date_modified' fields: {url}")
-                files["date_modified"] = float("nan")
+            if "date_updated" not in files:
+                GLOpenAPILogger.warning(f"No 'date_updated' fields: {url}")
+                files["date_updated"] = float("nan")
             files["timestamp"] = (
-                files[["date_created", "date_modified"]].max(axis=1).astype(int)
+                files[["date_created", "date_updated"]].max(axis=1).astype(int)
             )
             files_entries = dict((
                 self._format_file_entry(row, accession)
