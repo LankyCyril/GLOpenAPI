@@ -5,8 +5,7 @@ from operator import getitem
 from collections import defaultdict
 from flask import request
 from urllib.request import quote, unquote
-from json import dumps
-from glopenapi.common.utils import space_quote, json_permissive_default
+from glopenapi.common.utils import space_quote, pdumps
 from glopenapi.common.hacks import ForceShowAllDataColumns, HackyBlackHoleList
 from glopenapi.common.exceptions import GLOpenAPIConfigurationException
 
@@ -132,7 +131,7 @@ class Context():
     def _make_identity(self):
         """Serialize fields of Context"""
         return quote(
-            dumps(
+            pdumps(
                 obj={
                     "?": self.view, "query": self.query,
                     "sort_by": self.sort_by, "unwind": sorted(self.unwind),
@@ -144,7 +143,6 @@ class Context():
                 },
                 sort_keys=True,
                 separators=(",", ":"),
-                default=json_permissive_default,
             )
         )
  

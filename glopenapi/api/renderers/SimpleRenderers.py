@@ -1,7 +1,6 @@
-from json import dumps
 from collections.abc import Callable
 from glopenapi.api.renderers.types import StreamedString
-from glopenapi.common.utils import json_permissive_default
+from glopenapi.common.utils import pdumps
 
 
 def raw(obj, context=None, indent=None):
@@ -34,5 +33,4 @@ def html(obj, context=None, indent=None):
 
 def json(obj, context=None, indent=None):
     """Display record in plaintext dump format"""
-    content = dumps(obj, indent=indent, default=json_permissive_default)
-    return content, "application/json"
+    return pdumps(obj, indent=indent), "application/json"

@@ -1,7 +1,7 @@
 from requests import get as request_get
 from glopenapi.common.exceptions import GLOpenAPILogger
 from urllib.error import URLError
-from json import dumps
+from glopenapi.common.utils import pdumps
 from json.decoder import JSONDecodeError
 from glopenapi.common.exceptions import GLOpenAPIDataManagerException
 from pandas import json_normalize
@@ -36,39 +36,39 @@ KNOWN_DATATYPES = {
     r'^GLDS-[0-9]+_.*_raw\.fastq(\.gz)?$': datatype("raw reads"),
     r'^GLDS-[0-9]+_.*_trimmed\.fastq(\.gz)?$': datatype("trimmed reads"),
     r'^GLDS-[0-9]+_.*\.bam$': datatype("alignment"),
-    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_raw_multiqc_data\.zip$':
+    r'^GLDS-[0-9]+_rna.seq(_all-samples)?_raw_multiqc_data\.zip$':
         datatype("raw multiqc data"),
-    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_raw_multiqc_report\.htm(l)?$':
+    r'^GLDS-[0-9]+_rna.seq(_all-samples)?_raw_multiqc_report\.htm(l)?$':
         datatype("raw multiqc report"),
-    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_trimmed_multiqc_data\.zip$':
+    r'^GLDS-[0-9]+_rna.seq(_all-samples)?_trimmed_multiqc_data\.zip$':
         datatype("trimmed multiqc data"),
-    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_trimmed_multiqc_report\.htm(l)?$':
+    r'^GLDS-[0-9]+_rna.seq(_all-samples)?_trimmed_multiqc_report\.htm(l)?$':
         datatype("trimmed multiqc report"),
     r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.rda$':
         datatype("processed microarray data (rda)"),
     r'^GLDS-[0-9]+_array(_all-samples)?_normalized[_-]annotated\.txt$':
         tabletype("processed microarray data",
             column_subset="sample name", gct_valid=True),
-    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Normalized_Counts\.csv$':
+    r'^GLDS-[0-9]+_rna.seq(_all-samples)?_Normalized_Counts\.csv$':
         tabletype("normalized counts",
             column_subset="sample name", gct_valid=True),
-    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_Unnormalized_Counts\.csv$':
+    r'^GLDS-[0-9]+_rna.seq(_all-samples)?_Unnormalized_Counts\.csv$':
         tabletype("unnormalized counts", joinable=True,
             column_subset="sample name", gct_valid=True),
-    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_differential_expression\.csv$':
+    r'^GLDS-[0-9]+_(array|rna.seq)(_all-samples)?_differential_expression\.csv$':
         tabletype("differential expression"),
-    r'^GLDS-[0-9]+_(array|rna_seq)(_all-samples)?_contrasts\.csv$':
+    r'^GLDS-[0-9]+_(array|rna.seq)(_all-samples)?_contrasts\.csv$':
         datatype("differential expression contrasts"),
     r'^GLDS-[0-9]+_array(_all-samples)?_visualization_output_table\.csv$':
         tabletype("visualization table",
             internal=True, condition=is_microarray),
-    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_visualization_output_table\.csv$':
+    r'^GLDS-[0-9]+_rna.seq(_all-samples)?_visualization_output_table\.csv$':
         tabletype("visualization table",
             internal=True, condition=is_rna_seq),
     r'^GLDS-[0-9]+_array(_all-samples)?_visualization_PCA_table\.csv$':
         tabletype("pca", index_name="sample name", index_subset="sample name",
             internal=True, condition=is_microarray),
-    r'^GLDS-[0-9]+_rna_seq(_all-samples)?_visualization_PCA_table\.csv$':
+    r'^GLDS-[0-9]+_rna.seq(_all-samples)?_visualization_PCA_table\.csv$':
         tabletype("pca", index_name="sample name", index_subset="sample name",
             internal=True, condition=is_rna_seq),
 }
@@ -104,7 +104,7 @@ class GeneLabAdapter(Adapter):
  
     def get_accessions(self):
         """Return list of dataset accessions available through genelab.nasa.gov/genelabAPIs"""
-        # return ["OSD-42", "OSD-4", "OSD-168", "OSD-48"] # hehe
+        # return ["OSD-42", "OSD-47", "OSD-4", "OSD-168", "OSD-48"] # hehe
         try:
             n_datasets_url = self.constants.SEARCH_MASK.format(0)
             n_datasets = read_json(n_datasets_url)["hits"]["total"]
@@ -173,8 +173,7 @@ class GeneLabAdapter(Adapter):
                 self._format_file_entry(row, accession)
                 for _, row in files.sort_values(by="timestamp").iterrows()
             ))
-            files_entries_repr = dumps(files_entries, indent=4)
-            msg = f"Files ({accession}) (url={url}): {files_entries_repr}"
+            msg = f"Files ({accession}) (url={url}): {pdumps(files_entries)}"
             GLOpenAPILogger.debug(msg)
             return files_entries
  
