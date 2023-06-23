@@ -1,5 +1,4 @@
-from json import dumps
-from glopenapi.common.utils import json_permissive_default
+from glopenapi.common.utils import pdumps
 
 
 def json(obj, context=None, indent=None):
@@ -10,6 +9,6 @@ def json(obj, context=None, indent=None):
             if i > 0:
                 yield ','
             yield f'"{k}":'
-            yield dumps(v, indent=indent, default=json_permissive_default)
+            yield pdumps(v, indent=indent)
         yield '}'
     return content, "application/json"

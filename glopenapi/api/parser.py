@@ -5,8 +5,7 @@ from operator import getitem
 from collections import defaultdict
 from flask import request
 from urllib.request import quote, unquote
-from json import dumps
-from glopenapi.common.utils import space_quote, json_permissive_default
+from glopenapi.common.utils import space_quote, pdumps
 from glopenapi.common.hacks import ForceShowAllDataColumns, HackyBlackHoleList
 from glopenapi.common.exceptions import GLOpenAPIConfigurationException
 
@@ -46,8 +45,9 @@ NonNaN = type("NonNaN", (object,), {})
 # TODO: unified method instead of the two separate re_I and re_unquote
 # TODO: make regex syntax optional
 re_I = lambda expr: compile(expr, flags=IGNORECASE)
-re_unquote = lambda expr: (
-    "^(" + "|".join((escape(v) for v in unquote(expr).split("|"))) + ")$"
+re_unquote = lambda expr: compile(
+    "^(" + "|".join((escape(v) for v in unquote(expr).split("|"))) + ")$",
+    flags=IGNORECASE,
 )
 
 
@@ -132,7 +132,7 @@ class Context():
     def _make_identity(self):
         """Serialize fields of Context"""
         return quote(
-            dumps(
+            pdumps(
                 obj={
                     "?": self.view, "query": self.query,
                     "sort_by": self.sort_by, "unwind": sorted(self.unwind),
@@ -144,7 +144,6 @@ class Context():
                 },
                 sort_keys=True,
                 separators=(",", ":"),
-                default=json_permissive_default,
             )
         )
  

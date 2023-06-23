@@ -3,6 +3,7 @@ from datetime import datetime
 from copy import deepcopy
 from re import compile
 from typing.re import Pattern as SRE_Pattern
+from json import dumps
 from functools import partial
 from urllib.request import quote
 from base64 import b64encode
@@ -108,18 +109,23 @@ def flatten_all_keys(d, *, sep=".", head=()):
             yield sep.join((*head, k))
 
 
-def json_permissive_default(o):
+def json_permissive_default(obj):
     """Serialize numpy entries as native types, sets as informative strings, other unserializable entries as their type names"""
-    if isinstance(o, NumpyGenericType):
-        return o.item()
-    elif isinstance(o, set):
-        return f"<set>{list(o)}"
-    elif isinstance(o, SRE_Pattern):
-        return f"<SRE>{o!r}"
-    elif isinstance(o, bytes):
-        return str(o)
+    if isinstance(obj, NumpyGenericType):
+        return obj.item()
+    elif isinstance(obj, set):
+        return f"<set>{list(obj)}"
+    elif isinstance(obj, SRE_Pattern):
+        return f"<SRE>{obj!r}"
+    elif isinstance(obj, bytes):
+        return str(obj)
     else:
-        return str(type(o))
+        return str(type(obj))
+
+
+def pdumps(obj, indent=4, default=json_permissive_default, *args, **kwargs):
+    """Dump dictionaries and serialize nested objects in a generic way"""
+    return dumps(obj, indent=indent, default=default, *args, **kwargs)
 
 
 class ExceptionPropagatingThread(Thread):

@@ -2,8 +2,6 @@ from os import environ
 from logging import getLogger, DEBUG, INFO
 from sys import exc_info, stderr
 from traceback import format_tb
-from functools import partial
-from json import dumps
 from flask import Response
 
 
@@ -80,14 +78,13 @@ def interpret_exception(exc, debug=False):
 
 
 def exception_catcher(exc, debug=False):
-    from glopenapi.common.utils import json_permissive_default
+    from glopenapi.common.utils import pdumps
     info, traceback_lines = interpret_exception(exc, debug=debug)
     tb_preface = "Traceback (most recent call last):\n"
     traceback = "".join(traceback_lines)
     print(tb_preface, traceback, repr(exc), sep="", file=stderr)
-    dumps_permissive = partial(dumps, default=json_permissive_default)
     if debug:
-        content = dumps_permissive(info, indent=4) + "\n\n" + traceback
+        content = pdumps(info) + "\n\n" + traceback
     else:
-        content = dumps_permissive(info, indent=4)
+        content = pdumps(info)
     return Response(content, mimetype="application/json"), info["code"]

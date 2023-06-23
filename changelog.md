@@ -1,3 +1,23 @@
+Version 4.0.8-alpha3 (2023-05-24)
+
+- Hotfixes:
+    - Actually pass flags=IGNORECASE to the regexes that are generated from
+      plaintext values
+
+
+Version 4.0.8-alpha2 (2023-05-24)
+
+- Hotfixes:
+    - Match both "rna_seq" and "rna-seq" in filenames
+    - In debug mode, serialize functions when logging (print function name only)
+
+
+Version 4.0.8-alpha1 (2023-05-22)
+
+- Hotfix: in "all_files=True", look for "date_updated" (rather than
+  "date_modified")
+
+
 Version 4.0.8-alpha0 (2023-05-05)
 
 - Internal:
