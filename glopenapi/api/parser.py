@@ -45,8 +45,9 @@ NonNaN = type("NonNaN", (object,), {})
 # TODO: unified method instead of the two separate re_I and re_unquote
 # TODO: make regex syntax optional
 re_I = lambda expr: compile(expr, flags=IGNORECASE)
-re_unquote = lambda expr: (
-    "^(" + "|".join((escape(v) for v in unquote(expr).split("|"))) + ")$"
+re_unquote = lambda expr: compile(
+    "^(" + "|".join((escape(v) for v in unquote(expr).split("|"))) + ")$",
+    flags=IGNORECASE,
 )
 
 

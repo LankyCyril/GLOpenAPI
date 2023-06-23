@@ -1,3 +1,10 @@
+Version 4.0.8-alpha3 (2023-05-24)
+
+- Hotfixes:
+    - Actually pass flags=IGNORECASE to the regexes that are generated from
+      plaintext values
+
+
 Version 4.0.8-alpha2 (2023-05-24)
 
 - Hotfixes:
