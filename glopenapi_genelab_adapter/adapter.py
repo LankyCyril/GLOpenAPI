@@ -1,7 +1,6 @@
 from requests import get as request_get
 from glopenapi.common.exceptions import GLOpenAPILogger
 from urllib.error import URLError
-from glopenapi.common.utils import pdumps
 from json.decoder import JSONDecodeError
 from glopenapi.common.exceptions import GLOpenAPIDataManagerException
 from pandas import json_normalize
@@ -104,7 +103,7 @@ class GeneLabAdapter(Adapter):
  
     def get_accessions(self):
         """Return list of dataset accessions available through genelab.nasa.gov/genelabAPIs"""
-        # return ["OSD-42", "OSD-47", "OSD-4", "OSD-168", "OSD-48"] # hehe
+        # return [f"OSD-{i}" for i in (1, 3, 4, 42, 47, 48, 127, 168)] # hehe
         try:
             n_datasets_url = self.constants.SEARCH_MASK.format(0)
             n_datasets = read_json(n_datasets_url)["hits"]["total"]
@@ -173,8 +172,6 @@ class GeneLabAdapter(Adapter):
                 self._format_file_entry(row, accession)
                 for _, row in files.sort_values(by="timestamp").iterrows()
             ))
-            msg = f"Files ({accession}) (url={url}): {pdumps(files_entries)}"
-            GLOpenAPILogger.debug(msg)
             return files_entries
  
     def best_sample_name_matches(self, name, names, return_positions=False):
