@@ -1,4 +1,5 @@
-from re import split, sub
+from glopenapi.common.utils import split_version as splver
+from re import sub
 from glopenapi.common.exceptions import GLOpenAPILogger
 from glopenapi.db.sql.utils import SQLTransactions
 from functools import wraps
@@ -27,7 +28,6 @@ RESPONSE_CACHE_SCHEMAS = (
     )"""),
 )
 
-splver = lambda v: tuple(int(p) if p.isdigit() else p for p in split('[-.]', v))
 _logi, _logw = GLOpenAPILogger.info, GLOpenAPILogger.warning
 _loge = GLOpenAPILogger.error
 

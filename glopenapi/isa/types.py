@@ -3,7 +3,7 @@ from glopenapi.common.exceptions import GLOpenAPIDataManagerException
 from glopenapi.db.sql.files import CachedBinaryFile
 from glopenapi.isa.parser import IsaFromZip
 from glopenapi.common.utils import deepcopy_except, copy_except
-from glopenapi.common.exceptions import GLOpenAPIISAException
+from glopenapi.common.exceptions import GLOpenAPIISAException, GLOpenAPILogger
 from glopenapi.common.utils import iterate_terminal_leaf_elements
 
 
@@ -123,19 +123,33 @@ class Sample(dict):
                 matching_study_sample_names=matching_study_sample_names,
             )
  
-    def _INPLACE_extend_with_dataset_files(self):
+    def _INPLACE_extend_with_dataset_files(self, check_isa_elements=False):
         """Populate with File annotation for files that match records for the sample"""
-        isa_elements = set(iterate_terminal_leaf_elements(self))
-        _sdf = self.dataset.files
-        _no_condition = lambda *_: True
-        self["File"] = [
-            {**copy_except(_sdf[f], "condition"), "filename": f} for f in {
-                filename for filename, filedata in _sdf.items() if (
-                    (filedata.get("internal") or (filename in isa_elements)) and
-                    filedata.get("condition", _no_condition)(self, filename)
-                )
-            }
-        ]
+        if check_isa_elements:
+            isa_elements = set.union(set(), *(
+                set(v.split(",")) for v in iterate_terminal_leaf_elements(self)
+            ))
+        else:
+            isa_elements = type("", (set,), {"__contains__": lambda *_: True})()
+        def _log(msg, _id=self.dataset.accession):
+            GLOpenAPILogger.debug(f"Files for {_id}: {msg}")
+        def _format_file_entries(_sdf=self.dataset.files):
+            _log("Processing entries")
+            if check_isa_elements:
+                _log(f"Entries checked against ISA: {isa_elements!r}")
+            for fn, fd in _sdf.items():
+                is_eligible = bool(fd.get("condition", lambda *_: 1)(self, fn))
+                _log(f"{fn}: passes assay condition(s)? {is_eligible}")
+                if check_isa_elements:
+                    is_internal = bool(fd.get("internal"))
+                    is_in_isa_elements = bool(fn in isa_elements)
+                    _log(f"{fn}: is internal? {is_internal}")
+                    _log(f"{fn}: is in isa elements? {is_in_isa_elements}")
+                    is_eligible &= (is_internal | is_in_isa_elements)
+                _log(f"{fn}: is eligible? {is_eligible}")
+                if is_eligible:
+                    yield {**copy_except(_sdf[fn], "condition"), "filename": fn}
+        self["File"] = list(_format_file_entries())
  
     def _get_subkey_value(self, entry, key, subkey):
         """Check existence of `key.subkey` in entry and return its value"""

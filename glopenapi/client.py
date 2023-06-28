@@ -145,7 +145,7 @@ class GLOpenAPIClient():
                 GLOpenAPILogger.info(f"{self.mongo_appname}:\n  {m}")
                 return True
  
-    def _ensure_cacher_loop_thread(self, full_update_interval, full_update_retry_delay, dataset_init_interval, dataset_update_interval, enabled=True):
+    def _ensure_cacher_loop_thread(self, full_update_interval, full_update_retry_delay, dataset_init_interval, dataset_update_interval, min_app_version, enabled=True):
         """Start background cacher thread"""
         if self._ok_to_loop_cacher_loop_thread(enabled):
             # Note that cached responses get dropped *after* each cacher cycle;
@@ -166,6 +166,7 @@ class GLOpenAPIClient():
                     full_update_retry_delay=full_update_retry_delay,
                     dataset_init_interval=dataset_init_interval,
                     dataset_update_interval=dataset_update_interval,
+                    min_app_version=min_app_version,
                 )
                 for accessions in metadata_cacher_loop():
                     if accessions["updated"]:

@@ -1,7 +1,7 @@
 from numpy import generic as NumpyGenericType, base_repr
 from datetime import datetime
 from copy import deepcopy
-from re import compile
+from re import compile, split
 from typing.re import Pattern as SRE_Pattern
 from json import dumps
 from functools import partial
@@ -28,6 +28,11 @@ deepcopy_keys = lambda d, *kk: deepcopy({k: d[k] for k in kk})
 
 repr_quote = partial(quote, safe=" /'\",;:[{}]=")
 space_quote = partial(quote, safe=" /")
+
+
+def split_version(version):
+    """Convert strings like '4.0.3-rc1' into comparable tuples like (4, 0, 3, 'rc1')"""
+    return tuple(int(p) if p.isdigit() else p for p in split('[-.]', version))
 
 
 def random_unique_string(seed=""):

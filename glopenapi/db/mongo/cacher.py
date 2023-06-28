@@ -10,6 +10,8 @@ from glopenapi.db.mongo.utils import iterate_mongo_connections
 from glopenapi.db.mongo.types import ValueCheckedRecord
 from glopenapi.db.mongo.utils import run_mongo_action, harmonize_document
 from glopenapi.db.mongo.status import update_status
+from glopenapi.common.utils import split_version as splver
+from re import sub
 
 
 class MetadataCacherLoop():
@@ -19,7 +21,7 @@ class MetadataCacherLoop():
         "mongo_collections", "locale", "units_formatter",
     )
  
-    def __init__(self, *, glopenapi_client, full_update_interval, full_update_retry_delay, dataset_init_interval, dataset_update_interval):
+    def __init__(self, *, glopenapi_client, full_update_interval, full_update_retry_delay, dataset_init_interval, dataset_update_interval, min_app_version):
         """Prepare background loop that iteratively watches for changes to datasets"""
         self.glopenapi_client = glopenapi_client
         self._id = glopenapi_client.mongo_appname.replace(
@@ -31,6 +33,7 @@ class MetadataCacherLoop():
         self.full_update_retry_delay = full_update_retry_delay
         self.dataset_init_interval = dataset_init_interval
         self.dataset_update_interval = dataset_update_interval
+        self.min_app_version = min_app_version
         self.status_kwargs = dict(collection=self.mongo_collections.status)
         super().__init__()
  
@@ -50,10 +53,7 @@ class MetadataCacherLoop():
             accessions, success = self.recache_metadata()
             if success:
                 yield accessions
-                self.delay(
-                    self.full_update_interval,
-                    "full metadata update",
-                )
+                self.delay(self.full_update_interval, "full metadata update")
             else:
                 self.delay(
                     self.full_update_retry_delay,
@@ -70,10 +70,32 @@ class MetadataCacherLoop():
             updated=set(), stale=set(), dropped=set(), failed=set(),
         )
  
+    def _drop_database_if_app_version_is_stale(self):
+        """Destructive action: if app version logged in MongoDB is too old (or absent), drop the entire database"""
+        mongo_client = self.glopenapi_client.mongo_client
+        db_name = self.mongo_collections.metadata.database.name
+        version_in_db = max((
+            splver(e.get("version", "0")) for e in ({"version": "0"}, *(
+                mongo_client[db_name].version_tracker.find({"info": "version"}))
+            )
+        ))
+        if version_in_db < splver(self.min_app_version):
+            GLOpenAPILogger.warning((lambda s: sub(r'\s+', " ", s).strip())(f"""
+                DROPPING the MongoDB database {db_name!r} because the app
+                version in the database ({version_in_db}) is older than the
+                minimum target app version ({self.min_app_version})
+            """))
+            mongo_client.drop_database(db_name)
+        mongo_client[db_name].version_tracker.delete_many({"info": "version"})
+        mongo_client[db_name].version_tracker.insert_one({
+            "info": "version", "version": self.glopenapi_client.app_version,
+        })
+ 
     @apply_hack(precache_metadata_counts)
     @apply_hack(convert_legacy_metadata_pre)
     def recache_metadata(self):
         """Instantiate each available dataset; if contents changed, dataset automatically updates db.metadata"""
+        self._drop_database_if_app_version_is_stale()
         try:
             accessions = self.get_accession_dispatcher()
         except Exception as exc:

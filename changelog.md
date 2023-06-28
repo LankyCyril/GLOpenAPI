@@ -1,4 +1,16 @@
-Version 4.0.8-alpha3 (2023-05-24)
+Version 4.0.9-alpha0 (2023-06-27)
+
+- Fixes:
+    - By default, do not check filename lists against the filenames present in
+      the ISA record
+    - Retain ability to optionally check this via parameter to
+      Sample._INPLACE_extend_with_dataset_files(self, check_isa_elements: bool)
+- Internal:
+    - Drop the MongoDB database if it was created with an app version older than
+      specified by parameter `min_app_version`
+
+
+Version 4.0.8-alpha3 (2023-06-24)
 
 - Hotfixes:
     - Actually pass flags=IGNORECASE to the regexes that are generated from
