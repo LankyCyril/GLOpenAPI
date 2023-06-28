@@ -82,7 +82,7 @@ glopenapi_client = GLOpenAPIClient(
         response_cache=dict( # optional! pass `db=None` to disable;
             # caches results of user requests until the (meta)data changes:
             db=(None if NOCACHE else "./.genefab3.sqlite3/response-cache.db"),
-            maxsize=24*GiB, min_app_version="4.0.8-alpha2",
+            maxsize=24*GiB, min_app_version="4.0.9-alpha0",
         ),
     ),
     metadata_cacher_params=dict(
