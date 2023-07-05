@@ -3,6 +3,7 @@ from bson.errors import InvalidDocument as InvalidDocumentError
 from collections.abc import ValuesView
 from glopenapi.common.exceptions import GLOpenAPILogger
 from glopenapi.common.exceptions import GLOpenAPIDatabaseException
+from glopenapi.common.exceptions import GLOpenAPIParserException
 from collections import OrderedDict
 from pymongo import ASCENDING
 
@@ -140,10 +141,24 @@ def skip_same_file_urls_in_aggregation(cursor):
 
 def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), postprocess=()):
     """Run .find() or .aggregate() based on query, projection"""
+    from glopenapi.db.mongo.index import METADATA_AUX_TEMPLATE
     full_projection = {**context.projection, **{"id."+f: 1 for f in id_fields}}
-    if all(k.startswith("id.") for k in full_projection):
-        full_projection = {} # there's no metadata constraints provided by user
-        context.unwind.add("file") # `file` must always be unwound, though
+    no_user_constraints = all(k.startswith("id.") for k in full_projection)
+    if no_user_constraints:
+        full_projection = {}
+        context.unwind.add("file") # `file` must always be unwound
+    for cat, fields in METADATA_AUX_TEMPLATE.items():
+        allowed_in_projection = {f"{cat}.{f}": 1 for f in fields}
+        if no_user_constraints:
+            full_projection.update(allowed_in_projection)
+        else:
+            cat_in_full_projection = {
+                k for k in full_projection
+                if ((k == cat) or k.startswith(f"{cat}."))
+            }
+            if not (cat_in_full_projection <= set(allowed_in_projection)):
+                m = "Only certain fields are queriable in category"
+                raise GLOpenAPIParserException(m, category=cat, fields=fields)
     pipeline = [
         {"$sort": get_preferred_sort_order(collection, context, id_fields)},
       *({"$unwind": f"${f}"} for f in context.unwind),
@@ -153,8 +168,7 @@ def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), p
     ]
     collation = {"locale": locale, "numericOrdering": True}
     cursor = collection.aggregate(
-        pipeline, collation=collation,
-        allowDiskUse=True, # note: this is for worst-case, large, scenarios
+        pipeline, collation=collation, allowDiskUse=True,
     )
     return cursor, full_projection
 
