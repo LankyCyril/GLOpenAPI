@@ -1,3 +1,17 @@
+Version 4.0.10-alpha0 (2023-07-05)
+
+- Internal:
+    - Pre-cache the response to a smaller /metadata-cache/ request (the one used
+      in the visualization app):
+        investigation.study%20assays.study%20assay%20technology%20type&
+        investigation.study.comment.mission%20name&
+        investigation.study.comment.project%20type&
+        investigation.study.study%20title&
+        study.characteristics.material%20type&
+        study.characteristics.organism&
+        study.factor%20value
+
+
 Version 4.0.9-alpha0 (2023-06-27)
 
 - Fixes:

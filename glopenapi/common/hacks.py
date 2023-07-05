@@ -90,7 +90,7 @@ def remove_legacy_metadata_empty_values(self, _name="remove_legacy_metadata_empt
 
 
 def precache_metadata_counts(recache_metadata, self):
-    """Precache the rather large /metadata-counts/ JSON before users start asking for it"""
+    """Precache the rather large /metadata-counts/?[...] JSON before users start asking for it"""
     from glopenapi.api import views
     from glopenapi.api.parser import Context
     for fmt in None, "json":
@@ -98,9 +98,15 @@ def precache_metadata_counts(recache_metadata, self):
         GLOpenAPILogger.info(f"{prefix} rendering + storing with format={fmt}")
         context = SimpleNamespace(
             view="metadata-counts", query={}, unwind=set(), projection={
-                "id.accession": True, "id.assay name": True,
-                "study.factor value": True, "study.parameter value": True,
-                "study.characteristics": True,
+                "id.accession": True,
+                "id.assay name": True,
+                "investigation.study assays.study assay technology type": True,
+                "investigation.study.comment.mission name": True,
+                "investigation.study.comment.project type": True,
+                "investigation.study.study title": True,
+                "study.characteristics.material type": True,
+                "study.characteristics.organism": True,
+                "study.factor value": True,
             },
             data_columns=[], data_comparisons=[], schema="0", debug="0",
             sort_by=["id.accession", "id.assay name"], format=fmt,
@@ -120,7 +126,6 @@ def precache_metadata_counts(recache_metadata, self):
     # 1) that is true for all cached responses (!!),
     # 2) if any accessions are dropped/updated/failed, the /metadata-counts/
     #    response would immediately be invalidated and deleted from the cache,
-    #    and
     # 3) if no accessions are dropped/updated/failed after `recache_metadata`,
     #    the /metadata-counts/ will remain in the cache and be valid.
     # See note in glopenapi.client.GLOpenAPIClient._ensure_cacher_loop_thread()
