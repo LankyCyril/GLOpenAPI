@@ -97,23 +97,24 @@ def precache_metadata_counts(recache_metadata, self):
         prefix = "apply_hack(precache_metadata_counts):\n "
         GLOpenAPILogger.info(f"{prefix} rendering + storing with format={fmt}")
         context = SimpleNamespace(
-            view="metadata-counts", query={}, unwind=set(),
-            projection={"id.accession": True, "id.assay name": True},
+            view="metadata-counts", query={}, unwind=set(), projection={
+                "id.accession": True, "id.assay name": True,
+                "study.factor value": True, "study.parameter value": True,
+                "study.characteristics": True,
+            },
             data_columns=[], data_comparisons=[], schema="0", debug="0",
             sort_by=["id.accession", "id.assay name"], format=fmt,
         )
         context.identity = Context._make_identity(context)
         self.glopenapi_client.renderer._get_response_container_via_cache(
-            context=context,
-            method=views.metadata.get,
-            args=(),
-            kwargs=dict(
+            context=context, method=views.metadata.get, args=(), kwargs=dict(
                 mongo_collections=self.glopenapi_client.mongo_collections,
                 id_fields=["accession", "assay name", "sample name"],
                 condensed=False, unique_counts=True,
                 locale=self.glopenapi_client.locale,
             ),
         )
+        GLOpenAPILogger.info(f"{prefix} completed for format={fmt}")
     # Note that `recache_metadata` happens *after* we precache the counts JSON;
     # while yes, technically, this makes the cached counts lag by one cycle, but
     # 1) that is true for all cached responses (!!),
