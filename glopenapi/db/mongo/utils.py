@@ -153,7 +153,7 @@ def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), p
             full_projection.update(allowed_in_projection)
         else:
             cat_in_full_projection = {
-                k for k in full_projection
+                ".".join(k.split(".")[:2]) for k in full_projection
                 if ((k == cat) or k.startswith(f"{cat}."))
             }
             if not (cat_in_full_projection <= set(allowed_in_projection)):
