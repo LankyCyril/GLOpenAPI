@@ -85,13 +85,10 @@ def harmonize_columns(columns, descriptor, sample_names, best_sample_name_matche
     )
 
 
-def INPLACE_process_dataframe(dataframe, *, mongo_collections, descriptor, best_sample_name_matches):
+def INPLACE_process_dataframe(dataframe, *, all_sample_names, descriptor, best_sample_name_matches):
     """Harmonize index name, column names, reorder sample columns to match all associated sample names in database"""
     if not dataframe.index.name:
         dataframe.index.name = descriptor["file"].get("index_name", "index")
-    all_sample_names = natsorted(match_sample_names_to_file_descriptor(
-        mongo_collections.metadata, descriptor,
-    ))
     if descriptor["file"].get("index_subset") == "sample name":
         if descriptor["file"].get("column_subset") == "sample name":
             msg = "Processing data with both index_subset and column_subset"
@@ -136,10 +133,13 @@ def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, ada
         prefix = identifier_prefix
         identifier = f"{prefix}:{accession}/File/{assay_name}/{filename}"
     if "INPLACE_process" in _kws:
+        all_sample_names = natsorted(match_sample_names_to_file_descriptor(
+            mongo_collections.metadata, descriptor,
+        ))
         _kws = {**_kws, "INPLACE_process": partial(
             INPLACE_process_dataframe, descriptor=descriptor,
             best_sample_name_matches=adapter.best_sample_name_matches,
-            mongo_collections=mongo_collections,
+            all_sample_names=all_sample_names,
         )}
     file = CachedFile(
         name=filename, identifier=identifier,
@@ -147,18 +147,16 @@ def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, ada
         timestamp=descriptor["file"].get("timestamp", -1),
         sqlite_db=sqlite_db, **_kws,
     )
-    data = file.data
-    if isinstance(data, StreamedDataTableWizard):
+    if isinstance(file.data, StreamedDataTableWizard):
         _, harmonized_column_order = harmonize_columns(
-            [c[-1] for c in data.columns],
+            [c[-1] for c in file.data.columns],
             descriptor, natsorted(descriptor["sample name"]),
             adapter.best_sample_name_matches,
         )
-        data.columns = [
-            (accession, assay_name, column)
-            for column in harmonized_column_order
+        file.data.columns = [
+            (accession, assay_name, c) for c in harmonized_column_order
         ]
-    return data
+    return file.data
 
 
 def combine_objects(objects, context, limit=None):
