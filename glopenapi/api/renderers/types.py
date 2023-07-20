@@ -387,7 +387,7 @@ class StreamedAnnotationValueCounts(dict):
         # Note: this is relatively slow, but the result is LRU cached, which makes it fast in the generalized real use case
         leaf = self
         for node in (*keyseq, value):
-            if isinstance(leaf, dict):
+            if isinstance(leaf, dict): # TODO: cheaper to catch AttributeError (on setdefault) because it shouldn't really happen
                 try:
                     leaf = leaf.setdefault(node, _SAVC_PerKeyCounter())
                 except TypeError: # unhashable values nested in `node`

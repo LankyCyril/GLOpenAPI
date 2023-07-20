@@ -1,3 +1,12 @@
+Version 4.0.11-alpha0 (2023-07-20)
+
+- Fixes:
+    - Different MongoDB query validation rules for user-passed and internally-
+      generated queries
+    - Reduce the number of MongoDB requests (sample name lookups) when caching
+      data tables
+
+
 Version 4.0.10-alpha0 (2023-07-05)
 
 - Internal:
