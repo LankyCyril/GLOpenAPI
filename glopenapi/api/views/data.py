@@ -106,6 +106,8 @@ def INPLACE_process_dataframe(dataframe, *, mongo_collections, descriptor, best_
                     row = dataframe.loc[ix]
                     dataframe.drop(index=ix, inplace=True)
                     dataframe.loc[ix] = row
+            if len(dataframe.index) != len(harmonized_index_order):
+                return dict(index=dataframe.index, samples=all_sample_names)
             dataframe.index = harmonized_index_order
     else:
         column_order, harmonized_column_order = harmonize_columns(
@@ -115,7 +117,10 @@ def INPLACE_process_dataframe(dataframe, *, mongo_collections, descriptor, best_
         if not (dataframe.columns == column_order).all():
             for column in column_order: # reorder columns in-place
                 dataframe[column] = dataframe.pop(column)
+        if len(column_order) != len(harmonized_column_order):
+            return dict(columns=dataframe.columns, samples=all_sample_names)
         dataframe.columns = harmonized_column_order
+    return None
 
 
 def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, adapter, identifier_prefix, _kws):

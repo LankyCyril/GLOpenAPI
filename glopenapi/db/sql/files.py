@@ -5,7 +5,7 @@ from urllib.error import URLError
 from glopenapi.common.exceptions import GLOpenAPIDataManagerException
 from sqlite3 import Binary, OperationalError
 from datetime import datetime
-from glopenapi.common.utils import as_is, random_unique_string
+from glopenapi.common.utils import random_unique_string
 from contextlib import contextmanager
 from os import path, remove
 from shutil import copyfileobj
@@ -70,7 +70,7 @@ class CachedBinaryFile(SQLiteBlob):
 class CachedTableFile(SQLiteTable):
     """Represents an SQLiteObject that stores up-to-date file contents as generic table"""
  
-    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=as_is, maxdbsize=None, **pandas_kws):
+    def __init__(self, *, name, identifier, urls, timestamp, sqlite_db, aux_table="AUX:timestamp_table", INPLACE_process=lambda: True, maxdbsize=None, **pandas_kws):
         """Interpret file descriptors; inherit functionality from SQLiteTable; define equality (hashableness) of self"""
         self.name, self.identifier = name, identifier
         self.url, self.urls = None, urls
@@ -143,10 +143,15 @@ class CachedTableFile(SQLiteTable):
                     chunksize=chunksize, **self.pandas_kws,
                 )
                 for i, csv_chunk in enumerate(read_csv(tempfile, **_reader_kw)):
-                    self.INPLACE_process(csv_chunk)
-                    msg = f"interpreted table chunk {i}:\n  {tempfile}"
-                    GLOpenAPILogger.info(f"{self.name}; {msg}")
-                    yield csv_chunk
+                    errdata = self.INPLACE_process(csv_chunk)
+                    if errdata is None:
+                        msg = f"interpreted table chunk {i}:\n  {tempfile}"
+                        GLOpenAPILogger.info(f"{self.name}; {msg}")
+                        yield csv_chunk
+                    else:
+                        msg = "Could not match metadata and data sample names"
+                        _kw = dict(name=self.name, url=self.url, **errdata)
+                        raise GLOpenAPIFileException(msg, **_kw)
             except (IOError, UnicodeDecodeError, CSVError, PandasParserError):
                 msg = "Not recognized as a table file"
                 raise GLOpenAPIFileException(msg, name=self.name, url=self.url)
