@@ -147,16 +147,17 @@ def get_formatted_data(descriptor, mongo_collections, sqlite_db, CachedFile, ada
         timestamp=descriptor["file"].get("timestamp", -1),
         sqlite_db=sqlite_db, **_kws,
     )
-    if isinstance(file.data, StreamedDataTableWizard):
+    data = file.data # property setter works for `data`, but not `file.data`!!!
+    if isinstance(data, StreamedDataTableWizard):
         _, harmonized_column_order = harmonize_columns(
-            [c[-1] for c in file.data.columns],
+            [c[-1] for c in data.columns],
             descriptor, natsorted(descriptor["sample name"]),
             adapter.best_sample_name_matches,
         )
-        file.data.columns = [
+        data.columns = [
             (accession, assay_name, c) for c in harmonized_column_order
         ]
-    return file.data
+    return data
 
 
 def combine_objects(objects, context, limit=None):
