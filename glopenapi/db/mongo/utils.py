@@ -6,6 +6,7 @@ from glopenapi.common.exceptions import GLOpenAPIDatabaseException
 from glopenapi.common.exceptions import GLOpenAPIParserException
 from collections import OrderedDict
 from pymongo import ASCENDING
+from glopenapi.common.types import FuncTee
 
 
 def iterate_mongo_connections(mongo_client):
@@ -141,7 +142,6 @@ def skip_same_file_urls_in_aggregation(cursor):
 
 def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), postprocess=(), verify_projection=True, _logd=GLOpenAPILogger.debug):
     """Run .find() or .aggregate() based on query, projection"""
-    _logd(f"starting aggregate_entries_by_context() for:\n  {context.identity}")
     from glopenapi.db.mongo.index import METADATA_AUX_TEMPLATE
     full_projection = {**context.projection, **{"id."+f: 1 for f in id_fields}}
     no_user_constraints = all(k.startswith("id.") for k in full_projection)
@@ -168,10 +168,9 @@ def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), p
         *postprocess,
     ]
     collation = {"locale": locale, "numericOrdering": True}
-    cursor = collection.aggregate(
-        pipeline, collation=collation, allowDiskUse=True,
+    cursor = FuncTee(
+        collection.aggregate, pipeline, collation=collation, allowDiskUse=True,
     )
-    _logd(f"finished aggregate_entries_by_context() for:\n  {context.identity}")
     return cursor, full_projection
 
 
@@ -195,7 +194,10 @@ def aggregate_file_descriptors_by_context(collection, *, locale, context, unique
             {"$replaceRoot": {"newRoot": "$_id"}},
         ],
     )
-    return skip_same_file_urls_in_aggregation(cursor) if unique_urls else cursor
+    if unique_urls:
+        return FuncTee(skip_same_file_urls_in_aggregation, cursor)
+    else:
+        return cursor
 
 
 def match_sample_names_to_file_descriptor(collection, descriptor):

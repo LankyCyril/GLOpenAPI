@@ -9,7 +9,6 @@ from functools import partial, lru_cache, reduce
 from glopenapi.db.sql.streamed_tables import StreamedDataTableWizard
 from glopenapi.common.exceptions import GLOpenAPIFormatException
 from glopenapi.db.sql.files import CachedTableFile, CachedBinaryFile
-from glopenapi.common.types import PhoenixIterator
 from glopenapi.db.mongo.utils import aggregate_file_descriptors_by_context
 from urllib.request import quote
 from urllib.error import HTTPError
@@ -227,10 +226,10 @@ def combined_data(descriptors, n_descriptors, context, mongo_collections, sqlite
 
 def get(*, mongo_collections, locale, context, sqlite_dbs, adapter):
     """Return data corresponding to search parameters; merged if multiple underlying files are same type and joinable"""
-    descriptors = PhoenixIterator(aggregate_file_descriptors_by_context(
+    descriptors = aggregate_file_descriptors_by_context(
         mongo_collections.metadata, locale=locale, context=context,
         unique_urls=True,
-    ))
+    )
     n_descriptors = 0
     for n_descriptors, d in enumerate(descriptors, 1):
         if ("file" in d) and (not isinstance(d["file"], dict)):

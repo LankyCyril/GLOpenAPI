@@ -241,7 +241,7 @@ class ResponseCache():
             return ResponseContainer(content=None)
         else:
             _logi(f"ResponseCache(), retrieving:\n  {context.identity}")
-            iterator = self._iterdecompress(context.identity) # second pass # TODO PhoenixIterator?
+            iterator = self._iterdecompress(context.identity) # second pass
             mimetype = next(iterator)
             return ResponseContainer(lambda: iterator, mimetype)
  
