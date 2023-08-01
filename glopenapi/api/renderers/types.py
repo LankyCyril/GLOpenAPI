@@ -1,6 +1,5 @@
 from collections import OrderedDict
 from werkzeug.datastructures import ImmutableDict
-from marshal import dumps as marsh
 from itertools import chain, count
 from glopenapi.common.types import ExtNaN, NaN, PhoenixIterator
 from glopenapi.db.sql.utils import SQLTransactions, reraise_operational_error
@@ -12,26 +11,7 @@ from glopenapi.common.utils import iterate_branches_and_leaves
 from glopenapi.common.utils import blazing_json_normalize_itertuples
 
 
-def _SAT_normalize_entry(entry, max_level=2, head=(), add_on="comment", cache=OrderedDict(), join=".".join, marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple):
-    """Quickly iterate flattened dictionary key-value pairs of known schema in pure Python, with LRU caching"""
-    ck = marsh(entry, 4), max_level, head
-    if ck not in cache:
-        if len(cache) >= 65536:
-            cache.popitem(0)
-        if isinstance(entry, dict):
-            if (len(head) <= max_level) or (head[-1] == add_on):
-                cache[ck] = sum((
-                    tuple(_SAT_normalize_entry(v, max_level, head+(k,), add_on))
-                    for k, v in entry.items()
-                ), ())
-            else:
-                cache[ck] = ((join(head), entry.get("", entry)),)
-        else:
-            cache[ck] = ((join(head), entry),)
-    yield from cache[ck]
-
-
-def _SAT_KeyToPosition(*lists):
+def _SAT_KeysToPosition(*lists):
     """An OrderedDict mapping `keys` to integers in range"""
     return OrderedDict(zip(chain(*lists), count()))
 
@@ -146,12 +126,12 @@ class StreamedAnnotationTable(StreamedTable):
         for keys in _keypool:
             for category in _full_category_order:
                 if keys[0] == category:
-                    _key_order[category].add(".".join(keys))
+                    _key_order[category].add(keys)
                     break
-        self._index_key_dispatcher = _SAT_KeyToPosition(
+        self._index_key_dispatcher = _SAT_KeysToPosition(
             sorted(_key_order[self._index_category]),
         )
-        self._column_key_dispatcher = _SAT_KeyToPosition(
+        self._column_key_dispatcher = _SAT_KeysToPosition(
             *(sorted(_key_order[p]) for p in _full_category_order[1:]),
         )
         self.n_index_levels = len(self._index_key_dispatcher)
@@ -159,17 +139,16 @@ class StreamedAnnotationTable(StreamedTable):
  
     def move_index_boundary(self, *, to):
         """Like pandas methods reset_index() and set_index(), but by numeric position"""
-        keys = iter([*self._index_key_dispatcher, *self._column_key_dispatcher])
+        keys = iter((*self._index_key_dispatcher, *self._column_key_dispatcher))
         index_keys = (next(keys) for _ in range(to))
-        self._index_key_dispatcher = _SAT_KeyToPosition(index_keys)
-        self._column_key_dispatcher = _SAT_KeyToPosition(keys)
+        self._index_key_dispatcher = _SAT_KeysToPosition(index_keys)
+        self._column_key_dispatcher = _SAT_KeysToPosition(keys)
         self.shape = (self.shape[0], len(self._column_key_dispatcher))
         self.n_index_levels = len(self._index_key_dispatcher)
  
     def _iter_header_levels(self, dispatcher):
         fields_and_bounds = [
-            (ff, (ff[0] in self._isa_categories) + 1)
-            for ff in (c.split(".") for c in dispatcher)
+            (ff, (ff[0] in self._isa_categories) + 1) for ff in dispatcher
         ]
         yield [".".join(ff[:b]) or "*" for ff, b in fields_and_bounds]
         yield [".".join(ff[b:]) or "*" for ff, b in fields_and_bounds]
@@ -197,9 +176,9 @@ class StreamedAnnotationTable(StreamedTable):
     def _iter_body_levels(self, cursor, dispatcher):
         for entry in cursor:
             level = [self._na_rep] * len(dispatcher)
-            for key, value in _SAT_normalize_entry(entry):
-                if key in dispatcher:
-                    level[dispatcher[key]] = value
+            for keys, value in blazing_json_normalize_itertuples(entry):
+                if keys in dispatcher:
+                    level[dispatcher[keys]] = value
             yield level
  
     @property

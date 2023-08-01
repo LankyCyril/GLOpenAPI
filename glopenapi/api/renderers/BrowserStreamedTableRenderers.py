@@ -138,6 +138,11 @@ def twolevel(obj, context, squash_preheader=False, frozen=0, indent=None):
 
 
 def _get_passed_nlevels(obj):
+    # TODO: format=browser is the only place where move_index_boundary() may NOT
+    #       happen; after adding blazing_json_normalize_itertuples() etc this
+    #       may have broken, but we will have to test it when/if format=browser
+    #       is reinstated in its original form (although it should be reworked
+    #       in its entirety)
     set_of_passed_nlevels = {len(c) for c in getattr(obj, "columns", [[]])}
     if not set_of_passed_nlevels:
         obj.move_index_boundary(to=0)
