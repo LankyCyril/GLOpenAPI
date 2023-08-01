@@ -118,7 +118,7 @@ class StreamedSchema(StreamedTable):
 class StreamedAnnotationTable(StreamedTable):
     """Table streamed from MongoDB cursor or cursor-like iterator"""
     _index_category = "id"
-    _accession_key = "id.accession"
+    _accession_keyseq = ("id", "accession")
     _isa_categories = {"investigation", "study", "assay"}
  
     def __init__(self, *, cursor, full_projection=None, na_rep=NaN, category_order=("investigation", "study", "assay", "file")):
@@ -128,28 +128,29 @@ class StreamedAnnotationTable(StreamedTable):
         _key_pool, _key_lineages = set(), set()
         from tqdm import tqdm # XXX temporary
         for _nrows, entry in tqdm(enumerate(self._cursor, 1), ascii=True): # XXX temporary
-            for keyseq, value in blazing_json_normalize_to_tuples(entry, [], ()):
-                key = ".".join(keyseq)
-                if key == self._accession_key:
+            for keys, value in blazing_json_normalize_to_tuples(entry, [], ()):
+                if keys == self._accession_keyseq:
                     self.accessions.add(value)
-                if key not in _key_pool:
-                    _key_pool.add(key)
-                    while key:
-                        _key_lineages.add(key)
-                        key = ".".join(key.split(".")[:-1])
+                if keys not in _key_pool:
+                    _key_pool.add(keys)
+                    while keys:
+                        _key_lineages.add(keys)
+                        keys = keys[:-1]
         if full_projection:
-            for key, truthy in full_projection.items():
-                if truthy and (key not in _key_lineages):
-                    _key_pool.add(key)
+            for keyseq, truthy in full_projection.items():
+                if truthy:
+                    keys = tuple(keyseq.split("."))
+                    if keys not in _key_lineages:
+                        _key_pool.add(keys)
         _full_category_order = [
             self._index_category,
             *(p for p in category_order if p != self._index_category), "",
         ]
         _key_order = {p: set() for p in _full_category_order}
-        for key in _key_pool:
+        for keys in _key_pool:
             for category in _full_category_order:
-                if key.startswith(category):
-                    _key_order[category].add(key)
+                if keys[0] == category:
+                    _key_order[category].add(".".join(keys))
                     break
         self._index_key_dispatcher = _SAT_KeyToPosition(
             sorted(_key_order[self._index_category]),
