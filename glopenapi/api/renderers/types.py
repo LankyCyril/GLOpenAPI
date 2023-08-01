@@ -8,6 +8,7 @@ from glopenapi.common.exceptions import GLOpenAPIConfigurationException
 from glopenapi.common.exceptions import GLOpenAPIDatabaseException
 from glopenapi.common.exceptions import GLOpenAPILogger
 from glopenapi.common.utils import iterate_branches_and_leaves
+from glopenapi.common.utils import blazing_json_normalize
 
 
 def _SAT_normalize_entry(entry, max_level=2, head=(), add_on="comment", cache=OrderedDict(), join=".".join, marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple):
@@ -127,7 +128,8 @@ class StreamedAnnotationTable(StreamedTable):
         _key_pool, _key_lineages = set(), set()
         from tqdm import tqdm # XXX temporary
         for _nrows, entry in tqdm(enumerate(self._cursor, 1), ascii=True): # XXX temporary
-            for key, value in _SAT_normalize_entry(entry):
+            for *keyseq, value in blazing_json_normalize(entry, [], ()):
+                key = ".".join(keyseq)
                 if key == self._accession_key:
                     self.accessions.add(value)
                 if key not in _key_pool:
