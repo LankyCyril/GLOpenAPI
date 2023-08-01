@@ -139,8 +139,9 @@ def skip_same_file_urls_in_aggregation(cursor):
             yield entry
 
 
-def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), postprocess=(), verify_projection=True):
+def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), postprocess=(), verify_projection=True, _logd=GLOpenAPILogger.debug):
     """Run .find() or .aggregate() based on query, projection"""
+    _logd(f"starting aggregate_entries_by_context() for:\n  {context.identity}")
     from glopenapi.db.mongo.index import METADATA_AUX_TEMPLATE
     full_projection = {**context.projection, **{"id."+f: 1 for f in id_fields}}
     no_user_constraints = all(k.startswith("id.") for k in full_projection)
@@ -170,6 +171,7 @@ def aggregate_entries_by_context(collection, *, locale, context, id_fields=(), p
     cursor = collection.aggregate(
         pipeline, collation=collation, allowDiskUse=True,
     )
+    _logd(f"finished aggregate_entries_by_context() for:\n  {context.identity}")
     return cursor, full_projection
 
 
