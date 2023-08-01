@@ -104,8 +104,8 @@ class StreamedAnnotationTable(StreamedTable):
  
     def __init__(self, *, cursor, full_projection=ImmutableDict(), na_rep=NaN, category_order=("investigation", "study", "assay", "file")):
         """Infer index names and columns adhering to provided category order, retain forked aggregation cursors"""
-        self._cursor, self._na_rep = PhoenixIterator(cursor), na_rep
-        self.accessions, _keypool, _keylineages, _nrows = set(), set(), set(), 0
+        self._cursor, self.accessions = PhoenixIterator(cursor), set()
+        self._na_rep, _nrows, _keypool, _keylineages = na_rep, 0, set(), set()
         for _nrows, entry in enumerate(self._cursor, 1):
             for keys, value in blazing_json_normalize_itertuples(entry):
                 if keys == self._accession_keyseq:
