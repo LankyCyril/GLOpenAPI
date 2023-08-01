@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from werkzeug.datastructures import ImmutableDict
 from marshal import dumps as marsh
 from itertools import chain, count
 from glopenapi.common.types import ExtNaN, NaN, PhoenixIterator
@@ -8,7 +9,7 @@ from glopenapi.common.exceptions import GLOpenAPIConfigurationException
 from glopenapi.common.exceptions import GLOpenAPIDatabaseException
 from glopenapi.common.exceptions import GLOpenAPILogger
 from glopenapi.common.utils import iterate_branches_and_leaves
-from glopenapi.common.utils import blazing_json_normalize_to_tuples
+from glopenapi.common.utils import blazing_json_normalize_itertuples
 
 
 def _SAT_normalize_entry(entry, max_level=2, head=(), add_on="comment", cache=OrderedDict(), join=".".join, marsh=marsh, len=len, isinstance=isinstance, dict=dict, sum=sum, tuple=tuple):
@@ -121,33 +122,29 @@ class StreamedAnnotationTable(StreamedTable):
     _accession_keyseq = ("id", "accession")
     _isa_categories = {"investigation", "study", "assay"}
  
-    def __init__(self, *, cursor, full_projection=None, na_rep=NaN, category_order=("investigation", "study", "assay", "file")):
+    def __init__(self, *, cursor, full_projection=ImmutableDict(), na_rep=NaN, category_order=("investigation", "study", "assay", "file")):
         """Infer index names and columns adhering to provided category order, retain forked aggregation cursors"""
         self._cursor, self._na_rep = PhoenixIterator(cursor), na_rep
-        self.accessions, _nrows = set(), 0
-        _key_pool, _key_lineages = set(), set()
+        self.accessions, _keypool, _keylineages, _nrows = set(), set(), set(), 0
         from tqdm import tqdm # XXX temporary
         for _nrows, entry in tqdm(enumerate(self._cursor, 1), ascii=True): # XXX temporary
-            for keys, value in blazing_json_normalize_to_tuples(entry, ()):
+            for keys, value in blazing_json_normalize_itertuples(entry):
                 if keys == self._accession_keyseq:
                     self.accessions.add(value)
-                if keys not in _key_pool:
-                    _key_pool.add(keys)
+                if keys not in _keypool:
+                    _keypool.add(keys)
                     while keys:
-                        _key_lineages.add(keys)
+                        _keylineages.add(keys)
                         keys = keys[:-1]
-        if full_projection:
-            for keyseq, truthy in full_projection.items():
-                if truthy:
-                    keys = tuple(keyseq.split("."))
-                    if keys not in _key_lineages:
-                        _key_pool.add(keys)
+        for keyseq in (ks for ks, truthy in full_projection.items() if truthy):
+            keys = tuple(keyseq.split("."))
+            (keys not in _keylineages) and _keypool.add(keys)
         _full_category_order = [
             self._index_category,
             *(p for p in category_order if p != self._index_category), "",
         ]
         _key_order = {p: set() for p in _full_category_order}
-        for keys in _key_pool:
+        for keys in _keypool:
             for category in _full_category_order:
                 if keys[0] == category:
                     _key_order[category].add(".".join(keys))

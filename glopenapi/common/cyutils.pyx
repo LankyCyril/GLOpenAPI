@@ -14,13 +14,13 @@ cpdef list blazing_json_normalize(dict source: dict, list sink: list, tuple keys
     return sink
 
 
-def blazing_json_normalize_to_tuples(dict source: dict, tuple keyseq: tuple):
+def blazing_json_normalize_itertuples(dict source, tuple keyseq=()):
     cdef:
         str k
         object v
     for k, v in source.items():
         if isinstance(v, dict):
-            yield from blazing_json_normalize_to_tuples(
+            yield from blazing_json_normalize_itertuples(
                 v, keyseq if (k=="") else keyseq+(k,),
             )
         else:
