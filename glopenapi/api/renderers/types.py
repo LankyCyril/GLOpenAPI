@@ -128,7 +128,7 @@ class StreamedAnnotationTable(StreamedTable):
         _key_pool, _key_lineages = set(), set()
         from tqdm import tqdm # XXX temporary
         for _nrows, entry in tqdm(enumerate(self._cursor, 1), ascii=True): # XXX temporary
-            for keys, value in blazing_json_normalize_to_tuples(entry, [], ()):
+            for keys, value in blazing_json_normalize_to_tuples(entry, ()):
                 if keys == self._accession_keyseq:
                     self.accessions.add(value)
                 if keys not in _key_pool:
