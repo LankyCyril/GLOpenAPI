@@ -23,7 +23,8 @@ CYUTILS_PYX = path.join(path.dirname(__file__), "cyutils.pyx")
 with FileLock(f"{CYUTILS_PYX}.lock"):
     call(["cythonize", "-i", CYUTILS_PYX])
 from glopenapi.common.cyutils import blazing_json_normalize
-assert blazing_json_normalize
+from glopenapi.common.cyutils import blazing_json_normalize_to_tuples
+assert blazing_json_normalize and blazing_json_normalize_to_tuples
 
 PrimitiveTypes = (int, float, bool, str, type(None))
 
