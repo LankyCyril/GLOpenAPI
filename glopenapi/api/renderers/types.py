@@ -125,7 +125,8 @@ class StreamedAnnotationTable(StreamedTable):
         self._cursor, self._na_rep = PhoenixIterator(cursor), na_rep
         self.accessions, _nrows = set(), 0
         _key_pool, _key_lineages = set(), set()
-        for _nrows, entry in enumerate(self._cursor, 1):
+        from tqdm import tqdm # XXX temporary
+        for _nrows, entry in tqdm(enumerate(self._cursor, 1), ascii=True): # XXX temporary
             for key, value in _SAT_normalize_entry(entry):
                 if key == self._accession_key:
                     self.accessions.add(value)
