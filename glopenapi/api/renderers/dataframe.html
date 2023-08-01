@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title>$APPNAME</title>
+        <link rel="stylesheet" href="$URL_ROOT/libs/css/slick-2.4.36.grid.min.css" type="text/css"/>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxygen+Mono&display=swap"/>
+        <link rel="stylesheet" href="$URL_ROOT/css/dataframe.css"/>
+        <script src='$URL_ROOT/libs/js/jquery-3.6.0.slim.min.js'></script>
+        <script src='$URL_ROOT/libs/js/jquery.event.drag-2.3.0.min.js'></script>
+        <script src='$URL_ROOT/libs/js/slick-2.4.36.core.min.js'></script>
+        <script src='$URL_ROOT/libs/js/slick-2.4.36.grid.min.js'></script>
+    </head>
+    <body>
+        <div id="preface">
+            <b>Navigate:</b>
+            (Shift-)click headers to sort.
+            Hover to highlight equal values.
+            <a class="i3e090f718adf" id="crosshair-toggle">Toggle crosshairs</a>.<br>
+            <b>Download:</b> as
+            <a class="i3e090f718adf" href="$CSVLINK">csv</a>,
+            <a class="i3e090f718adf" href="$TSVLINK">tsv</a>,
+            <a class="i3e090f718adf" href="$JSONLINK">json</a
+            >$VIEWDEPENDENTLINKS.
+            <b>Switch view level:</b>
+            <a class="i3e090f718adf" href="$ASSAYSVIEW">assays</a>,
+            <a class="i3e090f718adf" href="$SAMPLESVIEW">samples</a>,
+            <a class="i3e090f718adf" href="$DATAVIEW">data</a>.
+        </div>
+        <div class="i60bea29a6ec6" id="sorting_popup">
+            <div class="ibcb37068d9d0" id="sorting_reload">CUSTOM SORT ORDER<br>&#8635;&nbsp;reload to reset</div>
+            <div class="ibcb37068d9d0" id="sorting_explain">[?]</div>
+        </div>
+        <div id="grid" class="fullpage">
+            <div id="noscript">
+                Loading data in an interactive viewer...<br>
+                The viewer requires JavaScript support.
+                You may access the requested data non-interactively in
+                <a class="i3e090f718adf" href="$CSVLINK">csv</a>,
+                <a class="i3e090f718adf" href="$TSVLINK">tsv</a>, or
+                <a class="i3e090f718adf" href="$JSONLINK">json</a> formats.
+            </div>
+        </div>
+        <div id="crosshair-h" class="crosshair"></div>
+        <div id="crosshair-v" class="crosshair"></div>
+    </body>
+    <script src='$JAVASCRIPT_PATH'></script>
+</html>

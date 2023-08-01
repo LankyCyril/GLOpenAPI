@@ -1,4 +1,20 @@
 #!/bin/bash
-set -eu
-FLASK_ENV=${1-development} FLASK_APP=app.py flask run --extra-files \
-    genefab3/api/renderers/dataframe.html:genefab3/api/views/root.html
+set -e
+
+export FLASK_ENV="${1-development}"
+
+if [ "$2" = "nocache" ]; then
+    echo "Old syntax (nocache) is not supported anymore" >&2
+    exit 1
+fi
+
+if [ "$2" = "NO_CACHER_THREAD" ] || [ "$3" = "NO_CACHER_THREAD" ]; then
+    export NO_CACHER_THREAD=1
+fi
+
+if [ "$2" = "NO_RESPONSE_CACHE" ] || [ "$3" = "NO_RESPONSE_CACHE" ]; then
+    export NO_RESPONSE_CACHE=1
+fi
+
+FLASK_APP=app.py flask run --extra-files \
+    glopenapi/api/renderers/dataframe.html:glopenapi/api/views/root.html

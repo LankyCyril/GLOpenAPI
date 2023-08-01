@@ -1,4 +1,4 @@
-name: genefab3
+name: glopenapi
 channels:
   - defaults
   - conda-forge

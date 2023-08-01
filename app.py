@@ -1,25 +1,48 @@
 #!/usr/bin/env python
+from os import environ
 from flask import Flask
-from genefab3.client import GeneFabClient
-from genefab3_genelab_adapter import GeneLabAdapter
-from genefab3.api.routes import DefaultRoutes
+from glopenapi.client import GLOpenAPIClient
+from glopenapi_genelab_adapter import GeneLabAdapter
+from glopenapi.api.routes import DefaultRoutes
 
 
 # Initialize the Flask app.
 # - Must be defined in the global scope, i.e. right here, even though all we are
-#   doing later is passing `flask_app` to `GeneFabClient` via `flask_params`.
+#   doing later is passing `flask_app` to `GLOpenAPIClient` via `flask_params`.
 #   Defining it in the global scope is meant to accommodate the standard ways of
 #   setting up the server and testing the app, because loaders usually rely on
 #   importing the app variable from this file.
 # - The name of the Flask app will be used in the header of the landing page.
 
 flask_app = Flask("NASA GeneLab Open API")
-__version__ = "3.1.0"
+__version__ = "4.0.11-alpha0"
+
+
+# If MODE is 'nocache' (e.g., `export MODE=nocache` in wrapper, or running in
+# debug mode as FLASK_ENV=development MODE=nocache FLASK_APP=app.py flask run),
+# will disable the continuous MetadataCacherLoop as well as the response_cache
+# SQLite3 database file (see below):
+
+MONGO_DB_NAME = "genefab3"
+SQL_DIR = "./.genefab3.sqlite3"
 GiB = 1024**3
 
+NO_CACHER_THREAD = environ.get("NO_CACHER_THREAD")
+NO_RESPONSE_CACHE = environ.get("NO_RESPONSE_CACHE")
 
-# Initialize the genefab3 client.
-# - `AdapterClass` must be a subclass of `genefab3.common.types.Adapter()`
+
+# By default, GLOpenAPI will try to read data from osdr.nasa.gov; this can
+# be changed by setting the environment variable GENELAB_ROOT, e.g.
+# GENELAB_ROOT=my.awesome.site FLASK_APP=app.py flask run:
+
+if "GENELAB_ROOT" in environ:
+    GENELAB_ROOT = [environ["GENELAB_ROOT"]]
+else:
+    GENELAB_ROOT = "https://osdr.nasa.gov", "https://genelab-data.ndc.nasa.gov"
+
+
+# Initialize the glopenapi client.
+# - `adapter` must be of subclass of `glopenapi.common.types.Adapter()`
 #      and provide the following methods:
 #      - `get_accessions()`: returns an iterable of accession names;
 #      - `get_files_by_accession(accession)`: returns a dictionary of the form
@@ -28,48 +51,46 @@ GiB = 1024**3
 #                 "urls": ["%URL1%", "%URL2%", ...], # first reachable is used
 #             }}
 #         Each entry can have additional optional fields; for more details,
-#         see documentation in genefab3/common/types.py,
-#         or an implementation in genefab3_genelab_adapter/adapter.py.
-# - `RoutesClass` must be a subclass of `genefab3.api.types.Routes()`
+#         see documentation in glopenapi/common/types.py,
+#         or an implementation in glopenapi_genelab_adapter/adapter.py.
+# - `RoutesClass` must be a subclass of `glopenapi.api.types.Routes()`
 #      and associate endpoints with functions that may return objects of various
-#      types understood by `genefab3.api.renderer.CacheableRenderer()`.
-#      See implementation of `DefaultRoutes` in genefab3/api/routes.py,
-#      and `TYPE_RENDERERS` in genefab3/api/renderer.py.
+#      types understood by `glopenapi.api.renderer.CacheableRenderer()`.
+#      See implementation of `DefaultRoutes` in glopenapi/api/routes.py,
+#      and `TYPE_RENDERERS` in glopenapi/api/renderer.py.
 # - `mongo_params`, `sqlite_params`, `metadata_cacher_params`, `flask_params`
-#      are passed as keyword arguments to methods of `GeneFabClient`;
-#      for possible argument names, see genefab3/client.py.
+#      are passed as keyword arguments to methods of `GLOpenAPIClient`;
+#      for possible argument names, see glopenapi/client.py.
 #      - `mongo_params` is passed to `_get_mongo_db_connection()`;
 #      - `sqlite_params` to `_get_validated_sqlite_dbs()`;
 #      - `metadata_cacher_params` to `_ensure_cacher_loop_thread()`
-#         - and then to `genefab3.db.mongo.cacher.MetadataCacherLoop()`;
+#         - and then to `glopenapi.db.mongo.cacher.MetadataCacherLoop()`;
 #      - `flask_params` to `_configure_flask_app()`
 
-genefab3_client = GeneFabClient(
+glopenapi_client = GLOpenAPIClient(
     app_version=__version__,
-    AdapterClass=GeneLabAdapter,
+    adapter=GeneLabAdapter(root_urls=GENELAB_ROOT),
     RoutesClass=DefaultRoutes,
     mongo_params=dict(
-        db_name="genefab3", locale="en_US",
+        db_name=MONGO_DB_NAME, locale="en_US",
         units_formatter="{value} {{{unit}}}".format, # `f(value, unit) -> str`
         client_params={}, # any other `pymongo.MongoClient()` parameters
     ),
-    sqlite_params=dict( # the SQLite databases are LRU if capped by `maxsize`:
-        blobs=dict(
-            db="./.genefab3.sqlite3/blobs.db", maxsize=None, # required;
-                # stores up-to-date ISA data
+    sqlite_params=dict( # the SQLite3 databases are LRU if capped by `maxsize`:
+        blobs=dict( # stores up-to-date ISA data; required:
+            db=f"{SQL_DIR}/blobs.db", maxsize=None,
         ),
-        tables=dict(
-            db="./.genefab3.sqlite3/tables.db", maxsize=48*GiB, # required;
-                # stores cacheable tabular data
+        tables=dict( # stores cacheable tabular data; required:
+            db=f"{SQL_DIR}/tables.db", maxsize=48*GiB,
         ),
-        response_cache=dict(
-            db="./.genefab3.sqlite3/response-cache.db", maxsize=24*GiB,
-                # optional, pass `db=None` to disable; caches displayable
-                # results of user requests until the (meta)data changes
+        response_cache=dict( # optional! pass `db=None` to disable;
+            # caches results of user requests until the (meta)data changes:
+            db=(None if NO_RESPONSE_CACHE else f"{SQL_DIR}/response-cache.db"),
+            maxsize=24*GiB, min_app_version="4.0.9-alpha0",
         ),
     ),
     metadata_cacher_params=dict(
-        enabled=True,
+        enabled=(not NO_CACHER_THREAD),
         dataset_init_interval=3, # seconds between adding datasets that have not
             # been previously cached
         dataset_update_interval=60, # seconds between updating datasets that
@@ -77,13 +98,14 @@ genefab3_client = GeneFabClient(
         full_update_interval=0, # seconds between full update cycles;
             # each update cycle already takes at least
             # `dataset_update_interval * n_datasets_in_local_database` seconds,
-            # and on average the app will only ping the backing cold storage
+            # and so on average the app will only ping the backing cold storage
             # approximately once every `dataset_update_interval` seconds;
             # therefore, the value of `full_update_interval` can be as low as 0,
             # but if you want the cacher to additionally sleep between these
             # cycles, set this value to whatever you like
         full_update_retry_delay=600, # seconds before retrying the full update
             # cycle if the cold storage server was unreachable
+        min_app_version="4.0.9-alpha0",
     ),
     flask_params=dict(
         app=flask_app,

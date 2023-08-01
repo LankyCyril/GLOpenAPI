@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang='en'>
+    <head>
+        <meta charset='utf-8'>
+        <meta http-equiv='X-UA-Compatible' content='IE=edge'/>
+        <meta http-equiv='Content-Type' content='text/html; charset=utf-8'/>
+        <title>$APPNAME</title>
+        <link rel='stylesheet' href='https://fonts.googleapis.com/css2?family=Oxygen+Mono&family=Roboto:wght@300;500&display=swap'/>
+        <link rel='stylesheet' href='$URL_ROOT/css/root.css'/>
+    </head>
+    <script src='$URL_ROOT/libs/js/jquery-3.6.0.slim.min.js'></script>
+    <script src='$URL_ROOT/root.js'></script>
+    <body>
+        <table id='i0ade8efeba2d'>
+            <tr valign='middle'>
+                <td id='i06b7561e6186'>
+                    <img src='$URL_ROOT/images/nasa-logo.svg' id='icc47c41d2ef6'>
+                </td>
+                <td id='i06b7561e6187'>
+                    <span>Open Science for Life in Space</span>
+                <td>
+                </td>
+                <td><b class='header'>$APPNAME</b></td>
+            </tr>
+        </table>
+        <div class='description' id='i2625ecfc0c2b'>
+            API version $APP_VERSION
+            (<a href="$URL_ROOT/changelog">changelog</a>)
+        </div>
+        <h2>Table of contents</h2>
+        <ul id='toc'>
+            <li><a href='#structure'>Structure</a></li>
+            <li><a href='#components'>URL and query components</a><ul>
+                <li><a href='#view'>View level</a></li>
+                <li><a href='#ids'>Retrieval of entries from specific datasets and/or assays</a></li>
+                <li><a href='#categories'>Retrieval of entries with metadata categories</a></li>
+                <li><a href='#fields'>Retrieval of entries with metadata fields</a></li>
+                <li><a href='#fieldvalues'>Retrieval of entries with metadata field values</a></li>
+                <li><a href='#files'>Retrieval of files or data</a></li>
+                <li><a href='#formats'>Display formats</a><ul>
+                    <li>
+                        <a href='#csv'>csv</a> |
+                        <a href='#tsv'>tsv</a> |
+                        <a href='#json'>json</a> |
+                        <!--<a href='#browser'>browser</a> |-->
+                        <a href='#raw'>raw</a> |
+                        <a href='#cls'>cls</a> |
+                        <a href='#gct'>gct</a>
+                    </li>
+                    <li><a href='#schema'>schema</a></li>
+                </ul></li>
+            </ul></li>
+        </ul>
+        <a name='structure' class='beforebuilder'><h2>Structure</h2></a>
+        <div class='description' id='i49ebfdb880a6'>
+            <p>This API provides the means to query the
+            <a target='_blank' href='https://genelab-data.ndc.nasa.gov/genelab/projects'>GeneLab database</a>
+            for annotation and data associated with datasets, assays, and samples hosted by GeneLab,
+            and represents results in a number of <a href='#formats'>formats</a>.</p>
+            <ul>
+                <li>Each queriable metadata <b>entry</b> represents a single sample;</li>
+                <li>a sample belongs to an assay, which in turn belongs to a dataset.</li>
+                <li>Each <b>entry</b> contains nested fields under multiple categories, for example:</li>
+            </ul>
+            <pre id='ice9422903e26'>
+              id &#x21B4;
+                 accession &rarr; GLDS-239
+                 assay name &rarr; mhu2_fskn_transcription_profiling_RNA_Sequencing_(RNA-Seq)
+                 sample name &rarr; Mmus_C57-6J_FSKN_FLT_1G_JC_Rep3_F12
+              study &#x21B4;
+                    factor value &#x21B4;
+                                 altered gravity &rarr; 1G by centrifugation
+                                 diet &rarr; JAXA Chow
+                                 spaceflight &rarr; Space Flight
+                                 ...
+                    characteristics &#x21B4;
+                                    ...
+                    parameter value &#x21B4;
+                                    ...
+              assay &#x21B4;
+                    parameter value &#x21B4;
+                                    read depth &rarr; 67001231 {read}
+                                    read length &rarr; 149 {base pair}
+                                    ...
+                    ...
+              file &#x21B4;
+                   datatype &rarr; normalized counts
+                   filename &rarr; GLDS-239_rna_seq_Normalized_Counts.csv
+            </pre>
+            <ul id=iae483a5f5f5c'>
+                <li>The <code>&quot;id&quot;</code> category always contains fields <code>&quot;accession&quot;</code>,
+                    <code>&quot;assay name&quot;</code>, <code>&quot;sample name&quot;</code>.</li>
+                <li>Categories <code>&quot;investigation&quot;</code>, <code>&quot;study&quot;</code>,
+                    <code>&quot;assay&quot;</code> are organized according to the
+                    <a target='_blank' href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab model</a>,
+                    and subsequently may contain the following fields, each of which may contain further nested subfields:
+                    <pre id='if9fb561e2ec8'>
+                      investigation &#x21B4;
+                                    study &#x21B4;
+                                          ...
+                                    study assays &#x21B4;
+                                                 ...
+                                    investigation &#x21B4;
+                                                  ...
+                      study &#x21B4;
+                            characteristics &#x21B4;
+                                            ...
+                            factor value &#x21B4;
+                                         ...
+                            parameter value &#x21B4;
+                                            ...
+                      assay &#x21B4;
+                            characteristics &#x21B4;
+                                            ...
+                            factor value &#x21B4;
+                                         ...
+                            parameter value &#x21B4;
+                                            ...
+                    </pre>
+                    </li>
+                <li id='ib40b74c60ecf'>The <code>&quot;file&quot;</code> category contains fields
+                    <code>&quot;filename&quot;</code>, <code>&quot;datatype&quot;</code> and represents the information
+                    about the file(s) associated with a given sample.</li>
+            </ul>
+            <p id='i94c463b92a8b'>Names of categories and nested fields can be joined with a period
+                (<code>.</code>) to form queries.<br>
+                Request URLs are formed by combining an arbitrary number of queries, described below.</p>
+        </div>
+        <div id='url-builder' class='interactive' id='i9b85c9d5d64a'>
+            <div id='url-wrapper'>
+                <div id='url-description'>You are here:</div>
+                <div id='url'>$URL_ROOT</div>
+                <div id='url-follow'><a href=''>Follow generated URL</a></div>
+            </div>
+        </div>
+        <div id='noscript'>
+            Additional interactive features on this page require a browser with JavaScript support.<br>
+        </div>
+        <a name='components'><h2>URL and query components</h2></a>
+        <div id='selectors'>
+            <div>
+                <div><a name='view'><b>View level</b></a></div><br>
+                <div class='interactive' id='ib15a60802981'>
+                    <select id='view'>
+                        <option value='' selected></option>
+                        <option value='assays'>/assays/</option>
+                        <option value='samples'>/samples/</option>
+                        <option value='data'>/data/</option>
+                    </select>
+                </div>
+                <div class='description on-newline'>
+                    <p>This part of the URL is required.</p>
+                    <ul>
+                        <li>
+                            The <b>&quot;assays&quot;</b> view generates overview tables;
+                            each column represents a property (such as a factor value), and
+                            each row represents one assay, followed by boolean values (True/False)
+                            denoting whether a property is associated with the assay.
+                            <ul>
+                                <li>The fields <code>id.accession</code> and <code>id.assay name</code> are always included;
+                                <li>There are two levels of column names:
+                                <ul>
+                                    <li>The bottom one is the target nested field;</li>
+                                    <li>
+                                        the top one is the preceding nested fields, joined by a period, e.g.:<br>
+                                        <code>id &rarr; accession</code>, <code>study.characteristics &rarr; age</code>.
+                                    </li>
+                                </ul>
+                                <li>
+                                    This tabular data can be represented in CSV, TSV, JSON, and interactive
+                                    <a href='#formats'>formats</a>.
+                                </li>
+                            </ul>
+                            <img class='example' src='$URL_ROOT/images/assays-example.png'>
+                        </li>
+                        <li>
+                            The <b>&quot;samples&quot;</b> view generates annotation (metadata) tables;
+                            each column represents a property (such as a factor value), and
+                            each row represents one sample, followed by its property values.
+                            <ul>
+                                <li>The output format is analogous to the &quot;assays&quot; view.</li>
+                                <li>
+                                    This tabular data can be represented in CSV, TSV, JSON, and interactive
+                                    <a href='#formats'>formats</a>.
+                                </li>
+                            </ul>
+                            <img class='example' src='$URL_ROOT/images/samples-example.png'>
+                        </li>
+                        <li>
+                            The &quot;data&quot; view outputs data associated with sample(s).
+                            <ul>
+                                <li>
+                                    All tabular <a href='#formats'>formats</a> (CSV, TSV, JSON<!--, browser-->) are supported
+                                    if the underlying data is a table, and contain three levels of column names,
+                                    from top to bottom:
+                                    <ul>
+                                        <li>accession (e.g., <code>GLDS-1</code>);</li>
+                                        <li>assay name (e.g., <code>E-GEOD-53196_GeneChip_assay</code>);</li>
+                                        <li>sample name (e.g., <code>Dmel_OR_wo_FLT_uninfd_Rep1</code>).</li>
+                                    </ul>
+                                    Thus, the header corresponds to the leftmost three columns (index)
+                                    of the &quot;samples&quot; view &ndash; the <code>&quot;id&quot;</code> fields.
+                                </li>
+                                <img class='example' id='i67c645a4ec71' src='$URL_ROOT/images/data-example.png'>
+                                <li>
+                                    Otherwise, if a single non-tabular file matches the query, it can be returned raw
+                                    (see <a href='#formats'>formats</a> below).
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples'><code><b>/samples/</b></code></a>
+                    <i id='i343455d76a96'>(we will build upon this below)</i>.
+                </div>
+            </div>
+            <div>
+                <div><a name='ids'><b>Retrieval of entries from specific <strong>datasets and/or assays</strong></b></a></div><br>
+                <div class='interactive' id='i237c45030082'>
+                    <div id='meta-assay-list' class='list'>
+                        <div class='meta-assay list-item'>
+                            <input type='checkbox'>
+                            <em class='remover'>&amp;</em>
+                            <em class='key included-key'>id=</em>
+                            <select class='key-level level-0'></select>
+                            <em>.</em>
+                            <select class='key-level level-1'></select>
+                        </div>
+                    </div>
+                    <div>
+                        <input type='checkbox' class='always-disabled' disabled>
+                        <a class='meta-assay add'>OR</a>
+                    </div>
+                </div>
+                <div class='description on-newline'>
+                    <p>This part of the URL, as well as all following parts, can be specified any number of times
+                    (including zero times).</p>
+                    <ul>
+                        <li>The search can be constrained to only the samples from
+                        specific datasets (<code>id.accession=ACCESSION</code>) and/or assays
+                        (<code>id.assay name=ASSAY</code>)</li>
+                        <li>As a shorthand, it is also possible to pass a mixed query, where accessions and assay names
+                        are separated by a forward slash, and multiple accessions / assay names are joined by a vertical pipe
+                        (<code>id=ACCESSION_1/ASSAY_1A|ACCESSION_2</code>)</li>
+                    </ul>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?id.accession=GLDS-38'><code>/samples/?<b>id.accession=GLDS-38</b></code></a><br>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?id=GLDS-38/proteomics|GLDS-276'><code>/samples/?<b>id=GLDS-38/proteomics|GLDS-276</b></code></a>
+                </div>
+            </div>
+            <div>
+                <div><a name='categories'><b>Retrieval of entries with metadata <strong>categories</strong></b></a></div><br>
+                <div class='interactive' id='if1d6e5a183d9'>
+                    <div id='meta-wildcard-list' class='list'>
+                        <div class='meta-wildcard list-item'>
+                            <input type='checkbox'>
+                            <em class='remover'>&amp;</em>
+                            <select class='key-level level-0'></select>
+                            <em>.</em>
+                            <select class='key-level level-1'></select>
+                        </div>
+                    </div>
+                    <div>
+                        <input type='checkbox' class='always-disabled' disabled>
+                        <a class='meta-wildcard add'>AND</a>
+                    </div>
+                </div>
+                <div class='description on-newline'>
+                    <p>Information on all values under a given
+                    <a target='_blank' href='https://isa-specs.readthedocs.io/en/latest/'>ISA-Tab</a> category can be retrieved:</p>
+                    <ul>
+                        <li>Querying directly by any of these <b>categories</b> (e.g., <code>assay.parameters</code>)
+                        will constrain the results to only the datasets, assays, and samples that have this category annotated.</li>
+                        <li>Under view levels &quot;assays&quot; and &quot;samples&quot;,
+                        the values of fields in the category will be reported in table columns.</li>
+                    </ul>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor value'><code>/samples/?<b>study.factor value</b></code></a>
+                </div>
+            </div>
+            <div>
+                <div><a name='fields'><b>Retrieval of entries with metadata <strong>fields</strong></b></a></div><br>
+                <div class='interactive' id='i373e00cc29ad'>
+                    <div id='meta-existence-list' class='list'>
+                        <div class='meta-existence list-item'>
+                            <input type='checkbox'>
+                            <em class='remover'>&amp;</em>
+                            <select class='key-level level-nodot level-noescape shortvalue'>
+                                <option value=''></option>
+                                <option value='=' selected>=</option>
+                            </select>
+                            <select class='key-level level-0'></select>
+                            <em>.</em>
+                            <select class='key-level level-1'></select>
+                            <em>.</em>
+                            <div class='or-selects'>
+                                <select class='keyunion-level level-2'></select>
+                            </div>
+                            <a class='meta-existence or'>OR</a>
+                        </div>
+                    </div>
+                    <div>
+                        <input type='checkbox' class='always-disabled' disabled>
+                        <a class='meta-existence add'>AND</a>
+                    </div>
+                </div>
+                <div class='description on-newline'>
+                    <p>Each ISA category contains multiple <b>fields</b>:</p>
+                    <ul>
+                        <li>The logical AND (inclusion of several fields) is achieved by passing them
+                            at the same&nbsp;time&nbsp;(<code>=x.a.b&amp;=y.c.d</code>).</li>
+                        <li>The logical OR of several fields within a <i>single</i> category is achieved by passing
+                            the target fields joined by a vertical&nbsp;pipe&nbsp;(<code>=x.a.b|d</code>).</li>
+                        <li>Under view levels &quot;assays&quot; and &quot;samples&quot;,
+                            the values of any such field will be reported in table columns.</li>
+                        <li>The leading &quot;=&quot;&nbsp;(<code>=x.a.b</code>) effectively queries for existing values
+                            of the field(s), i.e. constrains the results to to only the datasets, assays, and samples
+                            that have this field annotated (with non-<i>NaN</i> values).</li>
+                        <li>Without the leading &quot;=&quot;&nbsp;(<code>x.a.b</code>), the columns may contain
+                            <i>NaN</i> values (i.e., this constrains to the columns, but not to values within
+                            columns).</li>
+                    </ul>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?=study.factor value.spaceflight'><code>/samples/?<b>=study.factor value.spaceflight</b></code></a>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor value.spaceflight'><code>/samples/?<b>study.factor value.spaceflight</b></code></a>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?=study.factor value.radiation dose|absorbed radiation dose'><code>/samples/?<b>=study.factor value.radiation dose|absorbed radiation dose</b></code></a>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor value.radiation dose|absorbed radiation dose'><code>/samples/?<b>study.factor value.radiation dose|absorbed radiation dose</b></code></a>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor value.radiation dose|absorbed radiation dose&=assay.factor value.radiation type'><code>/samples/?<b>study.factor value.radiation dose|absorbed radiation dose&=assay.factor value.radiation type</b></code></a>
+                </div>
+            </div>
+            <div>
+                <div><a name='fieldvalues'><b>Retrieval of entries with metadata field <strong>values</strong></b></a></div><br>
+                <div class='interactive' id='ifbb818b33e58'>
+                    <div id='meta-equals-list' class='list'>
+                        <div class='meta-equals list-item'>
+                            <input type='checkbox'>
+                            <em class='remover'>&amp;</em>
+                            <select class='key-level level-0'></select>
+                            <em>.</em>
+                            <select class='key-level level-1'></select>
+                            <em>.</em>
+                            <select class='key-level level-2'></select>
+                            <em>=</em>
+                            <div class='or-selects'>
+                                <select class='value-level level-3'></select>
+                            </div>
+                            <a class='meta-equals or'>OR</a>
+                        </div>
+                    </div>
+                    <div>
+                        <input type='checkbox' class='always-disabled' disabled>
+                        <a class='meta-equals add'>AND</a>
+                    </div>
+                </div>
+                <div class='description on-newline'>
+                    <p>The search can be constrained to only the samples that are
+                    annotated with specific <b>value(s)</b> of an ISA field.</p>
+                    <ul>
+                        <li>The logical AND of several conditions is achieved by passing them
+                            at the same&nbsp;time&nbsp;(<code>x=a&amp;y=b</code>).</li>
+                        <li>The logical OR for a <i>single</i> condition is achieved by passing
+                            the target values joined by a vertical&nbsp;pipe&nbsp;(<code>x=a|b</code>).</li>
+                        <li>Under view levels &quot;assays&quot; and &quot;samples&quot;,
+                            the values of target field(s) will be reported in table columns.</li>
+                    </ul>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.characteristics.genotype=WT'><code>/samples/?<b>study.characteristics.genotype=WT</b></code></a><br>
+                    <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.characteristics.genotype=WT|TK6'><code>/samples/?<b>study.characteristics.genotype=WT|TK6</b></code></a>
+                </div>
+            </div>
+            <div>
+                <div><a name='files'><b>Retrieval of <strong>files or data</strong></b></a></div><br>
+                <div class='interactive' id='ie8ec0972a32d'>
+                    <div id='meta-file-filename-pseudo-list' class='list'>
+                        <div class='meta-file-filename-pseudo list-item'>
+                            <input type='checkbox'>
+                            <em class='key'>&amp;</em>
+                            <em class='key included-key'>file.filename=</em>
+                            <input class='value-level level-0' value='/.*/' type='text'></input>
+                        </div>
+                    </div>
+                </div>
+                <div class='interactive on-newline' id='i2c78064b9ee8'>
+                    <div id='meta-file-datatype-pseudo-list' class='list'>
+                        <div class='meta-file-datatype-pseudo list-item'>
+                            <input type='checkbox'>
+                            <em class='key'>&amp;</em>
+                            <em class='key included-key'>file.datatype</em>
+                            <select class='key-level level-0' id='i24af8594e8e8'>
+                                <option value='' selected></option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class='interactive on-newline' id='if28fc5f8a006'>
+                    <div id='meta-file-datatype-list' class='list'>
+                        <div class='meta-file-datatype list-item'>
+                            <input type='checkbox'>
+                            <em class='key'>&amp;</em>
+                            <em class='key included-key'>file.datatype=</em>
+                            <div class='or-selects'>
+                                <select class='value-level level-0'></select>
+                            </div>
+                            <a class='meta-datatype or'>OR</a>
+                        </div>
+                    </div>
+                </div>
+                <div class='description on-newline'>
+                    <p>For the resultant queried datasets, assays, and samples, there may be files associated.</b>
+                    <ul>
+                        <li>All files with recognized datatypes can be queried by passing <code>file.datatype</code>.</li>
+                        <li>The query can be constrained to files of particular datatypes
+                        by specifying these datatypes in the query (<code>file.datatype=pca</code>).</li>
+                        <li>Finally, the query can be constrained by specifying a full file name
+                        of interest or a regular expression pattern enclosed in forward slashes.</li>
+                    </ul>
+                    <i>Examples:</i><br>
+                    <a target='_blank' href='$URL_ROOT/samples/?file.datatype'><code>/samples/?<b>file.datatype</b></code></a><br>
+                    <a target='_blank' href='$URL_ROOT/samples/?file.datatype=differential expression'><code>/samples/?<b>file.datatype=differential expression</b></code></a><br>
+                    <a target='_blank' href='$URL_ROOT/samples/?file.datatype=visualization table|pca'><code>/samples/?<b>file.datatype=visualization table|pca</b></code></a><br>
+                    <a target='_blank' href='$URL_ROOT/samples/?file.filename=/trimmed\.fastq\.gz$/'><code>/samples/?<b>file.filename=/trimmed\.fastq\.gz$/</b></code></a>
+                </div>
+            </div>
+            <div>
+                <div><a name='formats'><b>Display formats</b></a></div><br>
+                <div class='interactive' id='i07e10716c55d'>
+                    <div id='meta-format-list' class='list'>
+                        <div class='meta-format list-item'>
+                            <input type='checkbox' checked disabled>
+                            <em class='key'>&amp;</em>
+                            <em class='key included-key'>format=</em>
+                            <select class='value-level level-0'>
+                                <!--<option value='browser' selected>browser</option>-->
+                                <option value='tsv' selected>tsv</option>
+                                <option value='csv'>csv</option>
+                                <option value='json'>json</option>
+                                <option value='cls'>cls</option>
+                                <option value='gct'>gct</option>
+                                <option value='raw'>raw</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class='interactive on-newline' id='i948470d65a41'>
+                    <div id='meta-schema-list' class='list'>
+                        <div class='meta-schema list-item'>
+                            <input type='checkbox'>
+                            <em class='key'>&amp;</em>
+                            <em class='key included-key'>schema=</em>
+                            <select class='value-level level-0' disabled>
+                                <option value='1' selected>1</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class='description on-newline'>
+                    <p>Data returned for the query can be formatted in multiple ways, depending on the output type.<br>
+                       Refer to the table below for a matrix of valid requested formats.</p>
+                    <p>Note that annotation columns only appear in the &quot;assays&quot; and &quot;samples&quot; views,
+                       while files are only sourced from for the &quot;data&quot; view.</p>
+                    <table id='formats-matrix'>
+                        <tr class='th th-upper'>
+                            <td rowspan=2>View<br></td>
+                            <td rowspan=2>Number&nbsp;of<br>annotation&nbsp;columns<br>in&nbsp;output<br></td>
+                            <td rowspan=2>Number&nbsp;of&nbsp;files<br>data&nbsp;is<br>sourced&nbsp;from<br></td>
+                            <td rowspan=2>Resultant<br>output&nbsp;type<br><br></td>
+                            <!--<td colspan=7>--><td colspan=6>&amp;format=</td><td colspan=2>&amp;schema=</td>
+                        </tr>
+                        <tr class='th th-lower'>
+                            <td>csv<sup>*</sup></td><td>tsv</td><td>json</td><!--<td>browser</td>--><td>raw</td>
+                            <td>cls</td><td>gct</td><td>0<sup>*</sup></td><td>1</td>
+                        </tr>
+                        <tr>
+                            <td>/assays/</td><td>1</td><td></td><td>table</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><!--<td class='y'>yes</td>-->
+                            <td class='n'>no</td><td class='y'>yes</td><td class='n'>no</td><td class='y'>yes</td>
+                            <td class='y'>yes</td>
+                        </tr>
+                        <tr>
+                            <td>/assays/</td><td>&gt;1</td><td></td><td>table</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><!--<td class='y'>yes</td>-->
+                            <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><td class='y'>yes</td>
+                            <td class='y'>yes</td>
+                        </tr>
+                        <tr>
+                            <td>/samples/</td><td>1</td><td></td><td>table</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><!--<td class='y'>yes</td>-->
+                            <td class='n'>no</td><td class='y'>yes</td><td class='n'>no</td><td class='y'>yes</td>
+                            <td class='y'>yes</td>
+                        </tr>
+                        <tr>
+                            <td>/samples/</td><td>&gt;1</td><td></td><td>table</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><!--<td class='y'>yes</td>-->
+                            <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><td class='y'>yes</td>
+                            <td class='y'>yes</td>
+                        </tr>
+                        <tr valign='bottom'>
+                            <td>/data/</td><td></td><td>1</td><td>table</td>
+                            <td class='y'>yes</td><td class='y'>yes</td><td class='y'>yes</td><!--<td class='y'>yes</td>-->
+                            <td class='y'>yes</td><td class='n'>no</td><td class='m'>maybe<sup>1</sup></td>
+                            <td class='y'>yes</td><td class='y'>yes</td>
+                        </tr>
+                        <tr valign='bottom'>
+                            <td>/data/</td><td></td><td>&gt;1</td><td>table</td>
+                            <td class='m'>maybe<sup>2</sup></td><td class='m'>maybe<sup>2</sup></td>
+                            <td class='m'>maybe<sup>2</sup></td><!--<td class='m'>maybe<sup>2</sup></td>-->
+                            <td class='n'>no</td><td class='n'>no</td><td class='m'>maybe<sup>1,2</sup></td>
+                            <td class='m'>maybe<sup>2</sup></td><td class='m'>maybe<sup>2</sup></td>
+                        </tr>
+                        <tr>
+                            <td>/data/</td><td></td><td>1</td><td>other</td>
+                            <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><!--<td class='n'>no</td>-->
+                            <td class='y'>yes</td><td class='n'>no</td><td class='n'>no</td><td class='n'>no</td>
+                            <td class='n'>no</td>
+                        </tr>
+                        <tr>
+                            <td>/data/</td><td></td><td>&gt;1</td><td>other</td>
+                            <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><!--<td class='n'>no</td>-->
+                            <td class='n'>no</td><td class='n'>no</td><td class='n'>no</td><td class='n'>no</td>
+                            <td class='n'>no</td>
+                        </tr>
+                    </table>
+                    <span class='footnotes' id='icb8d418b8bc0'>
+                        <sup>*</sup> Default<br>
+                        <sup>1</sup> Only for transcription profiling data<br>
+                        <sup>2</sup> Only for data that can be merged across assays
+                            (currently only unnormalized counts RNA-seq data)
+                    </span>
+                    <ul><li><a name='csv'>Character-separated</a> <a name='tsv'>formats</a>
+                            (<code>&amp;format=csv</code>, <code>&amp;format=tsv</code>):
+                        <ul>
+                            <li>Tabular results can be represented in comma-separated (CSV) or tab-separated (TSV) formats.</li>
+                            <li>Header lines (column names) are preceded with a hash sign (<code>&#x23;</code>):
+                                <ul>
+                                    <li>
+                                        Annotation headers (i.e., for views &quot;assays&quot; and &quot;samples&quot;)
+                                        contain two levels of column names:
+                                        <ul>
+                                            <li>The bottom one is the target nested field</li>
+                                            <li>
+                                                The top one is the preceding nested fields, joined by a period,
+                                                e.g.:<br>
+                                                <code>id &rarr; accession</code>,
+                                                <code>study.characteristics &rarr; age</code>
+                                            </li>
+                                        </ul>
+                                    </li>
+                                    <li>
+                                        Headers of tabular data (for view &quot;data&quot;) contain three levels of
+                                        column names, from top to bottom:
+                                        <ul>
+                                            <li>accession (e.g., <code>GLDS-1</code>);</li>
+                                            <li>assay name (e.g., <code>E-GEOD-53196_GeneChip_assay</code>);</li>
+                                            <li>sample name (e.g., <code>Dmel_OR_wo_FLT_uninfd_Rep1</code>).</li>
+                                        </ul>
+                                        Thus, the header corresponds to the leftmost three columns (index)
+                                        of the &quot;samples&quot; view &ndash; the <code>&quot;id&quot;</code> fields.
+                                    </li>
+                                </ul>
+                            </li>
+                            <li>In all remaining lines,
+                                <ul>
+                                    <li>string values are always quoted with double quotes (<code>&quot;value&quot;</code>),</li>
+                                    <li>numeric and boolean values are never quoted,</li>
+                                    <li>and missing values are always displayed as <code>NaN</code> (unquoted).</li>
+                                </ul>
+                            </li>
+                        </ul>
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&format=tsv'>
+                            <code>/data/?study.characteristics.organism=Homo sapiens&file.datatype=unnormalized counts&<b>format=tsv</b></code></a><br>
+                    </li></ul>
+                    <ul><li><a name='json'>JSON format</a> (<code>&amp;format=json</code>):
+                        <ul>
+                            <li>JSON-formatted output is derived from the tabular output in
+                                <a target='_blank' href='https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_json.html'>split orientation</a>,
+                                placing:
+                                <ul>
+                                    <li>column names under the &quot;columns&quot; key,</li>
+                                    <li>index names under the &quot;index&quot; key,</li>
+                                    <li>cell values under the &quot;data&quot; key,</li>
+                                    <li>and <b>additionally</b> providing the &quot;meta&quot; key with index names.</li>
+                                </ul>
+                            <li>The following are treated as indices:<ul>
+                                <li>The leftmost two columns of the &quot;assays&quot; view
+                                (i.e., the <code>&quot;id&quot;</code> columns);</li>
+                                <li>The leftmost three columns of the &quot;samples&quot; view
+                                (i.e., the <code>&quot;id&quot;</code> columns);</li>
+                                <li>The leftmost column of the &quot;data&quot; view
+                                (e.g., ENSEMBL gene names).</li>
+                            </ul></li>
+                            <li>String values are always quoted in double quotes (<code>&quot;value&quot;</code>),</li>
+                            <li>numeric and boolean values are never quoted,</li>
+                            <li>and missing values are always displayed as <code>NaN</code> (unquoted).</li>
+                        </ul>
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor%20value.spaceflight&id=GLDS-15&format=json'>
+                            <code>/samples/?study.factor value.spaceflight&id=GLDS-15&<b>format=json</b></code></a><br>
+                    </li></ul>
+                    <!--<ul><li><a name='browser'>Browser (interactive) format</a> (<code>&amp;format=browser</code>):
+                        <ul>
+                            <li>Tabular output can be displayed in interactive tables (this requires JavaScript support).</li>
+                            <li>Clicking on a bottom-level column name sorts the table by the values in the column;</li>
+                            <li>clicking on a file name prompts the download of said file;</li>
+                            <li>clicking on any other value subsets the query to that value.</li>
+                        </ul>
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor value.spaceflight&file.datatype&format=browser'>
+                            <code>/samples/?study.factor value.spaceflight&file.datatype&<b>format=browser</b></code></a><br>
+                    </li></ul>-->
+                    <ul><li><a name='raw'>Raw format</a> (<code>&amp;format=raw</code>):
+                        <ul>
+                            <li>Any <b>/data/</b> output (tabular or not) can be requested raw, i.e. exactly as it is stored in the
+                                <a target='_blank' href='https://genelab-data.ndc.nasa.gov/genelab/projects'>GeneLab database</a>.</li>
+                            <li>
+                                Such requests are possible if the query resolves to exactly one underlying file (e.g.
+                                if the request is for a specific file name, or for a single data type from a single assay, etc).</li>
+                        </ul>
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/data/?id=GLDS-4&file.filename=/.*normPCA.png$/&format=raw'>
+                            <code>/data/?id=GLDS-4&file.filename=/.*normPCA.png$/&<b>format=raw</b></code></a>
+                    </li></ul>
+                    <ul><li><a name='cls'>CLS format</a> (<code>&amp;format=cls</code>):
+                        <ul>
+                            <li>Annotation output (from views &quot;assays&quot; and &quot;samples&quot;) can be represented in the
+                                <a target='_blank' href='https://www.genepattern.org/file-formats-guide#CLS'>CLS</a> format
+                                if it contains exactly one non-<code>id</code> column
+                                (e.g., <code>study.factor value.genotype</code>).</li>
+                        </ul>
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/samples/?study.factor%20value.genotype&format=cls'>
+                            <code>/samples/?study.factor value.genotype&<b>format=cls</b></code></a><br>
+                    </li></ul>
+                    <ul><li><a name='gct'>GCT format</a> (<code>&amp;format=gct</code>):
+                        <ul>
+                            <li>Data output (from the &quot;data&quot; view) can be represented in the
+                                <a target='_blank' href='https://www.genepattern.org/file-formats-guide#GCT'>GCT</a> format
+                                if it contains transcriptomics data (i.e., microarrays or RNA-seq counts);</li>
+                            <li>in the output, the <code>id</code> information (accession, assay name, sample name)
+                                is joined with a forward slash&nbsp;(<code>/</code>).
+                        </ul>
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/data/?file.datatype=normalized%20counts&id=GLDS-38&format=gct'>
+                            <code>/data/?file.datatype=normalized counts&id=GLDS-38&<b>format=gct</b></code></a><br>
+                    </li></ul>
+                    <ul><li><a name='schema'>Schema</a> (<code>&amp;schema=1</code>):
+                        <ul>
+                            <li>Rather than retrieving the entire table, a description of tabular data can be requested.</li>
+                            <li>
+                                The output contains the same header as the full table, followed by a single row, where each cell
+                                contains a string of form <code>type[(minimum)..(maximum)|NaN]</code>.
+                                <ul>
+                                    <li>If <code>type</code> is &quot;str&quot;, minima and maxima are omitted;</li>
+                                    <li>if the column does not have any missing values, <code>NaN</code> is omitted.</li>
+                                </ul>
+                            </li>
+                        </ul>
+                        <!--<i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/data/?id=GLDS-4&file.datatype=differential%20expression&format=browser&schema=1'>
+                            <code>/data/?id=GLDS-4&file.datatype=differential%20expression&format=browser&<b>schema=1</b></code></a><br>-->
+                        <i>Example:</i>&nbsp;&nbsp;<a target='_blank' href='$URL_ROOT/data/?id=GLDS-4&file.datatype=differential%20expression&format=tsv&schema=1'>
+                            <code>/data/?id=GLDS-4&file.datatype=differential%20expression&format=tsv&<b>schema=1</b></code></a><br>
+                    </li></ul>
+                </div>
+            </div>
+            <!--DEBUG <div>
+                <div><b>Debug</b></div><br>
+                <div class='interactive' id='i3b6325314f89'>
+                    <div id='meta-debug-list' class='list'>
+                        <div class='meta-debug list-item'>
+                            <input type='checkbox'>
+                            <em class='key'>&amp;</em>
+                            <em class='key included-key'>debug=</em>
+                            <select class='value-level level-0' disabled>
+                                <option value='1' selected>1</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class='description on-newline'>
+                    <p>This option is only available in debug mode (development, testing, staging environments).<br>
+                       Add <code>&debug=1</code> to force the API to return its interpretation of the query.</p>
+                </div>
+            </div> DEBUG-->
+        </div>
+        <div class='footer' id='ic934326f20ae'>
+            API source code on GitHub:
+            <a href='https://github.com/lankycyril/glopenapi'>https://github.com/lankycyril/glopenapi</a> &nbsp;|&nbsp;
+            Kirill Grigorev &nbsp;|&nbsp;
+            <a href='https://masonlab.net'>The Mason Lab</a> &nbsp;|&nbsp;
+            <a href='https://med.cornell.edu'>Weill Cornell Medicine</a>
+        </div>
+        <div class='footer' id='i39941d39a72c'>
+            <table id='ic7b0e1d034f0'><tr>
+                <td>
+                    <img src='https://genelab.nasa.gov/sites/default/files/inline-images/GeneLab_patch.png'>
+                </td>
+                <td>
+                    <b class='h3'>CONTACTS</b><br>
+                    NASA Official: Sylvain Costes<br>
+                    <a href='https://genelab.nasa.gov/help/contact'><b>Questions and Feedback</b></a><br><br>
+                    <b class='h3'>SITE INFORMATION</b><br>
+                    &gt; <a href='https://genelab.nasa.gov/overview'>NASA GeneLab Overview</a><br>
+                    &gt; <a href='https://genelab.nasa.gov/terms'>Terms and Conditions</a><br>
+                    &gt; <a href='https://www.nasa.gov/about/highlights/HP_Privacy.html'>NASA Privacy Policy and Notices</a>
+                </td>
+                <td>
+                    <b class='h3'>OTHER RESOURCES</b><br>
+                    &gt; <a href='https://www.nasa.gov/spacebio'>NASA Space Biology Program</a><br>
+                    &gt; <a href='https://www.nasa.gov/ames/research/space-biosciences/'>NASA Ames Space Biosciences Division</a><br>
+                    &gt; <a href='https://lsda.jsc.nasa.gov/'>NASA Life Sciences Data Archive</a><br>
+                    &gt; <a href='https://psi.nasa.gov/'>NASA Physical Science Informatics</a><br>
+                    &gt; <a href='https://www.issnationallab.org/'>Center for the Advancement of Science in Space</a>
+                </td>
+            </tr></table>
+        </div>
+        <div class='subfooter'>
+            <a href='https://www.nasa.gov/'>NASA</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <a href='http://odeo.hq.nasa.gov/nofear.html'>No Fear Act</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <a href='http://www.nasa.gov/FOIA'>FOIA</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <a href='https://www.usa.gov/'>USA.gov</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <a href='https://get.adobe.com/reader/'>Get Acrobat Reader</a> &nbsp;&nbsp;|&nbsp;&nbsp;
+            <a href='mailto:genelab-outreach@lists.nasa.gov'>Contact</a>
+        </div>
+    </body>
+</html>

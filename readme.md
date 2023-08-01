@@ -1,4 +1,6 @@
-# GeneFab3: NASA GeneLab Open API
+# GLOpenAPI: NASA GeneLab Open API
+
+__(Formerly known as GeneFab3)__
 
 Provides cross-dataset access to multi-omics annotation and data from the
 [GeneLab data repository](https://genelab-data.ndc.nasa.gov/genelab/projects);
@@ -12,7 +14,7 @@ more information.
 
 ## Installation
 
-It is possible, however, to deploy GeneFab3 yourself as well.
+It is possible, however, to deploy GLOpenAPI yourself as well.
 
 
 ### Requirements
@@ -30,9 +32,9 @@ It is possible, however, to deploy GeneFab3 yourself as well.
 * filelock
 
 
-### How the GeneFab3 backend operates
+### How the GLOpenAPI backend operates
 
-In general, GeneFab3:
+In general, GLOpenAPI:
 * Maintains one daemon thread which continuously caches and updates metadata for
   all GeneLab datasets, and stores it in a MongoDB database
   (`db_name="genefab3"` by default):
@@ -40,7 +42,7 @@ In general, GeneFab3:
   * and all publicly available file names and URLs associated with each dataset.
 * Caches data on-demand (i.e., the first time it is requested by a user and then
   any time the source file is updated in the GeneLab repository) in SQLite3
-  databases (which, of course, should be writable by GeneFab3); by default:
+  databases (which, of course, should be writable by GLOpenAPI); by default:
   * `.genefab3.sqlite3/blobs.db` for binary blobs and
   * `.genefab3.sqlite3/tables.db` for tabular data.
 * Caches tabular data *representations* on-demand (for example, JSON-formatted
@@ -70,6 +72,6 @@ JavaScript-capable browsers it also provides an interactive URL builder.
 
 Basic (and very naive) examples of using the API programmatically (e.g., in
 Python) are available in this repository under
-[./examples](https://github.com/LankyCyril/genefab3/tree/master/examples);
+[./examples](https://github.com/LankyCyril/GLOpenAPI/tree/master/examples);
 for instance,
-[heatmap.ipynb](https://github.com/LankyCyril/genefab3/tree/master/examples/heatmap.ipynb).
+[heatmap.ipynb](https://github.com/LankyCyril/GLOpenAPI/tree/master/examples/heatmap.ipynb).
