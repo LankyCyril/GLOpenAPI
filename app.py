@@ -23,8 +23,12 @@ __version__ = "4.0.11-alpha0"
 # will disable the continuous MetadataCacherLoop as well as the response_cache
 # SQLite3 database file (see below):
 
-NOCACHE = (environ.get("MODE") == "nocache")
+MONGO_DB_NAME = "genefab3"
+SQL_DIR = "./.genefab3.sqlite3"
 GiB = 1024**3
+
+NO_CACHER_THREAD = environ.get("NO_CACHER_THREAD")
+NO_RESPONSE_CACHE = environ.get("NO_RESPONSE_CACHE")
 
 
 # By default, GLOpenAPI will try to read data from osdr.nasa.gov; this can
@@ -68,25 +72,25 @@ glopenapi_client = GLOpenAPIClient(
     adapter=GeneLabAdapter(root_urls=GENELAB_ROOT),
     RoutesClass=DefaultRoutes,
     mongo_params=dict(
-        db_name="genefab3", locale="en_US",
+        db_name=MONGO_DB_NAME, locale="en_US",
         units_formatter="{value} {{{unit}}}".format, # `f(value, unit) -> str`
         client_params={}, # any other `pymongo.MongoClient()` parameters
     ),
     sqlite_params=dict( # the SQLite3 databases are LRU if capped by `maxsize`:
         blobs=dict( # stores up-to-date ISA data; required:
-            db="./.genefab3.sqlite3/blobs.db", maxsize=None,
+            db=f"{SQL_DIR}/blobs.db", maxsize=None,
         ),
         tables=dict( # stores cacheable tabular data; required:
-            db="./.genefab3.sqlite3/tables.db", maxsize=48*GiB,
+            db=f"{SQL_DIR}/tables.db", maxsize=48*GiB,
         ),
         response_cache=dict( # optional! pass `db=None` to disable;
             # caches results of user requests until the (meta)data changes:
-            db=(None if NOCACHE else "./.genefab3.sqlite3/response-cache.db"),
+            db=(None if NO_RESPONSE_CACHE else f"{SQL_DIR}/response-cache.db"),
             maxsize=24*GiB, min_app_version="4.0.9-alpha0",
         ),
     ),
     metadata_cacher_params=dict(
-        enabled=(not NOCACHE),
+        enabled=(not NO_CACHER_THREAD),
         dataset_init_interval=3, # seconds between adding datasets that have not
             # been previously cached
         dataset_update_interval=60, # seconds between updating datasets that
