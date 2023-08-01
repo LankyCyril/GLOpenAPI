@@ -126,8 +126,7 @@ class StreamedAnnotationTable(StreamedTable):
         """Infer index names and columns adhering to provided category order, retain forked aggregation cursors"""
         self._cursor, self._na_rep = PhoenixIterator(cursor), na_rep
         self.accessions, _keypool, _keylineages, _nrows = set(), set(), set(), 0
-        from tqdm import tqdm # XXX temporary
-        for _nrows, entry in tqdm(enumerate(self._cursor, 1), ascii=True): # XXX temporary
+        for _nrows, entry in enumerate(self._cursor, 1):
             for keys, value in blazing_json_normalize_itertuples(entry):
                 if keys == self._accession_keyseq:
                     self.accessions.add(value)

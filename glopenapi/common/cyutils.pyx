@@ -8,9 +8,11 @@ cpdef list blazing_json_normalize(dict source: dict, list sink: list, tuple keys
         object v
     for k, v in source.items():
         if isinstance(v, dict):
-            blazing_json_normalize(v, sink, keyseq if (k=="") else keyseq+(k,))
+            blazing_json_normalize(
+                v, sink, keyseq if (k == "") else keyseq+(k,),
+            )
         else:
-            sink.append((keyseq+(v,) if (k=="") else keyseq+(k,v)))
+            sink.append((keyseq+(v,) if (k == "") else keyseq+(k,v)))
     return sink
 
 
@@ -21,7 +23,7 @@ def blazing_json_normalize_itertuples(dict source, tuple keyseq=()):
     for k, v in source.items():
         if isinstance(v, dict):
             yield from blazing_json_normalize_itertuples(
-                v, keyseq if (k=="") else keyseq+(k,),
+                v, keyseq if (k == "") else keyseq+(k,),
             )
         else:
-            yield ((keyseq, v) if (k=="") else (keyseq+(k,), v))
+            yield ((keyseq, v) if (k == "") else (keyseq+(k,), v))
