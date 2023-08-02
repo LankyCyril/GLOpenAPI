@@ -7,7 +7,6 @@ from sqlite3 import OperationalError
 from glopenapi.common.exceptions import GLOpenAPIConfigurationException
 from glopenapi.common.exceptions import GLOpenAPIDatabaseException
 from glopenapi.common.exceptions import GLOpenAPILogger
-from glopenapi.common.utils import iterate_branches_and_leaves
 from glopenapi.common.utils import blazing_json_normalize_itertuples
 
 
@@ -342,14 +341,9 @@ class StreamedAnnotationValueCounts(dict):
     IDMISSING_WARNMSG = "MongoDB 'metadata' document missing id fields"
     GENERIC_ERRMSG = "Sister branches of entry may have conflicting lengths"
  
-    def __init__(self, cursor, *, only_primitive=True):
+    def __init__(self, cursor, *, maxlevel=3):
         self.accessions = set()
-        self.only_primitive = only_primitive
-        _kw = dict(
-            value_key="", descend_past_value_key=False,
-            TargetKeyType=str, TargetValueType=str,
-            only_primitive=only_primitive,
-        )
+        ml = maxlevel
         for entry in cursor:
             try:
                 accession = entry["id"]["accession"]
@@ -358,31 +352,27 @@ class StreamedAnnotationValueCounts(dict):
             except (KeyError, TypeError, IndexError):
                 GLOpenAPILogger.warning(self.IDMISSING_WARNMSG)
             else:
-                for keyseq, value in iterate_branches_and_leaves(entry, **_kw):
-                    self.add(keyseq, value, accession, assay_name, sample_name)
+                for keys, value in blazing_json_normalize_itertuples(entry, ml):
+                    self.add(keys, value, accession, assay_name, sample_name)
                 self.accessions.add(accession)
  
-    def add(self, keyseq, value, accession, assay_name, sample_name):
+    def add(self, keys, value, accession, assay_name, sample_name):
         # Note: this is relatively slow, but the result is LRU cached, which makes it fast in the generalized real use case
         leaf = self
-        for node in (*keyseq, value):
-            if isinstance(leaf, dict): # TODO: cheaper to catch AttributeError (on setdefault) because it shouldn't really happen
-                try:
-                    leaf = leaf.setdefault(node, _SAVC_PerKeyCounter())
-                except TypeError: # unhashable values nested in `node`
-                    if self.only_primitive:
-                        return
-                    else:
-                        leaf = leaf.setdefault(str(node), _SAVC_PerKeyCounter())
-            else:
+        for node in (*keys, value):
+            try:
+                leaf = leaf.setdefault(node, _SAVC_PerKeyCounter())
+            except TypeError: # unhashable values nested in `node`
+                return
+            except AttributeError: # shouldn't really happen
                 raise GLOpenAPIDatabaseException(
-                    self.GENERIC_ERRMSG, keyseq=keyseq, accession=accession,
+                    self.GENERIC_ERRMSG, keys=keys, accession=accession,
                     assay_name=assay_name, sample_name=sample_name,
                 )
             try:
                 leaf.count(accession, assay_name, sample_name)
             except TypeError: # one of the identifiers is unhashable
                 raise GLOpenAPIDatabaseException(
-                    self.GENERIC_ERRMSG, keyseq=keyseq, accession=accession,
+                    self.GENERIC_ERRMSG, keys=keys, accession=accession,
                     assay_name=assay_name, sample_name=sample_name,
                 )

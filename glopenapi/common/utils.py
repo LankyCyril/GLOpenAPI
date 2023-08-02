@@ -22,9 +22,9 @@ from threading import Thread
 CYUTILS_PYX = path.join(path.dirname(__file__), "cyutils.pyx")
 with FileLock(f"{CYUTILS_PYX}.lock"):
     call(["cythonize", "-i", CYUTILS_PYX])
-from glopenapi.common.cyutils import blazing_json_normalize
+from glopenapi.common.cyutils import blazing_json_normalize_tolist
 from glopenapi.common.cyutils import blazing_json_normalize_itertuples
-assert blazing_json_normalize and blazing_json_normalize_itertuples
+assert blazing_json_normalize_tolist and blazing_json_normalize_itertuples
 
 PrimitiveTypes = (int, float, bool, str, type(None))
 
@@ -90,29 +90,6 @@ def iterate_terminal_leaf_elements(d, iter_leaves=iterate_terminal_leaves, isins
     for value in iter_leaves(d):
         if isinstance(value, str):
             yield from pattern.split(value)
-
-
-def iterate_branches_and_leaves(d, keyseq=(), value_key="", descend_past_value_key=False, step_tracker=1, max_steps=256, TargetKeyType=str, TargetValueType=str, isinstance=isinstance, dict=dict, PrimitiveTypes=PrimitiveTypes, only_primitive=True):
-    """Iterate (keyseq, terminal_value) of nested document; converts keys and values to TargetKeyType/TargetValueType"""
-    if step_tracker >= max_steps:
-        msg = "Document branch exceeds nestedness threshold"
-        raise GLOpenAPIConfigurationException(msg, max_steps=max_steps)
-    elif isinstance(d, dict):
-        if value_key in d:
-            yield keyseq, TargetValueType(d[""])
-        if descend_past_value_key or (value_key not in d):
-            for key, value in items_except(d, ""):
-                yield from iterate_branches_and_leaves(
-                    value, (*keyseq, TargetKeyType(key)), value_key,
-                    descend_past_value_key=descend_past_value_key,
-                    step_tracker=step_tracker+1, max_steps=max_steps,
-                    TargetKeyType=TargetKeyType,
-                    TargetValueType=TargetValueType,
-                    PrimitiveTypes=PrimitiveTypes,
-                    only_primitive=only_primitive,
-                )
-    elif (not only_primitive) or isinstance(d, PrimitiveTypes):
-        yield keyseq, TargetValueType(d)
 
 
 def flatten_all_keys(d, *, sep=".", head=()):

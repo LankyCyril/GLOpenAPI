@@ -2,28 +2,31 @@
 cimport cython
 
 
-cpdef list blazing_json_normalize(dict source: dict, list sink: list, tuple keyseq: tuple):
+def blazing_json_normalize_itertuples(dict source, int maxlevel=128, tuple keys=()):
     cdef:
         str k
         object v
     for k, v in source.items():
         if isinstance(v, dict):
-            blazing_json_normalize(
-                v, sink, keyseq if (k == "") else keyseq+(k,),
+            if len(keys) < maxlevel:
+                yield from blazing_json_normalize_itertuples(
+                    v, maxlevel, keys if (k == "") else keys+(k,),
+                )
+            else:
+                break
+        else:
+            yield ((keys, v) if (k == "") else (keys+(k,), v))
+
+
+cpdef list blazing_json_normalize_tolist(dict source: dict, list sink: list, tuple keys: tuple):
+    cdef:
+        str k
+        object v
+    for k, v in source.items():
+        if isinstance(v, dict):
+            blazing_json_normalize_tolist(
+                v, sink, keys if (k == "") else keys+(k,),
             )
         else:
-            sink.append((keyseq+(v,) if (k == "") else keyseq+(k,v)))
+            sink.append((keys+(v,) if (k == "") else keys+(k,v)))
     return sink
-
-
-def blazing_json_normalize_itertuples(dict source, tuple keyseq=()):
-    cdef:
-        str k
-        object v
-    for k, v in source.items():
-        if isinstance(v, dict):
-            yield from blazing_json_normalize_itertuples(
-                v, keyseq if (k == "") else keyseq+(k,),
-            )
-        else:
-            yield ((keyseq, v) if (k == "") else (keyseq+(k,), v))
