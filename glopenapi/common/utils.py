@@ -1,3 +1,6 @@
+from os import path
+from subprocess import call
+from filelock import FileLock
 from numpy import generic as NumpyGenericType, base_repr
 from datetime import datetime
 from copy import deepcopy
@@ -15,6 +18,13 @@ from urllib.error import URLError
 from glopenapi.common.exceptions import GLOpenAPIConfigurationException
 from threading import Thread
 
+
+CYUTILS_PYX = path.join(path.dirname(__file__), "cyutils.pyx")
+with FileLock(f"{CYUTILS_PYX}.lock"):
+    call(["cythonize", "-i", CYUTILS_PYX])
+from glopenapi.common.cyutils import blazing_json_normalize
+from glopenapi.common.cyutils import blazing_json_normalize_itertuples
+assert blazing_json_normalize and blazing_json_normalize_itertuples
 
 PrimitiveTypes = (int, float, bool, str, type(None))
 

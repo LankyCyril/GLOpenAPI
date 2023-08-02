@@ -1,6 +1,6 @@
-from itertools import tee
-from collections.abc import Callable
+from glopenapi.common.exceptions import GLOpenAPILogger
 from glopenapi.common.exceptions import GLOpenAPIConfigurationException
+from collections.abc import Callable
 
 
 class ExtNaN(float):
@@ -15,16 +15,18 @@ class ExtNaN(float):
 NaN = ExtNaN()
 
 
-class PhoenixIterator():
-    """Iterator factory, returns a teed copy of original iterator when asked to iterate"""
-    def __init__(self, it):
-        self.it = it
+class FuncTee():
+    """Used similar to `itertools.tee()`, but re-runs the generating function instead of keeping yielded elements in memory"""
+    def __init__(self, func, *args, **kwargs):
+        self.func, self.args, self.kwargs = func, args, kwargs
+        self.n_invocations = 0
     def __iter__(self):
-        self.it, _it = tee(self.it)
-        return _it
-    def __next__(self):
-        for entry in self:
-            return entry
+        self.n_invocations += 1
+        desc = f"invocation no. {self.n_invocations}: {self.func!r}"
+        GLOpenAPILogger.debug(f"Starting {desc}")
+        result = self.func(*self.args, **self.kwargs)
+        GLOpenAPILogger.debug(f"Finished {desc}")
+        return result
 
 
 class Adapter():
