@@ -1,7 +1,8 @@
+from glopenapi.common.exceptions import GLOpenAPILogger
+from glopenapi.common.exceptions import GLOpenAPIConfigurationException
 from functools import wraps
 from flask import Response
 from collections.abc import Callable
-from glopenapi.common.exceptions import GLOpenAPIConfigurationException
 
 
 class Routes():
@@ -15,6 +16,7 @@ class Routes():
         def outer(method):
             @wraps(method)
             def inner(*args, **kwargs):
+                GLOpenAPILogger.debug(method)
                 return method(*args, **kwargs)
             if endpoint:
                 inner.endpoint = endpoint
