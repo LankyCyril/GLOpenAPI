@@ -2,9 +2,11 @@ var url_root = "$URL_ROOT";
 var prefill_example = false;
 
 var metadata = {
-    "wildcard": $METADATA_WILDCARDS,
-    "existence": $METADATA_EXISTENCE,
-    "equals": $METADATA_EQUALS,
+    // "wildcard": $METADATA_WILDCARDS,
+    // "existence": $METADATA_EXISTENCE,
+    // "equals": $METADATA_EQUALS,
+    // TODO: this whole system is outdated - we will use /metadata-counts/
+    //       in the near future
     "assay": $METADATA_ASSAYS,
     "file-datatype": $METADATA_DATATYPES,
 };
@@ -180,8 +182,10 @@ function decorate_url(url) {
 }
 
 var TARGETS = [
-    "wildcard", "existence", "equals", "assay",
-    "file-filename-pseudo", "file-datatype-pseudo", "file-datatype",
+    // "wildcard", "existence", "equals",
+    // TODO: this whole system is outdated - we will use /metadata-counts/
+    //       in the near future
+    "assay", "file-filename-pseudo", "file-datatype-pseudo", "file-datatype",
     "format", "schema", "debug",
 ];
 

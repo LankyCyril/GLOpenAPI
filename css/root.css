@@ -121,3 +121,9 @@ table#formats-matrix sup, .footnotes sup {font-size: 8pt !important}
 #ic934326f20ae {margin-top: 24pt; padding: 5pt}
 #i39941d39a72c {margin-top: 12pt; height: 2.5in; max-height: 2.5in}
 #ic7b0e1d034f0 {width: 95%}
+
+.temporarily-disabled {
+    margin-top: 7pt; padding: 5pt;
+    border: 1px solid #D43; background: #DDD; color: #333; opacity: .7;
+    font-style: italic;
+}
