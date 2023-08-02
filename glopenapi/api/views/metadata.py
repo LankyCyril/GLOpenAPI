@@ -5,7 +5,7 @@ from pymongo.errors import OperationFailure as MongoOperationError
 from glopenapi.common.exceptions import GLOpenAPIDatabaseException
 from glopenapi.api.renderers.types import StreamedAnnotationValueCounts
 from glopenapi.api.renderers.types import StreamedAnnotationTable
-from glopenapi.common.types import NaN
+from glopenapi.common.types import FuncTee, NaN
 
 
 def squash(cursor):
@@ -66,7 +66,7 @@ def get(*, mongo_collections, locale, context, id_fields, condensed=False, uniqu
         return StreamedAnnotationValueCounts(cursor)
     else:
         annotation = StreamedAnnotationTable(
-            cursor=squash(cursor) if condensed else cursor,
+            cursor=FuncTee(squash, cursor) if condensed else cursor,
             full_projection=full_projection, # TODO: exclude sample, study name from /assays/
             na_rep=False if condensed else NaN,
         )

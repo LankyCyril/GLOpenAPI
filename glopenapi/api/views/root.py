@@ -9,6 +9,9 @@ from glopenapi.api.renderers.types import StreamedString
 
 def get_metadata_equals_json(mongo_collections):
     """Generate JSON for documentation section 'meta-equals'"""
+    return {}
+    # TODO: this whole system is outdated - we will use /metadata-counts/
+    #       in the near future
     equals_json = defaultdict(dict)
     for entry in mongo_collections.metadata_aux.find():
         equals_json[entry["isa_category"]][entry["subkey"]] = {
@@ -71,18 +74,20 @@ def get(*, glopenapi_client, mongo_collections, context):
         template_file = Path(__file__).parent / "root.html"
         default_format = "html"
     elif context.view == "root.js":
-        equals_json = get_metadata_equals_json(mongo_collections)
-        existence_json = get_metadata_existence_json(equals_json)
-        wildcards = get_metadata_wildcards(existence_json)
+        # equals_json = get_metadata_equals_json(mongo_collections)
+        # existence_json = get_metadata_existence_json(equals_json)
+        # wildcards = get_metadata_wildcards(existence_json)
+        # TODO: this whole system is outdated - we will use /metadata-counts/
+        #       in the near future
         metadata_assays = get_metadata_assays(mongo_collections)
         metadata_datatypes = get_metadata_datatypes(mongo_collections)
         dumps_as_is = lambda j: dumps(j, separators=(",", ":"))
         dumps_sorted = lambda j: dumps(j, separators=(",", ":"), sort_keys=True)
         replacements = {
             **replacements,
-            "$METADATA_WILDCARDS": dumps_sorted(wildcards),
-            "$METADATA_EXISTENCE": dumps_sorted(existence_json),
-            "$METADATA_EQUALS": dumps_sorted(equals_json),
+            # "$METADATA_WILDCARDS": dumps_sorted(wildcards),
+            # "$METADATA_EXISTENCE": dumps_sorted(existence_json),
+            # "$METADATA_EQUALS": dumps_sorted(equals_json),
             "$METADATA_ASSAYS": dumps_as_is(metadata_assays),
             "$METADATA_DATATYPES": dumps_sorted(metadata_datatypes),
         }

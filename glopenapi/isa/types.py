@@ -123,15 +123,14 @@ class Sample(dict):
                 matching_study_sample_names=matching_study_sample_names,
             )
  
-    def _INPLACE_extend_with_dataset_files(self, check_isa_elements=False):
+    def _INPLACE_extend_with_dataset_files(self, check_isa_elements=True):
         """Populate with File annotation for files that match records for the sample"""
         if check_isa_elements:
-            isa_elements = set.union(set(), *(
-                set(v.split(",")) for v in iterate_terminal_leaf_elements(self)
-            ))
+            isa_elements = set(iterate_terminal_leaf_elements(self))
         else:
             isa_elements = type("", (set,), {"__contains__": lambda *_: True})()
         def _log(msg, _id=self.dataset.accession):
+            _id = "/".join((self.accession, self.assay_name, self.sample_name))
             GLOpenAPILogger.debug(f"Files for {_id}: {msg}")
         def _format_file_entries(_sdf=self.dataset.files):
             _log("Processing entries")

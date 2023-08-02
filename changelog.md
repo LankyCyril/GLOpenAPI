@@ -1,3 +1,35 @@
+Version 4.1.0-alpha0 (2023-08-01)
+
+- Performance improvements:
+    - Use Cython to speed up normalization of MongoDB documents with known
+      schema:
+        - improves the performance of /metadata-counts/ endpoints
+        - improves the performance of /samples/ endpoints
+    - Implement `FuncTee()` in lieu of `itertools.tee()` to significantly reduce
+      RAM usage at the expense of re-running the underlying generating function
+- Fixes:
+    - Reinstate check_isa_elements=True and fix the ISA parser to split
+      file lists correctly; fixes wrong extraneous files being assigned to
+      samples (e.g. FASTQs of Sample A assigned both to Sample A and Sample B
+      within the same study)
+    - Enumerate all bottom-level leaves in /metadata-counts/ branches
+- Internal:
+    - The debug launcher accepts parameters to control the activity of the
+      cacher thread and of the response cache separately
+    - More logging in development/debug mode
+- Temporarily disabled:
+    - Interactive widgets on the landing page that rely on outdated and
+      performance-intensive database transactions; relevant syntax examples are
+      retained on the landing page
+    - Corresponding background functionality that used to update auxiliary
+      MongoDB collections and waste CPU cycles
+    NOTE: These are disabled pending backend redesign and performance
+      improvements.
+    NOTE: This is not a breaking change as all the API functionality is intact;
+      however, the landing page loses some level of interactivity with little to
+      no detriment to the presentation of the capabilities of the query syntax.
+
+
 Version 4.0.11-alpha0 (2023-07-20)
 
 - Fixes:

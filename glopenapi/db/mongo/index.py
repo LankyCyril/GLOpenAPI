@@ -101,6 +101,11 @@ def INPLACE_update_metadata_value_lookup_values(index, mongo_collections):
 
 def update_metadata_value_lookup(mongo_collections, cacher_id, keys=("investigation", "study", "assay")):
     """Collect existing keys and values for lookups"""
+    mf = "{}:\n  NOT reindexing metadata lookup records (disabled {})".format
+    GLOpenAPILogger.warning(mf(cacher_id, "pending performance improvements"))
+    return
+    # TODO: this whole system is outdated - we will use /metadata-counts/
+    #       in the near future
     mf = "{}:\n  reindexing metadata lookup records ('{}')".format
     GLOpenAPILogger.info(mf(cacher_id, mongo_collections.metadata_aux.name))
     index = deepcopy_keys(METADATA_AUX_TEMPLATE, *keys)
