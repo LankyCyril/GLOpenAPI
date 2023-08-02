@@ -1,4 +1,3 @@
-from tqdm import tqdm
 from collections import OrderedDict
 from werkzeug.datastructures import ImmutableDict
 from itertools import chain, count
@@ -107,7 +106,7 @@ class StreamedAnnotationTable(StreamedTable):
         """Infer index names and columns adhering to provided category order, retain forked aggregation cursors"""
         self._cursor, self.accessions = cursor, set()
         self._na_rep, _nrows, _keypool, _keylineages = na_rep, 0, set(), set()
-        for _nrows, entry in tqdm(enumerate(self._cursor, 1), ascii=True):
+        for _nrows, entry in enumerate(self._cursor, 1):
             for keys, value in blazing_json_normalize_itertuples(entry):
                 if keys == self._accession_keyseq:
                     self.accessions.add(value)
