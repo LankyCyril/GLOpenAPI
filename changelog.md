@@ -1,3 +1,10 @@
+Version 4.1.0-alpha1 (2023-08-02)
+
+- Internal:
+    - Use `pyximport` machinery instead of calling `cythonize` to build
+      cython submodules on the fly
+
+
 Version 4.1.0-alpha0 (2023-08-01)
 
 - Performance improvements:
