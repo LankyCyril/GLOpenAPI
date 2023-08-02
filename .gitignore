@@ -10,6 +10,7 @@ tests.py
 .genefab3.sqlite*
 examples/.ipynb_checkpoints
 tests/aux.py
-glopenapi/common/cyutils.c
-glopenapi/common/cyutils.cpython-36m-x86_64-linux-gnu.so
 glopenapi/common/cyutils.pyx.lock
+cyutils.c
+cyutils.cpython*.so
+cyutils.o
