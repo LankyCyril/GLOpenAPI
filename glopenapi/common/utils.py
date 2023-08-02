@@ -85,7 +85,7 @@ def iterate_terminal_leaves(d, step_tracker=1, max_steps=256, isinstance=isinsta
         yield d
 
 
-def iterate_terminal_leaf_elements(d, iter_leaves=iterate_terminal_leaves, isinstance=isinstance, str=str, pattern=compile(r'\s*,\s')):
+def iterate_terminal_leaf_elements(d, iter_leaves=iterate_terminal_leaves, isinstance=isinstance, str=str, pattern=compile(r'\s*,\s*')):
     """Get terminal leaf of document and iterate filenames stored in leaf"""
     for value in iter_leaves(d):
         if isinstance(value, str):
