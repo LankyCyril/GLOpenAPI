@@ -8,6 +8,7 @@ from glopenapi.common.exceptions import GLOpenAPIConfigurationException
 from glopenapi.common.exceptions import GLOpenAPIDatabaseException
 from glopenapi.common.exceptions import GLOpenAPILogger
 from glopenapi.common.utils import blazing_json_normalize_itertuples
+from glopenapi.common.utils import blazing_json_normalize_iterbranches
 
 
 def _SAT_KeysToPosition(*lists):
@@ -343,7 +344,6 @@ class StreamedAnnotationValueCounts(dict):
  
     def __init__(self, cursor, *, maxlevel=3):
         self.accessions = set()
-        ml = maxlevel
         for entry in cursor:
             try:
                 accession = entry["id"]["accession"]
@@ -352,27 +352,28 @@ class StreamedAnnotationValueCounts(dict):
             except (KeyError, TypeError, IndexError):
                 GLOpenAPILogger.warning(self.IDMISSING_WARNMSG)
             else:
-                for keys, value in blazing_json_normalize_itertuples(entry, ml):
-                    self.add(keys, value, accession, assay_name, sample_name)
+                _it = blazing_json_normalize_iterbranches(entry, maxlevel)
+                for branch in _it:
+                    self.add(branch, accession, assay_name, sample_name)
                 self.accessions.add(accession)
  
-    def add(self, keys, value, accession, assay_name, sample_name):
+    def add(self, branch, accession, assay_name, sample_name):
         # Note: this is relatively slow, but the result is LRU cached, which makes it fast in the generalized real use case
         leaf = self
-        for node in (*keys, value):
+        for node in branch:
             try:
                 leaf = leaf.setdefault(node, _SAVC_PerKeyCounter())
             except TypeError: # unhashable values nested in `node`
                 return
             except AttributeError: # shouldn't really happen
                 raise GLOpenAPIDatabaseException(
-                    self.GENERIC_ERRMSG, keys=keys, accession=accession,
+                    self.GENERIC_ERRMSG, branch=branch, accession=accession,
                     assay_name=assay_name, sample_name=sample_name,
                 )
             try:
                 leaf.count(accession, assay_name, sample_name)
             except TypeError: # one of the identifiers is unhashable
                 raise GLOpenAPIDatabaseException(
-                    self.GENERIC_ERRMSG, keys=keys, accession=accession,
+                    self.GENERIC_ERRMSG, branch=branch, accession=accession,
                     assay_name=assay_name, sample_name=sample_name,
                 )
