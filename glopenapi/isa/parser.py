@@ -1,5 +1,5 @@
 from glopenapi.common.utils import copy_except
-from glopenapi.common.exceptions import GLOpenAPIISAException
+from glopenapi.common.exceptions import GLOpenAPIISAException, GLOpenAPILogger
 from re import search, sub
 from collections import defaultdict
 from glopenapi.common.exceptions import GLOpenAPIConfigurationException
@@ -113,6 +113,7 @@ class StudyEntries(list):
  
     def __init__(self, raw_tabs, status_kwargs):
         """Convert tables to nested JSONs"""
+        self._duplicates_buffered = defaultdict(list)
         if self._self_identifier == "Study":
             self._by_sample_name = {}
         else: # lookup in classes like AssayEntries would be ambiguous
@@ -171,7 +172,7 @@ class StudyEntries(list):
             else:
                 if field == "Protocol REF":
                     protocol_ref = value
-                elif self._is_not_qualifier(field): # top-level field
+                elif not self._is_qualifier(field): # top-level field
                     if not subfield: # e.g. "Source Name"
                         qualifiable = self._INPLACE_add_toplevel_field(
                             json, field, value, protocol_ref,
@@ -191,6 +192,7 @@ class StudyEntries(list):
                             qualifiable, field, subfield, value,
                             status_kwargs={**status_kwargs, "name": name},
                         )
+        self._merge_duplicates_into_row(into=json, status_kwargs=status_kwargs)
         return json
  
     def _parse_field(self, column):
@@ -206,11 +208,11 @@ class StudyEntries(list):
         else:
             return None, None, None
  
-    def _is_not_qualifier(self, field):
+    def _is_qualifier(self, field):
         """Check if `column` is none of 'Term Accession Number', 'Unit', 'Comment', any '.* REF'"""
         return (
-            (field not in {"Term Accession Number", "Unit", "Comment"}) and
-            (not field.endswith(" REF"))
+            (field in {"Term Accession Number", "Unit", "Comment"}) or
+            field.endswith(" REF")
         )
  
     def _INPLACE_add_toplevel_field(self, json, field, value, protocol_ref):
@@ -228,15 +230,14 @@ class StudyEntries(list):
         if field not in json:
             json[field] = {}
         if subfield in json[field]:
-            m = "Duplicate field[subfield]"
-            _k = copy_except(status_kwargs, "collection")
-            raise GLOpenAPIISAException(m, field=field, subfield=subfield, **_k)
+            qualifiable = {"": value}
+            self._duplicates_buffered[(field, subfield)].append(qualifiable)
         else: # make {"Characteristics": {"Age": {"": "36"}}}
             json[field][subfield] = {"": value}
             qualifiable = json[field][subfield]
-            if field == "Parameter Value":
-                qualifiable["Protocol REF"] = protocol_ref
-            return qualifiable
+        if field == "Parameter Value":
+            qualifiable["Protocol REF"] = protocol_ref
+        return qualifiable
  
     def _INPLACE_qualify(self, qualifiable, field, subfield, value, status_kwargs):
         """Add qualifier to field at pointer (qualifiable)"""
@@ -252,6 +253,58 @@ class StudyEntries(list):
                     qualifier=field, tab=self._self_identifier,
                 )
             qualifiable[field] = value
+ 
+    def _merge_duplicates_into_row(self, into, status_kwargs, _MUST_BE_IDENTICAL={"", "Unit", "Term Accession Number", "Term Source REF"}):
+        """If any potential duplicates were found, assert they're actual duplicates and may be merged (Protocol REF is allowed to differ and will be combined)"""
+        _errkw = copy_except(status_kwargs, "collection")
+        def _panic(field, subfield, **_kw):
+            msg = f"Duplicate {field}[{subfield}], failed to resolve conflict"
+            raise GLOpenAPIISAException(msg, **_kw, **_errkw)
+        for (field, subfield), qq in self._duplicates_buffered.items():
+            for dup_q in qq:
+                orig_q = into.get(field, {}).get(subfield)
+                if orig_q is not None:
+                    for k in set(orig_q) | set(dup_q):
+                        ov, dv = orig_q.get(k), dup_q.get(k)
+                        ov_isdict = isinstance(ov, dict)
+                        dv_isdict = isinstance(dv, dict)
+                        if (dv is not None) and (ov != dv):
+                            if k in _MUST_BE_IDENTICAL:
+                                raise GLOpenAPIISAException(
+                                    f"Duplicate {field}[{subfield}], conflict",
+                                    value1=ov, value2=dv, **_errkw,
+                                )
+                            elif ov is None:
+                                if field not in into:
+                                    into[field] = {}
+                                if subfield not in into[field]:
+                                    into[field][subfield] = {}
+                                into[field][subfield][k] = dv
+                            elif (k == "Comment") and ov_isdict and dv_isdict:
+                                if not (isnull(ov[""]) and isnull(dv[""])):
+                                    _panic(field, subfield)
+                                for sk, sv in dv.items():
+                                    if sk in ov:
+                                        try:
+                                            ov[sk] += f", {sv}"
+                                        except Exception as e:
+                                            _panic(field, subfield, err=str(e))
+                                    else:
+                                        ov[sk] = sv
+                            elif k == "Protocol REF":
+                                try:
+                                    into[field][subfield][k] += f", {dv}"
+                                except Exception as e:
+                                    _panic(field, subfield, err=str(e))
+                            else:
+                                _panic(field, subfield)
+                else: # shouldn't ever happen, only duplicates here...
+                    _panic(field, subfield)
+            GLOpenAPILogger.warning((
+                f"{status_kwargs.get('accession', 'OSD-?')}: Duplicate "
+                f"{field}[{subfield}], merged as best as we could"
+            ))
+        self._duplicates_buffered.clear()
 
 
 class AssayEntries(StudyEntries):

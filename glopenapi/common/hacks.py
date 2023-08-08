@@ -4,8 +4,7 @@ from glopenapi.common.types import NaN
 from glopenapi.api.renderers.types import StreamedDataTable
 from sqlite3 import OperationalError
 from glopenapi.common.exceptions import GLOpenAPIDatabaseException
-from pandas import DataFrame
-from pandas import concat, Index
+from pandas import DataFrame, concat, Index
 from glopenapi.common.exceptions import GLOpenAPIFormatException
 from glopenapi.common.exceptions import GLOpenAPILogger
 from collections import OrderedDict
