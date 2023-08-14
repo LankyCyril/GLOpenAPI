@@ -1,3 +1,9 @@
+Version 4.1.1-alpha0 (2023-08-14)
+
+- Hotfix:
+    - For datasets with RSEM and STAR unnormalized counts, pick RSEM by default
+
+
 Version 4.1.0-alpha1 (2023-08-02)
 
 - Internal:
