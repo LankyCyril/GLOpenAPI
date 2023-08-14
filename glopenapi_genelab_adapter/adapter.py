@@ -51,7 +51,7 @@ KNOWN_DATATYPES = {
     r'^GLDS-[0-9]+_rna.seq(_all-samples)?_Normalized_Counts\.csv$':
         tabletype("normalized counts",
             column_subset="sample name", gct_valid=True),
-    r'^GLDS-[0-9]+_rna.seq(_all-samples)?_Unnormalized_Counts\.csv$':
+    r'^GLDS-[0-9]+_rna.seq(_RSEM)?(_all-samples)?(_RSEM)?_Unnormalized_Counts\.csv$':
         tabletype("unnormalized counts", joinable=True,
             column_subset="sample name", gct_valid=True),
     r'^GLDS-[0-9]+_(array|rna.seq)(_all-samples)?_differential_expression\.csv$':
