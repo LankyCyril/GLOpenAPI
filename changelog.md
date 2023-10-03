@@ -1,3 +1,15 @@
+Version 4.1.2-alpha0 (2023-10-03)
+
+- Fix:
+    - New logic that matches Assay entries to Study entries: if unable to guess
+      the matching sample name, check if there's only a single Study file in the
+      ISA Zip (actually, currently this is always the case), and use that
+      information instead.
+      Old logic (guessing the best sample name match) is retained to be future-
+      proof in case ISA Zips with multiple Study entries are added to the
+      repository later.
+
+
 Version 4.1.1-alpha0 (2023-08-14)
 
 - Hotfix:
