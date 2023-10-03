@@ -6,6 +6,7 @@ from glopenapi.common.hacks import apply_hack, convert_legacy_metadata_pre
 from glopenapi.common.hacks import convert_legacy_metadata_post
 from glopenapi.common.hacks import precache_metadata_counts
 from glopenapi.common.hacks import TEMP_force_recache_datasets_with_RSEM
+from glopenapi.common.hacks import TEMP_force_recache_datasets_with_missing_investigation_study
 from glopenapi.db.mongo.index import update_metadata_value_lookup
 from glopenapi.db.mongo.utils import iterate_mongo_connections
 from glopenapi.db.mongo.types import ValueCheckedRecord
@@ -95,6 +96,7 @@ class MetadataCacherLoop():
     @apply_hack(precache_metadata_counts)
     @apply_hack(convert_legacy_metadata_pre)
     @apply_hack(TEMP_force_recache_datasets_with_RSEM)
+    @apply_hack(TEMP_force_recache_datasets_with_missing_investigation_study)
     def recache_metadata(self):
         """Instantiate each available dataset; if contents changed, dataset automatically updates db.metadata"""
         self._drop_database_if_app_version_is_stale()

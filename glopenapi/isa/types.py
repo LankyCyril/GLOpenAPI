@@ -100,28 +100,38 @@ class Sample(dict):
  
     def _INPLACE_extend_with_study_metadata(self):
         """Populate with Study tab annotation for entries matching current Sample Name"""
+        _by_sample_name = self.dataset.isa.studies._by_sample_name
         matching_study_sample_names = set(
-            self.dataset.best_sample_name_matches(
-                self.name, self.dataset.isa.studies._by_sample_name,
-            )
+            self.dataset.best_sample_name_matches(self.name, _by_sample_name)
         )
-        if len(matching_study_sample_names) == 1:
-            study_entry = self.dataset.isa.studies._by_sample_name[
-                matching_study_sample_names.pop()
-            ]
-            self["Id"]["Study Name"] = self._get_subkey_value(
-                study_entry, "Id", "Study Name",
-            )
-            self["Study"] = deepcopy_except(study_entry, "Id")
-            self["Investigation"]["Study"] = (
-                self.dataset.isa.investigation["Study"].get(self.study_name, {})
-            )
-        elif len(matching_study_sample_names) > 1:
+        if len(matching_study_sample_names) > 1:
             raise GLOpenAPIISAException(
                 "Multiple Study 'Sample Name' entries match Assay entry",
                 accession=self.dataset.accession, assay_sample_name=self.name,
                 matching_study_sample_names=matching_study_sample_names,
             )
+        elif len(matching_study_sample_names) == 0: # fall back if single study
+            study_names, study_entry = set(), None
+            for entry in _by_sample_name.values():
+                study_name = entry.get("Id", {}).get("Study Name")
+                if study_name is not None:
+                    study_entry = entry
+                    study_names.add(study_name)
+            if (len(study_names) != 1) or (study_entry is None):
+                raise GLOpenAPIISAException(
+                    "Could not match Assay entry to a single study",
+                    accession=self.dataset.accession,
+                    assay_sample_name=self.name, study_names=study_names,
+                )
+        else: # matched to Study entry, get actual info from there
+            study_entry = _by_sample_name[matching_study_sample_names.pop()]
+        self["Id"]["Study Name"] = self._get_subkey_value(
+            study_entry, "Id", "Study Name",
+        )
+        self["Study"] = deepcopy_except(study_entry, "Id")
+        self["Investigation"]["Study"] = (
+            self.dataset.isa.investigation["Study"].get(self.study_name, {})
+        )
  
     def _INPLACE_extend_with_dataset_files(self, check_isa_elements=True):
         """Populate with File annotation for files that match records for the sample"""
