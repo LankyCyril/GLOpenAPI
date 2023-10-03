@@ -321,27 +321,31 @@ def TEMP_force_recache_datasets_with_RSEM(recache_metadata, self):
     _name = "TEMP_force_recache_datasets_with_RSEM"
     BREAKPOINT_TS = 1692048434
     blobs_db = self.DatasetConstructor.keywords["sqlite_dbs"].blobs["db"]
-    with connect(blobs_db, isolation_level=None) as conn:
-        for acc in 502, 508, 510:
-            conn.execute("BEGIN")
-            oacc, gacc = f"OSD-{acc}", f"GLDS-{acc}"
-            blob_name = f"BLOB:{oacc}/ISA/{oacc}_metadata_{gacc}-ISA.zip"
-            tss = conn.execute(f"""
-                SELECT `retrieved_at` FROM `BLOBS:blobs`
-                WHERE `identifier` = "{blob_name}"
-                AND `retrieved_at` < {BREAKPOINT_TS}
-            """)
-            if min((float("inf"), *(row[0] for row in tss))) < BREAKPOINT_TS:
-                prefix = f"apply_hack({_name}) on {oacc}:\n "
-                conn.execute(f"""
-                    DELETE FROM `BLOBS:blobs` WHERE `identifier` = "{blob_name}"
+    try:
+        with connect(blobs_db, isolation_level=None) as conn:
+            for acc in 502, 508, 510:
+                conn.execute("BEGIN")
+                oacc, gacc = f"OSD-{acc}", f"GLDS-{acc}"
+                blob_name = f"BLOB:{oacc}/ISA/{oacc}_metadata_{gacc}-ISA.zip"
+                tss = conn.execute(f"""
+                    SELECT `retrieved_at` FROM `BLOBS:blobs`
+                    WHERE `identifier` = "{blob_name}"
+                    AND `retrieved_at` < {BREAKPOINT_TS}
                 """)
-                GLOpenAPILogger.info(f"{prefix} dropped ISA blob")
-                self.mongo_collections.metadata.delete_many(
-                    {"id.accession": oacc},
-                )
-                GLOpenAPILogger.info(f"{prefix} dropped MongoDB entries")
-            conn.execute("COMMIT")
+                if min((float("inf"), *(r[0] for r in tss))) < BREAKPOINT_TS:
+                    prefix = f"apply_hack({_name}) on {oacc}:\n "
+                    conn.execute(f"""
+                        DELETE FROM `BLOBS:blobs`
+                        WHERE `identifier` = "{blob_name}"
+                    """)
+                    GLOpenAPILogger.info(f"{prefix} dropped ISA blob")
+                    self.mongo_collections.metadata.delete_many(
+                        {"id.accession": oacc},
+                    )
+                    GLOpenAPILogger.info(f"{prefix} dropped MongoDB entries")
+                conn.execute("COMMIT")
+    except OperationalError: # blobs_db doesn't exist yet
+        pass
     return recache_metadata(self)
 
 
