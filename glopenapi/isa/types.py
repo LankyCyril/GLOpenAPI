@@ -98,17 +98,27 @@ class Sample(dict):
             )
         )
  
+    def _get_matching_names(self):
+        """Try to match by 'Sample Name' in Study entry; fall back to 'Source Name'"""
+        study_entries = self.dataset.isa.studies._by_sample_name
+        matching_study_sample_names = set(
+            self.dataset.best_sample_name_matches(self.name, study_entries)
+        )
+        if matching_study_sample_names:
+            return matching_study_sample_names, study_entries
+        else:
+            study_entries = self.dataset.isa.studies._by_source_name
+            matching_study_source_names = set(
+                self.dataset.best_sample_name_matches(self.name, study_entries)
+            )
+            return matching_study_source_names, study_entries
+ 
     def _INPLACE_extend_with_study_metadata(self):
         """Populate with Study tab annotation for entries matching current Sample Name"""
-        matching_study_sample_names = set(
-            self.dataset.best_sample_name_matches(
-                self.name, self.dataset.isa.studies._by_sample_name,
-            )
-        )
-        if len(matching_study_sample_names) == 1:
-            study_entry = self.dataset.isa.studies._by_sample_name[
-                matching_study_sample_names.pop()
-            ]
+        matching_names, study_entries = self._get_matching_names()
+        print("MATCHES:", self.name, matching_names)
+        if len(matching_names) == 1:
+            study_entry = study_entries[matching_names.pop()]
             self["Id"]["Study Name"] = self._get_subkey_value(
                 study_entry, "Id", "Study Name",
             )
@@ -116,11 +126,11 @@ class Sample(dict):
             self["Investigation"]["Study"] = (
                 self.dataset.isa.investigation["Study"].get(self.study_name, {})
             )
-        elif len(matching_study_sample_names) > 1:
+        elif len(matching_names) > 1:
             raise GLOpenAPIISAException(
                 "Multiple Study 'Sample Name' entries match Assay entry",
                 accession=self.dataset.accession, assay_sample_name=self.name,
-                matching_study_sample_names=matching_study_sample_names,
+                matching_names=matching_names,
             )
  
     def _INPLACE_extend_with_dataset_files(self, check_isa_elements=True):

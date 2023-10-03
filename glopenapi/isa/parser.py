@@ -1,7 +1,7 @@
 from glopenapi.common.utils import copy_except
 from glopenapi.common.exceptions import GLOpenAPIISAException
 from re import search, sub
-from collections import defaultdict
+from glopenapi.common.types import Dummy
 from glopenapi.common.exceptions import GLOpenAPIConfigurationException
 from numpy import nan
 from pandas import isnull, read_csv, Series
@@ -114,9 +114,10 @@ class StudyEntries(list):
     def __init__(self, raw_tabs, status_kwargs):
         """Convert tables to nested JSONs"""
         if self._self_identifier == "Study":
-            self._by_sample_name = {}
+            self._by_sample_name, self._by_source_name = {}, {}
         else: # lookup in classes like AssayEntries would be ambiguous
-            self._by_sample_name = defaultdict(self._abort_lookup)
+            msg = f"Lookup by name not allowed for type {type(self).__name__}"
+            self._by_sample_name, self._by_source_name = Dummy(msg), Dummy(msg)
         for name, raw_tab in raw_tabs.items():
             for _, row in raw_tab.iterrows():
                 if "Sample Name" not in row:
@@ -124,15 +125,15 @@ class StudyEntries(list):
                     _kw = copy_except(status_kwargs, "collection")
                     raise GLOpenAPIISAException(msg, **_kw)
                 else:
-                    sample_name = row["Sample Name"]
-                if isinstance(sample_name, Series):
-                    if len(set(sample_name)) > 1:
-                        _m = "entry has multiple 'Sample Name' values"
-                        msg = f"{self._self_identifier} {_m}"
-                        _kw = copy_except(status_kwargs, "collection")
-                        raise GLOpenAPIISAException(msg, **_kw)
-                    else:
-                        sample_name = sample_name.iloc[0]
+                    sample_names = self._get_values(row, "Sample Name")
+                    source_names = self._get_values(row, "Source Name")
+                if len(sample_names) > 1:
+                    _m = "entry has multiple 'Sample Name' values"
+                    msg = f"{self._self_identifier} {_m}"
+                    _kw = copy_except(status_kwargs, "collection")
+                    raise GLOpenAPIISAException(msg, **_kw)
+                else:
+                    sample_name = sample_names.pop()
                 if not isnull(sample_name):
                     _kw = {**status_kwargs, "sample_name": sample_name}
                     json = self._row_to_json(row, name, _kw)
@@ -145,16 +146,28 @@ class StudyEntries(list):
                             raise GLOpenAPIISAException(msg, **_kkw)
                         else:
                             self._by_sample_name[sample_name] = json
+                            for source_name in source_names:
+                                if not isnull(source_name):
+                                    self._by_source_name[source_name] = json
                 else:
                     update_status(
                         **status_kwargs, status="warning",
                         warning="Null 'Sample Name'", tab=self._self_identifier,
                     )
  
-    def _abort_lookup(self):
-        """Prevents ambiguous lookup through `self._by_sample_name` in inherited classes"""
-        msg = "Unique lookup by sample name not allowed for type"
-        raise GLOpenAPIConfigurationException(msg, type=type(self).__name__)
+    def _get_values(self, row, field):
+        try:
+            value = row[field]
+        except KeyError:
+            return {float("nan")}
+        else:
+            if isinstance(value, Series):
+                if len(value) == 0:
+                    return {float("nan")}
+                else:
+                    return set(value)
+            else:
+                return {value}
  
     def _row_to_json(self, row, name, status_kwargs):
         """Convert single row of table to nested JSON"""

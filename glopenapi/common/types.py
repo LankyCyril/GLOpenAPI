@@ -15,6 +15,15 @@ class ExtNaN(float):
 NaN = ExtNaN()
 
 
+class Dummy():
+    def __init__(self, msg):
+        self._msg = msg
+    def __getattr__(self, a):
+        raise GLOpenAPIConfigurationException(self._msg)
+    def __iter__(self, a):
+        raise GLOpenAPIConfigurationException(self._msg)
+
+
 class FuncTee():
     """Used similar to `itertools.tee()`, but re-runs the generating function instead of keeping yielded elements in memory"""
     def __init__(self, func, *args, **kwargs):
