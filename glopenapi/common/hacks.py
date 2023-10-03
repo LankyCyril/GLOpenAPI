@@ -345,6 +345,24 @@ def TEMP_force_recache_datasets_with_RSEM(recache_metadata, self):
     return recache_metadata(self)
 
 
+def TEMP_force_recache_datasets_with_missing_investigation_study(recache_metadata, self):
+    """Drop datasets that got cached without Investigation->Study because they couldn't get a match with best_sample_name_matches, but can be matched to a unique one"""
+    _name = "TEMP_force_recache_datasets_with_missing_investigation_study"
+    collection = self.mongo_collections.metadata
+    with collection.database.client.start_session() as session:
+        with session.start_transaction():
+            accessions = {
+                e["id"]["accession"] for e in collection.find(
+                    {"investigation.study": {"$exists": False}},
+                    {"id.accession": True},
+                )
+            }
+            for acc in accessions:
+                GLOpenAPILogger.info(f"apply_hack({_name}) on {acc}")
+                self.drop_single_dataset_metadata(acc)
+    return recache_metadata(self)
+
+
 class NoCommitConnection():
     """Wrapper for sqlite3 connection that forcefully prevents commits (for pandas.to_sql)"""
     def __init__(self, connection):
